@@ -1,0 +1,88 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Room {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  description         String?
+  baseRateModifier    Float    @default(1.0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  beds                Bed[]
+  submissions        GuestSubmission[]
+}
+
+model Bed {
+  id                  String   @id @default(uuid())
+  roomId              Int
+  bedType             String   // "king" | "queen" | "twin" | "bunk"
+  nightlyRate         Float?   // Optional: can be calculated on-the-fly
+  capacity            Int      @default(1)
+  isAvailable         Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  room                Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  submissions        GuestSubmission[]
+  
+  @@index([roomId])
+  @@index([isAvailable])
+}
+
+model GuestSubmission {
+  id                  String   @id @default(uuid())
+  name                String
+  email               String
+  roomId              Int
+  bedId               String
+  checkInDate         DateTime
+  checkOutDate        DateTime
+  nights              Int
+  calculatedPrice     Float
+  submittedAt         DateTime @default(now())
+  
+  room                Room     @relation(fields: [roomId], references: [id])
+  bed                 Bed      @relation(fields: [bedId], references: [id])
+  
+  @@index([email])
+  @@index([roomId])
+  @@index([bedId])
+  @@index([submittedAt])
+}
+
+model EmailLog {
+  id                  String   @id @default(uuid())
+  to                  String
+  templateKey         String
+  templateId          String?
+  payloadJson         String?  // Redacted/partial payload
+  status              String   // "sent" | "failed" | "pending"
+  error               String?
+  createdAt           DateTime @default(now())
+  
+  @@index([to])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AdminUser {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  passwordHash        String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([email])
+}
+
