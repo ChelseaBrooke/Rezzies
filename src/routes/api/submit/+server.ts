@@ -4,7 +4,8 @@ import { requireInternalApiKey } from '$lib/server/api-protection.js';
 import { guestSubmissionSchema, createErrorResponse, createSuccessResponse } from '$lib/server/validation.js';
 import { prisma } from '$lib/server/prisma.js';
 import { calculateGuestPrice } from '$lib/server/pricing.js';
-import { sendTemplateEmail, TEMPLATE_KEYS } from '$lib/server/email/sendgrid.js';
+import { sendTemplateEmail } from '$lib/server/email/sendgrid.js';
+import { TEMPLATE_KEYS } from '$lib/server/email/templates.js';
 
 export const POST: RequestHandler = async (event) => {
 	// Verify API key

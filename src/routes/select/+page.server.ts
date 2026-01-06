@@ -4,7 +4,8 @@ import { prisma } from '$lib/server/prisma.js';
 import { getAllBedsWithPricing, getBedsByRoomId } from '$lib/server/pricing.js';
 import { guestSubmissionSchema } from '$lib/server/validation.js';
 import { calculateGuestPrice } from '$lib/server/pricing.js';
-import { sendTemplateEmail, TEMPLATE_KEYS } from '$lib/server/email/sendgrid.js';
+import { sendTemplateEmail } from '$lib/server/email/sendgrid.js';
+import { TEMPLATE_KEYS } from '$lib/server/email/templates.js';
 
 export const load: PageServerLoad = async () => {
 	// Get all rooms with their beds
