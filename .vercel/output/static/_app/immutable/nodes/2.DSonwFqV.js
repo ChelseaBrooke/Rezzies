@@ -1,1 +1,0 @@
-import{c as o,l as p}from"../chunks/CKfOPH6b.js";import{p as c,c as m,f as d,a as i,b as l,d as u,s as v,F as f}from"../chunks/2Hr-knV9.js";e[f]="node_modules/@sveltejs/kit/src/runtime/components/svelte-5/layout.svelte";function e(s,t){o(new.target),c(t,!0,e);var r={...p()},a=m(),n=d(a);return i(()=>v(n,()=>t.children),"render",e,5,0),l(s,a),u(r)}export{e as component};

@@ -10,6 +10,7 @@ coverage/
 build/
 dist/
 .svelte-kit/
+.vercel/
 
 # Misc
 .DS_Store
