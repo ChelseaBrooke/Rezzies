@@ -2,6 +2,30 @@
 	import { goto } from '$app/navigation';
 	
 	let selectedOption = $state<'scratch' | 'autofill' | null>(null);
+	let listingUrl = $state('');
+	let isAutofilling = $state(false);
+	let autofillError = $state<string | null>(null);
+	
+	async function handleAutofill() {
+		if (!listingUrl.trim()) {
+			autofillError = 'Please enter a listing URL';
+			return;
+		}
+
+		isAutofilling = true;
+		autofillError = null;
+
+		try {
+			// Store the URL and redirect to loading page
+			sessionStorage.setItem('autofillUrl', listingUrl);
+			goto('/admin/trips/new?autofill=true');
+		} catch (error) {
+			autofillError = 'Failed to start autofill. Please try again.';
+			console.error('Autofill error:', error);
+		} finally {
+			isAutofilling = false;
+		}
+	}
 </script>
 
 <div class="host-page">
@@ -34,32 +58,56 @@
 		</div>
 
 		{#if selectedOption === 'autofill'}
-			<div class="info-box card">
-				<h4>📋 How Autofill Works</h4>
-				<p>Simply paste your VRBO or Airbnb listing URL, and we'll automatically extract:</p>
-				<ul>
-					<li>Property name and photos</li>
-					<li>Maximum number of guests</li>
-					<li>Check-in and check-out dates (if in URL)</li>
-					<li>Total price with taxes (if available)</li>
-				</ul>
-				<p class="note">
-					<strong>Tip:</strong> For best results, select your dates and number of guests on the listing page before copying the URL.
+			<div class="autofill-section card">
+				<h4>🔗 Paste Your Listing URL</h4>
+				<p class="instructions">
+					Paste your VRBO or Airbnb listing URL below. For best results, select your dates and number of guests on the listing page before copying the URL.
 				</p>
+				
+				<div class="url-input-group">
+					<input
+						type="url"
+						placeholder="https://www.vrbo.com/123456 or https://www.airbnb.com/rooms/123456"
+						bind:value={listingUrl}
+						class="url-input"
+						disabled={isAutofilling}
+						onkeydown={(e) => {
+							if (e.key === 'Enter' && listingUrl.trim()) {
+								handleAutofill();
+							}
+						}}
+					/>
+					<button
+						class="btn btn-primary btn-large"
+						onclick={handleAutofill}
+						disabled={isAutofilling || !listingUrl.trim()}
+					>
+						{isAutofilling ? 'Processing...' : 'Autofill'}
+					</button>
+				</div>
+
+				{#if autofillError}
+					<p class="error-message">{autofillError}</p>
+				{/if}
+
+				<div class="info-box">
+					<h5>What we'll extract:</h5>
+					<ul>
+						<li>Property name and photos</li>
+						<li>Maximum number of guests</li>
+						<li>Check-in and check-out dates (if in URL)</li>
+						<li>Total price with taxes (if available)</li>
+						<li>Room types and bed configurations</li>
+					</ul>
+				</div>
 			</div>
 		{/if}
 
-		{#if selectedOption}
+		{#if selectedOption === 'scratch'}
 			<div class="action-buttons">
 				<button
 					class="btn btn-primary btn-large"
-					onclick={() => {
-						if (selectedOption === 'autofill') {
-							goto('/admin/trips/new?autofill=true');
-						} else {
-							goto('/admin/trips/new');
-						}
-					}}
+					onclick={() => goto('/admin/trips/new')}
 				>
 					Continue
 				</button>
@@ -136,34 +184,83 @@
 		line-height: 1.7;
 	}
 
-	.info-box {
+	.autofill-section {
 		margin-bottom: var(--spacing-xl);
-		background: rgba(37, 99, 235, 0.05);
-		border-left: 4px solid var(--color-primary);
 	}
 
-	.info-box h4 {
+	.autofill-section h4 {
 		margin-bottom: var(--spacing-sm);
 		color: var(--color-primary);
 	}
 
+	.instructions {
+		color: var(--color-text-light);
+		margin-bottom: var(--spacing-lg);
+		line-height: 1.7;
+	}
+
+	.url-input-group {
+		display: flex;
+		gap: var(--spacing-md);
+		margin-bottom: var(--spacing-md);
+	}
+
+	.url-input {
+		flex: 1;
+		padding: var(--spacing-md);
+		border: 2px solid var(--color-border);
+		border-radius: var(--radius-md);
+		font-size: 1rem;
+		font-family: inherit;
+		transition: border-color var(--transition-base);
+	}
+
+	.url-input:focus {
+		outline: none;
+		border-color: var(--color-primary);
+	}
+
+	.url-input:disabled {
+		background: var(--color-bg-light);
+		cursor: not-allowed;
+	}
+
+	.error-message {
+		color: var(--color-error);
+		margin-top: var(--spacing-sm);
+		font-size: 0.9rem;
+	}
+
+	.info-box {
+		margin-top: var(--spacing-lg);
+		padding: var(--spacing-md);
+		background: rgba(37, 99, 235, 0.05);
+		border-left: 4px solid var(--color-primary);
+		border-radius: var(--radius-sm);
+	}
+
+	.info-box h5 {
+		margin-bottom: var(--spacing-sm);
+		color: var(--color-primary);
+		font-size: 0.95rem;
+	}
+
 	.info-box ul {
-		margin: var(--spacing-md) 0;
+		margin: var(--spacing-sm) 0 0 0;
 		padding-left: var(--spacing-lg);
 		color: var(--color-text-light);
+		font-size: 0.9rem;
 	}
 
 	.info-box li {
 		margin-bottom: var(--spacing-xs);
-		line-height: 1.7;
+		line-height: 1.6;
 	}
 
-	.note {
-		margin-top: var(--spacing-md);
-		padding: var(--spacing-sm);
-		background: rgba(245, 158, 11, 0.1);
-		border-radius: var(--radius-sm);
-		color: var(--color-text);
+	@media (max-width: 768px) {
+		.url-input-group {
+			flex-direction: column;
+		}
 	}
 
 	.action-buttons {
