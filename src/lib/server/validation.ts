@@ -29,7 +29,10 @@ export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
 export const tripCreationSchema = z.object({
 	name: z.string().min(1, 'Trip name is required').max(200),
 	description: z.string().max(1000).optional(),
-	listingUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
+	listingUrl: z.preprocess(
+		(val) => (val === '' || val === null ? undefined : val),
+		z.string().url('Invalid URL').optional()
+	),
 	listingTitle: z.string().optional(),
 	listingCoverPhoto: z.string().optional(),
 	checkInDate: z.coerce.date(),

@@ -2,6 +2,8 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { prisma } from '$lib/server/prisma.js';
 import { roomCreationSchema, bedCreationSchema } from '$lib/server/validation.js';
+import { calculatePricingDisplay } from '$lib/server/pricing-display.js';
+import { extractPropertyRoomsAndPhotos } from '$lib/server/room-extractor.js';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const trip = await prisma.trip.findUnique({
@@ -22,8 +24,33 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw redirect(303, '/admin');
 	}
 
+	// Calculate pricing display
+	let pricingDisplay = null;
+	let extractedData = null;
+	
+	try {
+		if (trip.rooms.length > 0) {
+			pricingDisplay = await calculatePricingDisplay(params.tripId);
+		}
+		
+		// If trip has listingUrl and no rooms yet, fetch extracted data
+		if (trip.listingUrl && trip.rooms.length === 0) {
+			try {
+				extractedData = await extractPropertyRoomsAndPhotos(trip.listingUrl);
+			} catch (error) {
+				console.error('Error extracting rooms/photos:', error);
+				// Continue without extracted data
+			}
+		}
+	} catch (error) {
+		console.error('Error calculating pricing:', error);
+		// Continue without pricing display
+	}
+
 	return {
-		trip
+		trip,
+		pricingDisplay,
+		extractedData
 	};
 };
 
@@ -124,6 +151,60 @@ export const actions: Actions = {
 			console.error('Bed deletion error:', error);
 			return fail(500, {
 				error: 'Failed to delete bed. Please try again.'
+			});
+		}
+	},
+
+	importRooms: async ({ request, params }) => {
+		try {
+			const formData = await request.formData();
+			const roomsJson = formData.get('rooms') as string;
+			const photosJson = formData.get('photos') as string;
+			const selectedPhotosJson = formData.get('selectedPhotos') as string;
+
+			if (!roomsJson) {
+				return fail(400, { error: 'No rooms data provided' });
+			}
+
+			const rooms = JSON.parse(roomsJson);
+			const photos = photosJson ? JSON.parse(photosJson) : [];
+			const selectedPhotos = selectedPhotosJson ? JSON.parse(selectedPhotosJson) : [];
+
+			// Create rooms and beds from extracted data
+			for (let roomIdx = 0; roomIdx < rooms.length; roomIdx++) {
+				const roomData = rooms[roomIdx];
+				const roomPhotos = selectedPhotos[roomIdx] || [];
+
+				const room = await prisma.room.create({
+					data: {
+						tripId: params.tripId,
+						name: roomData.name,
+						description: roomData.description || undefined,
+						maxOccupancy: roomData.maxOccupancy || undefined,
+						photoUrls: roomPhotos // Set selected photos
+					}
+				});
+
+				// Create beds for this room
+				for (const bedData of roomData.beds) {
+					for (let i = 0; i < bedData.quantity; i++) {
+						await prisma.bed.create({
+							data: {
+								roomId: room.id,
+								bedType: bedData.bedType,
+								capacity: bedData.capacity || 1,
+								capacitySlots: bedData.bedType === 'bunk' ? 2 : 1
+							}
+						});
+					}
+				}
+			}
+
+			return { success: true, imported: true };
+		} catch (error) {
+			console.error('Import rooms error:', error);
+			return fail(500, {
+				error: 'Failed to import rooms. Please try again.'
 			});
 		}
 	},

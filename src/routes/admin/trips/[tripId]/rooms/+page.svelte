@@ -23,6 +23,15 @@
 
 	const bedTypes = ['king', 'queen', 'full', 'twin', 'bunk', 'sofa', 'other'];
 
+	// Photo selection for extracted rooms
+	let selectedPhotos = $state<string[][]>([]);
+	
+	$effect(() => {
+		if (data.extractedData?.rooms) {
+			selectedPhotos = data.extractedData.rooms.map(() => []);
+		}
+	});
+
 	function openBedForm(roomId: number) {
 		newBed.roomId = roomId;
 		showBedForm = roomId;
@@ -78,6 +87,79 @@
 				<p>✓ Trip is published! Share the invite code: <strong>{data.trip.inviteCode}</strong></p>
 				<a href="/trip/{data.trip.inviteCode}" target="_blank" class="btn-link">View Guest Page</a>
 			</div>
+		{/if}
+
+		{#if data.extractedData && data.extractedData.rooms.length > 0 && data.trip.rooms.length === 0}
+			<section class="extracted-rooms-section">
+				<div class="extracted-header">
+					<h2>Rooms & Beds from Listing</h2>
+					<p class="extracted-subtitle">We found {data.extractedData.rooms.length} room(s) from your listing. Review and import them below.</p>
+				</div>
+
+				<div class="extracted-rooms-list">
+					{#each data.extractedData.rooms as room, roomIdx}
+						<div class="extracted-room-card card">
+							<div class="room-name-section">
+								<h3>{room.name}</h3>
+								<div class="pricing-badge pricing-preview">
+									Pricing will be calculated after import
+								</div>
+							</div>
+
+							<div class="beds-list">
+								<h4>Beds:</h4>
+								<ul>
+									{#each room.beds as bed}
+										<li>
+											{bed.quantity}x {bed.bedType.charAt(0).toUpperCase() + bed.bedType.slice(1)} Bed
+											{#if bed.capacity}
+												<span class="bed-capacity">(sleeps {bed.capacity * bed.quantity})</span>
+											{/if}
+											<div class="bed-pricing">
+												Pricing calculated after import
+											</div>
+										</li>
+									{/each}
+								</ul>
+							</div>
+
+							{#if data.extractedData.photos.length > 0}
+								<div class="photo-selection">
+									<h4>Select Photos for {room.name}</h4>
+									<div class="photo-gallery">
+										{#each data.extractedData.photos as photo, photoIdx}
+											<label class="photo-thumbnail">
+												<input
+													type="checkbox"
+													checked={selectedPhotos[roomIdx]?.includes(photo) || false}
+													onchange={(e) => {
+														if (!selectedPhotos[roomIdx]) {
+															selectedPhotos[roomIdx] = [];
+														}
+														if (e.currentTarget.checked) {
+															selectedPhotos[roomIdx] = [...selectedPhotos[roomIdx], photo];
+														} else {
+															selectedPhotos[roomIdx] = selectedPhotos[roomIdx].filter(p => p !== photo);
+														}
+													}}
+												/>
+												<img src={photo} alt="Property photo {photoIdx + 1}" />
+											</label>
+										{/each}
+									</div>
+								</div>
+							{/if}
+						</div>
+					{/each}
+				</div>
+
+				<form method="POST" action="?/importRooms" use:enhance>
+					<input type="hidden" name="rooms" value={JSON.stringify(data.extractedData.rooms)} />
+					<input type="hidden" name="photos" value={JSON.stringify(data.extractedData.photos)} />
+					<input type="hidden" name="selectedPhotos" value={JSON.stringify(selectedPhotos)} />
+					<button type="submit" class="btn-primary btn-large">Import All Rooms</button>
+				</form>
+			</section>
 		{/if}
 
 		<section class="rooms-section">
@@ -143,6 +225,14 @@
 						<div class="room-card">
 							<div class="room-header">
 								<h3>{room.name}</h3>
+								{#if data.pricingDisplay}
+									{@const roomPricing = data.pricingDisplay.roomPricing.find(r => r.roomId === room.id)}
+									{#if roomPricing}
+										<div class="pricing-badge">
+											{roomPricing.priceDisplay}
+										</div>
+									{/if}
+								{/if}
 								<form method="POST" action="?/deleteRoom" use:enhance>
 									<input type="hidden" name="roomId" value={room.id} />
 									<button type="submit" class="btn-delete">Delete</button>
@@ -189,7 +279,6 @@
 													name="capacitySlots"
 													bind:value={newBed.capacitySlots}
 													min="1"
-													value="1"
 													required
 												/>
 												<small>Number of sleep positions (e.g., bunk bed = 2 slots)</small>
@@ -208,10 +297,19 @@
 									<ul class="beds-list">
 										{#each room.beds as bed}
 											<li class="bed-item">
-												<span>
-													{bed.bedType.toUpperCase()} 
-													(capacity: {bed.capacity}, slots: {bed.capacitySlots || bed.capacity})
-												</span>
+												<div class="bed-info">
+													<span>
+														{bed.bedType.toUpperCase()} 
+														(capacity: {bed.capacity}, slots: {bed.capacitySlots || bed.capacity})
+													</span>
+													{#if data.pricingDisplay}
+														{@const roomPricing = data.pricingDisplay.roomPricing.find(r => r.roomId === room.id)}
+														{@const bedPricing = roomPricing?.bedPricing?.find(b => b.bedId === bed.id || b.bedType === bed.bedType)}
+														{#if bedPricing}
+															<div class="bed-pricing-small">{bedPricing.priceDisplay}</div>
+														{/if}
+													{/if}
+												</div>
 												<form method="POST" action="?/deleteBed" use:enhance>
 													<input type="hidden" name="bedId" value={bed.id} />
 													<button type="submit" class="btn-delete-small">×</button>
@@ -507,5 +605,166 @@
 
 	.btn-delete-small:hover {
 		background: #c0392b;
+	}
+
+	.extracted-rooms-section {
+		margin-bottom: 2rem;
+		padding: 1.5rem;
+		background: #f0f8ff;
+		border-radius: 8px;
+		border: 2px solid #3498db;
+	}
+
+	.extracted-header {
+		margin-bottom: 1.5rem;
+	}
+
+	.extracted-header h2 {
+		margin: 0 0 0.5rem 0;
+		color: #2c3e50;
+	}
+
+	.extracted-subtitle {
+		color: #555;
+		margin: 0;
+		font-size: 0.9rem;
+	}
+
+	.extracted-rooms-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.extracted-room-card {
+		background: white;
+		border: 1px solid #ddd;
+		border-radius: 8px;
+		padding: 1.5rem;
+	}
+
+	.room-name-section {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+
+	.room-name-section h3 {
+		margin: 0;
+	}
+
+	.pricing-badge {
+		background: #3498db;
+		color: white;
+		padding: 0.5rem 1rem;
+		border-radius: 4px;
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+
+	.pricing-badge.pricing-preview {
+		background: #95a5a6;
+		font-size: 0.85rem;
+	}
+
+	.beds-list h4 {
+		margin: 0 0 0.5rem 0;
+		font-size: 0.95rem;
+		color: #555;
+	}
+
+	.beds-list ul {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	.beds-list li {
+		padding: 0.5rem 0;
+		border-bottom: 1px solid #eee;
+	}
+
+	.bed-capacity {
+		color: #7f8c8d;
+		font-size: 0.85rem;
+		margin-left: 0.5rem;
+	}
+
+	.bed-pricing {
+		margin-top: 0.25rem;
+		color: #27ae60;
+		font-size: 0.85rem;
+		font-weight: 500;
+	}
+
+	.bed-pricing-small {
+		margin-top: 0.25rem;
+		color: #27ae60;
+		font-size: 0.8rem;
+	}
+
+	.photo-selection {
+		margin-top: 1.5rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid #eee;
+	}
+
+	.photo-selection h4 {
+		margin: 0 0 1rem 0;
+		font-size: 0.95rem;
+		color: #555;
+	}
+
+	.photo-gallery {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.photo-thumbnail {
+		position: relative;
+		cursor: pointer;
+		border: 2px solid #ddd;
+		border-radius: 4px;
+		overflow: hidden;
+		aspect-ratio: 1;
+	}
+
+	.photo-thumbnail input[type="checkbox"] {
+		position: absolute;
+		top: 0.5rem;
+		left: 0.5rem;
+		width: 20px;
+		height: 20px;
+		z-index: 1;
+		cursor: pointer;
+	}
+
+	.photo-thumbnail img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.photo-thumbnail:has(input:checked) {
+		border-color: #3498db;
+		box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
+	}
+
+	.btn-large {
+		padding: 1rem 2rem;
+		font-size: 1rem;
+		width: 100%;
+		margin-top: 1rem;
+	}
+
+	.bed-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		flex: 1;
 	}
 </style>

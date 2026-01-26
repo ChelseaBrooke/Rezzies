@@ -8,7 +8,7 @@
 	// Check if autofill mode is enabled
 	let isAutofillMode = $derived($page.url.searchParams.get('autofill') === 'true');
 
-	let formData = {
+	let formData = $state({
 		name: '',
 		description: '',
 		listingUrl: '',
@@ -23,7 +23,7 @@
 		allowPartialStays: false,
 		sharingExponentAlpha: 0.60,
 		privacyPremiumP: 0.00
-	};
+	});
 
 	let propertyInfo = $state<{ 
 		title: string; 
@@ -90,6 +90,7 @@
 				if (result.ok && result.data) {
 					// Extract total from checkout
 					formData.totalCost = (result.data.totalCents / 100).toFixed(2);
+					console.log('Set totalCost from checkout:', formData.totalCost);
 					
 					// Try to extract dates and guests from checkout URL
 					try {
@@ -131,17 +132,24 @@
 							}
 						}
 						
-						if (checkIn) formData.checkInDate = checkIn;
-						if (checkOut) formData.checkOutDate = checkOut;
+					if (checkIn) {
+						formData.checkInDate = checkIn;
+						console.log('Set checkInDate from checkout URL:', formData.checkInDate);
+					}
+					if (checkOut) {
+						formData.checkOutDate = checkOut;
+						console.log('Set checkOutDate from checkout URL:', formData.checkOutDate);
+					}
 						
-						// Extract guests
-						const adults = params.get('adults') || params.get('guests');
-						if (adults) {
-							const guestCount = parseInt(adults, 10);
-							if (!isNaN(guestCount)) {
-								formData.expectedPeopleCount = guestCount.toString();
-							}
+					// Extract guests
+					const adults = params.get('adults') || params.get('guests');
+					if (adults) {
+						const guestCount = parseInt(adults, 10);
+						if (!isNaN(guestCount)) {
+							formData.expectedPeopleCount = guestCount.toString();
+							console.log('Set expectedPeopleCount from checkout URL:', formData.expectedPeopleCount);
 						}
+					}
 					} catch (e) {
 						// URL parsing failed, continue without dates/guests
 						console.log('Could not extract dates/guests from checkout URL:', e);
@@ -175,6 +183,8 @@
 					formData.listingTitle = result.data.title;
 					formData.listingCoverPhoto = result.data.coverPhoto || '';
 					
+					console.log('Property info received:', result.data);
+					
 					// Only set maxGuests if it was actually fetched (not null)
 					if (result.data.maxGuests !== null && result.data.maxGuests !== undefined) {
 						formData.maxGuests = result.data.maxGuests.toString();
@@ -183,6 +193,7 @@
 					// Use guests from URL if available, otherwise use maxGuests
 					if (result.data.guests) {
 						formData.expectedPeopleCount = result.data.guests.toString();
+						console.log('Set expectedPeopleCount from property info (guests):', formData.expectedPeopleCount);
 						// Also update maxGuests if URL guests is higher
 						if (!formData.maxGuests || parseInt(formData.maxGuests, 10) < result.data.guests) {
 							formData.maxGuests = result.data.guests.toString();
@@ -191,20 +202,24 @@
 						// Auto-set expectedPeopleCount to maxGuests if not already set
 						if (!formData.expectedPeopleCount) {
 							formData.expectedPeopleCount = result.data.maxGuests.toString();
+							console.log('Set expectedPeopleCount from property info (maxGuests):', formData.expectedPeopleCount);
 						}
 					}
 					
 					// Use dates from URL if available
 					if (result.data.checkInDate) {
 						formData.checkInDate = result.data.checkInDate;
+						console.log('Set checkInDate from property info:', formData.checkInDate);
 					}
 					if (result.data.checkOutDate) {
 						formData.checkOutDate = result.data.checkOutDate;
+						console.log('Set checkOutDate from property info:', formData.checkOutDate);
 					}
 					
 					// Use total price if available (convert from cents to dollars)
 					if (result.data.totalPrice) {
 						formData.totalCost = (result.data.totalPrice / 100).toFixed(2);
+						console.log('Set totalCost from property info:', formData.totalCost);
 					}
 					
 					// Auto-populate trip name if empty
@@ -332,11 +347,52 @@
 	}
 
 	function handleSubmit({ cancel }: Parameters<Parameters<typeof enhance>[0]>[0]) {
-		if (!formData.name || !formData.checkInDate || !formData.checkOutDate || !formData.totalCost) {
+		// Debug: Log form data before validation
+		console.log('=== Client-side Form Data ===');
+		console.log('name:', formData.name);
+		console.log('checkInDate:', formData.checkInDate);
+		console.log('checkOutDate:', formData.checkOutDate);
+		console.log('totalCost:', formData.totalCost, '(type:', typeof formData.totalCost, ')');
+		console.log('pricingModel:', formData.pricingModel);
+		console.log('===========================');
+		
+		// Validate required fields
+		if (!formData.name || !formData.name.trim()) {
 			cancel();
-			error = 'Please fill in all required fields';
+			error = 'Trip name is required';
+			console.error('Validation failed: name is missing or empty');
 			return;
 		}
+		
+		if (!formData.checkInDate) {
+			cancel();
+			error = 'Check-in date is required';
+			console.error('Validation failed: checkInDate is missing');
+			return;
+		}
+		
+		if (!formData.checkOutDate) {
+			cancel();
+			error = 'Check-out date is required';
+			console.error('Validation failed: checkOutDate is missing');
+			return;
+		}
+		
+		if (!formData.totalCost || formData.totalCost.trim() === '' || isNaN(Number(formData.totalCost)) || Number(formData.totalCost) <= 0) {
+			cancel();
+			error = `Total cost must be a positive number. Current value: "${formData.totalCost}"`;
+			console.error('Validation failed: totalCost is invalid', formData.totalCost);
+			return;
+		}
+		
+		if (!formData.pricingModel) {
+			cancel();
+			error = 'Pricing model is required';
+			console.error('Validation failed: pricingModel is missing');
+			return;
+		}
+		
+		console.log('✅ Client-side validation passed');
 
 		if (new Date(formData.checkOutDate) <= new Date(formData.checkInDate)) {
 			cancel();
@@ -537,85 +593,91 @@
 					{/if}
 				</div>
 
-				{#if propertyInfo}
-					<div class="property-preview-card">
-						{#if propertyInfo.coverPhoto}
-							<img src={propertyInfo.coverPhoto} alt={propertyInfo.title} class="preview-image" />
-						{/if}
-						<div class="preview-content">
+				<!-- Preview card - always visible for required fields -->
+				<div class="property-preview-card">
+					{#if propertyInfo?.coverPhoto}
+						<img src={propertyInfo.coverPhoto} alt={propertyInfo.title || 'Property'} class="preview-image" />
+					{/if}
+					<div class="preview-content">
+						{#if propertyInfo?.title}
 							<h3 class="preview-title">{propertyInfo.title}</h3>
-							
-							{#if propertyInfo.error}
-								<div class="preview-error">
-									<strong>⚠️ {propertyInfo.error.message}</strong>
-								</div>
-							{/if}
-							
-							<div class="preview-fields">
+						{/if}
+						
+						{#if propertyInfo?.error}
+							<div class="preview-error">
+								<strong>⚠️ {propertyInfo.error.message}</strong>
+							</div>
+						{/if}
+						
+						<div class="preview-fields">
 								<div class="preview-field">
-									<label>Check-in Date</label>
+									<label>Check-in Date *</label>
 									<input
 										type="date"
+										name="checkInDate"
 										bind:value={formData.checkInDate}
+										required
 										onchange={updateUrl}
 										min={new Date().toISOString().split('T')[0]}
 									/>
 								</div>
 								
 								<div class="preview-field">
-									<label>Check-out Date</label>
+									<label>Check-out Date *</label>
 									<input
 										type="date"
+										name="checkOutDate"
 										bind:value={formData.checkOutDate}
+										required
 										onchange={updateUrl}
 										min={formData.checkInDate || new Date().toISOString().split('T')[0]}
 									/>
 								</div>
 								
 								<div class="preview-field">
-									<label>Number of Guests</label>
+									<label>Number of Guests *</label>
 									<input
 										type="number"
+										name="expectedPeopleCount"
 										bind:value={formData.expectedPeopleCount}
+										required
 										onchange={updateUrl}
 										min="1"
-										max={propertyInfo.maxGuests || undefined}
+										max={propertyInfo?.maxGuests || undefined}
 									/>
-									{#if propertyInfo.maxGuests}
+									{#if propertyInfo?.maxGuests}
 										<small>Max: {propertyInfo.maxGuests}</small>
 									{/if}
 								</div>
 								
 								<div class="preview-field price-field">
-									<label>Total Price</label>
+									<label>Total Price *</label>
 									<div class="price-display">
-										{#if propertyInfo.totalPrice || formData.totalCost}
-											<div class="price-input-container">
-												<span>$</span>
-												<input
-													type="number"
-													bind:value={formData.totalCost}
-													step="0.01"
-													min="0"
-													class="price-input"
-													placeholder="563.00"
-												/>
-												<span>
-													{#if propertyInfo.totalNights}
-														for {propertyInfo.totalNights} {propertyInfo.totalNights === 1 ? 'night' : 'nights'}
-													{:else if formData.checkInDate && formData.checkOutDate}
-														{(() => {
-															const checkIn = new Date(formData.checkInDate);
-															const checkOut = new Date(formData.checkOutDate);
-															const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-															return nights > 0 ? `for ${nights} ${nights === 1 ? 'night' : 'nights'}` : '';
-														})()}
-													{/if}
-												</span>
-											</div>
-										{:else}
-											<span class="price-placeholder">Price will populate when valid dates and guests are selected</span>
-										{/if}
+										<div class="price-input-container">
+											<span>$</span>
+											<input
+												type="number"
+												name="totalCost"
+												bind:value={formData.totalCost}
+												required
+												step="0.01"
+												min="0.01"
+												class="price-input"
+												placeholder="563.00"
+											/>
+											<span>
+												{#if propertyInfo?.totalNights}
+													for {propertyInfo.totalNights} {propertyInfo.totalNights === 1 ? 'night' : 'nights'}
+												{:else if formData.checkInDate && formData.checkOutDate}
+													{(() => {
+														const checkIn = new Date(formData.checkInDate);
+														const checkOut = new Date(formData.checkOutDate);
+														const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+														return nights > 0 ? `for ${nights} ${nights === 1 ? 'night' : 'nights'}` : '';
+													})()}
+												{/if}
+											</span>
+										</div>
 									</div>
 									<div class="price-disclaimer">
 										⚠️ Please check that this matches what you see on the checkout page for this listing. This may not always account for taxes, etc.
@@ -624,7 +686,6 @@
 							</div>
 						</div>
 					</div>
-				{/if}
 			</section>
 
 			<section class="form-section">
@@ -652,15 +713,10 @@
 				</div>
 			</section>
 
-			<!-- Hidden inputs for form submission -->
-			<input type="hidden" name="checkInDate" value={formData.checkInDate} />
-			<input type="hidden" name="checkOutDate" value={formData.checkOutDate} />
-			<input type="hidden" name="expectedPeopleCount" value={formData.expectedPeopleCount} />
+			<!-- Hidden inputs for form submission (dates, guests, and totalCost are in the preview card with name attributes) -->
 
 			<section class="form-section">
 				<h2>Pricing Model</h2>
-				<!-- Hidden input for totalCost - it's edited in the preview card above -->
-				<input type="hidden" name="totalCost" value={formData.totalCost} required />
 
 				<div class="form-group">
 					<label for="pricingModel">Pricing Model *</label>

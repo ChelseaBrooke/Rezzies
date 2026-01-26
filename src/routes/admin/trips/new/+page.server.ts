@@ -12,31 +12,118 @@ export const actions: Actions = {
 	create: async ({ request, cookies }) => {
 		try {
 			const formData = await request.formData();
+			
+			// Debug: Log all form data
+			console.log('=== Form Data Received ===');
+			for (const [key, value] of formData.entries()) {
+				console.log(`${key}: ${value} (type: ${typeof value})`);
+			}
+			console.log('========================');
+
+			// Extract and clean form data
+			const name = formData.get('name') as string;
+			const description = formData.get('description') as string;
+			const listingUrl = formData.get('listingUrl') as string;
+			const listingTitle = formData.get('listingTitle') as string;
+			const listingCoverPhoto = formData.get('listingCoverPhoto') as string;
+			const checkInDateStr = formData.get('checkInDate') as string;
+			const checkOutDateStr = formData.get('checkOutDate') as string;
+			const totalCostStr = formData.get('totalCost') as string;
+			const pricingModelStr = formData.get('pricingModel') as string;
+			const expectedPeopleCountStr = formData.get('expectedPeopleCount') as string;
+			const maxGuestsStr = formData.get('maxGuests') as string;
+			const allowPartialStaysStr = formData.get('allowPartialStays') as string;
+			const bedWeightsStr = formData.get('bedWeights') as string;
+			const sharingExponentAlphaStr = formData.get('sharingExponentAlpha') as string;
+			const privacyPremiumPStr = formData.get('privacyPremiumP') as string;
+
+			// Validate required fields - check for empty strings too
+			const missingFields: string[] = [];
+			if (!name || name.trim() === '') missingFields.push('name');
+			if (!checkInDateStr || checkInDateStr.trim() === '') missingFields.push('checkInDate');
+			if (!checkOutDateStr || checkOutDateStr.trim() === '') missingFields.push('checkOutDate');
+			if (!totalCostStr || totalCostStr.trim() === '') missingFields.push('totalCost');
+			if (!pricingModelStr || pricingModelStr.trim() === '') missingFields.push('pricingModel');
+			
+			if (missingFields.length > 0) {
+				return fail(400, {
+					error: `Missing required fields: ${missingFields.join(', ')}`,
+					details: Object.fromEntries(missingFields.map(f => [f, `${f} is required`]))
+				});
+			}
+
+			const totalCost = Number(totalCostStr);
+			if (isNaN(totalCost) || totalCost <= 0) {
+				console.error(`Invalid totalCost: "${totalCostStr}" -> ${totalCost}`);
+				return fail(400, {
+					error: 'Invalid total cost',
+					details: { 
+						totalCost: `Total cost must be a positive number. Received: "${totalCostStr}" (parsed as: ${totalCost})` 
+					}
+				});
+			}
+
+			const checkInDate = new Date(checkInDateStr);
+			const checkOutDate = new Date(checkOutDateStr);
+			
+			if (isNaN(checkInDate.getTime())) {
+				console.error(`Invalid checkInDate: "${checkInDateStr}"`);
+				return fail(400, {
+					error: 'Invalid check-in date',
+					details: { checkInDate: `Check-in date is invalid. Received: "${checkInDateStr}"` }
+				});
+			}
+			
+			if (isNaN(checkOutDate.getTime())) {
+				console.error(`Invalid checkOutDate: "${checkOutDateStr}"`);
+				return fail(400, {
+					error: 'Invalid check-out date',
+					details: { checkOutDate: `Check-out date is invalid. Received: "${checkOutDateStr}"` }
+				});
+			}
+			
+			if (checkOutDate <= checkInDate) {
+				return fail(400, {
+					error: 'Invalid date range',
+					details: { checkOutDate: 'Check-out date must be after check-in date' }
+				});
+			}
+
+			const pricingModel = pricingModelStr.toUpperCase() as 'PER_ROOM' | 'PER_BED' | 'PER_PERSON' | 'PER_PERSON_PER_NIGHT';
+			if (!['PER_ROOM', 'PER_BED', 'PER_PERSON', 'PER_PERSON_PER_NIGHT'].includes(pricingModel)) {
+				return fail(400, {
+					error: 'Invalid pricing model',
+					details: { pricingModel: 'Pricing model must be one of: PER_ROOM, PER_BED, PER_PERSON, PER_PERSON_PER_NIGHT' }
+				});
+			}
 
 			const data = {
-				name: formData.get('name') as string,
-				description: formData.get('description') as string || undefined,
-				listingUrl: formData.get('listingUrl') as string || undefined,
-				listingTitle: formData.get('listingTitle') as string || undefined,
-				listingCoverPhoto: formData.get('listingCoverPhoto') as string || undefined,
-				checkInDate: new Date(formData.get('checkInDate') as string),
-				checkOutDate: new Date(formData.get('checkOutDate') as string),
-				totalCost: Number(formData.get('totalCost')),
-				pricingModel: (formData.get('pricingModel') as string).toUpperCase() as 'PER_ROOM' | 'PER_BED' | 'PER_PERSON' | 'PER_PERSON_PER_NIGHT',
-				expectedPeopleCount: formData.get('expectedPeopleCount') ? Number(formData.get('expectedPeopleCount')) : undefined,
-				maxGuests: formData.get('maxGuests') ? Number(formData.get('maxGuests')) : undefined,
-				allowPartialStays: formData.get('allowPartialStays') === 'true' || formData.get('allowPartialStays') === 'on',
-				bedWeights: formData.get('bedWeights') as string || null,
-				sharingExponentAlpha: Number(formData.get('sharingExponentAlpha')) || 0.60,
-				privacyPremiumP: Number(formData.get('privacyPremiumP')) || 0.00
+				name: name.trim(),
+				description: description?.trim() || undefined,
+				listingUrl: listingUrl?.trim() || undefined,
+				listingTitle: listingTitle?.trim() || undefined,
+				listingCoverPhoto: listingCoverPhoto?.trim() || undefined,
+				checkInDate,
+				checkOutDate,
+				totalCost,
+				pricingModel,
+				expectedPeopleCount: expectedPeopleCountStr && expectedPeopleCountStr.trim() !== '' ? Number(expectedPeopleCountStr) : undefined,
+				maxGuests: maxGuestsStr && maxGuestsStr.trim() !== '' ? Number(maxGuestsStr) : undefined,
+				allowPartialStays: allowPartialStaysStr === 'true' || allowPartialStaysStr === 'on',
+				bedWeights: bedWeightsStr?.trim() || undefined,
+				sharingExponentAlpha: sharingExponentAlphaStr && sharingExponentAlphaStr.trim() !== '' ? Number(sharingExponentAlphaStr) : 0.60,
+				privacyPremiumP: privacyPremiumPStr && privacyPremiumPStr.trim() !== '' ? Number(privacyPremiumPStr) : 0.00
 			};
 
 			// Validate
 			const validationResult = tripCreationSchema.safeParse(data);
 			if (!validationResult.success) {
+				console.error('Validation errors:', validationResult.error.errors);
+				console.error('Data being validated:', data);
 				return fail(400, {
 					error: 'Invalid trip data',
-					details: validationResult.error.errors
+					details: validationResult.error.errors,
+					formData: data
 				});
 			}
 
