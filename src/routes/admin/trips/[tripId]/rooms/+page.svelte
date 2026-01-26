@@ -27,12 +27,72 @@
 	let selectedPhotos = $state<string[][]>([]);
 	let isRetryingExtraction = $state(false);
 	let extractedDataOverride = $state<any>(null);
+	let draggedPhoto = $state<string | null>(null);
+	let dragOverRoomIndex = $state<number | null>(null);
 	
 	$effect(() => {
 		if (data.extractedData?.rooms) {
 			selectedPhotos = data.extractedData.rooms.map(() => []);
 		}
+		if (extractedDataOverride?.rooms) {
+			selectedPhotos = extractedDataOverride.rooms.map(() => []);
+		}
 	});
+	
+	function handleDragStart(photo: string) {
+		draggedPhoto = photo;
+	}
+	
+	function handleDragEnd() {
+		draggedPhoto = null;
+		dragOverRoomIndex = null;
+	}
+	
+	function handleDragOver(roomIdx: number, e: DragEvent) {
+		e.preventDefault();
+		dragOverRoomIndex = roomIdx;
+	}
+	
+	function handleDragLeave() {
+		dragOverRoomIndex = null;
+	}
+	
+	function handleDrop(roomIdx: number, e: DragEvent) {
+		e.preventDefault();
+		if (draggedPhoto) {
+			// Create a new array to ensure reactivity
+			const newSelectedPhotos = selectedPhotos.map((roomPhotos, idx) => {
+				if (idx === roomIdx) {
+					// Add to target room (remove if already there, then add)
+					const filtered = roomPhotos.filter(p => p !== draggedPhoto);
+					return [...filtered, draggedPhoto];
+				} else {
+					// Remove from other rooms
+					return roomPhotos.filter(p => p !== draggedPhoto);
+				}
+			});
+			selectedPhotos = newSelectedPhotos;
+		}
+		dragOverRoomIndex = null;
+		draggedPhoto = null;
+	}
+	
+	function removePhotoFromRoom(roomIdx: number, photo: string) {
+		if (selectedPhotos[roomIdx]) {
+			const newSelectedPhotos = [...selectedPhotos];
+			newSelectedPhotos[roomIdx] = newSelectedPhotos[roomIdx].filter(p => p !== photo);
+			selectedPhotos = newSelectedPhotos;
+		}
+	}
+	
+	function getPhotoRoomIndex(photo: string): number | null {
+		for (let i = 0; i < selectedPhotos.length; i++) {
+			if (selectedPhotos[i]?.includes(photo)) {
+				return i;
+			}
+		}
+		return null;
+	}
 
 	async function retryExtraction() {
 		if (!data.trip.listingUrl) return;
@@ -126,9 +186,24 @@
 						<p class="extracted-subtitle error-text">
 							⚠️ Could not automatically extract rooms from the listing.
 						</p>
+						{#if displayExtractedData?.error}
+							<div class="error-details">
+								<strong>Error:</strong> {displayExtractedData.error}
+							</div>
+						{/if}
 						<p class="extracted-subtitle">
 							<small>Listing URL: {data.trip.listingUrl}</small>
 						</p>
+						<div class="troubleshooting">
+							<p><strong>Possible reasons:</strong></p>
+							<ul>
+								<li>Zyte API key not configured in environment variables</li>
+								<li>Zyte API request failed (check server logs)</li>
+								<li>Room information not found in the listing HTML</li>
+								<li>HTML structure has changed and extraction patterns need updating</li>
+							</ul>
+							<p><strong>Solution:</strong> You can add rooms manually below, or check the server console logs for detailed error information.</p>
+						</div>
 						<button 
 							type="button" 
 							class="btn-primary"
@@ -142,9 +217,49 @@
 
 				{#if displayExtractedData && displayExtractedData.rooms.length > 0}
 
+				<!-- Photo Gallery (shown once) -->
+				{#if displayExtractedData.photos.length > 0}
+					<div class="photo-gallery-section card">
+						<h3>📷 Property Photos</h3>
+						<p class="gallery-instructions">Drag photos to room types below to assign them</p>
+						<div class="photo-gallery-grid">
+							{#each displayExtractedData.photos as photo, photoIdx}
+								{@const assignedRoom = getPhotoRoomIndex(photo)}
+								<div
+									class="photo-thumbnail draggable"
+									class:assigned={assignedRoom !== null}
+									draggable="true"
+									ondragstart={(e) => {
+										handleDragStart(photo);
+										if (e.dataTransfer) {
+											e.dataTransfer.effectAllowed = 'move';
+										}
+									}}
+									ondragend={handleDragEnd}
+								>
+									<img src={photo} alt="Property photo {photoIdx + 1}" />
+									{#if assignedRoom !== null}
+										<div class="photo-assigned-badge">
+											✓ {displayExtractedData.rooms[assignedRoom]?.name || `Room ${assignedRoom + 1}`}
+										</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Room Types (Drop Zones) -->
 				<div class="extracted-rooms-list">
+					<h3>Room Types - Drop Photos Here</h3>
 					{#each displayExtractedData.rooms as room, roomIdx}
-						<div class="extracted-room-card card">
+						<div
+							class="extracted-room-card card drop-zone"
+							class:drag-over={dragOverRoomIndex === roomIdx}
+							ondragover={(e) => handleDragOver(roomIdx, e)}
+							ondragleave={handleDragLeave}
+							ondrop={(e) => handleDrop(roomIdx, e)}
+						>
 							<div class="room-name-section">
 								<h3>{room.name}</h3>
 								<div class="pricing-badge pricing-preview">
@@ -161,38 +276,34 @@
 											{#if bed.capacity}
 												<span class="bed-capacity">(sleeps {bed.capacity * bed.quantity})</span>
 											{/if}
-											<div class="bed-pricing">
-												Pricing calculated after import
-											</div>
 										</li>
 									{/each}
 								</ul>
 							</div>
 
-							{#if displayExtractedData.photos.length > 0}
-								<div class="photo-selection">
-									<h4>Select Photos for {room.name}</h4>
-									<div class="photo-gallery">
-										{#each displayExtractedData.photos as photo, photoIdx}
-											<label class="photo-thumbnail">
-												<input
-													type="checkbox"
-													checked={selectedPhotos[roomIdx]?.includes(photo) || false}
-													onchange={(e) => {
-														if (!selectedPhotos[roomIdx]) {
-															selectedPhotos[roomIdx] = [];
-														}
-														if (e.currentTarget.checked) {
-															selectedPhotos[roomIdx] = [...selectedPhotos[roomIdx], photo];
-														} else {
-															selectedPhotos[roomIdx] = selectedPhotos[roomIdx].filter(p => p !== photo);
-														}
-													}}
-												/>
-												<img src={photo} alt="Property photo {photoIdx + 1}" />
-											</label>
+							<!-- Assigned Photos for this Room -->
+							{#if selectedPhotos[roomIdx] && selectedPhotos[roomIdx].length > 0}
+								<div class="assigned-photos">
+									<h4>Assigned Photos ({selectedPhotos[roomIdx].length}):</h4>
+									<div class="assigned-photos-grid">
+										{#each selectedPhotos[roomIdx] as photo}
+											<div class="assigned-photo-thumbnail">
+												<img src={photo} alt="Assigned photo" />
+												<button
+													type="button"
+													class="remove-photo-btn"
+													onclick={() => removePhotoFromRoom(roomIdx, photo)}
+													title="Remove photo"
+												>
+													×
+												</button>
+											</div>
 										{/each}
 									</div>
+								</div>
+							{:else}
+								<div class="drop-zone-hint">
+									<p>👆 Drop photos here to assign them to {room.name}</p>
 								</div>
 							{/if}
 						</div>
@@ -662,6 +773,37 @@
 		border: 2px solid #3498db;
 	}
 
+	.error-details {
+		background: #fee;
+		border: 1px solid #fcc;
+		border-radius: 4px;
+		padding: 0.75rem;
+		margin: 0.5rem 0;
+		color: #c33;
+	}
+
+	.troubleshooting {
+		background: #fff9e6;
+		border: 1px solid #ffd700;
+		border-radius: 4px;
+		padding: 1rem;
+		margin: 1rem 0;
+	}
+
+	.troubleshooting p {
+		margin: 0.5rem 0;
+	}
+
+	.troubleshooting ul {
+		margin: 0.5rem 0 0.5rem 1.5rem;
+		padding: 0;
+	}
+
+	.troubleshooting li {
+		margin: 0.25rem 0;
+	}
+	}
+
 	.extracted-header {
 		margin-bottom: 1.5rem;
 	}
@@ -682,6 +824,75 @@
 		font-weight: 500;
 	}
 
+	.photo-gallery-section {
+		margin-bottom: 2rem;
+		padding: 1.5rem;
+		background: #f8f9fa;
+	}
+
+	.photo-gallery-section h3 {
+		margin-bottom: 0.5rem;
+		color: #2c3e50;
+	}
+
+	.gallery-instructions {
+		color: #555;
+		margin-bottom: 1rem;
+		font-size: 0.9rem;
+	}
+
+	.photo-gallery-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+		gap: 1rem;
+	}
+
+	.photo-thumbnail {
+		position: relative;
+		aspect-ratio: 1;
+		border-radius: 8px;
+		overflow: hidden;
+		cursor: grab;
+		border: 2px solid transparent;
+		transition: all 0.2s ease;
+		background: white;
+	}
+
+	.photo-thumbnail:active {
+		cursor: grabbing;
+	}
+
+	.photo-thumbnail:hover {
+		transform: scale(1.05);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		border-color: #3498db;
+	}
+
+	.photo-thumbnail.assigned {
+		border-color: #27ae60;
+		opacity: 0.7;
+	}
+
+	.photo-thumbnail img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.photo-assigned-badge {
+		position: absolute;
+		top: 4px;
+		right: 4px;
+		background: #27ae60;
+		color: white;
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		pointer-events: none;
+	}
+
 	.extracted-rooms-list {
 		display: flex;
 		flex-direction: column;
@@ -689,11 +900,102 @@
 		margin-bottom: 1.5rem;
 	}
 
+	.extracted-rooms-list > h3 {
+		margin-bottom: 1rem;
+		color: #2c3e50;
+	}
+
 	.extracted-room-card {
 		background: white;
-		border: 1px solid #ddd;
+		border: 2px solid #ddd;
 		border-radius: 8px;
 		padding: 1.5rem;
+		transition: all 0.2s ease;
+		min-height: 200px;
+	}
+
+	.extracted-room-card.drop-zone {
+		position: relative;
+	}
+
+	.extracted-room-card.drag-over {
+		border-color: #3498db;
+		background: #ebf5fb;
+		transform: scale(1.02);
+		box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+	}
+
+	.drop-zone-hint {
+		margin-top: 1rem;
+		padding: 2rem;
+		text-align: center;
+		border: 2px dashed #bdc3c7;
+		border-radius: 8px;
+		color: #7f8c8d;
+		background: #f8f9fa;
+	}
+
+	.drop-zone-hint p {
+		margin: 0;
+		font-size: 0.95rem;
+	}
+
+	.assigned-photos {
+		margin-top: 1rem;
+		padding-top: 1rem;
+		border-top: 2px solid #e0e0e0;
+	}
+
+	.assigned-photos h4 {
+		margin-bottom: 0.75rem;
+		color: #27ae60;
+		font-size: 0.95rem;
+	}
+
+	.assigned-photos-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.assigned-photo-thumbnail {
+		position: relative;
+		aspect-ratio: 1;
+		border-radius: 6px;
+		overflow: hidden;
+		border: 2px solid #27ae60;
+	}
+
+	.assigned-photo-thumbnail img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.remove-photo-btn {
+		position: absolute;
+		top: 4px;
+		right: 4px;
+		background: #e74c3c;
+		color: white;
+		border: none;
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		cursor: pointer;
+		font-size: 1.2rem;
+		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		opacity: 0.9;
+		transition: opacity 0.2s;
+	}
+
+	.remove-photo-btn:hover {
+		opacity: 1;
+		background: #c0392b;
 	}
 
 	.room-name-section {
@@ -757,51 +1059,7 @@
 		font-size: 0.8rem;
 	}
 
-	.photo-selection {
-		margin-top: 1.5rem;
-		padding-top: 1.5rem;
-		border-top: 1px solid #eee;
-	}
-
-	.photo-selection h4 {
-		margin: 0 0 1rem 0;
-		font-size: 0.95rem;
-		color: #555;
-	}
-
-	.photo-gallery {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-		gap: 0.75rem;
-	}
-
-	.photo-thumbnail {
-		position: relative;
-		cursor: pointer;
-		border: 2px solid #ddd;
-		border-radius: 4px;
-		overflow: hidden;
-		aspect-ratio: 1;
-	}
-
-	.photo-thumbnail input[type="checkbox"] {
-		position: absolute;
-		top: 0.5rem;
-		left: 0.5rem;
-		width: 20px;
-		height: 20px;
-		z-index: 1;
-		cursor: pointer;
-	}
-
-	.photo-thumbnail img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-	}
-
-	.photo-thumbnail:has(input:checked) {
+	/* Old photo selection styles removed - using drag-and-drop instead */
 		border-color: #3498db;
 		box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
 	}

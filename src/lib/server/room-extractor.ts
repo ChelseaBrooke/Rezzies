@@ -65,10 +65,46 @@ export function extractVRBORoomsAndBeds(html: string): ExtractedRoom[] {
 		}
 	}
 	
+	// Look for uitk-heading with "Bedroom" to find the section
+	const uitkHeadingMatch = html.match(/<h[34][^>]*uitk-heading[^>]*>Bedroom\s*\d+[^<]*<\/h[34]>/gi);
+	if (uitkHeadingMatch) {
+		console.log(`[Room Extractor] Found ${uitkHeadingMatch.length} uitk-heading bedroom matches`);
+		// Log first match with context
+		const firstMatchIndex = html.indexOf(uitkHeadingMatch[0]);
+		if (firstMatchIndex > -1) {
+			const context = html.substring(Math.max(0, firstMatchIndex - 100), firstMatchIndex + 500);
+			console.log('[Room Extractor] First bedroom heading context:', context);
+		}
+	} else {
+		console.log('[Room Extractor] No uitk-heading bedroom matches found');
+	}
+	
+	// Look for uitk-text with bed information
+	const uitkTextBedMatch = html.match(/uitk-text[^>]*>(\d+)\s+(King|Queen|Twin|Full|Double|Bunk|Sofa|Murphy|Futon)[^<]*Bed/gi);
+	if (uitkTextBedMatch) {
+		console.log(`[Room Extractor] Found ${uitkTextBedMatch.length} uitk-text bed matches:`, uitkTextBedMatch.slice(0, 5));
+	} else {
+		console.log('[Room Extractor] No uitk-text bed matches found');
+	}
+	
 	// Look for bedroom patterns - more flexible matching
 	// Pattern: "Bedroom 1: 1 King Bed" or "Bedroom 1" followed by bed info
 	// Also handles: "1 Double Bed and 1 Double Futon"
 	const bedroomPatterns = [
+		// Pattern for VRBO uitk-heading structure with uitk-text bed info:
+		// <h4 class="uitk-heading uitk-heading-6">Bedroom 1</h4> ... <div class="uitk-text uitk-type-300">1 King Bed</div>
+		// Captures: room type, room number, quantity, and full bed type text (e.g., "King", "Queen Murphy")
+		// Very flexible - handles minified HTML, different attribute orders, etc.
+		/<h[34][^>]*uitk-heading[^>]*>(Bedroom|Living\s+Room)\s*(\d+)?[^<]*<\/h[34]>[\s\S]{0,2000}?uitk-text[^>]*>(\d+)\s+([^<]+?)\s+Bed/gi,
+		// Even more flexible - just looks for heading followed by bed text anywhere nearby
+		/<h[34][^>]*uitk-heading[^>]*>(Bedroom|Living\s+Room)\s*(\d+)?[^<]*<\/h[34]>[\s\S]{0,2000}?(\d+)\s+(King|Queen|Twin|Full|Double|Bunk|Sofa|Murphy|Futon)[^<]{0,50}Bed/gi,
+		// Pattern that looks for the structure with data-stid="content-item" wrapper
+		/data-stid="content-item"[^>]*>[\s\S]{0,500}?<h[34][^>]*uitk-heading[^>]*>(Bedroom|Living\s+Room)\s*(\d+)?[^<]*<\/h[34]>[\s\S]{0,2000}?uitk-text[^>]*>(\d+)\s+([^<]+?)\s+Bed/gi,
+		// Pattern for VRBO uitk-heading structure: <h4 class="uitk-heading">Bedroom 1</h4> followed by bed info
+		// This pattern looks for the h4 tag and then finds bed info within 500 characters after it
+		/<h4[^>]*class="[^"]*uitk-heading[^"]*"[^>]*>Bedroom\s*(\d+)[^<]*<\/h4>(?:[^<]|<(?!h4[^>]*>)){0,500}?(\d+)\s+(king|queen|twin|full|double|bunk|sofa|murphy|futon)[^<]{0,200}(?:bed|beds?)/gi,
+		// Alternative pattern for uitk-heading that's more flexible with spacing
+		/<h4[^>]*uitk-heading[^>]*>Bedroom\s*(\d+)[^<]*<\/h4>[\s\S]{0,500}?(\d+)\s+(king|queen|twin|full|double|bunk|sofa|murphy|futon)[^<]{0,200}(?:bed|beds?)/gi,
 		// Pattern for "Bedroom 1: 1 Double Bed and 1 Double Futon" format
 		/(?:bedroom|room)\s*(\d+)[^<]*?((?:\d+\s+(?:king|queen|twin|full|double|bunk|sofa|murphy|futon)\s+(?:bed|beds?|futon|futons?)(?:\s+and\s+)?)+)/gi,
 		// Pattern for "Bedroom 1: 1 King Bed" format (most common) - case insensitive, flexible spacing
@@ -80,7 +116,11 @@ export function extractVRBORoomsAndBeds(html: string): ExtractedRoom[] {
 		// Pattern for "Bedroom 1" with bed info in nearby text - very flexible
 		/bedroom\s*(\d+)[^<]{0,500}?(\d+)\s+(king|queen|twin|full|double|bunk|sofa|murphy|futon)[^<]{0,200}bed/gi,
 		// Pattern for text like "1 King Bed" near "Bedroom 1"
-		/bedroom\s*(\d+)[^<]*?(\d+)\s+(?:king|queen|twin|full|double|bunk|sofa|murphy|futon)\s+bed/gi
+		/bedroom\s*(\d+)[^<]*?(\d+)\s+(?:king|queen|twin|full|double|bunk|sofa|murphy|futon)\s+bed/gi,
+		// Simple text-based pattern - just look for "Bedroom X" followed by bed info (very flexible)
+		/Bedroom\s*(\d+)[\s\S]{0,2000}?(\d+)\s+(King|Queen|Twin|Full|Double|Bunk|Sofa|Murphy|Futon)[\s\S]{0,100}Bed/gi,
+		// Pattern for Living Room
+		/Living\s+Room\s*(\d+)?[\s\S]{0,2000}?(\d+)\s+(King|Queen|Twin|Full|Double|Bunk|Sofa|Murphy|Futon)[\s\S]{0,100}Bed/gi
 	];
 	
 	const roomMap = new Map<number, ExtractedRoom>();
@@ -93,25 +133,79 @@ export function extractVRBORoomsAndBeds(html: string): ExtractedRoom[] {
 		while ((match = pattern.exec(html)) !== null) {
 			matchCount++;
 			totalMatches++;
-			console.log(`[Room Extractor] Pattern ${patternIdx} matched:`, {
-				roomNum: match[1],
-				quantity: match[2],
-				bedType: match[3] || 'from match[2]',
-				fullMatch: match[0].substring(0, 100)
-			});
-			const roomNum = parseInt(match[1], 10);
 			
-			if (!roomMap.has(roomNum)) {
-				roomMap.set(roomNum, {
-					name: `Bedroom ${roomNum}`,
-					beds: []
+			// Handle new VRBO uitk-heading pattern (pattern 0 and 1)
+			// match[1] = "Bedroom" or "Living Room", match[2] = room number (optional), match[3] = quantity, match[4] = bed type
+			let roomNum: number;
+			let quantity: number;
+			let bedTypeText: string;
+			let roomName: string;
+			
+			if (patternIdx === 0 || patternIdx === 1) {
+				// New pattern structure
+				const roomType = match[1].trim(); // "Bedroom" or "Living Room"
+				roomNum = match[2] ? parseInt(match[2], 10) : 1;
+				quantity = parseInt(match[3], 10);
+				bedTypeText = match[4].trim();
+				
+				if (roomType.toLowerCase().includes('living')) {
+					roomName = roomNum > 1 ? `Living Room ${roomNum}` : 'Living Room';
+				} else {
+					roomName = `Bedroom ${roomNum}`;
+				}
+				
+				console.log(`[Room Extractor] Pattern ${patternIdx} matched (new structure):`, {
+					roomType,
+					roomNum,
+					roomName,
+					quantity,
+					bedType: bedTypeText,
+					fullMatch: match[0].substring(0, 150)
+				});
+			} else {
+				// Old pattern structure
+				roomNum = parseInt(match[1], 10);
+				quantity = parseInt(match[2], 10) || 1;
+				bedTypeText = (match[3] || '').trim();
+				roomName = `Bedroom ${roomNum}`;
+				
+				console.log(`[Room Extractor] Pattern ${patternIdx} matched:`, {
+					roomNum,
+					quantity,
+					bedType: bedTypeText || 'from match[2]',
+					fullMatch: match[0].substring(0, 100)
 				});
 			}
 			
-			const room = roomMap.get(roomNum)!;
+			// For living rooms, use a different array
+			const isLivingRoom = roomName.toLowerCase().includes('living');
+			const targetMap = isLivingRoom ? null : roomMap;
 			
-			// Handle pattern 1: "1 Double Bed and 1 Double Futon" format
-			if (match[2] && match[2].includes('and')) {
+			if (!isLivingRoom) {
+				if (!roomMap.has(roomNum)) {
+					roomMap.set(roomNum, {
+						name: roomName,
+						beds: []
+					});
+				}
+			} else {
+				// Handle living rooms separately
+				let livingRoom = rooms.find(r => r.name === roomName);
+				if (!livingRoom) {
+					livingRoom = {
+						name: roomName,
+						beds: []
+					};
+					rooms.push(livingRoom);
+				}
+			}
+			
+			const room = isLivingRoom 
+				? rooms.find(r => r.name === roomName)!
+				: roomMap.get(roomNum)!;
+			
+			// Handle pattern 1: "1 Double Bed and 1 Double Futon" format (only for old patterns)
+			if (patternIdx > 1 && match[2] && match[2].includes('and')) {
 				// Split by "and" to get multiple bed types
 				const bedDescriptions = match[2].split(/\s+and\s+/);
 				for (const bedDesc of bedDescriptions) {
@@ -147,18 +241,25 @@ export function extractVRBORoomsAndBeds(html: string): ExtractedRoom[] {
 				}
 			} else {
 				// Handle other patterns: single bed type
-				const quantity = parseInt(match[2], 10) || 1;
-				const bedTypeText = (match[3] || '').trim().toLowerCase();
+				// For new patterns (0, 1), we already have the values extracted above
+				// For old patterns, extract from match[2] and match[3]
+				if (patternIdx > 1) {
+					quantity = parseInt(match[2], 10) || 1;
+					bedTypeText = (match[3] || '').trim();
+				}
+				// bedTypeText is already set for patterns 0 and 1
 				
-				// Map bed type text to our bed types
+				// Map bed type text to our bed types (case insensitive)
+				// Check for compound types first (e.g., "Queen Murphy" should be "murphy")
+				const bedTypeLower = bedTypeText.toLowerCase();
 				let bedType = 'other';
-				if (bedTypeText.includes('king')) bedType = 'king';
-				else if (bedTypeText.includes('queen')) bedType = 'queen';
-				else if (bedTypeText.includes('twin')) bedType = 'twin';
-				else if (bedTypeText.includes('full') || bedTypeText.includes('double')) bedType = 'full';
-				else if (bedTypeText.includes('bunk')) bedType = 'bunk';
-				else if (bedTypeText.includes('sofa') || bedTypeText.includes('futon')) bedType = 'sofa';
-				else if (bedTypeText.includes('murphy')) bedType = 'murphy';
+				if (bedTypeLower.includes('murphy')) bedType = 'murphy';
+				else if (bedTypeLower.includes('bunk')) bedType = 'bunk';
+				else if (bedTypeLower.includes('sofa') || bedTypeLower.includes('futon')) bedType = 'sofa';
+				else if (bedTypeLower.includes('king')) bedType = 'king';
+				else if (bedTypeLower.includes('queen')) bedType = 'queen';
+				else if (bedTypeLower.includes('twin')) bedType = 'twin';
+				else if (bedTypeLower.includes('full') || bedTypeLower.includes('double')) bedType = 'full';
 				
 				// Check if this bed type already exists in the room
 				const existingBed = room.beds.find(b => b.bedType === bedType);
@@ -179,6 +280,32 @@ export function extractVRBORoomsAndBeds(html: string): ExtractedRoom[] {
 	}
 	
 	console.log(`[Room Extractor] Total matches found: ${totalMatches}, rooms in map: ${roomMap.size}`);
+	
+	// If no matches, try to find why - search for key elements
+	if (totalMatches === 0) {
+		console.log('[Room Extractor] DEBUG: No matches found. Searching for key elements...');
+		
+		// Search for uitk-heading with Bedroom
+		const headingMatches = html.match(/<h[34][^>]*uitk-heading[^>]*>Bedroom\s*\d+[^<]*<\/h[34]>/gi);
+		console.log(`[Room Extractor] DEBUG: Found ${headingMatches?.length || 0} uitk-heading Bedroom matches`);
+		
+		// Search for uitk-text with bed info
+		const textMatches = html.match(/uitk-text[^>]*>\s*\d+\s+(King|Queen|Twin|Full|Double|Bunk|Sofa|Murphy|Futon)[^<]*Bed/gi);
+		console.log(`[Room Extractor] DEBUG: Found ${textMatches?.length || 0} uitk-text bed matches`);
+		
+		// Try to find the actual structure from the user's example
+		const structureMatch = html.match(/data-stid="content-item"[^>]*>[\s\S]{0,1000}?<h[34][^>]*uitk-heading[^>]*>Bedroom\s*\d+[^<]*<\/h[34]>/gi);
+		console.log(`[Room Extractor] DEBUG: Found ${structureMatch?.length || 0} data-stid content-item matches`);
+		
+		// If we found headings but not matches, show a sample
+		if (headingMatches && headingMatches.length > 0) {
+			const sampleIndex = html.indexOf(headingMatches[0]);
+			if (sampleIndex > -1) {
+				const sample = html.substring(sampleIndex, Math.min(sampleIndex + 2000, html.length));
+				console.log('[Room Extractor] DEBUG: Sample HTML around first heading:', sample.substring(0, 1000));
+			}
+		}
+	}
 	
 	// Look for living room or other spaces
 	// Pattern: "Living Room 1: 1 Queen Murphy Bed"
@@ -387,8 +514,9 @@ export async function extractPropertyRoomsAndPhotos(
 	const zyteApiKey = process.env.ZYTE_API_KEY;
 	
 	if (!zyteApiKey) {
-		console.warn('ZYTE_API_KEY not set, cannot extract rooms/photos');
-		return { rooms: [], photos: [] };
+		const errorMsg = 'ZYTE_API_KEY not set in environment variables. Please configure Zyte API key to extract rooms and photos.';
+		console.error('[Room Extractor]', errorMsg);
+		throw new Error(errorMsg);
 	}
 	
 	try {
@@ -409,24 +537,45 @@ export async function extractPropertyRoomsAndPhotos(
 		
 		if (!response.ok) {
 			const errorText = await response.text();
-			console.error(`[Room Extractor] Zyte API error ${response.status}:`, errorText);
-			throw new Error(`Zyte API error: ${response.status} - ${errorText}`);
+			const errorMsg = `Zyte API error ${response.status}: ${errorText}`;
+			console.error(`[Room Extractor] ${errorMsg}`);
+			throw new Error(errorMsg);
 		}
 		
 		const data = await response.json();
 		const html = data.browserHtml || data.httpResponseBody || '';
 		
 		if (!html) {
-			console.warn('[Room Extractor] No HTML returned from Zyte API');
-			return { rooms: [], photos: [] };
+			const errorMsg = 'No HTML returned from Zyte API. The page may not have loaded correctly.';
+			console.error(`[Room Extractor] ${errorMsg}`);
+			throw new Error(errorMsg);
 		}
 		
 		console.log(`[Room Extractor] HTML fetched successfully (${html.length} characters)`);
+		
+		// Check if HTML contains room-related content
+		const hasRoomContent = /bedroom|room|bed/i.test(html);
+		if (!hasRoomContent) {
+			console.warn('[Room Extractor] HTML does not appear to contain room/bed information');
+		}
+		
 		const result = extractRoomsAndPhotosFromHTML(html, isVRBO ? 'vrbo' : 'airbnb');
 		console.log(`[Room Extractor] Extraction complete: ${result.rooms.length} rooms, ${result.photos.length} photos`);
+		
+		if (result.rooms.length === 0) {
+			console.warn('[Room Extractor] No rooms extracted. This could mean:');
+			console.warn('  1. The HTML structure has changed');
+			console.warn('  2. The listing does not have room information in the expected format');
+			console.warn('  3. The extraction patterns need to be updated');
+			console.warn(`[Room Extractor] HTML snippet (first 2000 chars): ${html.substring(0, 2000)}`);
+		}
+		
 		return result;
 	} catch (error) {
-		console.error('[Room Extractor] Error fetching HTML for room extraction:', error);
-		return { rooms: [], photos: [] };
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		console.error('[Room Extractor] Error fetching HTML for room extraction:', errorMsg);
+		console.error('[Room Extractor] Stack:', error instanceof Error ? error.stack : 'N/A');
+		// Re-throw the error so the caller knows what went wrong
+		throw new Error(`Failed to extract rooms and photos: ${errorMsg}`);
 	}
 }

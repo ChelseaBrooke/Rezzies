@@ -43,9 +43,20 @@ export const load: PageServerLoad = async ({ params }) => {
 					photosFound: extractedData?.photos?.length || 0,
 					rooms: extractedData?.rooms
 				});
+				
+				if (!extractedData || extractedData.rooms.length === 0) {
+					console.warn('[Room Setup] No rooms extracted. Check server logs for details.');
+				}
 			} catch (error) {
-				console.error('[Room Setup] Error extracting rooms/photos:', error);
-				// Continue without extracted data
+				const errorMsg = error instanceof Error ? error.message : String(error);
+				console.error('[Room Setup] Error extracting rooms/photos:', errorMsg);
+				console.error('[Room Setup] Error details:', error);
+				// Store error message so UI can display it
+				extractedData = {
+					rooms: [],
+					photos: [],
+					error: errorMsg
+				};
 			}
 		} else {
 			console.log(`[Room Setup] Skipping extraction - listingUrl: ${trip.listingUrl ? 'exists' : 'missing'}, rooms.length: ${trip.rooms.length}`);
@@ -170,49 +181,113 @@ export const actions: Actions = {
 			const photosJson = formData.get('photos') as string;
 			const selectedPhotosJson = formData.get('selectedPhotos') as string;
 
+			console.log('[Import Rooms] Starting import...');
+			console.log('[Import Rooms] roomsJson length:', roomsJson?.length || 0);
+			console.log('[Import Rooms] photosJson length:', photosJson?.length || 0);
+			console.log('[Import Rooms] selectedPhotosJson length:', selectedPhotosJson?.length || 0);
+
 			if (!roomsJson) {
+				console.error('[Import Rooms] No rooms data provided');
 				return fail(400, { error: 'No rooms data provided' });
 			}
 
-			const rooms = JSON.parse(roomsJson);
-			const photos = photosJson ? JSON.parse(photosJson) : [];
-			const selectedPhotos = selectedPhotosJson ? JSON.parse(selectedPhotosJson) : [];
+			let rooms, photos, selectedPhotos;
+			try {
+				rooms = JSON.parse(roomsJson);
+				photos = photosJson ? JSON.parse(photosJson) : [];
+				selectedPhotos = selectedPhotosJson ? JSON.parse(selectedPhotosJson) : [];
+				console.log('[Import Rooms] Parsed data:', {
+					roomsCount: rooms?.length || 0,
+					photosCount: photos?.length || 0,
+					selectedPhotosCount: selectedPhotos?.length || 0
+				});
+			} catch (parseError) {
+				console.error('[Import Rooms] JSON parse error:', parseError);
+				return fail(400, { 
+					error: 'Invalid data format. Please try extracting rooms again.',
+					details: parseError instanceof Error ? parseError.message : String(parseError)
+				});
+			}
+
+			if (!Array.isArray(rooms) || rooms.length === 0) {
+				console.error('[Import Rooms] Invalid rooms array:', rooms);
+				return fail(400, { error: 'No valid rooms found in data' });
+			}
 
 			// Create rooms and beds from extracted data
 			for (let roomIdx = 0; roomIdx < rooms.length; roomIdx++) {
 				const roomData = rooms[roomIdx];
 				const roomPhotos = selectedPhotos[roomIdx] || [];
 
-				const room = await prisma.room.create({
-					data: {
-						tripId: params.tripId,
-						name: roomData.name,
-						description: roomData.description || undefined,
-						maxOccupancy: roomData.maxOccupancy || undefined,
-						photoUrls: roomPhotos // Set selected photos
-					}
+				console.log(`[Import Rooms] Processing room ${roomIdx + 1}/${rooms.length}:`, {
+					name: roomData.name,
+					bedsCount: roomData.beds?.length || 0,
+					photosCount: roomPhotos.length
 				});
 
-				// Create beds for this room
-				for (const bedData of roomData.beds) {
-					for (let i = 0; i < bedData.quantity; i++) {
-						await prisma.bed.create({
-							data: {
-								roomId: room.id,
-								bedType: bedData.bedType,
-								capacity: bedData.capacity || 1,
-								capacitySlots: bedData.bedType === 'bunk' ? 2 : 1
+				if (!roomData.name) {
+					console.error(`[Import Rooms] Room ${roomIdx} missing name:`, roomData);
+					return fail(400, { error: `Room ${roomIdx + 1} is missing a name` });
+				}
+
+				if (!Array.isArray(roomData.beds) || roomData.beds.length === 0) {
+					console.warn(`[Import Rooms] Room ${roomIdx} has no beds, creating room without beds`);
+				}
+
+				try {
+					const room = await prisma.room.create({
+						data: {
+							tripId: params.tripId,
+							name: roomData.name,
+							description: roomData.description || undefined,
+							maxOccupancy: roomData.maxOccupancy || undefined,
+							photoUrls: Array.isArray(roomPhotos) ? roomPhotos : []
+						}
+					});
+
+					console.log(`[Import Rooms] Created room: ${room.name} (ID: ${room.id})`);
+
+					// Create beds for this room
+					if (Array.isArray(roomData.beds)) {
+						for (const bedData of roomData.beds) {
+							if (!bedData.bedType) {
+								console.warn(`[Import Rooms] Bed missing bedType, skipping:`, bedData);
+								continue;
 							}
-						});
+
+							const quantity = bedData.quantity || 1;
+							const capacity = bedData.capacity || (bedData.bedType === 'king' || bedData.bedType === 'queen' || bedData.bedType === 'full' || bedData.bedType === 'murphy' ? 2 : 1);
+							const capacitySlots = bedData.bedType === 'bunk' ? 2 : 1;
+
+							for (let i = 0; i < quantity; i++) {
+								await prisma.bed.create({
+									data: {
+										roomId: room.id,
+										bedType: bedData.bedType,
+										capacity: capacity,
+										capacitySlots: capacitySlots
+									}
+								});
+							}
+							console.log(`[Import Rooms] Created ${quantity} bed(s) of type ${bedData.bedType}`);
+						}
 					}
+				} catch (dbError) {
+					console.error(`[Import Rooms] Database error creating room ${roomIdx}:`, dbError);
+					return fail(500, {
+						error: `Failed to create room "${roomData.name}": ${dbError instanceof Error ? dbError.message : String(dbError)}`
+					});
 				}
 			}
 
+			console.log('[Import Rooms] Successfully imported all rooms');
 			return { success: true, imported: true };
 		} catch (error) {
-			console.error('Import rooms error:', error);
+			console.error('[Import Rooms] Unexpected error:', error);
+			console.error('[Import Rooms] Error stack:', error instanceof Error ? error.stack : 'N/A');
 			return fail(500, {
-				error: 'Failed to import rooms. Please try again.'
+				error: 'Failed to import rooms. Please try again.',
+				details: error instanceof Error ? error.message : String(error)
 			});
 		}
 	},
