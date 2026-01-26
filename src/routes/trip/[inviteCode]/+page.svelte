@@ -10,19 +10,19 @@
 		checkInDate: '',
 		checkOutDate: '',
 		roomId: null as number | null,
-		bedId: null as string | null
+		bedId: null as string | null,
+		numberOfGuests: 1
 	};
 
-	let selectedRoom = $state<typeof data.rooms[0] | null>(null);
+	let selectedRoom = $state<typeof data.trip.rooms[0] | null>(null);
 	let priceCalculation = $state<{ nights: number; nightlyRate: number; totalPrice: number } | null>(null);
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
 
-	// Wedding dates (adjust as needed)
-	const weddingCheckIn = '2027-06-14';
-	const weddingCheckOut = '2027-06-21';
+	let minDate = $derived(new Date(data.trip.checkInDate).toISOString().split('T')[0]);
+	let maxDate = $derived(new Date(data.trip.checkOutDate).toISOString().split('T')[0]);
 
-	function selectRoom(room: typeof data.rooms[0]) {
+	function selectRoom(room: typeof data.trip.rooms[0]) {
 		selectedRoom = room;
 		formData.roomId = room.id;
 		formData.bedId = null;
@@ -35,9 +35,18 @@
 	}
 
 	async function calculatePrice() {
-		if (!formData.bedId || !formData.checkInDate || !formData.checkOutDate) {
+		if (!formData.roomId || !formData.checkInDate || !formData.checkOutDate) {
 			priceCalculation = null;
 			return;
+		}
+
+		// Get bed to determine slots
+		let numberOfSlots = 1;
+		if (formData.bedId && selectedRoom) {
+			const bed = selectedRoom.beds.find(b => b.id === formData.bedId);
+			if (bed) {
+				numberOfSlots = bed.capacitySlots || bed.capacity || 1;
+			}
 		}
 
 		try {
@@ -45,7 +54,10 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
+					tripId: data.trip.id,
+					roomId: formData.roomId,
 					bedId: formData.bedId,
+					numberOfSlots: numberOfSlots,
 					checkInDate: formData.checkInDate,
 					checkOutDate: formData.checkOutDate
 				})
@@ -54,16 +66,25 @@
 			const result = await response.json();
 			if (result.ok) {
 				priceCalculation = result.data;
+			} else {
+				error = result.message || 'Failed to calculate price';
 			}
 		} catch (err) {
 			console.error('Price calculation error:', err);
+			error = 'Failed to calculate price';
 		}
 	}
 
 	function handleSubmit({ cancel }: Parameters<Parameters<typeof enhance>[0]>[0]) {
-		if (!formData.name || !formData.email || !formData.bedId || !formData.checkInDate || !formData.checkOutDate) {
+		if (!formData.name || !formData.email || !formData.roomId || !formData.checkInDate || !formData.checkOutDate) {
 			cancel();
 			error = 'Please fill in all required fields';
+			return;
+		}
+
+		if (data.trip.pricingModel !== 'PER_ROOM' && !formData.bedId) {
+			cancel();
+			error = 'Please select a bed';
 			return;
 		}
 
@@ -78,36 +99,38 @@
 	}
 
 	$effect(() => {
-		if (formData.checkInDate && formData.checkOutDate) {
+		if (formData.checkInDate && formData.checkOutDate && formData.roomId) {
 			calculatePrice();
 		}
 	});
 
-	// Handle form errors and success
 	$effect(() => {
-		if (form) {
-			if (form.error) {
-				error = form.error;
-				isSubmitting = false;
-			} else if (form.status === 200 || form.status === 303) {
-				// Success - redirect will happen automatically
-				isSubmitting = false;
-			}
+		if (form?.error) {
+			error = form.error;
+			isSubmitting = false;
+		} else if (form?.status === 200 || form?.status === 303) {
+			isSubmitting = false;
 		}
 	});
 </script>
 
-<div class="select-page">
+<div class="trip-page">
 	<div class="container">
 		<header>
-			<h1>Choose Your Room</h1>
+			<h1>{data.trip.name}</h1>
+			{#if data.trip.description}
+				<p class="trip-description">{data.trip.description}</p>
+			{/if}
+			<p class="trip-dates">
+				{new Date(data.trip.checkInDate).toLocaleDateString()} - {new Date(data.trip.checkOutDate).toLocaleDateString()}
+			</p>
 		</header>
 
 		{#if error}
 			<div class="error-message">{error}</div>
 		{/if}
 
-		<form method="POST" action="?/submit" use:enhance={handleSubmit}>
+		<form method="POST" action="?/reserve" use:enhance={handleSubmit}>
 			<!-- Guest Info -->
 			<section class="form-section">
 				<h2>Your Information</h2>
@@ -133,6 +156,19 @@
 						placeholder="john@example.com"
 					/>
 				</div>
+				{#if data.trip.pricingModel === 'per_person' || data.trip.pricingModel === 'per_person_per_night'}
+					<div class="form-group">
+						<label for="numberOfGuests">Number of Guests *</label>
+						<input
+							type="number"
+							id="numberOfGuests"
+							name="numberOfGuests"
+							bind:value={formData.numberOfGuests}
+							min="1"
+							required
+						/>
+					</div>
+				{/if}
 			</section>
 
 			<!-- Dates -->
@@ -146,8 +182,8 @@
 							id="checkIn"
 							name="checkInDate"
 							bind:value={formData.checkInDate}
-							min={weddingCheckIn}
-							max={weddingCheckOut}
+							min={minDate}
+							max={maxDate}
 							required
 						/>
 					</div>
@@ -158,8 +194,8 @@
 							id="checkOut"
 							name="checkOutDate"
 							bind:value={formData.checkOutDate}
-							min={weddingCheckIn}
-							max={weddingCheckOut}
+							min={minDate}
+							max={maxDate}
 							required
 						/>
 					</div>
@@ -170,7 +206,7 @@
 			<section class="form-section">
 				<h2>Select Room</h2>
 				<div class="room-grid">
-					{#each data.rooms as room}
+					{#each data.trip.rooms as room}
 						<button
 							type="button"
 							class="room-card"
@@ -181,14 +217,16 @@
 							{#if room.description}
 								<p>{room.description}</p>
 							{/if}
-							<div class="bed-count">{room.beds.length} bed{room.beds.length !== 1 ? 's' : ''} available</div>
+							<div class="bed-count">
+								{room.beds.length} bed{room.beds.length !== 1 ? 's' : ''} available
+							</div>
 						</button>
 					{/each}
 				</div>
 			</section>
 
-			<!-- Bed Selection -->
-			{#if selectedRoom}
+			<!-- Bed Selection (if not PER_ROOM pricing) -->
+			{#if selectedRoom && data.trip.pricingModel !== 'PER_ROOM'}
 				<section class="form-section">
 					<h2>Select Bed</h2>
 					<div class="bed-list">
@@ -197,17 +235,12 @@
 								type="button"
 								class="bed-option"
 								class:selected={formData.bedId === bed.id}
-								class:unavailable={!bed.isAvailable}
-								disabled={!bed.isAvailable}
 								onclick={() => selectBed(bed.id)}
 							>
 								<div class="bed-info">
 									<span class="bed-type">{bed.bedType.toUpperCase()}</span>
-									<span class="bed-price">${bed.nightlyRate.toFixed(2)}/night</span>
+									<span class="bed-capacity">Capacity: {bed.capacity}</span>
 								</div>
-								{#if !bed.isAvailable}
-									<span class="unavailable-badge">Unavailable</span>
-								{/if}
 							</button>
 						{/each}
 					</div>
@@ -228,24 +261,23 @@
 							<span>{priceCalculation.nights}</span>
 						</div>
 						<div class="price-row total">
-							<span>Total Estimated Cost:</span>
+							<span>Total Cost:</span>
 							<span>${priceCalculation.totalPrice.toFixed(2)}</span>
 						</div>
 					</div>
-					<p class="price-note">
-						Pricing is based on bed type, room sharing, and length of stay to keep things fair for everyone.
-					</p>
 				</section>
 			{/if}
 
-			<!-- Hidden fields for form submission -->
+			<!-- Hidden fields -->
 			<input type="hidden" name="roomId" value={formData.roomId || ''} />
-			<input type="hidden" name="bedId" value={formData.bedId || ''} />
+			{#if formData.bedId}
+				<input type="hidden" name="bedId" value={formData.bedId} />
+			{/if}
 
 			<!-- Submit -->
 			<div class="form-actions">
 				<button type="submit" class="btn-primary" disabled={isSubmitting || !priceCalculation}>
-					{isSubmitting ? 'Submitting...' : 'Submit Selection'}
+					{isSubmitting ? 'Submitting...' : 'Reserve'}
 				</button>
 			</div>
 		</form>
@@ -253,7 +285,7 @@
 </div>
 
 <style>
-	.select-page {
+	.trip-page {
 		min-height: 100vh;
 		padding: 2rem;
 		background: #f5f7fa;
@@ -276,7 +308,18 @@
 	h1 {
 		font-size: 2rem;
 		color: #2c3e50;
-		margin: 0;
+		margin: 0 0 0.5rem 0;
+	}
+
+	.trip-description {
+		color: #555;
+		margin: 0.5rem 0;
+	}
+
+	.trip-dates {
+		color: #7f8c8d;
+		font-size: 1rem;
+		margin: 0.5rem 0;
 	}
 
 	.error-message {
@@ -314,6 +357,7 @@
 
 	input[type="text"],
 	input[type="email"],
+	input[type="number"],
 	input[type="date"] {
 		width: 100%;
 		padding: 0.75rem;
@@ -390,18 +434,13 @@
 		align-items: center;
 	}
 
-	.bed-option:hover:not(:disabled) {
+	.bed-option:hover {
 		border-color: #3498db;
 	}
 
 	.bed-option.selected {
 		border-color: #3498db;
 		background: #ebf5fb;
-	}
-
-	.bed-option.unavailable {
-		opacity: 0.5;
-		cursor: not-allowed;
 	}
 
 	.bed-info {
@@ -415,17 +454,9 @@
 		color: #2c3e50;
 	}
 
-	.bed-price {
-		color: #27ae60;
-		font-weight: 500;
-	}
-
-	.unavailable-badge {
-		background: #e74c3c;
-		color: white;
-		padding: 0.25rem 0.75rem;
-		border-radius: 4px;
-		font-size: 0.85rem;
+	.bed-capacity {
+		color: #7f8c8d;
+		font-size: 0.9rem;
 	}
 
 	.price-summary {
@@ -454,13 +485,6 @@
 		color: #2c3e50;
 	}
 
-	.price-note {
-		margin-top: 1rem;
-		font-size: 0.9rem;
-		color: #555;
-		font-style: italic;
-	}
-
 	.form-actions {
 		text-align: center;
 		margin-top: 2rem;
@@ -487,4 +511,3 @@
 		cursor: not-allowed;
 	}
 </style>
-

@@ -11,35 +11,109 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model Room {
-  id                  Int      @id @default(autoincrement())
+model Trip {
+  id                  String   @id @default(uuid())
   name                String
   description         String?
-  baseRateModifier    Float    @default(1.0)
+  listingUrl          String?   // Airbnb/VRBO URL
+  listingTitle        String?
+  listingCoverPhoto   String?
+  checkInDate         DateTime
+  checkOutDate        DateTime
+  totalCost           Float    // Total cost of the rental
+  pricingModel        String   // "per_room" | "per_bed" | "per_person" | "per_person_per_night"
+  inviteCode          String   @unique // Unique code for guests to access
+  isPublished         Boolean  @default(false)
+  hostId              String?  // AdminUser who created this trip
+  
+  // New pricing fields
+  expectedPeopleCount Int?     // Expected number of people (for PER_PERSON mode)
+  maxGuests           Int?     // Max guests from property listing
+  allowPartialStays  Boolean  @default(false) // Toggle for partial stay reservations
+  
+  // Pricing settings (stored as JSON for flexibility)
+  bedWeights          String?  // JSON: {"king": 1.00, "queen": 0.75, "twin": 0.50, ...}
+  sharingExponentAlpha Float   @default(0.60) // Sharing discount exponent (0.3-0.9)
+  privacyPremiumP     Float   @default(0.00) // Privacy premium (0-0.25)
+  
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   
+  host                AdminUser? @relation(fields: [hostId], references: [id])
+  rooms               Room[]
+  reservations        Reservation[]
+  
+  @@index([inviteCode])
+  @@index([isPublished])
+  @@index([hostId])
+}
+
+model Room {
+  id                  Int      @id @default(autoincrement())
+  tripId              String
+  name                String
+  description         String?
+  baseRateModifier    Float    @default(1.0)
+  photoUrls           String[] // Array of photo URLs
+  maxOccupancy        Int?     // Max people per room
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
   beds                Bed[]
-  submissions        GuestSubmission[]
+  reservations        Reservation[]
+  legacySubmissions   GuestSubmission[] // Legacy support
+  
+  @@index([tripId])
 }
 
 model Bed {
   id                  String   @id @default(uuid())
   roomId              Int
-  bedType             String   // "king" | "queen" | "twin" | "bunk"
+  bedType             String   // "king" | "queen" | "twin" | "bunk" | "sofa" | "full" | etc.
   nightlyRate         Float?   // Optional: can be calculated on-the-fly
-  capacity            Int      @default(1)
+  capacity            Int      @default(1) // Number of people per bed (legacy)
+  capacitySlots       Int      @default(1) // Number of sleep slots (for canonical model)
   isAvailable         Boolean  @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   
-  room                Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  submissions        GuestSubmission[]
+  room                Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  reservations        Reservation[]
+  legacySubmissions   GuestSubmission[] // Legacy support
   
   @@index([roomId])
   @@index([isAvailable])
 }
 
+model Reservation {
+  id                  String   @id @default(uuid())
+  tripId              String
+  name                String
+  email               String
+  roomId              Int
+  bedId               String?
+  checkInDate         DateTime
+  checkOutDate        DateTime
+  nights              Int
+  numberOfGuests      Int      @default(1)
+  numberOfSlots       Int      @default(1) // Number of sleep slots reserved
+  calculatedPrice     Float
+  pricingSnapshot     String?  // JSON snapshot of pricing at time of reservation
+  submittedAt         DateTime @default(now())
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  room                Room     @relation(fields: [roomId], references: [id])
+  bed                 Bed?     @relation(fields: [bedId], references: [id])
+  
+  @@index([email])
+  @@index([tripId])
+  @@index([roomId])
+  @@index([bedId])
+  @@index([submittedAt])
+}
+
+// Legacy model - keeping for backward compatibility during migration
 model GuestSubmission {
   id                  String   @id @default(uuid())
   name                String
@@ -82,6 +156,8 @@ model AdminUser {
   passwordHash        String
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  
+  trips               Trip[]   // Hosts can create multiple trips
   
   @@index([email])
 }

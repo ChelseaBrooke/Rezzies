@@ -1,149 +1,108 @@
-// Pricing calculation logic
-// DO NOT CHANGE CONSTANTS UNLESS YOU WANT PRICING TO SHIFT
+// Pricing calculation logic for RoomSplit
+// Supports multiple pricing models: per_room, per_bed, per_person, per_person_per_night
 
-// Stay details
-const TOTAL_STAY_COST = 7538;
-const TOTAL_NIGHTS = 7;
-const NIGHTLY_HOUSE_COST = TOTAL_STAY_COST / TOTAL_NIGHTS; // 1076.86
+import { prisma } from './prisma.js';
 
-// Bed Base Weights (value of bed type)
-const BED_BASE_WEIGHTS = {
-	king: 1.35,
-	queen: 1.15,
-	twin: 0.85,
-	bunk: 0.7
-} as const;
+export type PricingModel = 'per_room' | 'per_bed' | 'per_person' | 'per_person_per_night';
 
-// Room Sharing Modifiers (privacy penalty)
-const ROOM_BED_COUNT_MODIFIER: Record<number, number> = {
-	1: 1.0, // private room
-	2: 0.92, // shared with 1 other bed
-	3: 0.85 // shared with 2 other beds
-};
-
-// Bed type
-type BedType = 'king' | 'queen' | 'twin' | 'bunk';
-
-// Canonical Room + Bed Inventory
-type Bed = {
-	id: string;
-	roomId: number;
-	bedType: BedType;
-};
-
-const BEDS: Bed[] = [
-	// Bedroom 1
-	{ id: 'r1-king', roomId: 1, bedType: 'king' },
-	{ id: 'r1-bunk-a', roomId: 1, bedType: 'bunk' },
-	{ id: 'r1-bunk-b', roomId: 1, bedType: 'bunk' },
-
-	// Bedroom 2
-	{ id: 'r2-queen', roomId: 2, bedType: 'queen' },
-	{ id: 'r2-bunk-a', roomId: 2, bedType: 'bunk' },
-	{ id: 'r2-bunk-b', roomId: 2, bedType: 'bunk' },
-
-	// Bedroom 3
-	{ id: 'r3-queen', roomId: 3, bedType: 'queen' },
-	{ id: 'r3-bunk-a', roomId: 3, bedType: 'bunk' },
-	{ id: 'r3-bunk-b', roomId: 3, bedType: 'bunk' },
-
-	// Bedroom 4
-	{ id: 'r4-queen', roomId: 4, bedType: 'queen' },
-	{ id: 'r4-twin', roomId: 4, bedType: 'twin' },
-
-	// Bedroom 5
-	{ id: 'r5-queen', roomId: 5, bedType: 'queen' },
-
-	// Bedroom 6
-	{ id: 'r6-queen', roomId: 6, bedType: 'queen' },
-
-	// Bedroom 7
-	{ id: 'r7-queen', roomId: 7, bedType: 'queen' },
-	{ id: 'r7-bunk-a', roomId: 7, bedType: 'bunk' },
-	{ id: 'r7-bunk-b', roomId: 7, bedType: 'bunk' },
-
-	// Bedroom 8
-	{ id: 'r8-queen', roomId: 8, bedType: 'queen' },
-	{ id: 'r8-bunk-a', roomId: 8, bedType: 'bunk' },
-	{ id: 'r8-bunk-b', roomId: 8, bedType: 'bunk' },
-
-	// Bedroom 9
-	{ id: 'r9-queen', roomId: 9, bedType: 'queen' },
-	{ id: 'r9-twin', roomId: 9, bedType: 'twin' }
-];
-
-// Utility: Count Beds Per Room
-function getRoomBedCounts(beds: Bed[]): Record<number, number> {
-	return beds.reduce((acc, bed) => {
-		acc[bed.roomId] = (acc[bed.roomId] || 0) + 1;
-		return acc;
-	}, {} as Record<number, number>);
-}
-
-// Compute Weight for Each Bed
-type BedWithWeight = Bed & {
-	baseWeight: number;
-	roomModifier: number;
-	effectiveWeight: number;
-};
-
-function calculateBedWeights(beds: Bed[]): BedWithWeight[] {
-	const roomBedCounts = getRoomBedCounts(beds);
-
-	return beds.map((bed) => {
-		const baseWeight = BED_BASE_WEIGHTS[bed.bedType];
-		const roomModifier = ROOM_BED_COUNT_MODIFIER[roomBedCounts[bed.roomId]] ?? 0.85;
-
-		const effectiveWeight = baseWeight * roomModifier;
-
-		return {
-			...bed,
-			baseWeight,
-			roomModifier,
-			effectiveWeight
-		};
-	});
-}
-
-// Calculate Total Weight Pool
-function calculateTotalWeight(bedsWithWeights: BedWithWeight[]): number {
-	return bedsWithWeights.reduce((sum, bed) => sum + bed.effectiveWeight, 0);
-}
-
-// Derive Dollar Value per Weight Unit
-function calculatePricePerWeightUnit(): number {
-	const bedsWithWeights = calculateBedWeights(BEDS);
-	const totalWeight = calculateTotalWeight(bedsWithWeights);
-	return NIGHTLY_HOUSE_COST / totalWeight;
-}
-
-// Guest Price Calculation (CORE FUNCTION)
-export function calculateGuestPrice({
-	bedId,
-	checkInDate,
-	checkOutDate
-}: {
-	bedId: string;
-	checkInDate: Date;
-	checkOutDate: Date;
-}): {
+export interface PriceCalculationResult {
 	nights: number;
 	nightlyRate: number;
 	totalPrice: number;
-} {
-	const nights = Math.ceil(
+}
+
+export interface CalculatePriceParams {
+	tripId: string;
+	roomId?: number;
+	bedId?: string;
+	numberOfGuests?: number;
+	checkInDate: Date;
+	checkOutDate: Date;
+}
+
+/**
+ * Calculate the number of nights between two dates
+ */
+function calculateNights(checkInDate: Date, checkOutDate: Date): number {
+	return Math.ceil(
 		(checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
 	);
+}
 
-	const bedsWithWeights = calculateBedWeights(BEDS);
-	const pricePerWeightUnit = calculatePricePerWeightUnit();
+/**
+ * Generate a unique invite code
+ */
+export function generateInviteCode(): string {
+	const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars
+	let code = '';
+	for (let i = 0; i < 6; i++) {
+		code += chars.charAt(Math.floor(Math.random() * chars.length));
+	}
+	return code;
+}
 
-	const selectedBed = bedsWithWeights.find((b) => b.id === bedId);
-	if (!selectedBed) {
-		throw new Error(`Invalid bed selection: ${bedId}`);
+/**
+ * Calculate price based on pricing model
+ */
+export async function calculatePrice(
+	params: CalculatePriceParams
+): Promise<PriceCalculationResult> {
+	const { tripId, roomId, bedId, numberOfGuests = 1, checkInDate, checkOutDate } = params;
+
+	// Get trip details
+	const trip = await prisma.trip.findUnique({
+		where: { id: tripId },
+		include: {
+			rooms: {
+				include: {
+					beds: true
+				}
+			}
+		}
+	});
+
+	if (!trip) {
+		throw new Error('Trip not found');
 	}
 
-	const nightlyRate = selectedBed.effectiveWeight * pricePerWeightUnit;
+	const nights = calculateNights(checkInDate, checkOutDate);
+	if (nights <= 0) {
+		throw new Error('Invalid date range');
+	}
+
+	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
+
+	// Calculate price based on model
+	switch (trip.pricingModel) {
+		case 'per_room':
+			return calculatePerRoomPrice(trip, roomId!, nights, totalNights);
+
+		case 'per_bed':
+			return await calculatePerBedPrice(trip, bedId!, nights, totalNights);
+
+		case 'per_person':
+			return calculatePerPersonPrice(trip, numberOfGuests, totalNights);
+
+		case 'per_person_per_night':
+			return calculatePerPersonPerNightPrice(trip, numberOfGuests, nights, totalNights);
+
+		default:
+			throw new Error(`Unknown pricing model: ${trip.pricingModel}`);
+	}
+}
+
+/**
+ * Per Room: Total cost divided by number of rooms, then by nights
+ */
+function calculatePerRoomPrice(
+	trip: { totalCost: number; rooms: Array<{ id: number }> },
+	roomId: number,
+	nights: number,
+	totalNights: number
+): PriceCalculationResult {
+	const totalRooms = trip.rooms.length;
+	const roomCostPerNight = trip.totalCost / totalNights / totalRooms;
+	const nightlyRate = roomCostPerNight;
 	const totalPrice = nightlyRate * nights;
 
 	return {
@@ -153,26 +112,116 @@ export function calculateGuestPrice({
 	};
 }
 
-// Get all beds with their pricing info (for UI)
-export function getAllBedsWithPricing(): Array<Bed & { nightlyRate: number }> {
-	const bedsWithWeights = calculateBedWeights(BEDS);
-	const pricePerWeightUnit = calculatePricePerWeightUnit();
+/**
+ * Per Bed: Total cost divided by number of beds, then by nights
+ */
+async function calculatePerBedPrice(
+	trip: { totalCost: number; rooms: Array<{ id: number; beds: Array<{ id: string }> }> },
+	bedId: string,
+	nights: number,
+	totalNights: number
+): Promise<PriceCalculationResult> {
+	// Count total beds across all rooms
+	const totalBeds = trip.rooms.reduce((sum, room) => sum + room.beds.length, 0);
+	const bedCostPerNight = trip.totalCost / totalNights / totalBeds;
+	const nightlyRate = bedCostPerNight;
+	const totalPrice = nightlyRate * nights;
 
-	return bedsWithWeights.map((bed) => ({
-		id: bed.id,
-		roomId: bed.roomId,
-		bedType: bed.bedType,
-		nightlyRate: Number((bed.effectiveWeight * pricePerWeightUnit).toFixed(2))
-	}));
+	return {
+		nights,
+		nightlyRate: Number(nightlyRate.toFixed(2)),
+		totalPrice: Number(totalPrice.toFixed(2))
+	};
 }
 
-// Get bed by ID
-export function getBedById(bedId: string): Bed | undefined {
-	return BEDS.find((b) => b.id === bedId);
+/**
+ * Per Person: Total cost divided by total capacity, flat rate
+ */
+function calculatePerPersonPrice(
+	trip: { totalCost: number; rooms: Array<{ maxOccupancy: number | null }> },
+	numberOfGuests: number,
+	totalNights: number
+): PriceCalculationResult {
+	// Calculate total capacity
+	const totalCapacity = trip.rooms.reduce((sum, room) => {
+		return sum + (room.maxOccupancy || 1);
+	}, 0);
+
+	const costPerPerson = trip.totalCost / totalCapacity;
+	const totalPrice = costPerPerson * numberOfGuests;
+	const nightlyRate = totalPrice / totalNights; // For display purposes
+
+	return {
+		nights: totalNights, // Full trip duration
+		nightlyRate: Number(nightlyRate.toFixed(2)),
+		totalPrice: Number(totalPrice.toFixed(2))
+	};
 }
 
-// Get all beds for a room
-export function getBedsByRoomId(roomId: number): Bed[] {
-	return BEDS.filter((b) => b.roomId === roomId);
+/**
+ * Per Person Per Night: Total cost divided by total capacity and nights
+ */
+function calculatePerPersonPerNightPrice(
+	trip: { totalCost: number; rooms: Array<{ maxOccupancy: number | null }> },
+	numberOfGuests: number,
+	nights: number,
+	totalNights: number
+): PriceCalculationResult {
+	// Calculate total capacity
+	const totalCapacity = trip.rooms.reduce((sum, room) => {
+		return sum + (room.maxOccupancy || 1);
+	}, 0);
+
+	const costPerPersonPerNight = trip.totalCost / totalNights / totalCapacity;
+	const nightlyRate = costPerPersonPerNight * numberOfGuests;
+	const totalPrice = nightlyRate * nights;
+
+	return {
+		nights,
+		nightlyRate: Number(nightlyRate.toFixed(2)),
+		totalPrice: Number(totalPrice.toFixed(2))
+	};
 }
 
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use calculatePrice instead
+ */
+export function calculateGuestPrice({
+	bedId,
+	checkInDate,
+	checkOutDate
+}: {
+	bedId: string;
+	checkInDate: Date;
+	checkOutDate: Date;
+}): PriceCalculationResult {
+	const nights = calculateNights(checkInDate, checkOutDate);
+	// This is a stub - should not be used in new code
+	throw new Error('Legacy calculateGuestPrice is deprecated. Use calculatePrice with tripId instead.');
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated
+ */
+export function getAllBedsWithPricing(): Array<{ id: string; roomId: number; bedType: string; nightlyRate: number }> {
+	// Stub for backward compatibility
+	return [];
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated
+ */
+export function getBedById(bedId: string): { id: string; roomId: number; bedType: string } | undefined {
+	return undefined;
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated
+ */
+export function getBedsByRoomId(roomId: number): Array<{ id: string; roomId: number; bedType: string }> {
+	return [];
+}

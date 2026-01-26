@@ -64,7 +64,7 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions: Actions = {
-	default: async ({ request }) => {
+	submit: async ({ request }) => {
 		try {
 			const formData = await request.formData();
 			

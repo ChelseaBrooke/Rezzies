@@ -44,3 +44,6 @@ desktop.ini
 # Logs
 logs
 *.log
+
+# Debug HTML files (saved for price extraction debugging)
+debug-html/

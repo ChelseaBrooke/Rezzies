@@ -11,7 +11,7 @@
 		{#if form?.error}
 			<div class="error-message">{form.error}</div>
 		{/if}
-		<form method="POST" use:enhance>
+		<form method="POST" action="?/login" use:enhance>
 			<div class="form-group">
 				<label for="email">Email</label>
 				<input type="email" id="email" name="email" required />

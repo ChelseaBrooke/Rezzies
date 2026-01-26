@@ -1,6 +1,6 @@
-# Wedding Airbnb Room Selection App
+# RoomSplit
 
-A lightweight web app for coordinating room and bed assignments for wedding guests staying at an Airbnb property.
+A consumer-friendly web application that allows trip organizers to fairly split vacation rental costs among guests. No more spreadsheets, group chat confusion, or last-minute renegotiations.
 
 ## Tech Stack
 
@@ -13,12 +13,14 @@ A lightweight web app for coordinating room and bed assignments for wedding gues
 
 ## Features
 
-- Guest room/bed selection with dynamic pricing
-- Automatic price calculation based on bed type, room sharing, and stay duration
-- Email confirmations via SendGrid templates
-- Admin dashboard for viewing submissions
-- Double-booking prevention
-- No user authentication required for guests (public access)
+- **Trip Management**: Create and manage multiple trips with Airbnb/VRBO integration
+- **Flexible Pricing Models**: Support for per-room, per-bed, per-person, and per-person-per-night pricing
+- **Room & Bed Setup**: Easy interface for hosts to configure room inventory
+- **Invite Code Access**: Secure trip access via unique invite codes
+- **Guest Reservations**: Simple reservation flow for guests with automatic price calculation
+- **Host Dashboard**: View reservations, manage trips, and export ledger data
+- **Email Confirmations**: Automated confirmation emails via SendGrid
+- **Double-booking Prevention**: Automatic conflict detection
 
 ## Prerequisites
 
@@ -188,7 +190,7 @@ See `src/lib/server/pricing.ts` for the implementation.
 
 1. Push your code to GitHub
 2. Import the project in Vercel
-3. Configure all environment variables in Vercel dashboard
+3. Configure all environment variables in Vercel dashboard (see Environment Variables section)
 4. Deploy
 
 Vercel will automatically:
@@ -198,7 +200,22 @@ Vercel will automatically:
 
 ### Database Migrations on Vercel
 
-For production deployments, migrations should run automatically via the `db:migrate` script in your build process, or you can configure Vercel to run migrations as a build step.
+For production deployments, add a build command that runs migrations:
+
+```json
+{
+  "buildCommand": "npm run prisma:generate && npm run db:migrate && npm run build"
+}
+```
+
+Or configure Vercel to run migrations as a post-deploy step.
+
+### Accessing Your App
+
+After deployment:
+- **Guest Access**: Share the invite code with guests. They can access trips at `https://your-app.vercel.app/trip/[INVITE_CODE]`
+- **Host Access**: Log in at `https://your-app.vercel.app/admin/login`
+- **Home Page**: `https://your-app.vercel.app/` - Guests can enter invite codes here
 
 ## Security
 

@@ -1,11 +1,14 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { z } from 'zod';
-import { calculateGuestPrice } from '$lib/server/pricing.js';
+import { calculateReservationPrice } from '$lib/server/pricing-canonical.js';
 import { createSuccessResponse, createErrorResponse } from '$lib/server/validation.js';
 
 const priceCalculationSchema = z.object({
-	bedId: z.string(),
+	tripId: z.string().uuid(),
+	roomId: z.number().int().positive(),
+	bedId: z.string().uuid().optional(),
+	numberOfSlots: z.number().int().positive().default(1),
 	checkInDate: z.coerce.date(),
 	checkOutDate: z.coerce.date()
 }).refine((data) => data.checkOutDate > data.checkInDate, {
@@ -25,15 +28,22 @@ export const POST: RequestHandler = async (event) => {
 			);
 		}
 
-		const { bedId, checkInDate, checkOutDate } = validationResult.data;
+		const { tripId, roomId, bedId, numberOfSlots, checkInDate, checkOutDate } = validationResult.data;
 		
-		const result = calculateGuestPrice({
+		const result = await calculateReservationPrice({
+			tripId,
+			roomId,
 			bedId,
+			numberOfSlots,
 			checkInDate,
 			checkOutDate
 		});
 
-		return json(createSuccessResponse(result));
+		return json(createSuccessResponse({
+			nights: result.nights,
+			nightlyRate: result.perNightRate,
+			totalPrice: result.totalPrice
+		}));
 	} catch (error) {
 		console.error('Price calculation error:', error);
 		return json(
