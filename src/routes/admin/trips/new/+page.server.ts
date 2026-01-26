@@ -36,6 +36,10 @@ export const actions: Actions = {
 			const bedWeightsStr = formData.get('bedWeights') as string;
 			const sharingExponentAlphaStr = formData.get('sharingExponentAlpha') as string;
 			const privacyPremiumPStr = formData.get('privacyPremiumP') as string;
+			const enableMeals = formData.get('enableMeals') === 'true' || formData.get('enableMeals') === 'on';
+			const enableActivities = formData.get('enableActivities') === 'true' || formData.get('enableActivities') === 'on';
+			const enableExtras = formData.get('enableExtras') === 'true' || formData.get('enableExtras') === 'on';
+			const selectedRoomPhotosStr = formData.get('selectedRoomPhotos') as string;
 
 			// Validate required fields - check for empty strings too
 			const missingFields: string[] = [];
@@ -141,6 +145,17 @@ export const actions: Actions = {
 				}
 			}
 
+			// Get user session if available (for /trips/new route)
+			const userSession = cookies.get('user_session');
+			let userId: string | null = null;
+			
+			if (userSession) {
+				// Try to get user from session
+				const { getSessionUser } = await import('$lib/server/session.js');
+				const user = await getSessionUser(cookies);
+				userId = user?.id || null;
+			}
+
 			// Create trip
 			const trip = await prisma.trip.create({
 				data: {
@@ -160,9 +175,53 @@ export const actions: Actions = {
 					bedWeights: validationResult.data.bedWeights || null,
 					sharingExponentAlpha: validationResult.data.sharingExponentAlpha,
 					privacyPremiumP: validationResult.data.privacyPremiumP,
-					isPublished: false
+					isPublished: false,
+					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+					scrapePayload: formData.get('scrapePayload') as string || null
 				}
 			});
+
+			// If created by a User (not AdminUser), create TripMember record
+			if (userId) {
+				await prisma.tripMember.create({
+					data: {
+						tripId: trip.id,
+						userId: userId,
+						role: 'host',
+						inviteStatus: 'accepted'
+					}
+				});
+			}
+
+			// Create MealPlan if enabled
+			if (enableMeals) {
+				await prisma.mealPlan.create({
+					data: {
+						tripId: trip.id,
+						enabled: true,
+						mode: 'slots'
+					}
+				});
+			}
+
+			// Store selected room photos in scrapePayload for later use
+			if (selectedRoomPhotosStr) {
+				try {
+					const roomPhotos = JSON.parse(selectedRoomPhotosStr);
+					const currentPayload = trip.scrapePayload ? JSON.parse(trip.scrapePayload) : {};
+					await prisma.trip.update({
+						where: { id: trip.id },
+						data: {
+							scrapePayload: JSON.stringify({
+								...currentPayload,
+								selectedRoomPhotos: roomPhotos
+							})
+						}
+					});
+				} catch (e) {
+					console.error('Error storing room photos:', e);
+				}
+			}
 
 			// Redirect to room setup
 			throw redirect(303, `/admin/trips/${trip.id}/rooms`);

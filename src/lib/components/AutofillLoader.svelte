@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+
 	interface Props {
 		progress: number;
 		status: string;
@@ -9,6 +11,7 @@
 	const animals = ['🐱', '🐶', '🐰', '🐼', '🐨', '🦊', '🐸', '🐯'];
 	let currentAnimal = $state(animals[0]);
 	let animalIndex = $state(0);
+	let showCancel = $state(false);
 
 	$effect(() => {
 		const interval = setInterval(() => {
@@ -17,6 +20,21 @@
 		}, 500);
 		return () => clearInterval(interval);
 	});
+
+	// Show cancel button if stuck for more than 30 seconds
+	$effect(() => {
+		if (progress > 0 && progress < 90) {
+			const timer = setTimeout(() => {
+				showCancel = true;
+			}, 30000); // 30 seconds
+			return () => clearTimeout(timer);
+		}
+	});
+
+	function handleCancel() {
+		sessionStorage.removeItem('autofillUrl');
+		goto('/host-vacation');
+	}
 </script>
 
 <div class="loader-container">
@@ -31,6 +49,15 @@
 			</div>
 			<p class="progress-text">{Math.round(progress)}%</p>
 		</div>
+		
+		{#if showCancel}
+			<div class="cancel-section">
+				<p class="cancel-message">This is taking longer than expected...</p>
+				<button class="btn btn-secondary" onclick={handleCancel}>
+					Cancel & Go Back
+				</button>
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -102,5 +129,17 @@
 		color: var(--color-text-light);
 		font-size: 0.9rem;
 		font-weight: 600;
+	}
+
+	.cancel-section {
+		margin-top: var(--spacing-xl);
+		padding-top: var(--spacing-lg);
+		border-top: 1px solid rgba(255, 255, 255, 0.2);
+	}
+
+	.cancel-message {
+		color: rgba(255, 255, 255, 0.8);
+		margin-bottom: var(--spacing-md);
+		font-size: 0.95rem;
 	}
 </style>

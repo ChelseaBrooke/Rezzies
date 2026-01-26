@@ -12,7 +12,9 @@
 	<title>Rezzies - Fair Room & Cost Splitting for Group Vacations</title>
 </svelte:head>
 
-<Navigation user={data?.user} />
+{#if $page.url.pathname !== '/'}
+	<Navigation user={data?.user} />
+{/if}
 
 <main>
 	{@render children()}
@@ -21,5 +23,10 @@
 <style>
 	main {
 		min-height: calc(100vh - 80px);
+	}
+	
+	:global(body) {
+		margin: 0;
+		padding: 0;
 	}
 </style>

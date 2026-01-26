@@ -1,0 +1,166 @@
+import { prisma } from './prisma.js';
+import { calculateReservationPrice } from './pricing-canonical.js';
+
+export interface InvoiceBreakdown {
+	rooms: {
+		roomId: number;
+		roomName: string;
+		amount: number;
+		nights: number;
+	}[];
+	activities: {
+		activityId: string;
+		activityName: string;
+		amount: number;
+		participants: number;
+	}[];
+	extras: {
+		ruleId: string;
+		label: string;
+		amount: number;
+		quantity: number;
+	}[];
+	total: number;
+}
+
+export async function calculateInvoiceForUser(tripId: string, userId: string): Promise<InvoiceBreakdown> {
+	// Get user's selections
+	const [roomAssignment, activityParticipants, extraSelections, trip] = await Promise.all([
+		prisma.roomAssignment.findFirst({
+			where: { tripId, userId },
+			include: { room: true }
+		}),
+		prisma.activityParticipant.findMany({
+			where: {
+				userId,
+				activity: { tripId }
+			},
+			include: {
+				activity: true
+			}
+		}),
+		prisma.guestExtraSelection.findMany({
+			where: { tripId, userId },
+			include: {
+				rule: true
+			}
+		}),
+		prisma.trip.findUnique({
+			where: { id: tripId }
+		})
+	]);
+
+	if (!trip) {
+		throw new Error('Trip not found');
+	}
+
+	const breakdown: InvoiceBreakdown = {
+		rooms: [],
+		activities: [],
+		extras: [],
+		total: 0
+	};
+
+	// Calculate room costs
+	if (roomAssignment) {
+		const startDate = roomAssignment.startDate || trip.checkInDate;
+		const endDate = roomAssignment.endDate || trip.checkOutDate;
+		const nights = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+		// Use existing pricing calculation
+		const bed = roomAssignment.room.beds.find(b => b.bedType === roomAssignment.bedType) || roomAssignment.room.beds[0];
+		
+		if (bed) {
+			const priceCalculation = await calculateReservationPrice({
+				tripId,
+				roomId: roomAssignment.roomId,
+				bedId: bed.id,
+				numberOfSlots: roomAssignment.partySize,
+				checkInDate: startDate,
+				checkOutDate: endDate
+			});
+
+			breakdown.rooms.push({
+				roomId: roomAssignment.roomId,
+				roomName: roomAssignment.room.name,
+				amount: priceCalculation.totalPrice,
+				nights
+			});
+		}
+	}
+
+	// Calculate activity costs
+	for (const participant of activityParticipants) {
+		if (participant.status === 'in') {
+			breakdown.activities.push({
+				activityId: participant.activityId,
+				activityName: participant.activity.title,
+				amount: participant.activity.pricePerPerson,
+				participants: 1 // Each participant pays their own
+			});
+		}
+	}
+
+	// Calculate extra costs
+	for (const selection of extraSelections) {
+		let amount = selection.rule.amount;
+		
+		// Apply quantity-based pricing
+		if (selection.rule.type === 'per_pet' || selection.rule.type === 'per_night') {
+			const nights = roomAssignment 
+				? Math.ceil(((roomAssignment.endDate || trip.checkOutDate).getTime() - (roomAssignment.startDate || trip.checkInDate).getTime()) / (1000 * 60 * 60 * 24))
+				: Math.ceil((trip.checkOutDate.getTime() - trip.checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+			
+			if (selection.rule.type === 'per_night') {
+				amount = amount * nights;
+			}
+		}
+		
+		breakdown.extras.push({
+			ruleId: selection.ruleId,
+			label: selection.rule.label,
+			amount: amount * selection.quantity,
+			quantity: selection.quantity
+		});
+	}
+
+	// Calculate total
+	breakdown.total = 
+		breakdown.rooms.reduce((sum, r) => sum + r.amount, 0) +
+		breakdown.activities.reduce((sum, a) => sum + a.amount, 0) +
+		breakdown.extras.reduce((sum, e) => sum + e.amount, 0);
+
+	return breakdown;
+}
+
+export async function createInvoiceForUser(tripId: string, userId: string) {
+	const breakdown = await calculateInvoiceForUser(tripId, userId);
+
+	// Check if invoice already exists
+	const existing = await prisma.invoice.findFirst({
+		where: { tripId, userId, status: 'due' }
+	});
+
+	if (existing) {
+		// Update existing invoice
+		return prisma.invoice.update({
+			where: { id: existing.id },
+			data: {
+				totalAmount: breakdown.total,
+				breakdownJson: JSON.stringify(breakdown)
+			}
+		});
+	}
+
+	// Create new invoice
+	return prisma.invoice.create({
+		data: {
+			tripId,
+			userId,
+			totalAmount: breakdown.total,
+			currency: 'USD',
+			status: 'due',
+			breakdownJson: JSON.stringify(breakdown)
+		}
+	});
+}

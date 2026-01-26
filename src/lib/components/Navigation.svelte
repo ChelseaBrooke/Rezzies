@@ -21,7 +21,10 @@
 		
 		<div class="nav-auth">
 			{#if user}
-				<a href="/admin" class="btn btn-secondary">Dashboard</a>
+				<a href="/trips" class="nav-link">My Trips</a>
+				<form method="POST" action="/logout" style="display: inline;">
+					<button type="submit" class="btn btn-secondary">Log Out</button>
+				</form>
 			{:else}
 				<a href="/login" class="nav-link">Log In</a>
 				<a href="/signup" class="btn btn-primary">Sign Up</a>

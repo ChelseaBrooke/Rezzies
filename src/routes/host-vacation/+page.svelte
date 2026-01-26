@@ -17,12 +17,19 @@
 
 		try {
 			// Store the URL and redirect to loading page
-			sessionStorage.setItem('autofillUrl', listingUrl);
-			goto('/admin/trips/new?autofill=true');
+			const urlToStore = listingUrl.trim();
+			console.log('[Host Vacation] Storing URL in sessionStorage:', urlToStore);
+			sessionStorage.setItem('autofillUrl', urlToStore);
+			
+			// Verify it was stored
+			const stored = sessionStorage.getItem('autofillUrl');
+			console.log('[Host Vacation] Verified stored URL:', stored);
+			
+			console.log('[Host Vacation] Redirecting to /trips/new?autofill=true');
+			await goto('/trips/new?autofill=true');
 		} catch (error) {
 			autofillError = 'Failed to start autofill. Please try again.';
-			console.error('Autofill error:', error);
-		} finally {
+			console.error('[Host Vacation] Autofill error:', error);
 			isAutofilling = false;
 		}
 	}
@@ -107,7 +114,7 @@
 			<div class="action-buttons">
 				<button
 					class="btn btn-primary btn-large"
-					onclick={() => goto('/admin/trips/new')}
+					onclick={() => goto('/trips/new')}
 				>
 					Continue
 				</button>

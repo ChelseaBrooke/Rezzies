@@ -1,13 +1,12 @@
 import type { LayoutServerLoad } from './$types';
+import { getSessionUser } from '$lib/server/session.js';
 
 export const load: LayoutServerLoad = async ({ cookies }) => {
-	// Check for admin session
-	const session = cookies.get('admin_session');
+	// Get user session (regular users, not admin)
+	const user = await getSessionUser(cookies);
 	
-	// For now, just return if there's a session (user is logged in)
-	// In a real app, you'd decode the session and get user details
 	return {
-		user: session ? { email: 'user@example.com' } : null
+		user
 	};
 };
 

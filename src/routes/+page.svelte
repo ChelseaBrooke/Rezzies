@@ -1,209 +1,298 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	
+	// Background image will be in src/lib/assets/images/homepage-bg.jpg
+	// User will add this file
 </script>
 
 <div class="home-page">
-	<!-- Hero Section -->
-	<section class="hero">
-		<div class="hero-background">
-			<div class="hero-overlay"></div>
-		</div>
-		<div class="hero-content">
-			<div class="container">
-				<h1 class="hero-title">Split Your Vacation Costs Fairly</h1>
-				<p class="hero-subtitle">
-					No more spreadsheets or group chat confusion. Rezzies makes it easy to fairly divide vacation rental costs among your group.
-				</p>
-				<div class="hero-actions">
-					<a href="/host-vacation" class="btn btn-primary btn-large">Host a Vacation</a>
-					<a href="/find-vacation" class="btn btn-secondary btn-large">Find a Vacation</a>
-				</div>
-			</div>
-		</div>
-	</section>
+	<!-- Background Image -->
+	<div class="background-image">
+		<img src="/images/homepage-bg.jpg" alt="Background" class="bg-img" />
+		<div class="background-overlay"></div>
+	</div>
 
-	<!-- Features Section -->
-	<section class="features">
-		<div class="container">
-			<h2 class="section-title">How It Works</h2>
-			<div class="features-grid">
-				<div class="feature-card card">
-					<div class="feature-icon">🏠</div>
-					<h3>Host Sets Up Trip</h3>
-					<p>Import your VRBO or Airbnb listing, set dates, and choose how costs are split (per room, per person, per bed, or per person per night).</p>
-				</div>
-				<div class="feature-card card">
-					<div class="feature-icon">👥</div>
-					<h3>Guests Reserve Rooms</h3>
-					<p>Guests use a simple invite link to view available rooms and beds, then reserve their preferred accommodations.</p>
-				</div>
-				<div class="feature-card card">
-					<div class="feature-icon">💰</div>
-					<h3>Automatic Cost Calculation</h3>
-					<p>Rezzies automatically calculates what each guest owes based on their room choice, stay duration, and your pricing model.</p>
-				</div>
-				<div class="feature-card card">
-					<div class="feature-icon">📊</div>
-					<h3>Track Everything</h3>
-					<p>Hosts get a complete dashboard to view reservations, track payments, and export a detailed ledger.</p>
-				</div>
-			</div>
+	<!-- Header -->
+	<header class="home-header">
+		<div class="header-left">
+			<a href="/" class="logo-link">
+				<span class="logo-text">rezzies</span>
+				<span class="flamingo-icon">🦩</span>
+			</a>
+			<span class="tagline">for the host that does the most</span>
 		</div>
-	</section>
+		
+		<div class="header-right">
+			<button class="header-btn">
+				<span class="globe-icon">🌐</span>
+				<span>US</span>
+			</button>
+			<a href="/our-services" class="header-btn">About Us</a>
+			<button class="header-btn">
+				<span class="bell-icon">🔔</span>
+				<span>Notifications</span>
+			</button>
+			<button class="avatar-btn">
+				<div class="avatar-circle"></div>
+			</button>
+		</div>
+	</header>
 
-	<!-- CTA Section -->
-	<section class="cta">
-		<div class="container">
-			<div class="cta-content">
-				<h2>Ready to Plan Your Next Group Vacation?</h2>
-				<p>Join hosts who are making group travel planning stress-free and fair.</p>
-				<a href="/host-vacation" class="btn btn-primary btn-large">Get Started</a>
+	<!-- Main Content -->
+	<main class="home-main">
+		<div class="main-content">
+			<div class="main-actions">
+				<a href="/host-vacation" class="action-btn primary">Host a Trip</a>
+				<a href="/trips" class="action-btn secondary">Find a Trip</a>
+				<a href="/our-services" class="action-btn secondary">Learn More</a>
 			</div>
 		</div>
-	</section>
+	</main>
 </div>
 
 <style>
 	.home-page {
+		position: relative;
+		min-height: 100vh;
 		width: 100%;
+		overflow: hidden;
+		color: white;
+		margin: 0;
+		padding: 0;
 	}
 
-	/* Hero Section */
-	.hero {
-		position: relative;
-		min-height: 600px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+	.background-image {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 0;
 		overflow: hidden;
 	}
 
-	.hero-background {
+	.bg-img {
 		position: absolute;
 		top: 0;
 		left: 0;
-		right: 0;
-		bottom: 0;
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-		background-image: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80');
-		background-size: cover;
-		background-position: center;
-	}
-
-	.hero-overlay {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: linear-gradient(135deg, rgba(37, 99, 235, 0.8) 0%, rgba(29, 78, 216, 0.9) 100%);
-	}
-
-	.hero-content {
-		position: relative;
-		z-index: 1;
 		width: 100%;
-		padding: var(--spacing-2xl) var(--spacing-md);
-		text-align: center;
+		height: 100%;
+		object-fit: cover;
+		object-position: center;
+		z-index: 0;
 	}
 
-	.hero-title {
-		font-size: 3.5rem;
-		font-weight: 700;
-		color: white;
-		margin-bottom: var(--spacing-md);
-		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+	/* Fallback gradient - shows behind image */
+	.background-image::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+		z-index: -1;
 	}
 
-	.hero-subtitle {
-		font-size: 1.25rem;
-		color: rgba(255, 255, 255, 0.95);
-		max-width: 700px;
-		margin: 0 auto var(--spacing-xl);
-		line-height: 1.8;
+	.background-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.3);
+		z-index: 1;
 	}
 
-	.hero-actions {
+	/* Header */
+	.home-header {
+		position: relative;
+		z-index: 10;
 		display: flex;
-		gap: var(--spacing-md);
+		justify-content: space-between;
+		align-items: center;
+		padding: 1.5rem 2rem;
+		background: rgba(0, 0, 0, 0.2);
+		backdrop-filter: blur(10px);
+	}
+
+	.header-left {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.logo-link {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		text-decoration: none;
+		color: white;
+		font-size: 1.5rem;
+		font-weight: 600;
+	}
+
+	.logo-text {
+		text-transform: lowercase;
+		letter-spacing: -0.5px;
+	}
+
+	.flamingo-icon {
+		font-size: 1.25rem;
+	}
+
+	.tagline {
+		font-size: 0.875rem;
+		color: rgba(255, 255, 255, 0.8);
+		font-weight: 300;
+		margin-left: 0.5rem;
+	}
+
+	.header-right {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.header-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		background: transparent;
+		border: none;
+		color: white;
+		font-size: 0.9rem;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: background 0.2s;
+		text-decoration: none;
+		font-family: inherit;
+	}
+
+	.header-btn:hover {
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.globe-icon,
+	.bell-icon {
+		font-size: 1rem;
+	}
+
+	.avatar-btn {
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+	}
+
+	.avatar-circle {
+		width: 40px;
+		height: 40px;
+		border-radius: 50%;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		border: 2px solid rgba(255, 255, 255, 0.3);
+	}
+
+	/* Main Content */
+	.home-main {
+		position: relative;
+		z-index: 5;
+		display: flex;
+		align-items: flex-end;
 		justify-content: center;
+		min-height: calc(100vh - 80px);
+		padding: 2rem;
+		padding-bottom: 20vh; /* Move content down 20% */
+	}
+
+	.main-content {
+		text-align: center;
+		max-width: 800px;
+	}
+
+	.main-actions {
+		display: flex;
 		flex-wrap: wrap;
+		gap: 1.5rem;
+		justify-content: center;
+		margin-top: 2rem;
 	}
 
-	/* Features Section */
-	.features {
-		padding: var(--spacing-2xl) 0;
+	.action-btn {
+		padding: 0.875rem 2rem;
+		border-radius: 8px;
+		font-size: 1rem;
+		font-weight: 600;
+		text-decoration: none;
+		transition: all 0.2s;
+		border: none;
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.action-btn.primary {
 		background: white;
+		color: #1a1a2e;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 	}
 
-	.section-title {
-		text-align: center;
-		margin-bottom: var(--spacing-xl);
-		color: var(--color-text);
+	.action-btn.primary:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 	}
 
-	.features-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-		gap: var(--spacing-lg);
-		margin-top: var(--spacing-xl);
-	}
-
-	.feature-card {
-		text-align: center;
-		padding: var(--spacing-xl);
-	}
-
-	.feature-icon {
-		font-size: 3rem;
-		margin-bottom: var(--spacing-md);
-	}
-
-	.feature-card h3 {
-		margin-bottom: var(--spacing-sm);
-		color: var(--color-text);
-	}
-
-	.feature-card p {
-		color: var(--color-text-light);
-		line-height: 1.7;
-	}
-
-	/* CTA Section */
-	.cta {
-		padding: var(--spacing-2xl) 0;
-		background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+	.action-btn.secondary {
+		background: rgba(255, 255, 255, 0.15);
 		color: white;
+		backdrop-filter: blur(10px);
+		border: 1px solid rgba(255, 255, 255, 0.2);
 	}
 
-	.cta-content {
-		text-align: center;
-		max-width: 600px;
-		margin: 0 auto;
-	}
-
-	.cta-content h2 {
-		color: white;
-		margin-bottom: var(--spacing-md);
-	}
-
-	.cta-content p {
-		font-size: 1.125rem;
-		margin-bottom: var(--spacing-xl);
-		opacity: 0.95;
+	.action-btn.secondary:hover {
+		background: rgba(255, 255, 255, 0.25);
+		transform: translateY(-2px);
 	}
 
 	@media (max-width: 768px) {
-		.hero-title {
+		.home-header {
+			padding: 1rem;
+			flex-wrap: wrap;
+		}
+
+		.header-left {
+			flex-wrap: wrap;
+		}
+
+		.tagline {
+			font-size: 0.75rem;
+			margin-left: 0;
+		}
+
+		.header-right {
+			gap: 0.5rem;
+		}
+
+		.header-btn span:not(.globe-icon):not(.bell-icon) {
+			display: none;
+		}
+
+		.main-title {
 			font-size: 2.5rem;
 		}
 
-		.hero-subtitle {
-			font-size: 1.125rem;
+		.main-address {
+			font-size: 1rem;
 		}
 
-		.features-grid {
-			grid-template-columns: 1fr;
+		.main-actions {
+			flex-direction: column;
+		}
+
+		.action-btn {
+			width: 100%;
 		}
 	}
 </style>

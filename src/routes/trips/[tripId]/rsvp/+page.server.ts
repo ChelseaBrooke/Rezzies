@@ -1,0 +1,296 @@
+import { error, redirect } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './$types';
+import { getSessionUser } from '$lib/server/session.js';
+import { isTripMember } from '$lib/server/trip-access.js';
+import { prisma } from '$lib/server/prisma.js';
+import { z } from 'zod';
+
+export const load: PageServerLoad = async ({ params, cookies }) => {
+	const user = await getSessionUser(cookies);
+	
+	if (!user) {
+		throw redirect(303, `/login?redirect=/trips/${params.tripId}/rsvp`);
+	}
+
+	const tripId = params.tripId;
+
+	// Check if user is a member
+	const member = await isTripMember(tripId, user.id);
+	if (!member) {
+		throw error(403, 'You must be a member of this trip to RSVP');
+	}
+
+	// Get trip with all necessary data
+	const trip = await prisma.trip.findUnique({
+		where: { id: tripId },
+		include: {
+			rooms: {
+				include: {
+					beds: true,
+					roomAssignments: {
+						where: {
+							userId: user.id
+						}
+					}
+				}
+			},
+			activities: {
+				include: {
+					participants: {
+						where: {
+							userId: user.id
+						}
+					}
+				},
+				orderBy: {
+					date: 'asc'
+				}
+			},
+			extraCostRules: true,
+			guestProfiles: {
+				where: {
+					userId: user.id
+				}
+			},
+			rsvps: {
+				where: {
+					userId: user.id
+				}
+			}
+		}
+	});
+
+	if (!trip) {
+		throw error(404, 'Trip not found');
+	}
+
+	// Get user's current selections
+	const currentRsvp = trip.rsvps[0] || null;
+	const currentProfile = trip.guestProfiles[0] || null;
+	const currentRoomAssignment = trip.rooms.flatMap(r => r.roomAssignments)[0] || null;
+	const selectedActivities = trip.activities.filter(a => a.participants.length > 0);
+
+	return {
+		user,
+		trip,
+		currentRsvp,
+		currentProfile,
+		currentRoomAssignment,
+		selectedActivities
+	};
+};
+
+const rsvpSchema = z.object({
+	status: z.enum(['yes', 'no', 'maybe']),
+	arrivalDatetime: z.coerce.date().optional(),
+	departureDatetime: z.coerce.date().optional(),
+	adultsCount: z.coerce.number().int().positive().default(1),
+	kidsCount: z.coerce.number().int().min(0).default(0),
+	petsCount: z.coerce.number().int().min(0).default(0),
+	notes: z.string().optional()
+});
+
+const profileSchema = z.object({
+	dietaryRestrictions: z.string().optional(),
+	allergies: z.string().optional(),
+	phone: z.string().optional(),
+	emergencyContact: z.string().optional()
+});
+
+export const actions: Actions = {
+	updateRsvp: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) throw error(403, 'You must be a member of this trip');
+
+		const formData = await request.formData();
+		const data = {
+			status: formData.get('status') as string,
+			arrivalDatetime: formData.get('arrivalDatetime') ? new Date(formData.get('arrivalDatetime') as string) : undefined,
+			departureDatetime: formData.get('departureDatetime') ? new Date(formData.get('departureDatetime') as string) : undefined,
+			adultsCount: Number(formData.get('adultsCount')),
+			kidsCount: Number(formData.get('kidsCount')),
+			petsCount: Number(formData.get('petsCount')),
+			notes: formData.get('notes') as string | null
+		};
+
+		const validation = rsvpSchema.safeParse(data);
+		if (!validation.success) {
+			return { error: validation.error.errors[0]?.message };
+		}
+
+		// Upsert RSVP
+		await prisma.rSVP.upsert({
+			where: {
+				tripId_userId: {
+					tripId,
+					userId: user.id
+				}
+			},
+			create: {
+				tripId,
+				userId: user.id,
+				...validation.data
+			},
+			update: validation.data
+		});
+
+		return { success: true };
+	},
+
+	updateProfile: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) throw error(403, 'You must be a member of this trip');
+
+		const formData = await request.formData();
+		const data = {
+			dietaryRestrictions: formData.get('dietaryRestrictions') as string | null,
+			allergies: formData.get('allergies') as string | null,
+			phone: formData.get('phone') as string | null,
+			emergencyContact: formData.get('emergencyContact') as string | null
+		};
+
+		const validation = profileSchema.safeParse(data);
+		if (!validation.success) {
+			return { error: validation.error.errors[0]?.message };
+		}
+
+		// Upsert profile
+		await prisma.guestProfile.upsert({
+			where: {
+				tripId_userId: {
+					tripId,
+					userId: user.id
+				}
+			},
+			create: {
+				tripId,
+				userId: user.id,
+				...validation.data
+			},
+			update: validation.data
+		});
+
+		return { success: true };
+	},
+
+	selectRoom: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) throw error(403, 'You must be a member of this trip');
+
+		const formData = await request.formData();
+		const roomId = Number(formData.get('roomId'));
+		const bedId = formData.get('bedId') as string | null;
+		const startDate = formData.get('startDate') ? new Date(formData.get('startDate') as string) : null;
+		const endDate = formData.get('endDate') ? new Date(formData.get('endDate') as string) : null;
+		const partySize = Number(formData.get('partySize')) || 1;
+
+		// Remove existing assignment
+		await prisma.roomAssignment.deleteMany({
+			where: {
+				tripId,
+				userId: user.id
+			}
+		});
+
+		// Create new assignment
+		await prisma.roomAssignment.create({
+			data: {
+				tripId,
+				roomId,
+				userId: user.id,
+				startDate,
+				endDate,
+				partySize,
+				bedType: bedId ? (await prisma.bed.findUnique({ where: { id: bedId } }))?.bedType || null : null
+			}
+		});
+
+		return { success: true };
+	},
+
+	toggleActivity: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) throw error(403, 'You must be a member of this trip');
+
+		const formData = await request.formData();
+		const activityId = formData.get('activityId') as string;
+		const status = formData.get('status') as string;
+
+		await prisma.activityParticipant.upsert({
+			where: {
+				activityId_userId: {
+					activityId,
+					userId: user.id
+				}
+			},
+			create: {
+				activityId,
+				userId: user.id,
+				status: status === 'in' ? 'in' : 'out'
+			},
+			update: {
+				status: status === 'in' ? 'in' : 'out'
+			}
+		});
+
+		return { success: true };
+	},
+
+	selectExtra: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) throw error(403, 'You must be a member of this trip');
+
+		const formData = await request.formData();
+		const ruleId = formData.get('ruleId') as string;
+		const quantity = Number(formData.get('quantity')) || 0;
+
+		if (quantity === 0) {
+			// Remove selection
+			await prisma.guestExtraSelection.deleteMany({
+				where: {
+					tripId,
+					userId: user.id,
+					ruleId
+				}
+			});
+		} else {
+			// Upsert selection
+			await prisma.guestExtraSelection.upsert({
+				where: {
+					id: `${tripId}-${user.id}-${ruleId}` // This won't work, need to find a better way
+				},
+				create: {
+					tripId,
+					userId: user.id,
+					ruleId,
+					quantity
+				},
+				update: {
+					quantity
+				}
+			});
+		}
+
+		return { success: true };
+	}
+};

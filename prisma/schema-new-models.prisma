@@ -1,0 +1,317 @@
+// Regular users (separate from AdminUser)
+model User {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  passwordHash        String
+  name                String?
+  phone               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  tripMemberships     TripMember[]
+  invitesReceived     Invite[] @relation("InviteRecipient")
+  invitesSent         Invite[] @relation("InviteSender")
+  roomAssignments     RoomAssignment[]
+  mealSlotAssignments MealSlot[]
+  activityParticipants ActivityParticipant[]
+  extraSelections     GuestExtraSelection[]
+  rsvps                RSVP[]
+  guestProfiles        GuestProfile[]
+  invoices             Invoice[]
+  notifications        Notification[]
+  sessions             Session[]
+  
+  @@index([email])
+}
+
+// User Sessions
+model Session {
+  id                  String   @id @default(uuid())
+  userId              String
+  token               String   @unique
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+  
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Trip Members (users who are part of trips)
+model TripMember {
+  id                  String   @id @default(uuid())
+  tripId              String
+  userId              String
+  role                String   @default("guest") // "host" | "guest"
+  inviteStatus        String   @default("invited") // "invited" | "accepted" | "declined"
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([tripId, userId])
+  @@index([tripId])
+  @@index([userId])
+}
+
+// Invites
+model Invite {
+  id                  String   @id @default(uuid())
+  tripId              String
+  token               String   @unique
+  invitedByUserId     String
+  channel             String   // "email" | "sms" | "app"
+  recipientEmail      String?
+  recipientPhone      String?
+  recipientUserId     String?
+  status              String   @default("sent") // "sent" | "opened" | "accepted" | "declined" | "expired"
+  expiresAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  invitedBy           User     @relation("InviteSender", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+  recipient           User?    @relation("InviteRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  
+  @@index([tripId])
+  @@index([token])
+}
+
+// Room Assignments
+model RoomAssignment {
+  id                  String   @id @default(uuid())
+  tripId              String
+  roomId              Int
+  userId              String
+  startDate           DateTime?
+  endDate             DateTime?
+  partySize           Int      @default(1)
+  bedType             String?
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  room                Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([tripId])
+  @@index([roomId])
+  @@index([userId])
+}
+
+// Meal Plan
+model MealPlan {
+  id                          String   @id @default(uuid())
+  tripId                      String   @unique
+  enabled                     Boolean  @default(false)
+  mode                        String   @default("slots") // "slots" | "host_budget"
+  hostBudgetTotal             Float?
+  perGuestMealContribution    Float?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+  
+  trip                        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+}
+
+// Meal Slots
+model MealSlot {
+  id                  String   @id @default(uuid())
+  tripId              String
+  mealType            String   // "breakfast" | "lunch" | "dinner" | "snack"
+  date                DateTime
+  time                String?
+  capacityServings    Int?
+  notes               String?
+  menuText            String?
+  assignedUserId      String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  assignedUser        User?    @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  
+  @@index([tripId])
+  @@index([date])
+  @@index([assignedUserId])
+}
+
+// Activities
+model Activity {
+  id                  String   @id @default(uuid())
+  tripId              String
+  title               String
+  date                DateTime
+  time                String?
+  location            String?
+  pricePerPerson      Float    @default(0)
+  maxParticipants     Int?
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  participants        ActivityParticipant[]
+  
+  @@index([tripId])
+  @@index([date])
+}
+
+// Activity Participants
+model ActivityParticipant {
+  id                  String   @id @default(uuid())
+  activityId          String
+  userId              String
+  status              String   @default("in") // "in" | "out"
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  activity            Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([activityId, userId])
+  @@index([activityId])
+  @@index([userId])
+}
+
+// Extra Cost Rules
+model ExtraCostRule {
+  id                  String   @id @default(uuid())
+  tripId              String
+  label               String
+  amount              Float
+  type                String   // "flat" | "per_pet" | "per_night"
+  appliesToJson       String?  // JSON for complex rules
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  guestSelections     GuestExtraSelection[]
+  
+  @@index([tripId])
+}
+
+// Guest Extra Selections
+model GuestExtraSelection {
+  id                  String   @id @default(uuid())
+  tripId              String
+  userId              String
+  ruleId              String
+  quantity            Int      @default(1)
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rule                ExtraCostRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  @@index([tripId])
+  @@index([userId])
+  @@index([ruleId])
+}
+
+// RSVPs
+model RSVP {
+  id                  String   @id @default(uuid())
+  tripId              String
+  userId              String
+  status              String   // "yes" | "no" | "maybe"
+  arrivalDatetime     DateTime?
+  departureDatetime   DateTime?
+  adultsCount          Int      @default(1)
+  kidsCount            Int      @default(0)
+  petsCount            Int      @default(0)
+  notes                String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([tripId, userId])
+  @@index([tripId])
+  @@index([userId])
+}
+
+// Guest Profiles (trip-scoped)
+model GuestProfile {
+  id                  String   @id @default(uuid())
+  tripId              String
+  userId              String
+  dietaryRestrictions String?
+  allergies           String?
+  phone               String?
+  emergencyContact     String?
+  paymentPreference    String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([tripId, userId])
+  @@index([tripId])
+  @@index([userId])
+}
+
+// Invoices
+model Invoice {
+  id                  String   @id @default(uuid())
+  tripId              String
+  userId              String
+  totalAmount         Float
+  currency            String   @default("USD")
+  status              String   @default("due") // "due" | "paid" | "refunded"
+  breakdownJson       String?  // JSON breakdown
+  stripePaymentIntentId String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments            Payment[]
+  
+  @@index([tripId])
+  @@index([userId])
+  @@index([status])
+}
+
+// Payments
+model Payment {
+  id                  String   @id @default(uuid())
+  invoiceId           String
+  provider            String   // "stripe"
+  amount              Float
+  status              String   // "pending" | "completed" | "failed" | "refunded"
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  invoice             Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  @@index([invoiceId])
+  @@index([status])
+}
+
+// Notifications
+model Notification {
+  id                  String   @id @default(uuid())
+  userId              String
+  type                String   // "invite_received" | "invite_accepted" | "room_assigned" | etc.
+  title               String
+  message             String
+  relatedTripId       String?
+  relatedEntityId     String?
+  read                Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relatedTrip         Trip?    @relation(fields: [relatedTripId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}

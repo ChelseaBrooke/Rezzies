@@ -12,100 +12,116 @@ datasource db {
 }
 
 model Trip {
-  id                  String   @id @default(uuid())
-  name                String
-  description         String?
-  listingUrl          String?   // Airbnb/VRBO URL
-  listingTitle        String?
-  listingCoverPhoto   String?
-  checkInDate         DateTime
-  checkOutDate        DateTime
-  totalCost           Float    // Total cost of the rental
-  pricingModel        String   // "per_room" | "per_bed" | "per_person" | "per_person_per_night"
-  inviteCode          String   @unique // Unique code for guests to access
-  isPublished         Boolean  @default(false)
-  hostId              String?  // AdminUser who created this trip
-  
+  id                String   @id @default(uuid())
+  name              String
+  description       String?
+  listingUrl        String? // Airbnb/VRBO URL
+  listingTitle      String?
+  listingCoverPhoto String?
+  checkInDate       DateTime
+  checkOutDate      DateTime
+  totalCost         Float // Total cost of the rental
+  pricingModel      String // "per_room" | "per_bed" | "per_person" | "per_person_per_night"
+  inviteCode        String   @unique // Unique code for guests to access
+  isPublished       Boolean  @default(false)
+  hostId            String? // AdminUser who created this trip
+  timezone          String   @default("UTC")
+  location          String?
+  scrapePayload     String? // JSON payload from scraping
+
   // New pricing fields
-  expectedPeopleCount Int?     // Expected number of people (for PER_PERSON mode)
-  maxGuests           Int?     // Max guests from property listing
-  allowPartialStays  Boolean  @default(false) // Toggle for partial stay reservations
-  
+  expectedPeopleCount Int? // Expected number of people (for PER_PERSON mode)
+  maxGuests           Int? // Max guests from property listing
+  allowPartialStays   Boolean @default(false) // Toggle for partial stay reservations
+
   // Pricing settings (stored as JSON for flexibility)
-  bedWeights          String?  // JSON: {"king": 1.00, "queen": 0.75, "twin": 0.50, ...}
+  bedWeights           String? // JSON: {"king": 1.00, "queen": 0.75, "twin": 0.50, ...}
   sharingExponentAlpha Float   @default(0.60) // Sharing discount exponent (0.3-0.9)
-  privacyPremiumP     Float   @default(0.00) // Privacy premium (0-0.25)
-  
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
-  host                AdminUser? @relation(fields: [hostId], references: [id])
-  rooms               Room[]
-  reservations        Reservation[]
-  
+  privacyPremiumP      Float   @default(0.00) // Privacy premium (0-0.25)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  host                 AdminUser?            @relation(fields: [hostId], references: [id])
+  rooms                Room[]
+  reservations         Reservation[]
+  members              TripMember[]
+  invites              Invite[]
+  roomAssignments      RoomAssignment[]
+  mealPlan             MealPlan?
+  mealSlots            MealSlot[]
+  activities           Activity[]
+  extraCostRules       ExtraCostRule[]
+  guestExtraSelections GuestExtraSelection[]
+  rsvps                RSVP[]
+  guestProfiles        GuestProfile[]
+  invoices             Invoice[]
+  notifications        Notification[]
+
   @@index([inviteCode])
   @@index([isPublished])
   @@index([hostId])
 }
 
 model Room {
-  id                  Int      @id @default(autoincrement())
-  tripId              String
-  name                String
-  description         String?
-  baseRateModifier    Float    @default(1.0)
-  photoUrls           String[] // Array of photo URLs
-  maxOccupancy        Int?     // Max people per room
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
-  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  beds                Bed[]
-  reservations        Reservation[]
-  legacySubmissions   GuestSubmission[] // Legacy support
-  
+  id               Int      @id @default(autoincrement())
+  tripId           String
+  name             String
+  description      String?
+  baseRateModifier Float    @default(1.0)
+  photoUrls        String[] // Array of photo URLs
+  maxOccupancy     Int? // Max people per room
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  trip              Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  beds              Bed[]
+  reservations      Reservation[]
+  legacySubmissions GuestSubmission[] // Legacy support
+  roomAssignments   RoomAssignment[]
+
   @@index([tripId])
 }
 
 model Bed {
-  id                  String   @id @default(uuid())
-  roomId              Int
-  bedType             String   // "king" | "queen" | "twin" | "bunk" | "sofa" | "full" | etc.
-  nightlyRate         Float?   // Optional: can be calculated on-the-fly
-  capacity            Int      @default(1) // Number of people per bed (legacy)
-  capacitySlots       Int      @default(1) // Number of sleep slots (for canonical model)
-  isAvailable         Boolean  @default(true)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
-  room                Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  reservations        Reservation[]
-  legacySubmissions   GuestSubmission[] // Legacy support
-  
+  id            String   @id @default(uuid())
+  roomId        Int
+  bedType       String // "king" | "queen" | "twin" | "bunk" | "sofa" | "full" | etc.
+  nightlyRate   Float? // Optional: can be calculated on-the-fly
+  capacity      Int      @default(1) // Number of people per bed (legacy)
+  capacitySlots Int      @default(1) // Number of sleep slots (for canonical model)
+  isAvailable   Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  room              Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  reservations      Reservation[]
+  legacySubmissions GuestSubmission[] // Legacy support
+
   @@index([roomId])
   @@index([isAvailable])
 }
 
 model Reservation {
-  id                  String   @id @default(uuid())
-  tripId              String
-  name                String
-  email               String
-  roomId              Int
-  bedId               String?
-  checkInDate         DateTime
-  checkOutDate        DateTime
-  nights              Int
-  numberOfGuests      Int      @default(1)
-  numberOfSlots       Int      @default(1) // Number of sleep slots reserved
-  calculatedPrice     Float
-  pricingSnapshot     String?  // JSON snapshot of pricing at time of reservation
-  submittedAt         DateTime @default(now())
-  
-  trip                Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  room                Room     @relation(fields: [roomId], references: [id])
-  bed                 Bed?     @relation(fields: [bedId], references: [id])
-  
+  id              String   @id @default(uuid())
+  tripId          String
+  name            String
+  email           String
+  roomId          Int
+  bedId           String?
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  nights          Int
+  numberOfGuests  Int      @default(1)
+  numberOfSlots   Int      @default(1) // Number of sleep slots reserved
+  calculatedPrice Float
+  pricingSnapshot String? // JSON snapshot of pricing at time of reservation
+  submittedAt     DateTime @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id])
+  bed  Bed? @relation(fields: [bedId], references: [id])
+
   @@index([email])
   @@index([tripId])
   @@index([roomId])
@@ -115,20 +131,20 @@ model Reservation {
 
 // Legacy model - keeping for backward compatibility during migration
 model GuestSubmission {
-  id                  String   @id @default(uuid())
-  name                String
-  email               String
-  roomId              Int
-  bedId               String
-  checkInDate         DateTime
-  checkOutDate        DateTime
-  nights              Int
-  calculatedPrice     Float
-  submittedAt         DateTime @default(now())
-  
-  room                Room     @relation(fields: [roomId], references: [id])
-  bed                 Bed      @relation(fields: [bedId], references: [id])
-  
+  id              String   @id @default(uuid())
+  name            String
+  email           String
+  roomId          Int
+  bedId           String
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  nights          Int
+  calculatedPrice Float
+  submittedAt     DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id])
+  bed  Bed  @relation(fields: [bedId], references: [id])
+
   @@index([email])
   @@index([roomId])
   @@index([bedId])
@@ -136,29 +152,346 @@ model GuestSubmission {
 }
 
 model EmailLog {
-  id                  String   @id @default(uuid())
-  to                  String
-  templateKey         String
-  templateId          String?
-  payloadJson         String?  // Redacted/partial payload
-  status              String   // "sent" | "failed" | "pending"
-  error               String?
-  createdAt           DateTime @default(now())
-  
+  id          String   @id @default(uuid())
+  to          String
+  templateKey String
+  templateId  String?
+  payloadJson String? // Redacted/partial payload
+  status      String // "sent" | "failed" | "pending"
+  error       String?
+  createdAt   DateTime @default(now())
+
   @@index([to])
   @@index([status])
   @@index([createdAt])
 }
 
 model AdminUser {
-  id                  String   @id @default(uuid())
-  email               String   @unique
-  passwordHash        String
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
-  trips               Trip[]   // Hosts can create multiple trips
-  
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  trips Trip[] // Hosts can create multiple trips
+
   @@index([email])
 }
 
+// Regular users (separate from AdminUser)
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tripMemberships      TripMember[]
+  invitesReceived      Invite[]              @relation("InviteRecipient")
+  invitesSent          Invite[]              @relation("InviteSender")
+  roomAssignments      RoomAssignment[]
+  mealSlotAssignments  MealSlot[]
+  activityParticipants ActivityParticipant[]
+  extraSelections      GuestExtraSelection[]
+  rsvps                RSVP[]
+  guestProfiles        GuestProfile[]
+  invoices             Invoice[]
+  notifications        Notification[]
+  sessions             Session[]
+
+  @@index([email])
+}
+
+// User Sessions
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Trip Members (users who are part of trips)
+model TripMember {
+  id           String   @id @default(uuid())
+  tripId       String
+  userId       String
+  role         String   @default("guest") // "host" | "guest"
+  inviteStatus String   @default("invited") // "invited" | "accepted" | "declined"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, userId])
+  @@index([tripId])
+  @@index([userId])
+}
+
+// Invites
+model Invite {
+  id              String    @id @default(uuid())
+  tripId          String
+  token           String    @unique
+  invitedByUserId String
+  channel         String // "email" | "sms" | "app"
+  recipientEmail  String?
+  recipientPhone  String?
+  recipientUserId String?
+  status          String    @default("sent") // "sent" | "opened" | "accepted" | "declined" | "expired"
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  trip      Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  invitedBy User  @relation("InviteSender", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+  recipient User? @relation("InviteRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+
+  @@index([tripId])
+  @@index([token])
+}
+
+// Room Assignments
+model RoomAssignment {
+  id        String    @id @default(uuid())
+  tripId    String
+  roomId    Int
+  userId    String
+  startDate DateTime?
+  endDate   DateTime?
+  partySize Int       @default(1)
+  bedType   String?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([roomId])
+  @@index([userId])
+}
+
+// Meal Plan
+model MealPlan {
+  id                       String   @id @default(uuid())
+  tripId                   String   @unique
+  enabled                  Boolean  @default(false)
+  mode                     String   @default("slots") // "slots" | "host_budget"
+  hostBudgetTotal          Float?
+  perGuestMealContribution Float?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+}
+
+// Meal Slots
+model MealSlot {
+  id               String   @id @default(uuid())
+  tripId           String
+  mealType         String // "breakfast" | "lunch" | "dinner" | "snack"
+  date             DateTime
+  time             String?
+  capacityServings Int?
+  notes            String?
+  menuText         String?
+  assignedUserId   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  trip         Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  assignedUser User? @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@index([tripId])
+  @@index([date])
+  @@index([assignedUserId])
+}
+
+// Activities
+model Activity {
+  id              String   @id @default(uuid())
+  tripId          String
+  title           String
+  date            DateTime
+  time            String?
+  location        String?
+  pricePerPerson  Float    @default(0)
+  maxParticipants Int?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  trip         Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  participants ActivityParticipant[]
+
+  @@index([tripId])
+  @@index([date])
+}
+
+// Activity Participants
+model ActivityParticipant {
+  id         String   @id @default(uuid())
+  activityId String
+  userId     String
+  status     String   @default("in") // "in" | "out"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, userId])
+  @@index([activityId])
+  @@index([userId])
+}
+
+// Extra Cost Rules
+model ExtraCostRule {
+  id            String   @id @default(uuid())
+  tripId        String
+  label         String
+  amount        Float
+  type          String // "flat" | "per_pet" | "per_night"
+  appliesToJson String? // JSON for complex rules
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  trip            Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  guestSelections GuestExtraSelection[]
+
+  @@index([tripId])
+}
+
+// Guest Extra Selections
+model GuestExtraSelection {
+  id        String   @id @default(uuid())
+  tripId    String
+  userId    String
+  ruleId    String
+  quantity  Int      @default(1)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trip Trip          @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rule ExtraCostRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([userId])
+  @@index([ruleId])
+}
+
+// RSVPs
+model RSVP {
+  id                String    @id @default(uuid())
+  tripId            String
+  userId            String
+  status            String // "yes" | "no" | "maybe"
+  arrivalDatetime   DateTime?
+  departureDatetime DateTime?
+  adultsCount       Int       @default(1)
+  kidsCount         Int       @default(0)
+  petsCount         Int       @default(0)
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, userId])
+  @@index([tripId])
+  @@index([userId])
+}
+
+// Guest Profiles (trip-scoped)
+model GuestProfile {
+  id                  String   @id @default(uuid())
+  tripId              String
+  userId              String
+  dietaryRestrictions String?
+  allergies           String?
+  phone               String?
+  emergencyContact    String?
+  paymentPreference   String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, userId])
+  @@index([tripId])
+  @@index([userId])
+}
+
+// Invoices
+model Invoice {
+  id                    String   @id @default(uuid())
+  tripId                String
+  userId                String
+  totalAmount           Float
+  currency              String   @default("USD")
+  status                String   @default("due") // "due" | "paid" | "refunded"
+  breakdownJson         String? // JSON breakdown
+  stripePaymentIntentId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  trip     Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([tripId])
+  @@index([userId])
+  @@index([status])
+}
+
+// Payments
+model Payment {
+  id        String   @id @default(uuid())
+  invoiceId String
+  provider  String // "stripe"
+  amount    Float
+  status    String // "pending" | "completed" | "failed" | "refunded"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([status])
+}
+
+// Notifications
+model Notification {
+  id              String   @id @default(uuid())
+  userId          String
+  type            String // "invite_received" | "invite_accepted" | "room_assigned" | etc.
+  title           String
+  message         String
+  relatedTripId   String?
+  relatedEntityId String?
+  read            Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  user        User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relatedTrip Trip? @relation(fields: [relatedTripId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}

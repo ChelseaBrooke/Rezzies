@@ -1,0 +1,90 @@
+import { fail, redirect } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
+import { createUser } from '$lib/server/user-auth.js';
+import { createSession } from '$lib/server/session.js';
+import { z } from 'zod';
+
+const signupSchema = z.object({
+	email: z.string().email('Invalid email address'),
+	password: z.string().min(8, 'Password must be at least 8 characters'),
+	name: z.string().optional()
+}).refine((data) => data.password.length >= 8, {
+	message: 'Password must be at least 8 characters',
+	path: ['password']
+});
+
+export const load: PageServerLoad = async ({ cookies }) => {
+	// If already logged in, redirect to trips
+	const sessionToken = cookies.get('user_session');
+	if (sessionToken) {
+		throw redirect(303, '/trips');
+	}
+	return {};
+};
+
+export const actions: Actions = {
+	default: async ({ request, cookies }) => {
+		const formData = await request.formData();
+		const email = formData.get('email');
+		const password = formData.get('password');
+		const confirmPassword = formData.get('confirmPassword');
+		const name = formData.get('name');
+
+		// Validate required fields are present
+		if (!email || typeof email !== 'string') {
+			return fail(400, {
+				error: 'Email is required'
+			});
+		}
+
+		if (!password || typeof password !== 'string') {
+			return fail(400, {
+				error: 'Password is required'
+			});
+		}
+
+		if (!confirmPassword || typeof confirmPassword !== 'string') {
+			return fail(400, {
+				error: 'Please confirm your password'
+			});
+		}
+
+		// Check passwords match
+		if (password !== confirmPassword) {
+			return fail(400, {
+				error: 'Passwords do not match'
+			});
+		}
+
+		const validationResult = signupSchema.safeParse({ 
+			email, 
+			password, 
+			name: name && typeof name === 'string' ? name : undefined 
+		});
+		if (!validationResult.success) {
+			return fail(400, {
+				error: validationResult.error.errors[0]?.message || 'Invalid input'
+			});
+		}
+
+		try {
+			const user = await createUser(email, password, name || undefined);
+			
+			// Create session
+			await createSession(cookies, user.id);
+
+			// Redirect to trips page
+			throw redirect(303, '/trips');
+		} catch (error) {
+			// Re-throw redirects (they're special errors in SvelteKit)
+			if (error && typeof error === 'object' && 'status' in error && error.status === 303) {
+				throw error;
+			}
+			
+			console.error('Signup error:', error);
+			return fail(400, {
+				error: error instanceof Error ? error.message : 'Failed to create account'
+			});
+		}
+	}
+};

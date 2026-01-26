@@ -802,7 +802,6 @@
 	.troubleshooting li {
 		margin: 0.25rem 0;
 	}
-	}
 
 	.extracted-header {
 		margin-bottom: 1.5rem;
@@ -1060,9 +1059,6 @@
 	}
 
 	/* Old photo selection styles removed - using drag-and-drop instead */
-		border-color: #3498db;
-		box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
-	}
 
 	.btn-large {
 		padding: 1rem 2rem;
