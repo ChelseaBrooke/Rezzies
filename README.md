@@ -1,4 +1,4 @@
-# RoomSplit
+# Rezzies
 
 A consumer-friendly web application that allows trip organizers to fairly split vacation rental costs among guests. No more spreadsheets, group chat confusion, or last-minute renegotiations.
 

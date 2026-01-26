@@ -9,7 +9,7 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<title>RoomSplit - Fair Room & Cost Splitting for Group Vacations</title>
+	<title>Rezzies - Fair Room & Cost Splitting for Group Vacations</title>
 </svelte:head>
 
 <Navigation user={data?.user} />

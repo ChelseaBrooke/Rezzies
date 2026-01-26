@@ -335,7 +335,7 @@
 				if (roomCount > 0) {
 					breakdown.perRoom = totalCost / roomCount;
 					breakdown.perRoomPerNight = breakdown.perRoom / nights;
-					breakdown.description = `Each room costs $${breakdown.perRoomPerNight.toFixed(2)} per night`;
+					breakdown.description = `Each of the ${roomCount} ${roomCount === 1 ? 'room' : 'rooms'} costs $${breakdown.perRoomPerNight.toFixed(2)} per night`;
 					breakdown.description += ` ($${breakdown.perRoom.toFixed(2)} for ${nights} nights)`;
 				} else {
 					breakdown.description = 'Room count will be calculated after rooms are set up';

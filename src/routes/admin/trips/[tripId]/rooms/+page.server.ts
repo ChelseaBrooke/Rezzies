@@ -36,11 +36,19 @@ export const load: PageServerLoad = async ({ params }) => {
 		// If trip has listingUrl and no rooms yet, fetch extracted data
 		if (trip.listingUrl && trip.rooms.length === 0) {
 			try {
+				console.log(`[Room Setup] Attempting to extract rooms from: ${trip.listingUrl}`);
 				extractedData = await extractPropertyRoomsAndPhotos(trip.listingUrl);
+				console.log(`[Room Setup] Extraction result:`, {
+					roomsFound: extractedData?.rooms?.length || 0,
+					photosFound: extractedData?.photos?.length || 0,
+					rooms: extractedData?.rooms
+				});
 			} catch (error) {
-				console.error('Error extracting rooms/photos:', error);
+				console.error('[Room Setup] Error extracting rooms/photos:', error);
 				// Continue without extracted data
 			}
+		} else {
+			console.log(`[Room Setup] Skipping extraction - listingUrl: ${trip.listingUrl ? 'exists' : 'missing'}, rooms.length: ${trip.rooms.length}`);
 		}
 	} catch (error) {
 		console.error('Error calculating pricing:', error);

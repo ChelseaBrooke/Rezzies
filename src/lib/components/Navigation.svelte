@@ -9,7 +9,7 @@
 	<div class="nav-container">
 		<a href="/" class="logo">
 			<span class="logo-icon">🏖️</span>
-			<span class="logo-text">RoomSplit</span>
+			<span class="logo-text">Rezzies</span>
 		</a>
 		
 		<div class="nav-links">

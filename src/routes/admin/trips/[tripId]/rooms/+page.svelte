@@ -25,12 +25,39 @@
 
 	// Photo selection for extracted rooms
 	let selectedPhotos = $state<string[][]>([]);
+	let isRetryingExtraction = $state(false);
+	let extractedDataOverride = $state<any>(null);
 	
 	$effect(() => {
 		if (data.extractedData?.rooms) {
 			selectedPhotos = data.extractedData.rooms.map(() => []);
 		}
 	});
+
+	async function retryExtraction() {
+		if (!data.trip.listingUrl) return;
+		
+		isRetryingExtraction = true;
+		try {
+			const response = await fetch(`/api/extract-rooms?url=${encodeURIComponent(data.trip.listingUrl)}`);
+			const result = await response.json();
+			
+			if (result.ok && result.data) {
+				extractedDataOverride = result.data;
+				selectedPhotos = result.data.rooms.map(() => []);
+			} else {
+				error = result.message || 'Failed to extract rooms';
+			}
+		} catch (e) {
+			error = 'Error extracting rooms. Please check the server logs.';
+			console.error('Extraction error:', e);
+		} finally {
+			isRetryingExtraction = false;
+		}
+	}
+
+	// Use override if available, otherwise use server data
+	let displayExtractedData = $derived(extractedDataOverride || data.extractedData);
 
 	function openBedForm(roomId: number) {
 		newBed.roomId = roomId;
@@ -89,15 +116,34 @@
 			</div>
 		{/if}
 
-		{#if data.extractedData && data.extractedData.rooms.length > 0 && data.trip.rooms.length === 0}
+		{#if data.trip.listingUrl && data.trip.rooms.length === 0}
 			<section class="extracted-rooms-section">
 				<div class="extracted-header">
 					<h2>Rooms & Beds from Listing</h2>
-					<p class="extracted-subtitle">We found {data.extractedData.rooms.length} room(s) from your listing. Review and import them below.</p>
+					{#if displayExtractedData && displayExtractedData.rooms.length > 0}
+						<p class="extracted-subtitle">We found {displayExtractedData.rooms.length} room(s) from your listing. Review and import them below.</p>
+					{:else}
+						<p class="extracted-subtitle error-text">
+							⚠️ Could not automatically extract rooms from the listing.
+						</p>
+						<p class="extracted-subtitle">
+							<small>Listing URL: {data.trip.listingUrl}</small>
+						</p>
+						<button 
+							type="button" 
+							class="btn-primary"
+							onclick={retryExtraction}
+							disabled={isRetryingExtraction}
+						>
+							{isRetryingExtraction ? 'Extracting...' : '🔄 Retry Extraction'}
+						</button>
+					{/if}
 				</div>
 
+				{#if displayExtractedData && displayExtractedData.rooms.length > 0}
+
 				<div class="extracted-rooms-list">
-					{#each data.extractedData.rooms as room, roomIdx}
+					{#each displayExtractedData.rooms as room, roomIdx}
 						<div class="extracted-room-card card">
 							<div class="room-name-section">
 								<h3>{room.name}</h3>
@@ -123,11 +169,11 @@
 								</ul>
 							</div>
 
-							{#if data.extractedData.photos.length > 0}
+							{#if displayExtractedData.photos.length > 0}
 								<div class="photo-selection">
 									<h4>Select Photos for {room.name}</h4>
 									<div class="photo-gallery">
-										{#each data.extractedData.photos as photo, photoIdx}
+										{#each displayExtractedData.photos as photo, photoIdx}
 											<label class="photo-thumbnail">
 												<input
 													type="checkbox"
@@ -153,12 +199,13 @@
 					{/each}
 				</div>
 
-				<form method="POST" action="?/importRooms" use:enhance>
-					<input type="hidden" name="rooms" value={JSON.stringify(data.extractedData.rooms)} />
-					<input type="hidden" name="photos" value={JSON.stringify(data.extractedData.photos)} />
-					<input type="hidden" name="selectedPhotos" value={JSON.stringify(selectedPhotos)} />
-					<button type="submit" class="btn-primary btn-large">Import All Rooms</button>
-				</form>
+					<form method="POST" action="?/importRooms" use:enhance>
+						<input type="hidden" name="rooms" value={JSON.stringify(displayExtractedData.rooms)} />
+						<input type="hidden" name="photos" value={JSON.stringify(displayExtractedData.photos)} />
+						<input type="hidden" name="selectedPhotos" value={JSON.stringify(selectedPhotos)} />
+						<button type="submit" class="btn-primary btn-large">Import All Rooms</button>
+					</form>
+				{/if}
 			</section>
 		{/if}
 
@@ -628,6 +675,11 @@
 		color: #555;
 		margin: 0;
 		font-size: 0.9rem;
+	}
+
+	.extracted-subtitle.error-text {
+		color: #e74c3c;
+		font-weight: 500;
 	}
 
 	.extracted-rooms-list {

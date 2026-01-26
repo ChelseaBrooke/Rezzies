@@ -12,7 +12,7 @@
 			<div class="container">
 				<h1 class="hero-title">Split Your Vacation Costs Fairly</h1>
 				<p class="hero-subtitle">
-					No more spreadsheets or group chat confusion. RoomSplit makes it easy to fairly divide vacation rental costs among your group.
+					No more spreadsheets or group chat confusion. Rezzies makes it easy to fairly divide vacation rental costs among your group.
 				</p>
 				<div class="hero-actions">
 					<a href="/host-vacation" class="btn btn-primary btn-large">Host a Vacation</a>
@@ -40,7 +40,7 @@
 				<div class="feature-card card">
 					<div class="feature-icon">💰</div>
 					<h3>Automatic Cost Calculation</h3>
-					<p>RoomSplit automatically calculates what each guest owes based on their room choice, stay duration, and your pricing model.</p>
+					<p>Rezzies automatically calculates what each guest owes based on their room choice, stay duration, and your pricing model.</p>
 				</div>
 				<div class="feature-card card">
 					<div class="feature-icon">📊</div>
