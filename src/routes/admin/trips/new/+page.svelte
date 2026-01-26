@@ -5,10 +5,6 @@
 	import type { ActionData } from './$types';
 	import AutofillLoader from '$lib/components/AutofillLoader.svelte';
 
-	// TEST: This should log immediately when component loads
-	console.log('🔴 COMPONENT SCRIPT LOADED');
-	alert('Component loaded - check console');
-
 	let { form } = $props();
 	
 	let isAutofillMode = $derived($page.url.searchParams.get('autofill') === 'true');
@@ -49,6 +45,17 @@
 	let selectedRoomPhotos = $state<Record<string, string[]>>({});
 	let selectedCoverPhoto = $state<string | null>(null);
 	let customRooms = $state<Array<{ id: string; name: string; beds: Array<{ bedType: string; quantity: number }> }>>([]);
+	
+	// Combine scraped rooms and custom rooms
+	let allRooms = $derived.by(() => {
+		const scraped = scrapedData?.rooms || [];
+		const custom = customRooms.map((room) => ({
+			id: room.id,
+			name: room.name,
+			beds: room.beds.map(bed => ({ type: bed.bedType, quantity: bed.quantity }))
+		}));
+		return [...scraped, ...custom];
+	});
 
 	// Photo gallery state
 	let showPhotoGallery = $state(false);
@@ -58,32 +65,35 @@
 	let newRoomName = $state('');
 	let newRoomBeds = $state<Array<{ bedType: string; quantity: number }>>([{ bedType: 'sofa', quantity: 1 }]);
 
-	// Trigger autofill on mount - use both window.location and $page as fallback
-	onMount(() => {
-		console.log('[AdminTripNew] onMount running');
-		console.log('[AdminTripNew] window.location.search:', window.location.search);
-		console.log('[AdminTripNew] $page.url.search:', $page.url.search);
+	// Trigger autofill on mount
+	onMount(async () => {
+		console.log('🔴 onMount STARTED');
+		console.log('window.location:', window.location.href);
 		
 		const urlParams = new URLSearchParams(window.location.search);
-		const isAutofill = urlParams.get('autofill') === 'true' || $page.url.searchParams.get('autofill') === 'true';
-		console.log('[AdminTripNew] isAutofill:', isAutofill);
+		const isAutofill = urlParams.get('autofill') === 'true';
+		console.log('isAutofill param:', isAutofill);
 		
 		if (isAutofill) {
+			console.log('Checking sessionStorage...');
 			const url = sessionStorage.getItem('autofillUrl');
-			console.log('[AdminTripNew] URL from sessionStorage:', url);
-			console.log('[AdminTripNew] All sessionStorage:', Object.keys(sessionStorage));
+			console.log('URL from sessionStorage:', url);
 			
 			if (url) {
-				console.log('[AdminTripNew] Calling performAutofill NOW');
-				performAutofill(url).catch(err => {
-					console.error('[AdminTripNew] performAutofill error:', err);
-					error = err.message;
+				console.log('✅ Calling performAutofill with URL:', url);
+				try {
+					await performAutofill(url);
+				} catch (err) {
+					console.error('❌ performAutofill error:', err);
+					error = err instanceof Error ? err.message : 'Failed to extract property data';
 					isLoading = false;
-				});
+				}
 			} else {
-				console.error('[AdminTripNew] No URL in sessionStorage');
+				console.error('❌ No URL in sessionStorage');
 				error = 'No listing URL found. Please go back and try again.';
 			}
+		} else {
+			console.log('Not in autofill mode');
 		}
 	});
 
