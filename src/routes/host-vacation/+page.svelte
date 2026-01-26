@@ -25,8 +25,8 @@
 			const stored = sessionStorage.getItem('autofillUrl');
 			console.log('[Host Vacation] Verified stored URL:', stored);
 			
-			console.log('[Host Vacation] Redirecting to /trips/new?autofill=true');
-			await goto('/trips/new?autofill=true');
+			console.log('[Host Vacation] Redirecting to /trips/new/autofill');
+			await goto('/trips/new/autofill');
 		} catch (error) {
 			autofillError = 'Failed to start autofill. Please try again.';
 			console.error('[Host Vacation] Autofill error:', error);
@@ -114,7 +114,7 @@
 			<div class="action-buttons">
 				<button
 					class="btn btn-primary btn-large"
-					onclick={() => goto('/trips/new')}
+					onclick={() => goto('/trips/new/manual')}
 				>
 					Continue
 				</button>

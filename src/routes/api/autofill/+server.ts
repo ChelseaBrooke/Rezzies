@@ -34,13 +34,29 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Step 1: Fetch property info (title, photos, max guests, dates, price)
 		console.log('[Autofill API] Step 1: Fetching property info...');
 		const propertyInfoStart = Date.now();
-		const propertyInfo = await fetchPropertyInfo(listingUrl);
-		console.log('[Autofill API] Step 1 completed in', Date.now() - propertyInfoStart, 'ms');
+		let propertyInfo;
+		try {
+			propertyInfo = await fetchPropertyInfo(listingUrl);
+			console.log('[Autofill API] Step 1 completed in', Date.now() - propertyInfoStart, 'ms');
+		} catch (error) {
+			console.error('[Autofill API] Property info fetch failed:', error);
+			const errorMsg = error instanceof Error ? error.message : String(error);
+			if (errorMsg.includes('520') || errorMsg.includes('Website Ban')) {
+				return json(
+					createErrorResponse('ZYTE_BANNED', 'VRBO/Airbnb is currently blocking our scraper. Please try again in a few minutes, or enter the property details manually.'),
+					503
+				);
+			}
+			return json(
+				createErrorResponse('EXTRACTION_FAILED', `Could not extract property information: ${errorMsg}`),
+				500
+			);
+		}
 		
 		if (!propertyInfo) {
 			console.error('[Autofill API] Property info extraction returned null');
 			return json(
-				createErrorResponse('EXTRACTION_FAILED', 'Could not extract property information'),
+				createErrorResponse('EXTRACTION_FAILED', 'Could not extract property information. The listing may be unavailable or the scraper was blocked.'),
 				500
 			);
 		}

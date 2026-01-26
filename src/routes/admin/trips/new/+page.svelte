@@ -65,35 +65,25 @@
 	let newRoomName = $state('');
 	let newRoomBeds = $state<Array<{ bedType: string; quantity: number }>>([{ bedType: 'sofa', quantity: 1 }]);
 
-	// Trigger autofill on mount
+	// Trigger autofill on mount - check if we're on the autofill route
 	onMount(async () => {
-		console.log('🔴 onMount STARTED');
-		console.log('window.location:', window.location.href);
+		// Check if we're on the autofill route or have autofill param
+		const isAutofillRoute = window.location.pathname.includes('/autofill') || 
+		                         new URLSearchParams(window.location.search).get('autofill') === 'true';
 		
-		const urlParams = new URLSearchParams(window.location.search);
-		const isAutofill = urlParams.get('autofill') === 'true';
-		console.log('isAutofill param:', isAutofill);
-		
-		if (isAutofill) {
-			console.log('Checking sessionStorage...');
+		if (isAutofillRoute) {
 			const url = sessionStorage.getItem('autofillUrl');
-			console.log('URL from sessionStorage:', url);
 			
 			if (url) {
-				console.log('✅ Calling performAutofill with URL:', url);
 				try {
 					await performAutofill(url);
 				} catch (err) {
-					console.error('❌ performAutofill error:', err);
 					error = err instanceof Error ? err.message : 'Failed to extract property data';
 					isLoading = false;
 				}
 			} else {
-				console.error('❌ No URL in sessionStorage');
 				error = 'No listing URL found. Please go back and try again.';
 			}
-		} else {
-			console.log('Not in autofill mode');
 		}
 	});
 
