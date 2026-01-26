@@ -8,6 +8,7 @@ export interface PropertyInfo {
 	title: string;
 	coverPhoto: string | null;
 	maxGuests: number | null; // null if not available - host must enter manually
+	roomCount: number | null; // Number of bedrooms/rooms
 	availableDates?: {
 		start: Date;
 		end: Date;
@@ -255,6 +256,7 @@ export async function fetchPropertyInfo(url: string): Promise<PropertyInfo | nul
 			title,
 			coverPhoto: scraped.coverPhoto,
 			maxGuests: scraped.maxGuests,
+			roomCount: scraped.roomCount,
 			availableDates: scraped.availableDates,
 			totalPrice: finalPrice,
 			// Use calculated nights if scraper didn't find them, or prefer scraper's value if it exists

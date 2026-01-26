@@ -29,6 +29,7 @@
 		title: string; 
 		coverPhoto: string | null; 
 		maxGuests: number | null;
+		roomCount: number | null;
 		availableDates?: { start: Date; end: Date }[];
 		checkInDate?: string;
 		checkOutDate?: string;
@@ -298,6 +299,58 @@
 		const end = new Date(formData.checkOutDate);
 		return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 	}
+
+	// Calculate pricing breakdown based on selected model
+	function calculatePricingBreakdown() {
+		const totalCost = parseFloat(formData.totalCost) || 0;
+		const nights = calculateNights();
+		const expectedGuests = parseInt(formData.expectedPeopleCount) || 0;
+		const roomCount = propertyInfo?.roomCount || 0;
+
+		if (!totalCost || !nights || !expectedGuests) {
+			return null;
+		}
+
+		const breakdown: Record<string, any> = {};
+
+		switch (formData.pricingModel) {
+			case 'PER_PERSON':
+				if (expectedGuests > 0) {
+					breakdown.perPerson = totalCost / expectedGuests;
+					breakdown.description = `Each person pays $${breakdown.perPerson.toFixed(2)} for the full stay`;
+					breakdown.disclaimer = '⚠️ RSVPs must equal expected guest count to split the total in this way.';
+				}
+				break;
+
+			case 'PER_PERSON_PER_NIGHT':
+				if (expectedGuests > 0 && nights > 0) {
+					breakdown.perPersonPerNight = totalCost / nights / expectedGuests;
+					breakdown.description = `Each person pays $${breakdown.perPersonPerNight.toFixed(2)} per night`;
+					breakdown.totalForStay = breakdown.perPersonPerNight * nights;
+					breakdown.description += ` ($${breakdown.totalForStay.toFixed(2)} for ${nights} nights)`;
+				}
+				break;
+
+			case 'PER_ROOM':
+				if (roomCount > 0) {
+					breakdown.perRoom = totalCost / roomCount;
+					breakdown.perRoomPerNight = breakdown.perRoom / nights;
+					breakdown.description = `Each room costs $${breakdown.perRoomPerNight.toFixed(2)} per night`;
+					breakdown.description += ` ($${breakdown.perRoom.toFixed(2)} for ${nights} nights)`;
+				} else {
+					breakdown.description = 'Room count will be calculated after rooms are set up';
+				}
+				break;
+
+			case 'PER_BED':
+				breakdown.description = 'Bed pricing will be calculated after rooms and beds are set up (weighted by bed type)';
+				break;
+		}
+
+		return breakdown;
+	}
+
+	let pricingBreakdown = $derived(calculatePricingBreakdown());
 	
 	async function importTotalFromCheckout() {
 		if (!checkoutUrl.trim()) {
@@ -599,9 +652,18 @@
 						<img src={propertyInfo.coverPhoto} alt={propertyInfo.title || 'Property'} class="preview-image" />
 					{/if}
 					<div class="preview-content">
-						{#if propertyInfo?.title}
-							<h3 class="preview-title">{propertyInfo.title}</h3>
-						{/if}
+					{#if propertyInfo?.title}
+						<h3 class="preview-title">{propertyInfo.title}</h3>
+					{/if}
+					
+					{#if propertyInfo?.roomCount}
+						<div class="preview-meta">
+							<span class="meta-item">🛏️ {propertyInfo.roomCount} {propertyInfo.roomCount === 1 ? 'Bedroom' : 'Bedrooms'}</span>
+							{#if propertyInfo.maxGuests}
+								<span class="meta-item">👥 Sleeps {propertyInfo.maxGuests}</span>
+							{/if}
+						</div>
+					{/if}
 						
 						{#if propertyInfo?.error}
 							<div class="preview-error">
@@ -738,6 +800,31 @@
 						{formData.pricingModel === 'PER_PERSON_PER_NIGHT' && 'Total cost divided by capacity and nights (most fair)'}
 					</small>
 				</div>
+
+				{#if pricingBreakdown && formData.totalCost && formData.checkInDate && formData.checkOutDate && formData.expectedPeopleCount}
+					<div class="pricing-breakdown card">
+						<h3>💰 Pricing Breakdown</h3>
+						<p class="breakdown-description">{pricingBreakdown.description}</p>
+						{#if pricingBreakdown.disclaimer}
+							<p class="breakdown-disclaimer">{pricingBreakdown.disclaimer}</p>
+						{/if}
+						{#if pricingBreakdown.perPerson}
+							<div class="breakdown-detail">
+								<strong>Per Person:</strong> ${pricingBreakdown.perPerson.toFixed(2)}
+							</div>
+						{/if}
+						{#if pricingBreakdown.perPersonPerNight}
+							<div class="breakdown-detail">
+								<strong>Per Person Per Night:</strong> ${pricingBreakdown.perPersonPerNight.toFixed(2)}
+							</div>
+						{/if}
+						{#if pricingBreakdown.perRoom}
+							<div class="breakdown-detail">
+								<strong>Per Room:</strong> ${pricingBreakdown.perRoom.toFixed(2)} for {calculateNights()} nights
+							</div>
+						{/if}
+					</div>
+				{/if}
 
 				<div class="form-group">
 					<label class="checkbox-label">
@@ -1455,6 +1542,56 @@
 		margin: 0 0 0.75rem 0;
 		font-size: 1.1rem;
 		color: #333;
+	}
+
+	.preview-meta {
+		display: flex;
+		gap: 1rem;
+		margin-top: 0.5rem;
+		font-size: 0.9rem;
+		color: #666;
+	}
+
+	.meta-item {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.pricing-breakdown {
+		margin-top: 1.5rem;
+		padding: 1.5rem;
+		background: #f8f9fa;
+		border: 2px solid #3498db;
+		border-radius: 8px;
+	}
+
+	.pricing-breakdown h3 {
+		margin: 0 0 1rem 0;
+		color: #2c3e50;
+		font-size: 1.2rem;
+	}
+
+	.breakdown-description {
+		font-size: 1rem;
+		color: #333;
+		margin: 0 0 0.5rem 0;
+		font-weight: 500;
+	}
+
+	.breakdown-disclaimer {
+		font-size: 0.9rem;
+		color: #e74c3c;
+		margin: 0.5rem 0;
+		font-weight: 500;
+	}
+
+	.breakdown-detail {
+		margin-top: 0.75rem;
+		padding: 0.75rem;
+		background: white;
+		border-radius: 4px;
+		border-left: 3px solid #3498db;
 	}
 
 	.instructions-list {

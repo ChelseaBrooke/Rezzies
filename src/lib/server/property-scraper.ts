@@ -8,16 +8,26 @@ export interface ScrapingConfig {
 		maxGuests?: string[]; // Patterns to find "Sleeps X" or "Accommodates X"
 		coverPhoto?: string[]; // Selectors for main image
 		totalPrice?: string[]; // Patterns to find total price
+		roomCount?: string[]; // Patterns to find "X bedrooms" or "X rooms"
 	};
 }
 
 // Default configurations - you can customize these
 const SCRAPING_CONFIGS: Record<string, ScrapingConfig> = {
-	vrbo: {
+		vrbo: {
 		site: 'vrbo',
 		selectors: {
 			title: [
 				// Add specific selectors here - e.g., 'h1.property-title', '.listing-name', etc.
+			],
+			roomCount: [
+				// Patterns for "X bedrooms" or "X rooms"
+				'(\\d+)\\s+bedrooms?',
+				'(\\d+)\\s+bedrooms?\\s*\\(',
+				'bedrooms?[^0-9]*(\\d+)',
+				'"bedrooms":\\s*(\\d+)',
+				'bedroomCount[^0-9]*(\\d+)',
+				'data-bedrooms="(\\d+)"'
 			],
 			maxGuests: [
 				// Specific pattern for VRBO: </span>Sleeps 4 (text after closing span, handles whitespace)
@@ -64,6 +74,15 @@ const SCRAPING_CONFIGS: Record<string, ScrapingConfig> = {
 		site: 'airbnb',
 		selectors: {
 			title: [],
+			roomCount: [
+				// Patterns for "X bedrooms" or "X rooms"
+				'(\\d+)\\s+bedrooms?',
+				'(\\d+)\\s+bedrooms?\\s*\\(',
+				'bedrooms?[^0-9]*(\\d+)',
+				'"bedrooms":\\s*(\\d+)',
+				'bedroomCount[^0-9]*(\\d+)',
+				'data-bedrooms="(\\d+)"'
+			],
 			maxGuests: [
 				'"accommodates":\\s*(\\d+)',
 				'"guests":\\s*(\\d+)',
@@ -1313,6 +1332,7 @@ export async function scrapePropertyInfo(
 ): Promise<{
 	title: string | null;
 	maxGuests: number | null;
+	roomCount: number | null;
 	coverPhoto: string | null;
 	availableDates?: { start: Date; end: Date }[];
 	totalPrice?: number | null; // Price in cents
@@ -1326,7 +1346,7 @@ export async function scrapePropertyInfo(
 	const isAirbnb = url.includes('airbnb.com');
 
 	if (!isVRBO && !isAirbnb) {
-		return { title: null, maxGuests: null, coverPhoto: null };
+		return { title: null, maxGuests: null, roomCount: null, coverPhoto: null };
 	}
 
 	// Check if this is a checkout URL - these have the final calculated price!
@@ -1347,7 +1367,7 @@ export async function scrapePropertyInfo(
 	let html = await fetchPageHTML(url);
 	if (!html) {
 		console.log(`[${timestamp}] ❌ Failed to fetch HTML`);
-		return { title: null, maxGuests: null, coverPhoto: null };
+		return { title: null, maxGuests: null, roomCount: null, coverPhoto: null };
 	}
 	console.log(`[${timestamp}] ✅ HTML fetched successfully (${html.length} characters)`);
 	
@@ -1380,6 +1400,11 @@ export async function scrapePropertyInfo(
 		? extractNumber(html, config.selectors.maxGuests)
 		: null;
 	console.log(`[${timestamp}]   - maxGuests: ${maxGuests || '(not found)'}`);
+
+	const roomCount = config.selectors.roomCount && config.selectors.roomCount.length > 0
+		? extractNumber(html, config.selectors.roomCount)
+		: null;
+	console.log(`[${timestamp}]   - roomCount: ${roomCount || '(not found)'}`);
 
 	const coverPhoto = config.selectors.coverPhoto && config.selectors.coverPhoto.length > 0
 		? extractValue(html, config.selectors.coverPhoto)
@@ -1459,6 +1484,7 @@ export async function scrapePropertyInfo(
 	return {
 		title,
 		maxGuests,
+		roomCount,
 		coverPhoto,
 		totalPrice,
 		totalNights,
