@@ -2,19 +2,42 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
-import { tripCreationSchema } from '$lib/server/validation.js';
 import { generateInviteCode } from '$lib/server/pricing.js';
 
-export const load: PageServerLoad = async ({ cookies }) => {
+export const load: PageServerLoad = async ({ cookies, url }) => {
 	const user = await getSessionUser(cookies);
+	
 	if (!user) {
-		throw redirect(303, '/login?redirect=/trips/new');
+		throw redirect(303, `/login?redirect=${encodeURIComponent(url.pathname)}`);
 	}
-	return { user };
+
+	// Load draft from session or database if needed
+	// For now, we'll use sessionStorage on client side
+	return {
+		user,
+		draft: null // Could load from database here
+	};
 };
 
 export const actions: Actions = {
-	create: async ({ request, cookies }) => {
+	saveDraft: async ({ request, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) {
+			return fail(401, { error: 'Unauthorized' });
+		}
+
+		try {
+			const { formData } = await request.json();
+			// Store draft in sessionStorage on client for now
+			// Could save to database here if needed
+			return { success: true };
+		} catch (error) {
+			console.error('Error saving draft:', error);
+			return fail(500, { error: 'Failed to save draft' });
+		}
+	},
+
+		create: async ({ request, cookies }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) {
 			throw redirect(303, '/login');
@@ -22,114 +45,197 @@ export const actions: Actions = {
 
 		try {
 			const formData = await request.formData();
+			const formDataJson = formData.get('formData') as string;
 			
-			// Extract form data (same as admin version)
-			const name = formData.get('name') as string;
-			const description = formData.get('description') as string;
-			const listingUrl = formData.get('listingUrl') as string;
-			const listingTitle = formData.get('listingTitle') as string;
-			const listingCoverPhoto = formData.get('listingCoverPhoto') as string;
-			const checkInDateStr = formData.get('checkInDate') as string;
-			const checkOutDateStr = formData.get('checkOutDate') as string;
-			const totalCostStr = formData.get('totalCost') as string;
-			const pricingModelStr = formData.get('pricingModel') as string;
-			const expectedPeopleCountStr = formData.get('expectedPeopleCount') as string;
-			const maxGuestsStr = formData.get('maxGuests') as string;
-			const allowPartialStaysStr = formData.get('allowPartialStays') as string;
-			const bedWeightsStr = formData.get('bedWeights') as string;
-			const sharingExponentAlphaStr = formData.get('sharingExponentAlpha') as string;
-			const privacyPremiumPStr = formData.get('privacyPremiumP') as string;
-			const scrapePayloadStr = formData.get('scrapePayload') as string;
+			if (!formDataJson) {
+				return fail(400, { error: 'Missing form data' });
+			}
+
+			const data = JSON.parse(formDataJson);
+			
+			// Fix Room sequence if needed (one-time fix for out-of-sync sequences)
+			// This ensures the auto-increment sequence is in sync with existing data
+			try {
+				await prisma.$executeRawUnsafe(`
+					SELECT setval(
+						pg_get_serial_sequence('"Room"', 'id'),
+						COALESCE((SELECT MAX(id) FROM "Room"), 0) + 1,
+						false
+					)
+				`);
+			} catch (seqError) {
+				// Ignore sequence fix errors - not critical, might not be needed
+				console.log('Sequence fix skipped (may not be needed):', seqError);
+			}
 
 			// Validate required fields
-			const missingFields: string[] = [];
-			if (!name || name.trim() === '') missingFields.push('name');
-			if (!checkInDateStr || checkInDateStr.trim() === '') missingFields.push('checkInDate');
-			if (!checkOutDateStr || checkOutDateStr.trim() === '') missingFields.push('checkOutDate');
-			if (!totalCostStr || totalCostStr.trim() === '') missingFields.push('totalCost');
-			if (!pricingModelStr || pricingModelStr.trim() === '') missingFields.push('pricingModel');
-			
-			if (missingFields.length > 0) {
+			if (!data.name || !data.checkInDate || !data.checkOutDate || !data.totalCost) {
 				return fail(400, {
-					error: `Missing required fields: ${missingFields.join(', ')}`
+					error: 'Missing required fields: name, dates, and total cost are required'
 				});
 			}
 
-			const totalCost = Number(totalCostStr);
-			if (isNaN(totalCost) || totalCost <= 0) {
+			if (!data.rooms || data.rooms.length === 0) {
 				return fail(400, {
-					error: 'Invalid total cost'
+					error: 'At least one room is required'
 				});
 			}
 
-			const checkInDate = new Date(checkInDateStr);
-			const checkOutDate = new Date(checkOutDateStr);
+			// Validate dates
+			const checkInDate = new Date(data.checkInDate);
+			const checkOutDate = new Date(data.checkOutDate);
 			
 			if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
-				return fail(400, {
-					error: 'Invalid dates'
-				});
+				return fail(400, { error: 'Invalid dates' });
 			}
 			
 			if (checkOutDate <= checkInDate) {
-				return fail(400, {
-					error: 'Check-out date must be after check-in date'
-				});
+				return fail(400, { error: 'Check-out date must be after check-in date' });
 			}
 
-			const pricingModel = pricingModelStr.toUpperCase() as 'PER_ROOM' | 'PER_BED' | 'PER_PERSON' | 'PER_PERSON_PER_NIGHT';
-			if (!['PER_ROOM', 'PER_BED', 'PER_PERSON', 'PER_PERSON_PER_NIGHT'].includes(pricingModel)) {
-				return fail(400, {
-					error: 'Invalid pricing model'
-				});
+			const totalCost = parseFloat(data.totalCost);
+			if (isNaN(totalCost) || totalCost <= 0) {
+				return fail(400, { error: 'Invalid total cost' });
 			}
 
 			// Generate unique invite code
 			const inviteCode = generateInviteCode();
 
-			// Create trip with User as host (no hostId, we'll use TripMember)
-			const trip = await prisma.trip.create({
-				data: {
-					name,
-					description: description || null,
-					listingUrl: listingUrl || null,
-					listingTitle: listingTitle || null,
-					listingCoverPhoto: listingCoverPhoto || null,
-					checkInDate,
-					checkOutDate,
-					totalCost,
-					pricingModel,
-					inviteCode,
-					isPublished: false,
-					expectedPeopleCount: expectedPeopleCountStr ? Number(expectedPeopleCountStr) : null,
-					maxGuests: maxGuestsStr ? Number(maxGuestsStr) : null,
-					allowPartialStays: allowPartialStaysStr === 'true',
-					bedWeights: bedWeightsStr || null,
-					sharingExponentAlpha: sharingExponentAlphaStr ? Number(sharingExponentAlphaStr) : 0.60,
-					privacyPremiumP: privacyPremiumPStr ? Number(privacyPremiumPStr) : 0.00,
-					scrapePayload: scrapePayloadStr || null,
-					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+			// Use a transaction to ensure atomicity
+			const trip = await prisma.$transaction(async (tx) => {
+				// Create trip
+				const newTrip = await tx.trip.create({
+					data: {
+						name: data.name,
+						description: data.description || null,
+						location: data.location || null,
+						listingUrl: data.listingUrl || null,
+						listingTitle: data.listingTitle || null,
+						listingCoverPhoto: data.coverPhoto || null,
+						checkInDate,
+						checkOutDate,
+						totalCost,
+						pricingModel: data.pricingModel || 'PER_PERSON',
+						inviteCode,
+						isPublished: false,
+						maxGuests: data.maxGuests ? parseInt(data.maxGuests) : null,
+						allowPartialStays: data.allowPartialStays || false,
+						timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+						scrapePayload: JSON.stringify(data) // Store full form data for reference
+					}
+				});
+
+				// Create TripMember record for the host
+				await tx.tripMember.create({
+					data: {
+						tripId: newTrip.id,
+						userId: user.id,
+						role: 'host',
+						inviteStatus: 'accepted'
+					}
+				});
+
+				// Create rooms and beds
+				for (const roomData of data.rooms) {
+					const room = await tx.room.create({
+						data: {
+							tripId: newTrip.id,
+							name: roomData.name,
+							maxOccupancy: roomData.maxOccupants || 2,
+							photoUrls: roomData.photos || [],
+							baseRateModifier: 1.0
+						}
+					});
+
+					// Create beds for this room
+					if (roomData.beds && roomData.beds.length > 0) {
+						for (const bedData of roomData.beds) {
+							const bedType = bedData.bedType === 'CUSTOM' && bedData.customType 
+								? bedData.customType.toLowerCase() 
+								: bedData.bedType.toLowerCase();
+							
+							// Create multiple beds based on quantity
+							for (let i = 0; i < (bedData.quantity || 1); i++) {
+								await tx.bed.create({
+									data: {
+										roomId: room.id,
+										bedType: bedType,
+										capacity: bedData.bedType === 'KING' ? 2 : bedData.bedType === 'QUEEN' ? 2 : bedData.bedType === 'TWIN' ? 1 : bedData.bedType === 'BUNK' ? 2 : 1,
+										capacitySlots: bedData.bedType === 'KING' ? 2 : bedData.bedType === 'QUEEN' ? 2 : bedData.bedType === 'TWIN' ? 1 : bedData.bedType === 'BUNK' ? 2 : 1,
+										isAvailable: true
+									}
+								});
+							}
+						}
+					}
 				}
+
+				return newTrip;
 			});
 
-			// Create TripMember record for the host
-			await prisma.tripMember.create({
-				data: {
-					tripId: trip.id,
-					userId: user.id,
-					role: 'host',
-					inviteStatus: 'accepted'
-				}
-			});
+			// Create meal plan if enabled (outside transaction to avoid timeout)
+			if (data.enableMeals) {
+				try {
+					await prisma.mealPlan.create({
+						data: {
+							tripId: trip.id,
+							enabled: true,
+							mode: 'slots'
+						}
+					});
 
-			throw redirect(303, `/admin/trips/${trip.id}/rooms`);
+					// Create meal slots if meals are provided
+					if (data.meals && data.meals.length > 0) {
+						for (const mealData of data.meals) {
+							if (mealData.date && mealData.name) {
+								await prisma.mealSlot.create({
+									data: {
+										tripId: trip.id,
+										mealType: 'dinner', // Default, can be customized
+										date: new Date(mealData.date),
+										menuText: mealData.name,
+										capacityServings: null
+									}
+								});
+							}
+						}
+					}
+				} catch (mealError) {
+					console.error('Error creating meal plan:', mealError);
+					// Non-critical, continue
+				}
+			}
+
+			// Send invites if requested (outside transaction to avoid timeout)
+			if (data.inviteNow && data.inviteEmails && data.inviteEmails.length > 0) {
+				// Import invite service
+				const { createInvite } = await import('$lib/server/invite-service.js');
+				
+				for (const email of data.inviteEmails) {
+					try {
+						await createInvite({
+							tripId: trip.id,
+							invitedByUserId: user.id,
+							channel: 'email',
+							recipientEmail: email,
+							message: data.inviteMessage || null
+						});
+					} catch (error) {
+						console.error(`Failed to create invite for ${email}:`, error);
+						// Continue with other invites even if one fails
+					}
+				}
+			}
+
+			// Redirect to trip management page
+			throw redirect(303, `/trips/${trip.id}/manage`);
 		} catch (error) {
 			console.error('Error creating trip:', error);
-			if (error instanceof Error && error.message.includes('redirect')) {
-				throw error;
+			if (error && typeof error === 'object' && 'status' in error && error.status === 303) {
+				throw error; // Re-throw redirects
 			}
 			return fail(500, {
-				error: 'Failed to create trip'
+				error: 'Failed to create trip. Please try again.'
 			});
 		}
 	}

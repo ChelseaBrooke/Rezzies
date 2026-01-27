@@ -42,7 +42,7 @@
 	<main class="home-main">
 		<div class="main-content">
 			<div class="main-actions">
-				<a href="/host-vacation" class="action-btn primary">Host a Trip</a>
+				<a href="/trips/new" class="action-btn primary">Host a Trip</a>
 				<a href="/trips" class="action-btn secondary">Find a Trip</a>
 				<a href="/our-services" class="action-btn secondary">Learn More</a>
 			</div>

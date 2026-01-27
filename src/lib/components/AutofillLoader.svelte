@@ -33,7 +33,7 @@
 
 	function handleCancel() {
 		sessionStorage.removeItem('autofillUrl');
-		goto('/host-vacation');
+		goto('/trips/new');
 	}
 </script>
 

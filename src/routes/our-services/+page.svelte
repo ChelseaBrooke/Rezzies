@@ -81,7 +81,7 @@
 			<div class="cta-content">
 				<h2>Ready to Get Started?</h2>
 				<p>Start planning your next group vacation today.</p>
-				<a href="/host-vacation" class="btn btn-primary btn-large">Host a Vacation</a>
+				<a href="/trips/new" class="btn btn-primary btn-large">Host a Trip</a>
 			</div>
 		</div>
 	</section>

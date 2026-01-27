@@ -114,7 +114,7 @@
 			<div class="action-buttons">
 				<button
 					class="btn btn-primary btn-large"
-					onclick={() => goto('/trips/new/manual')}
+					onclick={() => goto('/trips/new')}
 				>
 					Continue
 				</button>
