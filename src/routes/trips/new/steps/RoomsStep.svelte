@@ -92,6 +92,35 @@
 		});
 	}
 	
+	let pendingUploadRoomId = $state<string | null>(null);
+	let roomPhotoUploading = $state(false);
+	
+	function startRoomPhotoUpload(roomId: string) {
+		pendingUploadRoomId = roomId;
+		document.getElementById('room-photo-file-input')?.click();
+	}
+	
+	async function handleRoomPhotoUpload(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		const roomId = pendingUploadRoomId;
+		pendingUploadRoomId = null;
+		input.value = '';
+		if (!file || !roomId) return;
+		roomPhotoUploading = true;
+		try {
+			const fd = new FormData();
+			fd.set('file', file);
+			const res = await fetch('/api/upload-image', { method: 'POST', body: fd });
+			const json = await res.json();
+			if (res.ok && json.url) {
+				addPhotoToRoom(roomId, json.url);
+			}
+		} finally {
+			roomPhotoUploading = false;
+		}
+	}
+	
 	function removePhotoFromRoom(roomId: string, photoIndex: number) {
 		formData.rooms = formData.rooms.map((room: Room) => {
 			if (room.id === roomId) {
@@ -121,6 +150,13 @@
 </script>
 
 <div class="step-content">
+	<input
+		type="file"
+		accept="image/jpeg,image/png,image/webp,image/gif"
+		class="room-photo-file-input"
+		id="room-photo-file-input"
+		onchange={handleRoomPhotoUpload}
+	/>
 	<h1 class="step-title">Rooms & Beds</h1>
 	
 	{#if formData.rooms.length === 0}
@@ -182,9 +218,13 @@
 								</div>
 							{/each}
 							<div class="add-photo-input">
+								<button type="button" class="upload-room-photo-btn" onclick={() => startRoomPhotoUpload(room.id)} disabled={roomPhotoUploading}>
+									{roomPhotoUploading ? 'Uploading…' : 'Upload from computer'}
+								</button>
+								<span class="add-photo-or">or paste URL</span>
 								<input
 									type="text"
-									placeholder="Paste photo URL"
+									placeholder="Paste URL and press Enter"
 									class="photo-url-input"
 									onkeydown={(e) => {
 										if (e.key === 'Enter') {
@@ -302,11 +342,10 @@
 	}
 	
 	.room-card {
-		background: rgba(255, 255, 255, 0.6);
-		border: none;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-		border-radius: 0;
-		padding: 2.5rem 0;
+		background: #fff;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		border-radius: 8px;
+		padding: 2.5rem;
 		margin-bottom: 2rem;
 	}
 	
@@ -454,26 +493,67 @@
 		line-height: 1;
 	}
 	
+	.room-photo-file-input {
+		position: absolute;
+		width: 0.1px;
+		height: 0.1px;
+		opacity: 0;
+		overflow: hidden;
+		z-index: -1;
+	}
+	
 	.add-photo-input {
 		aspect-ratio: 1;
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
+		gap: 0.5rem;
 		border: 1px dashed rgba(0, 0, 0, 0.2);
 		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.5);
+		background: #f8f8f8;
+		padding: 0.75rem;
+	}
+	
+	.upload-room-photo-btn {
+		padding: 0.5rem 1rem;
+		background: #000;
+		color: white;
+		border: none;
+		border-radius: 6px;
+		font-size: 0.8rem;
+		font-weight: 500;
+		cursor: pointer;
+		font-family: inherit;
+	}
+	
+	.upload-room-photo-btn:hover:not(:disabled) {
+		background: #333;
+	}
+	
+	.upload-room-photo-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	
+	.add-photo-or {
+		font-size: 0.75rem;
+		color: rgba(0, 0, 0, 0.5);
 	}
 	
 	.photo-url-input {
 		width: 100%;
-		padding: var(--spacing-sm);
+		padding: 0.5rem;
 		border: none;
-		font-size: 0.875rem;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+		font-size: 0.8rem;
 		text-align: center;
+		background: transparent;
 	}
 	
 	.photo-url-input:focus {
 		outline: none;
+		border-bottom-color: rgba(0, 0, 0, 0.4);
 	}
 	
 	.beds-section {
@@ -619,5 +699,49 @@
 		border-color: rgba(0, 0, 0, 0.4);
 		color: rgba(0, 0, 0, 0.9);
 		background: rgba(0, 0, 0, 0.02);
+	}
+	
+	.step-actions {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-top: 4rem;
+		padding-top: 2rem;
+		border-top: 1px solid rgba(0, 0, 0, 0.08);
+	}
+	
+	.btn-primary,
+	.btn-secondary {
+		padding: 1rem 2rem;
+		border-radius: 8px;
+		font-size: 1rem;
+		font-weight: 500;
+		cursor: pointer;
+		font-family: inherit;
+		transition: all 0.2s ease;
+		border: none;
+	}
+	
+	.btn-primary {
+		background: #000;
+		color: white;
+	}
+	
+	.btn-primary:hover:not(:disabled) {
+		background: #333;
+	}
+	
+	.btn-primary:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+	
+	.btn-secondary {
+		background: transparent;
+		color: rgba(0, 0, 0, 0.6);
+	}
+	
+	.btn-secondary:hover {
+		color: rgba(0, 0, 0, 0.8);
 	}
 </style>

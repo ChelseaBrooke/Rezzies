@@ -4,60 +4,80 @@
 	import { enhance } from '$app/forms';
 	import type { PageData, ActionData } from './$types';
 	import RoomsStep from './steps/RoomsStep.svelte';
-	import PricingStep from './steps/PricingStep.svelte';
-	import MealsStep from './steps/MealsStep.svelte';
-	import InvitesStep from './steps/InvitesStep.svelte';
+	import PricingPoliciesStep from './steps/PricingPoliciesStep.svelte';
+	import InvitePeopleStep from './steps/InvitePeopleStep.svelte';
 	import ReviewStep from './steps/ReviewStep.svelte';
 	
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	
-	type Step = 'overview' | 'rooms' | 'pricing' | 'meals' | 'invites' | 'review';
+	type Step = 'basics' | 'rooms' | 'pricing-policies' | 'invite-people' | 'review';
 	
-	let currentStep = $state<Step>('overview');
+	let currentStep = $state<Step>('basics');
 	let isAutofilling = $state(false);
 	let autofillError = $state<string | null>(null);
 	let showAutofillInput = $state(false);
+	let coverPhotoUploading = $state(false);
 	
 	// Form data state
 	let formData = $state({
-		// Overview
+		// Trip Basics
 		name: data.draft?.name || '',
-		location: data.draft?.location || '',
+		description: data.draft?.description || '',
+		destination: data.draft?.destination || '',
 		checkInDate: data.draft?.checkInDate || '',
 		checkOutDate: data.draft?.checkOutDate || '',
-		maxGuests: data.draft?.maxGuests || '',
-		totalCost: data.draft?.totalCost || '',
+		flexibleDates: data.draft?.flexibleDates || false,
 		coverPhoto: data.draft?.coverPhoto || '',
-		description: data.draft?.description || '',
 		listingUrl: data.draft?.listingUrl || '',
 		
 		// Rooms (will be populated from autofill or manual entry)
 		rooms: data.draft?.rooms || [],
 		
-		// Pricing
+		// Pricing & Policies
+		totalCost: data.draft?.totalCost || '',
+		cleaningFees: data.draft?.cleaningFees || '',
+		serviceFees: data.draft?.serviceFees || '',
+		taxes: data.draft?.taxes || '',
 		pricingModel: data.draft?.pricingModel || 'PER_PERSON',
-		rsvpByDate: data.draft?.rsvpByDate || '',
 		allowPartialStays: data.draft?.allowPartialStays || false,
-		roundUp: data.draft?.roundUp || true,
+		paymentDueDates: data.draft?.paymentDueDates || [],
+		installments: data.draft?.installments || false,
+		refundPolicy: data.draft?.refundPolicy || '',
+		cancellationCutoff: data.draft?.cancellationCutoff || '',
+		latePaymentHandling: data.draft?.latePaymentHandling || '',
+		rsvpDeadline: data.draft?.rsvpDeadline || '',
+		autoReminders: data.draft?.autoReminders || false,
+		overbookingAllowed: data.draft?.overbookingAllowed || false,
+		houseRules: data.draft?.houseRules || '',
+		quietHours: data.draft?.quietHours || '',
+		petPolicy: data.draft?.petPolicy || '',
+		smokingPolicy: data.draft?.smokingPolicy || '',
+		accessibilityNotes: data.draft?.accessibilityNotes || '',
+		checkInInstructions: data.draft?.checkInInstructions || '',
+		checkOutInstructions: data.draft?.checkOutInstructions || '',
 		
-		// Meals
-		enableMeals: data.draft?.enableMeals || false,
-		meals: data.draft?.meals || [],
-		
-		// Invites
-		inviteNow: data.draft?.inviteNow || false,
+		// Invite People
 		inviteEmails: data.draft?.inviteEmails || [],
 		inviteMessage: data.draft?.inviteMessage || ''
 	});
 	
 	const steps: { id: Step; label: string }[] = [
-		{ id: 'overview', label: 'Overview' },
+		{ id: 'basics', label: 'Trip Basics' },
 		{ id: 'rooms', label: 'Rooms' },
-		{ id: 'pricing', label: 'Pricing' },
-		{ id: 'meals', label: 'Meals' },
-		{ id: 'invites', label: 'Invites' },
-		{ id: 'review', label: 'Review' }
+		{ id: 'pricing-policies', label: 'Pricing & Policies' },
+		{ id: 'invite-people', label: 'Invite People' },
+		{ id: 'review', label: 'Review & Publish' }
 	];
+	
+	// Calculate number of nights
+	const numberOfNights = $derived(() => {
+		if (!formData.checkInDate || !formData.checkOutDate) return 0;
+		const checkIn = new Date(formData.checkInDate);
+		const checkOut = new Date(formData.checkOutDate);
+		const diffTime = checkOut.getTime() - checkIn.getTime();
+		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+		return diffDays > 0 ? diffDays : 0;
+	});
 	
 	const currentStepIndex = $derived(steps.findIndex(s => s.id === currentStep));
 	
@@ -68,10 +88,12 @@
 		if (autosaveTimeout) clearTimeout(autosaveTimeout);
 		autosaveTimeout = setTimeout(async () => {
 			try {
+				const body = new URLSearchParams();
+				body.set('formData', JSON.stringify(formData));
 				const response = await fetch('?/saveDraft', {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(formData)
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+					body: body.toString()
 				});
 				if (response.ok) {
 					console.log('Draft autosaved');
@@ -117,11 +139,11 @@
 				// Map property info
 				if (propertyInfo) {
 					if (propertyInfo.title) formData.name = propertyInfo.title;
-					if (propertyInfo.maxGuests) formData.maxGuests = String(propertyInfo.maxGuests);
 					if (propertyInfo.checkInDate) formData.checkInDate = propertyInfo.checkInDate;
 					if (propertyInfo.checkOutDate) formData.checkOutDate = propertyInfo.checkOutDate;
 					if (propertyInfo.totalPrice) formData.totalCost = String(propertyInfo.totalPrice);
 					if (propertyInfo.coverPhoto) formData.coverPhoto = propertyInfo.coverPhoto;
+					if (propertyInfo.location) formData.destination = propertyInfo.location;
 				}
 				
 				// Use photos array if available
@@ -204,10 +226,10 @@
 	
 	<!-- Main Content -->
 	<div class="wizard-content">
-		{#if currentStep === 'overview'}
-			<!-- Step 1: Overview -->
-			<div class="step-content">
-				<h1 class="step-title">Create Your Trip</h1>
+		<div class="step-content">
+			{#if currentStep === 'basics'}
+				<!-- Step 1: Trip Basics & Source -->
+				<h1 class="step-title">Trip Basics & Source</h1>
 				
 				<!-- Subtle Autofill Link -->
 				<div class="autofill-section">
@@ -258,150 +280,142 @@
 					{/if}
 				</div>
 				
-				<form method="POST" action="?/create" use:enhance>
-					<!-- Trip Name -->
-					<div class="form-section">
+				<!-- Trip Name -->
+				<div class="form-section">
+					<input
+						type="text"
+						id="name"
+						name="name"
+						bind:value={formData.name}
+						required
+						class="form-input large"
+						placeholder="Trip name"
+					/>
+				</div>
+				
+				<!-- Trip Description -->
+				<div class="form-section">
+					<textarea
+						id="description"
+						name="description"
+						bind:value={formData.description}
+						rows="4"
+						class="form-textarea"
+						placeholder="Trip description / notes"
+					></textarea>
+				</div>
+				
+				<!-- Destination -->
+				<div class="form-section">
+					<input
+						type="text"
+						id="destination"
+						name="destination"
+						bind:value={formData.destination}
+						class="form-input"
+						placeholder="Destination"
+					/>
+				</div>
+				
+				<!-- Dates -->
+				<div class="form-section">
+					<div class="inline-fields">
 						<input
-							type="text"
-							id="name"
-							name="name"
-							bind:value={formData.name}
+							type="date"
+							id="checkInDate"
+							name="checkInDate"
+							bind:value={formData.checkInDate}
 							required
-							class="form-input large"
-							placeholder="Trip name"
-						/>
-					</div>
-					
-					<!-- Dates -->
-					<div class="form-section">
-						<div class="inline-fields">
-							<input
-								type="date"
-								id="checkInDate"
-								name="checkInDate"
-								bind:value={formData.checkInDate}
-								required
-								class="form-input"
-							/>
-							<span class="field-separator">to</span>
-							<input
-								type="date"
-								id="checkOutDate"
-								name="checkOutDate"
-								bind:value={formData.checkOutDate}
-								required
-								class="form-input"
-							/>
-						</div>
-					</div>
-					
-					<!-- Location -->
-					<div class="form-section">
-						<input
-							type="text"
-							id="location"
-							name="location"
-							bind:value={formData.location}
 							class="form-input"
-							placeholder="Location"
+						/>
+						<span class="field-separator">to</span>
+						<input
+							type="date"
+							id="checkOutDate"
+							name="checkOutDate"
+							bind:value={formData.checkOutDate}
+							required
+							class="form-input"
 						/>
 					</div>
-					
-					<!-- Guests & Cost -->
-					<div class="form-section">
-						<div class="inline-fields">
-							<input
-								type="number"
-								id="maxGuests"
-								name="maxGuests"
-								bind:value={formData.maxGuests}
-								min="1"
-								class="form-input"
-								placeholder="Max guests"
-							/>
-							<span class="field-separator">·</span>
-							<input
-								type="number"
-								id="totalCost"
-								name="totalCost"
-								bind:value={formData.totalCost}
-								min="0"
-								step="0.01"
-								required
-								class="form-input"
-								placeholder="Total cost"
-							/>
-						</div>
-					</div>
-					
-					<!-- Cover Photo -->
+					{#if numberOfNights > 0}
+						<p class="helper-text">{numberOfNights} night{numberOfNights !== 1 ? 's' : ''}</p>
+					{/if}
+				</div>
+				
+				<!-- Flexible Dates -->
+				<div class="form-section">
+					<label class="toggle-label">
+						<input
+							type="checkbox"
+							bind:checked={formData.flexibleDates}
+							class="toggle-input"
+						/>
+						<span class="toggle-text">Flexible dates allowed?</span>
+					</label>
+				</div>
+				
+				<!-- Cover Photo -->
+				<div class="form-section">
+					<label class="section-label">Main / Cover Photo</label>
 					{#if formData.coverPhoto}
-						<div class="form-section">
-							<div class="cover-photo-preview">
-								<img src={formData.coverPhoto} alt="Cover photo" />
-								<button
-									type="button"
-									class="remove-photo"
-									onclick={() => formData.coverPhoto = ''}
-								>
-									Remove
-								</button>
-							</div>
+						<div class="cover-photo-preview">
+							<img src={formData.coverPhoto} alt="Cover photo" />
+							<button
+								type="button"
+								class="remove-photo"
+								onclick={() => formData.coverPhoto = ''}
+							>
+								Remove
+							</button>
 						</div>
 					{:else}
-						<div class="form-section">
+						<div class="cover-photo-options">
+							<input
+								type="file"
+								accept="image/jpeg,image/png,image/webp,image/gif"
+								class="cover-photo-file-input"
+								id="cover-photo-file-input"
+								onchange={handleCoverPhotoUpload}
+							/>
+							<button type="button" class="upload-from-computer-btn" onclick={() => document.getElementById('cover-photo-file-input')?.click()}>
+								{coverPhotoUploading ? 'Uploading…' : 'Upload from computer'}
+							</button>
+							<span class="cover-photo-or">or paste URL</span>
 							<input
 								type="text"
 								id="coverPhoto"
 								name="coverPhoto"
 								bind:value={formData.coverPhoto}
 								class="form-input"
-								placeholder="Cover photo URL (optional)"
+								placeholder="https://…"
 							/>
 						</div>
 					{/if}
-					
-					<!-- Description -->
-					<div class="form-section">
-						<textarea
-							id="description"
-							name="description"
-							bind:value={formData.description}
-							rows="4"
-							class="form-textarea"
-							placeholder="Description (optional)"
-						></textarea>
-					</div>
-					
-					<!-- Hidden fields for form submission -->
-					<input type="hidden" name="step" value="overview" />
-					
-					<div class="step-actions">
-						<button type="button" class="btn-secondary" onclick={() => goto('/trips')}>
-							Cancel
-						</button>
-						<button type="button" class="btn-primary" onclick={nextStep}>
-							Continue
-						</button>
-					</div>
-				</form>
-			</div>
-		{:else if currentStep === 'rooms'}
-			<!-- Step 2: Rooms & Beds -->
-			<RoomsStep bind:formData {nextStep} {prevStep} />
-		{:else if currentStep === 'pricing'}
-			<!-- Step 3: Pricing -->
-			<PricingStep bind:formData {nextStep} {prevStep} />
-		{:else if currentStep === 'meals'}
-			<!-- Step 4: Meals -->
-			<MealsStep bind:formData {nextStep} {prevStep} />
-		{:else if currentStep === 'invites'}
-			<!-- Step 5: Invites -->
-			<InvitesStep bind:formData {nextStep} {prevStep} />
-		{:else if currentStep === 'review'}
-			<!-- Step 6: Review -->
-			<ReviewStep {formData} {prevStep} />
-		{/if}
+				</div>
+				
+				<div class="step-actions">
+					<button type="button" class="btn-secondary" onclick={() => goto('/trips')}>
+						Cancel
+					</button>
+					<button type="button" class="btn-primary" onclick={nextStep}>
+						Continue
+					</button>
+				</div>
+				{:else if currentStep === 'rooms'}
+				<!-- Step 2: Rooms -->
+				<RoomsStep bind:formData {nextStep} {prevStep} />
+			{:else if currentStep === 'pricing-policies'}
+				<!-- Step 3: Pricing, Invites & Policies -->
+				<PricingPoliciesStep bind:formData {nextStep} {prevStep} />
+			{:else if currentStep === 'invite-people'}
+				<!-- Step 4: Invite People -->
+				<InvitePeopleStep bind:formData {nextStep} {prevStep} />
+			{:else if currentStep === 'review'}
+				<!-- Step 5: Review & Publish -->
+				<ReviewStep {formData} {prevStep} numberOfNights={numberOfNights} />
+			{/if}
+		</div>
 	</div>
 </div>
 
@@ -431,17 +445,15 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: rgba(0, 0, 0, 0.4);
-		backdrop-filter: blur(1px);
+		background: rgba(0, 0, 0, 0.5);
 	}
 	
 	.step-indicator {
 		position: relative;
 		z-index: 10;
 		padding: 2rem 0 1rem;
-		background: rgba(255, 255, 255, 0.95);
-		backdrop-filter: blur(10px);
-		border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+		background: #fff;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 	}
 	
 	.step-indicator-content {
@@ -494,11 +506,10 @@
 	}
 	
 	.step-content {
-		background: rgba(255, 255, 255, 0.95);
-		backdrop-filter: blur(10px);
+		background: #fff;
 		border-radius: 8px;
 		padding: 3rem 2.5rem;
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
 	}
 	
 	.step-title {
@@ -663,6 +674,81 @@
 	
 	.form-textarea::placeholder {
 		color: rgba(0, 0, 0, 0.3);
+	}
+	
+	.section-label {
+		font-size: 0.875rem;
+		color: rgba(0, 0, 0, 0.5);
+		font-weight: 400;
+		margin-bottom: 0.75rem;
+		display: block;
+	}
+	
+	.helper-text {
+		font-size: 0.875rem;
+		color: rgba(0, 0, 0, 0.5);
+		margin-top: 0.5rem;
+	}
+	
+	.toggle-label {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		cursor: pointer;
+	}
+	
+	.toggle-input {
+		width: 18px;
+		height: 18px;
+		cursor: pointer;
+	}
+	
+	.toggle-text {
+		font-size: 1rem;
+		color: rgba(0, 0, 0, 0.7);
+	}
+	
+	.cover-photo-options {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+	
+	.cover-photo-file-input {
+		position: absolute;
+		width: 0.1px;
+		height: 0.1px;
+		opacity: 0;
+		overflow: hidden;
+		z-index: -1;
+	}
+	
+	.upload-from-computer-btn {
+		align-self: flex-start;
+		padding: 0.75rem 1.5rem;
+		background: #000;
+		color: white;
+		border: none;
+		border-radius: 8px;
+		font-size: 0.95rem;
+		font-weight: 500;
+		cursor: pointer;
+		font-family: inherit;
+		transition: background 0.2s ease;
+	}
+	
+	.upload-from-computer-btn:hover:not(:disabled) {
+		background: #333;
+	}
+	
+	.upload-from-computer-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	
+	.cover-photo-or {
+		font-size: 0.875rem;
+		color: rgba(0, 0, 0, 0.5);
 	}
 	
 	.cover-photo-preview {

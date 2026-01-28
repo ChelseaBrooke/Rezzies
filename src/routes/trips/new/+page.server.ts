@@ -27,9 +27,12 @@ export const actions: Actions = {
 		}
 
 		try {
-			const { formData } = await request.json();
-			// Store draft in sessionStorage on client for now
-			// Could save to database here if needed
+			const fd = await request.formData();
+			const formDataJson = fd.get('formData');
+			if (formDataJson != null && typeof formDataJson === 'string') {
+				JSON.parse(formDataJson); // validate it's valid JSON; store in DB/session if needed
+			}
+			// Store draft in sessionStorage on client for now; could save to database here if needed
 			return { success: true };
 		} catch (error) {
 			console.error('Error saving draft:', error);

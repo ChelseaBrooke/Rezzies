@@ -5,9 +5,10 @@
 	interface Props {
 		formData: any;
 		prevStep: () => void;
+		numberOfNights?: number;
 	}
 	
-	let { formData, prevStep }: Props = $props();
+	let { formData, prevStep, numberOfNights = 0 }: Props = $props();
 	
 	let isSubmitting = $state(false);
 	
@@ -46,37 +47,37 @@
 </script>
 
 <div class="step-content">
-	<h1 class="step-title">Review & Create</h1>
-	<p class="step-subtitle">Review your trip details before creating</p>
+	<h1 class="step-title">Review & Publish</h1>
+	<p class="step-subtitle">Review your trip details before publishing</p>
 	
 	<div class="review-sections">
-		<!-- Overview -->
+		<!-- Trip Basics -->
 		<section class="review-section">
-			<h2>Overview</h2>
+			<h2>Trip Basics</h2>
 			<div class="review-grid">
 				<div class="review-item">
-					<span class="review-label">Trip Title</span>
+					<span class="review-label">Trip Name</span>
 					<span class="review-value">{formData.name || 'Not set'}</span>
 				</div>
 				<div class="review-item">
-					<span class="review-label">Location</span>
-					<span class="review-value">{formData.location || 'Not set'}</span>
+					<span class="review-label">Destination</span>
+					<span class="review-value">{formData.destination || 'Not set'}</span>
 				</div>
 				<div class="review-item">
-					<span class="review-label">Start Date</span>
+					<span class="review-label">Check-in Date</span>
 					<span class="review-value">{formatDate(formData.checkInDate)}</span>
 				</div>
 				<div class="review-item">
-					<span class="review-label">End Date</span>
+					<span class="review-label">Check-out Date</span>
 					<span class="review-value">{formatDate(formData.checkOutDate)}</span>
 				</div>
 				<div class="review-item">
-					<span class="review-label">Max Guests</span>
-					<span class="review-value">{formData.maxGuests || 'Not set'}</span>
+					<span class="review-label">Number of Nights</span>
+					<span class="review-value">{numberOfNights} night{numberOfNights !== 1 ? 's' : ''}</span>
 				</div>
 				<div class="review-item">
-					<span class="review-label">Total Cost</span>
-					<span class="review-value">{formatCurrency(formData.totalCost || 0)}</span>
+					<span class="review-label">Flexible Dates</span>
+					<span class="review-value">{formData.flexibleDates ? 'Yes' : 'No'}</span>
 				</div>
 			</div>
 			{#if formData.description}
@@ -126,73 +127,189 @@
 			</div>
 		</section>
 		
-		<!-- Pricing -->
+		<!-- Pricing Breakdown -->
 		<section class="review-section">
-			<h2>Pricing</h2>
+			<h2>Pricing Breakdown</h2>
 			<div class="review-grid">
+				<div class="review-item">
+					<span class="review-label">Base Cost</span>
+					<span class="review-value">{formatCurrency(formData.totalCost || 0)}</span>
+				</div>
+				{#if formData.cleaningFees}
+					<div class="review-item">
+						<span class="review-label">Cleaning Fees</span>
+						<span class="review-value">{formatCurrency(formData.cleaningFees || 0)}</span>
+					</div>
+				{/if}
+				{#if formData.serviceFees}
+					<div class="review-item">
+						<span class="review-label">Service Fees</span>
+						<span class="review-value">{formatCurrency(formData.serviceFees || 0)}</span>
+					</div>
+				{/if}
+				{#if formData.taxes}
+					<div class="review-item">
+						<span class="review-label">Taxes</span>
+						<span class="review-value">{formatCurrency(formData.taxes || 0)}</span>
+					</div>
+				{/if}
+				<div class="review-item full-width">
+					<span class="review-label">Total Cost</span>
+					<span class="review-value large">
+						{formatCurrency(
+							(parseFloat(formData.totalCost || 0) +
+							parseFloat(formData.cleaningFees || 0) +
+							parseFloat(formData.serviceFees || 0) +
+							parseFloat(formData.taxes || 0))
+						)}
+					</span>
+				</div>
 				<div class="review-item">
 					<span class="review-label">Pricing Model</span>
 					<span class="review-value">{pricingModelLabels[formData.pricingModel] || formData.pricingModel}</span>
 				</div>
 				<div class="review-item">
-					<span class="review-label">RSVP By</span>
-					<span class="review-value">{formatDate(formData.rsvpByDate)}</span>
-				</div>
-				<div class="review-item">
-					<span class="review-label">Allow Partial Stays</span>
+					<span class="review-label">Partial Stay Allowed</span>
 					<span class="review-value">{formData.allowPartialStays ? 'Yes' : 'No'}</span>
-				</div>
-				<div class="review-item">
-					<span class="review-label">Round Up</span>
-					<span class="review-value">{formData.roundUp ? 'Yes' : 'No'}</span>
 				</div>
 			</div>
 		</section>
 		
-		<!-- Meals -->
-		{#if formData.enableMeals}
+		<!-- Payment Rules -->
+		{#if formData.paymentDueDates?.length > 0 || formData.installments || formData.refundPolicy || formData.cancellationCutoff || formData.latePaymentHandling}
 			<section class="review-section">
-				<h2>Meals</h2>
-				{#if formData.meals && formData.meals.length > 0}
-					<div class="meals-review">
-						{#each formData.meals as meal}
-							<div class="meal-review-item">
-								<strong>{meal.name || 'Unnamed Meal'}</strong>
-								<span>{formatDate(meal.date)}</span>
-								{#if meal.cost > 0}
-									<span>{formatCurrency(meal.cost)}</span>
-								{/if}
+				<h2>Payment Rules</h2>
+				<div class="review-grid">
+					{#if formData.paymentDueDates?.length > 0}
+						<div class="review-item full-width">
+							<span class="review-label">Payment Due Dates</span>
+							<div class="dates-list">
+								{#each formData.paymentDueDates as date}
+									<span class="date-badge">{formatDate(date)}</span>
+								{/each}
 							</div>
-						{/each}
+						</div>
+					{/if}
+					<div class="review-item">
+						<span class="review-label">Installments</span>
+						<span class="review-value">{formData.installments ? 'Allowed' : 'Not allowed'}</span>
 					</div>
-				{:else}
-					<p class="empty-state">No meals added yet</p>
-				{/if}
+					{#if formData.refundPolicy}
+						<div class="review-item full-width">
+							<span class="review-label">Refund Policy</span>
+							<p class="review-text">{formData.refundPolicy}</p>
+						</div>
+					{/if}
+					{#if formData.cancellationCutoff}
+						<div class="review-item">
+							<span class="review-label">Cancellation Cutoff</span>
+							<span class="review-value">{formatDate(formData.cancellationCutoff)}</span>
+						</div>
+					{/if}
+					{#if formData.latePaymentHandling}
+						<div class="review-item full-width">
+							<span class="review-label">Late Payment Handling</span>
+							<p class="review-text">{formData.latePaymentHandling}</p>
+						</div>
+					{/if}
+				</div>
+			</section>
+		{/if}
+		
+		<!-- RSVP Settings -->
+		{#if formData.rsvpDeadline || formData.autoReminders || formData.overbookingAllowed}
+			<section class="review-section">
+				<h2>RSVP Settings</h2>
+				<div class="review-grid">
+					{#if formData.rsvpDeadline}
+						<div class="review-item">
+							<span class="review-label">RSVP Deadline</span>
+							<span class="review-value">{formatDate(formData.rsvpDeadline)}</span>
+						</div>
+					{/if}
+					<div class="review-item">
+						<span class="review-label">Auto-reminders</span>
+						<span class="review-value">{formData.autoReminders ? 'Enabled' : 'Disabled'}</span>
+					</div>
+					<div class="review-item">
+						<span class="review-label">Overbooking Allowed</span>
+						<span class="review-value">{formData.overbookingAllowed ? 'Yes' : 'No'}</span>
+					</div>
+				</div>
+			</section>
+		{/if}
+		
+		<!-- House Rules -->
+		{#if formData.houseRules || formData.quietHours || formData.petPolicy || formData.smokingPolicy || formData.accessibilityNotes || formData.checkInInstructions || formData.checkOutInstructions}
+			<section class="review-section">
+				<h2>House Rules</h2>
+				<div class="review-grid">
+					{#if formData.houseRules}
+						<div class="review-item full-width">
+							<span class="review-label">House Rules</span>
+							<p class="review-text">{formData.houseRules}</p>
+						</div>
+					{/if}
+					{#if formData.quietHours}
+						<div class="review-item">
+							<span class="review-label">Quiet Hours</span>
+							<span class="review-value">{formData.quietHours}</span>
+						</div>
+					{/if}
+					{#if formData.petPolicy}
+						<div class="review-item full-width">
+							<span class="review-label">Pet Policy</span>
+							<p class="review-text">{formData.petPolicy}</p>
+						</div>
+					{/if}
+					{#if formData.smokingPolicy}
+						<div class="review-item full-width">
+							<span class="review-label">Smoking Policy</span>
+							<p class="review-text">{formData.smokingPolicy}</p>
+						</div>
+					{/if}
+					{#if formData.accessibilityNotes}
+						<div class="review-item full-width">
+							<span class="review-label">Accessibility Notes</span>
+							<p class="review-text">{formData.accessibilityNotes}</p>
+						</div>
+					{/if}
+					{#if formData.checkInInstructions}
+						<div class="review-item full-width">
+							<span class="review-label">Check-in Instructions</span>
+							<p class="review-text">{formData.checkInInstructions}</p>
+						</div>
+					{/if}
+					{#if formData.checkOutInstructions}
+						<div class="review-item full-width">
+							<span class="review-label">Check-out Instructions</span>
+							<p class="review-text">{formData.checkOutInstructions}</p>
+						</div>
+					{/if}
+				</div>
 			</section>
 		{/if}
 		
 		<!-- Invites -->
-		<section class="review-section">
-			<h2>Invites</h2>
-			<div class="review-grid">
-				<div class="review-item">
-					<span class="review-label">Send Invites</span>
-					<span class="review-value">
-						{formData.inviteNow === 'true' || formData.inviteNow === true ? 'Now' : 'Later'}
-					</span>
+		{#if formData.inviteEmails && formData.inviteEmails.length > 0}
+			<section class="review-section">
+				<h2>Invite People</h2>
+				<div class="review-item full-width">
+					<span class="review-label">Guest Emails</span>
+					<div class="emails-review">
+						{#each formData.inviteEmails as email}
+							<span class="email-badge">{email}</span>
+						{/each}
+					</div>
 				</div>
-				{#if (formData.inviteNow === 'true' || formData.inviteNow === true) && formData.inviteEmails && formData.inviteEmails.length > 0}
+				{#if formData.inviteMessage}
 					<div class="review-item full-width">
-						<span class="review-label">Guest Emails</span>
-						<div class="emails-review">
-							{#each formData.inviteEmails as email}
-								<span class="email-badge">{email}</span>
-							{/each}
-						</div>
+						<span class="review-label">Invite Message</span>
+						<p class="review-text">{formData.inviteMessage}</p>
 					</div>
 				{/if}
-			</div>
-		</section>
+			</section>
+		{/if}
 	</div>
 	
 	<form method="POST" action="?/create" use:enhance={() => {
@@ -209,17 +326,37 @@
 		<input type="hidden" name="formData" value={JSON.stringify(formData)} />
 		
 		<div class="step-actions">
-			<button type="button" class="btn btn-secondary" onclick={prevStep} disabled={isSubmitting}>
-				← Back
+			<button type="button" class="btn-secondary" onclick={prevStep} disabled={isSubmitting}>
+				Back
 			</button>
-			<button type="submit" class="btn btn-primary btn-large" disabled={isSubmitting}>
-				{isSubmitting ? 'Creating...' : 'Create Trip'}
-			</button>
+			<div>
+				<button type="button" class="btn-secondary" onclick={() => goto('/trips')} disabled={isSubmitting}>
+					Save as Draft
+				</button>
+				<button type="submit" class="btn-primary" disabled={isSubmitting}>
+					{isSubmitting ? 'Publishing...' : 'Publish Trip'}
+				</button>
+			</div>
 		</div>
 	</form>
 </div>
 
 <style>
+	.step-title {
+		font-size: 3rem;
+		font-weight: 700;
+		margin-bottom: 1rem;
+		color: #000;
+		letter-spacing: -0.02em;
+		line-height: 1.1;
+	}
+	
+	.step-subtitle {
+		font-size: 1rem;
+		color: rgba(0, 0, 0, 0.5);
+		margin-bottom: 3rem;
+	}
+	
 	.review-sections {
 		display: flex;
 		flex-direction: column;
@@ -269,6 +406,32 @@
 		font-size: 1.125rem;
 		color: var(--color-text);
 		font-weight: 500;
+	}
+	
+	.review-value.large {
+		font-size: 1.5rem;
+		font-weight: 700;
+	}
+	
+	.review-text {
+		margin-top: 0.5rem;
+		color: var(--color-text);
+		line-height: 1.7;
+	}
+	
+	.dates-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
+	}
+	
+	.date-badge {
+		background: rgba(0, 0, 0, 0.05);
+		color: rgba(0, 0, 0, 0.8);
+		padding: 0.5rem 1rem;
+		border-radius: 20px;
+		font-size: 0.95rem;
 	}
 	
 	.review-description {
@@ -366,6 +529,60 @@
 		padding: var(--spacing-xs) var(--spacing-md);
 		border-radius: var(--radius-md);
 		font-size: 0.875rem;
+	}
+	
+	.step-actions {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-top: 4rem;
+		padding-top: 2rem;
+		border-top: 1px solid rgba(0, 0, 0, 0.08);
+	}
+	
+	.step-actions > div {
+		display: flex;
+		gap: 1rem;
+	}
+	
+	.btn-primary,
+	.btn-secondary {
+		padding: 1rem 2rem;
+		border-radius: 8px;
+		font-size: 1rem;
+		font-weight: 500;
+		cursor: pointer;
+		font-family: inherit;
+		transition: all 0.2s ease;
+		border: none;
+	}
+	
+	.btn-primary {
+		background: #000;
+		color: white;
+	}
+	
+	.btn-primary:hover:not(:disabled) {
+		background: #333;
+	}
+	
+	.btn-primary:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+	
+	.btn-secondary {
+		background: transparent;
+		color: rgba(0, 0, 0, 0.6);
+	}
+	
+	.btn-secondary:hover:not(:disabled) {
+		color: rgba(0, 0, 0, 0.8);
+	}
+	
+	.btn-secondary:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
 	}
 	
 	@media (max-width: 768px) {
