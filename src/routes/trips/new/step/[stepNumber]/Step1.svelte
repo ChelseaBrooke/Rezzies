@@ -138,7 +138,28 @@
 					</button>
 				</div>
 			{:else}
-				<FileUploadTile label="Upload Cover Photo" on:files={handleCoverPhotoUpload} />
+				<label class="cover-photo-upload">
+					<input
+						type="file"
+						accept="image/*"
+						onchange={(e) => {
+							const file = (e.target as HTMLInputElement).files?.[0];
+							if (file) {
+								const reader = new FileReader();
+								reader.onload = (e) => {
+									draft.coverPhoto = e.target?.result as string;
+									autosave();
+								};
+								reader.readAsDataURL(file);
+							}
+						}}
+						style="display: none;"
+					/>
+					<div class="upload-tile">
+						<span class="upload-icon">📷</span>
+						<span class="upload-text">Upload Cover Photo</span>
+					</div>
+				</label>
 			{/if}
 		</div>
 	</div>
@@ -187,38 +208,38 @@
 	.step-content {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 0;
 	}
 	
 	.two-column-layout {
 		display: grid;
 		grid-template-columns: 35% 65%;
-		gap: 2rem;
+		gap: 1.5rem;
 		align-items: start;
 	}
 	
 	.left-column {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.75rem;
 	}
 	
 	.right-column {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1rem;
 	}
 	
 	.right-content {
 		display: flex;
 		flex-direction: column;
-		gap: 2rem;
+		gap: 1rem;
 	}
 	
 	.form-section {
 		display: flex;
 		flex-direction: column;
-		gap: 0.375rem;
+		gap: 0.25rem;
 	}
 	
 	.form-label {
@@ -353,9 +374,42 @@
 	.rooms-beds-section {
 		background: #fafafa;
 		border: 2px solid var(--primary);
+		border-radius: 0.5rem;
+		padding: 1rem;
+		margin-bottom: 1rem;
+	}
+	
+	.cover-photo-upload {
+		cursor: pointer;
+		display: block;
+	}
+	
+	.upload-tile {
+		border: 2px dashed var(--border);
 		border-radius: 0;
 		padding: 2rem;
-		margin-bottom: 2rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s ease;
+		background: white;
+		gap: 0.5rem;
+	}
+	
+	.upload-tile:hover {
+		border-color: var(--primary);
+		background: rgba(30, 58, 138, 0.02);
+	}
+	
+	.upload-tile .upload-icon {
+		font-size: 2rem;
+	}
+	
+	.upload-tile .upload-text {
+		font-size: 0.875rem;
+		color: var(--muted);
+		font-weight: 500;
 	}
 	
 	.cost-note {
@@ -367,7 +421,7 @@
 	
 	.pricing-section {
 		border-top: 1px solid var(--border);
-		padding-top: 1.5rem;
+		padding-top: 1rem;
 	}
 	
 	@media (max-width: 1024px) {

@@ -31,11 +31,6 @@
 		<!-- Stepper inside card -->
 		<Stepper {steps} {currentStep} />
 		
-		<!-- Card Header -->
-		<div class="card-header">
-			<h1 class="card-title">{currentTitle}</h1>
-		</div>
-		
 		<!-- Card Content -->
 		<div class="card-content">
 			{@render children()}
@@ -103,15 +98,15 @@
 	}
 	
 	.card-header {
-		padding: 1.5rem 2.5rem;
+		padding: 1rem 2.5rem;
 		border-bottom: 1px solid var(--border);
 	}
 	
 	.card-title {
-		font-size: 2rem;
+		font-size: 1.5rem;
 		font-weight: 600;
 		color: var(--text);
-		margin: 0 0 0.5rem 0;
+		margin: 0;
 	}
 	
 	.card-subtitle {
@@ -121,7 +116,7 @@
 	
 	.card-content {
 		flex: 1;
-		padding: 2rem 3rem 2.5rem;
+		padding: 1.5rem 2.5rem 2rem;
 		display: flex;
 		flex-direction: column;
 	}

@@ -75,22 +75,22 @@
 <style>
 	.price-breakdown {
 		border-top: 1px solid var(--border);
-		padding-top: 1.5rem;
-		margin-top: 1.5rem;
+		padding-top: 1rem;
+		margin-top: 1rem;
 	}
 	
 	.breakdown-title {
-		font-size: 1.125rem;
+		font-size: 1rem;
 		font-weight: 600;
 		color: var(--text);
-		margin: 0 0 1rem 0;
+		margin: 0 0 0.75rem 0;
 	}
 	
 	.breakdown-list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
-		margin-bottom: 1rem;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
 	}
 	
 	.breakdown-item {
@@ -113,18 +113,18 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding-top: 1rem;
+		padding-top: 0.75rem;
 		border-top: 2px solid var(--border);
 	}
 	
 	.total-label {
-		font-size: 1.125rem;
+		font-size: 1rem;
 		font-weight: 600;
 		color: var(--text);
 	}
 	
 	.total-value {
-		font-size: 1.25rem;
+		font-size: 1.125rem;
 		font-weight: 700;
 		color: var(--primary);
 	}

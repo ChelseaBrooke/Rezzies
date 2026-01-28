@@ -205,7 +205,7 @@
 	.room-bed-picker {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1rem;
 		height: 100%;
 	}
 	
@@ -241,16 +241,16 @@
 	.rooms-container {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.75rem;
 		max-height: 500px;
 		overflow-y: auto;
 	}
 	
 	.room-card {
 		border: 1px solid var(--border);
-		border-radius: 0.75rem;
-		padding: 1rem;
-		background: #fafafa;
+		border-radius: 0;
+		padding: 0.75rem;
+		background: white;
 		transition: all 0.2s ease;
 	}
 	
@@ -263,7 +263,7 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		margin-bottom: 1rem;
+		margin-bottom: 0.75rem;
 		gap: 0.5rem;
 	}
 	
@@ -307,7 +307,7 @@
 	}
 	
 	.room-photos-section {
-		margin-bottom: 1rem;
+		margin-bottom: 0.75rem;
 	}
 	
 	.photos-grid {
@@ -390,13 +390,13 @@
 	}
 	
 	.beds-section {
-		margin-top: 1rem;
+		margin-top: 0.75rem;
 	}
 	
 	.beds-list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.375rem;
 	}
 	
 	.bed-item {
