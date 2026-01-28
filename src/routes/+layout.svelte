@@ -12,17 +12,23 @@
 	<title>Rezzies - Fair Room & Cost Splitting for Group Vacations</title>
 </svelte:head>
 
-{#if $page.url.pathname !== '/'}
+{#if $page.url.pathname !== '/' && !$page.url.pathname.startsWith('/trips/new/step') && !$page.url.pathname.match(/^\/trips\/[^\/]+/)}
 	<Navigation user={data?.user} />
 {/if}
 
-<main>
+<main class:no-padding={$page.url.pathname.startsWith('/trips/new/step')}>
 	{@render children()}
 </main>
 
 <style>
 	main {
 		min-height: calc(100vh - 80px);
+	}
+	
+	main.no-padding {
+		min-height: 100vh;
+		padding: 0;
+		margin: 0;
 	}
 	
 	:global(body) {

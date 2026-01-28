@@ -86,7 +86,7 @@
 
 <style>
 	.trip-page {
-		min-height: calc(100vh - 80px);
+		min-height: 100vh;
 		padding: var(--spacing-xl) var(--spacing-md);
 	}
 

@@ -1,8 +1,17 @@
 /* Modern Design System for Rezzies */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import './styles/theme.css';
+@import './styles/wizard-forms.css';
 
 :root {
-	/* Colors */
+	/* Wizard Design System Colors (matching reference) */
+	--primary: #1E7CF5;
+	--bg: #F6F9FF;
+	--border: #E7EEF8;
+	--muted: #8AA0B8;
+	--text: #0F172A;
+	
+	/* Legacy Colors (keeping for compatibility) */
 	--color-primary: #2563eb;
 	--color-primary-dark: #1d4ed8;
 	--color-primary-light: #3b82f6;

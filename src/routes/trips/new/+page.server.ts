@@ -11,12 +11,8 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 		throw redirect(303, `/login?redirect=${encodeURIComponent(url.pathname)}`);
 	}
 
-	// Load draft from session or database if needed
-	// For now, we'll use sessionStorage on client side
-	return {
-		user,
-		draft: null // Could load from database here
-	};
+	// Redirect to first step of wizard
+	throw redirect(303, '/trips/new/step/1');
 };
 
 export const actions: Actions = {
