@@ -1,5 +1,10 @@
 <script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
+	import kingBedIconUrl from '$lib/assets/images/beds/king.svg.svg?url';
+	import queenBedIconUrl from '$lib/assets/images/beds/queen.svg.svg?url';
+	import twinBedIconUrl from '$lib/assets/images/beds/twin.svg.svg?url';
+	import bunkBedIconUrl from '$lib/assets/images/beds/bunk.svg.svg?url';
+	import sofaBedIconUrl from '$lib/assets/images/beds/sofabed.svg.svg?url';
 	
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
 	
@@ -7,9 +12,52 @@
 	let draggedOverRoomId: string | null = $state(null);
 	let galleryPhotos: string[] = $state([]);
 	let editingRoomId: string | null = $state(null);
-	let newRoomBedTypes: Record<string, number> = $state({});
-	let newRoomType: string = $state('bedroom');
+	let newRoomBedTypesArray: Array<{ bedType: string; quantity: number }> = $state([]);
+	let newRoomType: string = $state('');
 	let newRoomCustomDesc: string = $state('');
+	let isBedTypesDropdownOpen: boolean = $state(false);
+	let bedTypesDropdownElement: HTMLElement | null = $state(null);
+	let bedTypesDropdownMenu: HTMLElement | null = $state(null);
+	let dropdownPosition = $state({ top: 0, left: 0 });
+	
+	// Position dropdown when it opens
+	$effect(() => {
+		if (!isBedTypesDropdownOpen || !bedTypesDropdownElement) return;
+		
+		// Use setTimeout to ensure DOM is updated
+		setTimeout(() => {
+			if (bedTypesDropdownElement) {
+				const triggerRect = bedTypesDropdownElement.getBoundingClientRect();
+				dropdownPosition = {
+					top: triggerRect.bottom + 4,
+					left: triggerRect.left
+				};
+			}
+		}, 0);
+	});
+	
+	// Close dropdown when clicking outside
+	$effect(() => {
+		if (!isBedTypesDropdownOpen) return;
+		
+		function handleClickOutside(event: MouseEvent) {
+			const target = event.target as Node;
+			if (bedTypesDropdownElement && !bedTypesDropdownElement.contains(target) &&
+			    bedTypesDropdownMenu && !bedTypesDropdownMenu.contains(target)) {
+				isBedTypesDropdownOpen = false;
+			}
+		}
+		
+		// Use a small delay to avoid closing immediately when opening
+		const timeoutId = setTimeout(() => {
+			document.addEventListener('mousedown', handleClickOutside, true);
+		}, 10);
+		
+		return () => {
+			clearTimeout(timeoutId);
+			document.removeEventListener('mousedown', handleClickOutside, true);
+		};
+	});
 	
 	const roomTypeOptions = [
 		{ value: 'bedroom', label: 'Bedroom' },
@@ -24,12 +72,13 @@
 	];
 	
 	const bedTypeOptions = [
-		{ value: 'king', label: 'King', icon: '🛏️' },
-		{ value: 'queen', label: 'Queen', icon: '🛏️' },
-		{ value: 'full', label: 'Full', icon: '🛏️' },
-		{ value: 'twin', label: 'Twin', icon: '🛏️' },
-		{ value: 'bunk', label: 'Bunk', icon: '🛏️' },
-		{ value: 'sofa', label: 'Sofa Bed', icon: '🛋️' }
+		{ value: 'king', label: 'King', iconUrl: kingBedIconUrl, fallbackIcon: '🛏️' },
+		{ value: 'queen', label: 'Queen', iconUrl: queenBedIconUrl, fallbackIcon: '🛏️' },
+		// If you add a dedicated "full" icon later, we can swap it in here.
+		{ value: 'full', label: 'Full', iconUrl: queenBedIconUrl, fallbackIcon: '🛏️' },
+		{ value: 'twin', label: 'Twin', iconUrl: twinBedIconUrl, fallbackIcon: '🛏️' },
+		{ value: 'bunk', label: 'Bunk', iconUrl: bunkBedIconUrl, fallbackIcon: '🛏️' },
+		{ value: 'sofa', label: 'Sofa Bed', iconUrl: sofaBedIconUrl, fallbackIcon: '🛋️' }
 	];
 	
 	function getRoomDisplayName(room: { roomType: string; customRoomDescription?: string }, roomIndex: number): string {
@@ -54,37 +103,92 @@
 		return baseName;
 	}
 	
-	function getBedIcon(bedType: string): string {
-		const option = bedTypeOptions.find(opt => opt.value === bedType);
-		return option ? option.icon : '🛏️';
+	function getBedIconMeta(bedType: string): { url?: string; alt: string; fallback: string } {
+		const option = bedTypeOptions.find((opt) => opt.value === bedType);
+		if (!option) return { alt: bedType, fallback: '🛏️' };
+		return { url: option.iconUrl, alt: option.label, fallback: option.fallbackIcon };
 	}
 	
 	function startAddingRoom() {
 		editingRoomId = 'new';
-		newRoomType = 'bedroom';
+		newRoomType = '';
 		newRoomCustomDesc = '';
-		newRoomBedTypes = {};
+		newRoomBedTypesArray = [];
+		isBedTypesDropdownOpen = false;
 	}
 	
 	function cancelAddingRoom() {
 		editingRoomId = null;
-		newRoomBedTypes = {};
+		newRoomBedTypesArray = [];
 		newRoomCustomDesc = '';
+		isBedTypesDropdownOpen = false;
+	}
+	
+	function toggleBedTypeInDropdown(bedType: string) {
+		const existing = newRoomBedTypesArray.find(b => b.bedType === bedType);
+		if (existing) {
+			newRoomBedTypesArray = newRoomBedTypesArray.filter(b => b.bedType !== bedType);
+		} else {
+			newRoomBedTypesArray = [...newRoomBedTypesArray, { bedType, quantity: 0 }];
+		}
+		newRoomBedTypesArray = [...newRoomBedTypesArray];
+	}
+	
+	function getBedQuantity(bedType: string): number {
+		return newRoomBedTypesArray.find(b => b.bedType === bedType)?.quantity || 0;
+	}
+	
+	function incrementBedQuantity(bedType: string) {
+		const existing = newRoomBedTypesArray.find(b => b.bedType === bedType);
+		if (existing) {
+			newRoomBedTypesArray = newRoomBedTypesArray.map(b => 
+				b.bedType === bedType ? { ...b, quantity: b.quantity + 1 } : b
+			);
+		} else {
+			newRoomBedTypesArray = [...newRoomBedTypesArray, { bedType, quantity: 1 }];
+		}
+		newRoomBedTypesArray = [...newRoomBedTypesArray];
+	}
+	
+	function decrementBedQuantity(bedType: string) {
+		const existing = newRoomBedTypesArray.find(b => b.bedType === bedType);
+		if (existing) {
+			if (existing.quantity <= 1) {
+				newRoomBedTypesArray = newRoomBedTypesArray.filter(b => b.bedType !== bedType);
+			} else {
+				newRoomBedTypesArray = newRoomBedTypesArray.map(b => 
+					b.bedType === bedType ? { ...b, quantity: b.quantity - 1 } : b
+				);
+			}
+			newRoomBedTypesArray = [...newRoomBedTypesArray];
+		}
 	}
 	
 	function saveNewRoom() {
-		// Convert bed types object to beds array
-		const beds = Object.entries(newRoomBedTypes)
-			.filter(([_, count]) => count > 0)
-			.flatMap(([bedType, count]) => 
-				Array.from({ length: count }, () => ({
-					id: crypto.randomUUID(),
-					bedType,
-					count: 1,
-					shared: false,
-					notes: ''
-				}))
-			);
+		const totalBeds = newRoomBedTypesArray.reduce((sum, b) => sum + b.quantity, 0);
+		if (!newRoomType || totalBeds === 0) {
+			// Validation: ensure room type is selected
+			if (!newRoomType) {
+				alert('Please select a room type');
+				return;
+			}
+			if (totalBeds === 0) {
+				alert('Please select at least one bed type and set quantity');
+				return;
+			}
+			return;
+		}
+		
+		// Convert bed types array to beds array
+		const beds = newRoomBedTypesArray.flatMap(({ bedType, quantity }) => 
+			Array.from({ length: quantity }, () => ({
+				id: crypto.randomUUID(),
+				bedType,
+				count: 1,
+				shared: false,
+				notes: ''
+			}))
+		);
 		
 		draft.rooms = [
 			...draft.rooms,
@@ -104,6 +208,12 @@
 		cancelAddingRoom();
 	}
 	
+	function getSelectedBedTypesDisplay(): string {
+		const total = newRoomBedTypesArray.reduce((sum, b) => sum + b.quantity, 0);
+		if (total === 0) return 'Select bed types...';
+		return `${total} bed${total !== 1 ? 's' : ''} selected`;
+	}
+	
 	function editRoom(roomId: string) {
 		const room = draft.rooms.find(r => r.id === roomId);
 		if (!room) return;
@@ -111,12 +221,17 @@
 		editingRoomId = roomId;
 		newRoomType = room.roomType;
 		newRoomCustomDesc = room.customRoomDescription || '';
+		isBedTypesDropdownOpen = false;
 		
-		// Convert beds array to bed types object
-		newRoomBedTypes = {};
+		// Convert beds array to bed types array
+		const bedTypesMap: Record<string, number> = {};
 		room.beds.forEach(bed => {
-			newRoomBedTypes[bed.bedType] = (newRoomBedTypes[bed.bedType] || 0) + 1;
+			bedTypesMap[bed.bedType] = (bedTypesMap[bed.bedType] || 0) + 1;
 		});
+		newRoomBedTypesArray = Object.entries(bedTypesMap).map(([bedType, quantity]) => ({
+			bedType,
+			quantity
+		}));
 	}
 	
 	function saveEditedRoom() {
@@ -128,46 +243,27 @@
 		room.roomType = newRoomType;
 		room.customRoomDescription = newRoomType === 'other' ? newRoomCustomDesc : '';
 		
-		// Convert bed types object to beds array
-		room.beds = Object.entries(newRoomBedTypes)
-			.filter(([_, count]) => count > 0)
-			.flatMap(([bedType, count]) => 
-				Array.from({ length: count }, () => ({
-					id: crypto.randomUUID(),
-					bedType,
-					count: 1,
-					shared: false,
-					notes: ''
-				}))
-			);
+		// Convert bed types array to beds array
+		room.beds = newRoomBedTypesArray.flatMap(({ bedType, quantity }) => 
+			Array.from({ length: quantity }, () => ({
+				id: crypto.randomUUID(),
+				bedType,
+				count: 1,
+				shared: false,
+				notes: ''
+			}))
+		);
 		
 		autosave();
 		editingRoomId = null;
-		newRoomBedTypes = {};
+		newRoomBedTypesArray = [];
 		newRoomCustomDesc = '';
+		isBedTypesDropdownOpen = false;
 	}
 	
 	function removeRoom(roomId: string) {
 		draft.rooms = draft.rooms.filter((r) => r.id !== roomId);
 		autosave();
-	}
-	
-	function toggleBedType(bedType: string) {
-		if (newRoomBedTypes[bedType]) {
-			delete newRoomBedTypes[bedType];
-		} else {
-			newRoomBedTypes[bedType] = 1;
-		}
-		newRoomBedTypes = { ...newRoomBedTypes };
-	}
-	
-	function updateBedQuantity(bedType: string, quantity: number) {
-		if (quantity <= 0) {
-			delete newRoomBedTypes[bedType];
-		} else {
-			newRoomBedTypes[bedType] = quantity;
-		}
-		newRoomBedTypes = { ...newRoomBedTypes };
 	}
 	
 	function handleGalleryUpload(event: Event) {
@@ -250,61 +346,96 @@
 	<div class="rooms-grid">
 		<!-- Add Room Card -->
 		{#if editingRoomId === 'new'}
-			<div class="room-card editing">
-				<div class="room-card-header">
-					<h4>Add Room</h4>
-					<button type="button" class="btn-close" onclick={cancelAddingRoom}>×</button>
-				</div>
-				<div class="room-edit-content">
-					<div class="edit-field">
-						<label>Room Type</label>
-						<select class="room-type-select" bind:value={newRoomType}>
+			<div class="room-card add-room-editing">
+				<div class="add-room-dropdowns">
+					<div class="dropdown-wrapper">
+						<select class="room-type-dropdown" bind:value={newRoomType} required>
+							<option value="" disabled selected>Room Type</option>
 							{#each roomTypeOptions as option}
 								<option value={option.value}>{option.label}</option>
 							{/each}
 						</select>
 					</div>
-					{#if newRoomType === 'other'}
-						<div class="edit-field">
-							<label>Description</label>
-							<input
-								type="text"
-								class="room-description-input"
-								bind:value={newRoomCustomDesc}
-								placeholder="Describe the room..."
-							/>
-						</div>
-					{/if}
-					<div class="edit-field">
-						<label>Bed Types</label>
-						<div class="bed-types-multiselect">
-							{#each bedTypeOptions as bedOption}
-								<div class="bed-type-checkbox-row">
-									<label class="bed-checkbox-label">
-										<input
-											type="checkbox"
-											checked={!!newRoomBedTypes[bedOption.value]}
-											onchange={() => toggleBedType(bedOption.value)}
-										/>
-										<span class="bed-icon">{bedOption.icon}</span>
-										<span class="bed-label">{bedOption.label}</span>
-									</label>
-									{#if newRoomBedTypes[bedOption.value]}
-										<input
-											type="number"
-											class="bed-quantity-input"
-											min="1"
-											value={newRoomBedTypes[bedOption.value] || 1}
-											oninput={(e) => updateBedQuantity(bedOption.value, parseInt((e.target as HTMLInputElement).value) || 1)}
-										/>
-									{/if}
-								</div>
-							{/each}
-						</div>
+					
+					<div class="dropdown-wrapper" bind:this={bedTypesDropdownElement}>
+						<button 
+							type="button" 
+							class="bed-types-dropdown-trigger"
+							onclick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								isBedTypesDropdownOpen = !isBedTypesDropdownOpen;
+							}}
+						>
+							<span>{getSelectedBedTypesDisplay()}</span>
+							<span class="dropdown-arrow">{isBedTypesDropdownOpen ? '▲' : '▼'}</span>
+						</button>
+						{#if isBedTypesDropdownOpen}
+							<div 
+								class="bed-types-dropdown-menu" 
+								bind:this={bedTypesDropdownMenu}
+								style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px;"
+								onclick={(e) => e.stopPropagation()}
+								onmousedown={(e) => e.stopPropagation()}
+							>
+								{#each bedTypeOptions as bedOption}
+									<div class="bed-type-checkbox-row">
+										<div class="bed-quantity-controls">
+											<button
+												type="button"
+												class="bed-quantity-btn bed-quantity-up"
+												onclick={() => incrementBedQuantity(bedOption.value)}
+											>
+												↑
+											</button>
+											<button
+												type="button"
+												class="bed-quantity-btn bed-quantity-down"
+												onclick={() => decrementBedQuantity(bedOption.value)}
+												disabled={getBedQuantity(bedOption.value) === 0}
+											>
+												↓
+											</button>
+										</div>
+										<label class="bed-checkbox-label">
+											<input
+												type="checkbox"
+												checked={getBedQuantity(bedOption.value) > 0}
+												onchange={() => toggleBedTypeInDropdown(bedOption.value)}
+											/>
+											{#if bedOption.iconUrl}
+												<img class="bed-icon-img" src={bedOption.iconUrl} alt="" />
+											{:else}
+												<span class="bed-icon">{bedOption.fallbackIcon}</span>
+											{/if}
+											<span class="bed-label">{bedOption.label}</span>
+											{#if getBedQuantity(bedOption.value) > 0}
+												<span class="bed-quantity-display">{getBedQuantity(bedOption.value)}</span>
+											{/if}
+										</label>
+									</div>
+								{/each}
+							</div>
+						{/if}
 					</div>
-					<button type="button" class="btn-save-room" onclick={saveNewRoom}>
-						Save Room
-					</button>
+					
+					{#if newRoomType === 'other'}
+						<input
+							type="text"
+							class="room-description-input-inline"
+							bind:value={newRoomCustomDesc}
+							placeholder="Describe the room..."
+						/>
+					{/if}
+					
+					<div class="add-room-actions">
+						<button type="button" class="btn-save-room-small" onclick={saveNewRoom} disabled={newRoomBedTypesArray.reduce((sum, b) => sum + b.quantity, 0) === 0}>
+							Save
+						</button>
+						<button type="button" class="btn-cancel-room" onclick={cancelAddingRoom}>
+							Cancel
+						</button>
+					</div>
 				</div>
 			</div>
 		{:else}
@@ -317,61 +448,96 @@
 		<!-- Existing Room Cards -->
 		{#each draft.rooms as room, index}
 			{#if editingRoomId === room.id}
-				<div class="room-card editing">
-					<div class="room-card-header">
-						<h4>Edit Room</h4>
-						<button type="button" class="btn-close" onclick={() => { editingRoomId = null; }}>×</button>
-					</div>
-					<div class="room-edit-content">
-						<div class="edit-field">
-							<label>Room Type</label>
-							<select class="room-type-select" bind:value={newRoomType}>
+				<div class="room-card add-room-editing">
+					<div class="add-room-dropdowns">
+						<div class="dropdown-wrapper">
+							<select class="room-type-dropdown" bind:value={newRoomType} required>
+								<option value="" disabled selected={!newRoomType}>Room Type</option>
 								{#each roomTypeOptions as option}
 									<option value={option.value}>{option.label}</option>
 								{/each}
 							</select>
 						</div>
-						{#if newRoomType === 'other'}
-							<div class="edit-field">
-								<label>Description</label>
-								<input
-									type="text"
-									class="room-description-input"
-									bind:value={newRoomCustomDesc}
-									placeholder="Describe the room..."
-								/>
-							</div>
-						{/if}
-						<div class="edit-field">
-							<label>Bed Types</label>
-							<div class="bed-types-multiselect">
-								{#each bedTypeOptions as bedOption}
-									<div class="bed-type-checkbox-row">
-										<label class="bed-checkbox-label">
-											<input
-												type="checkbox"
-												checked={!!newRoomBedTypes[bedOption.value]}
-												onchange={() => toggleBedType(bedOption.value)}
-											/>
-											<span class="bed-icon">{bedOption.icon}</span>
-											<span class="bed-label">{bedOption.label}</span>
-										</label>
-										{#if newRoomBedTypes[bedOption.value]}
-											<input
-												type="number"
-												class="bed-quantity-input"
-												min="1"
-												value={newRoomBedTypes[bedOption.value] || 1}
-												oninput={(e) => updateBedQuantity(bedOption.value, parseInt((e.target as HTMLInputElement).value) || 1)}
-											/>
-										{/if}
-									</div>
-								{/each}
-							</div>
+						
+						<div class="dropdown-wrapper" bind:this={bedTypesDropdownElement}>
+							<button 
+								type="button" 
+								class="bed-types-dropdown-trigger"
+								onclick={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									isBedTypesDropdownOpen = !isBedTypesDropdownOpen;
+								}}
+							>
+								<span>{getSelectedBedTypesDisplay()}</span>
+								<span class="dropdown-arrow">{isBedTypesDropdownOpen ? '▲' : '▼'}</span>
+							</button>
+							{#if isBedTypesDropdownOpen}
+								<div 
+									class="bed-types-dropdown-menu" 
+									bind:this={bedTypesDropdownMenu}
+									style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px;"
+									onclick={(e) => e.stopPropagation()}
+									onmousedown={(e) => e.stopPropagation()}
+								>
+									{#each bedTypeOptions as bedOption}
+										<div class="bed-type-checkbox-row">
+											<div class="bed-quantity-controls">
+												<button
+													type="button"
+													class="bed-quantity-btn bed-quantity-down"
+													onclick={() => decrementBedQuantity(bedOption.value)}
+													disabled={getBedQuantity(bedOption.value) === 0}
+												>
+													↓
+												</button>
+												<button
+													type="button"
+													class="bed-quantity-btn bed-quantity-up"
+													onclick={() => incrementBedQuantity(bedOption.value)}
+												>
+													↑
+												</button>
+											</div>
+											<label class="bed-checkbox-label">
+												<input
+													type="checkbox"
+													checked={getBedQuantity(bedOption.value) > 0}
+													onchange={() => toggleBedTypeInDropdown(bedOption.value)}
+												/>
+												{#if bedOption.iconUrl}
+													<img class="bed-icon-img" src={bedOption.iconUrl} alt="" />
+												{:else}
+													<span class="bed-icon">{bedOption.fallbackIcon}</span>
+												{/if}
+												<span class="bed-label">{bedOption.label}</span>
+												{#if getBedQuantity(bedOption.value) > 0}
+													<span class="bed-quantity-display">{getBedQuantity(bedOption.value)}</span>
+												{/if}
+											</label>
+										</div>
+									{/each}
+								</div>
+							{/if}
 						</div>
-						<button type="button" class="btn-save-room" onclick={saveEditedRoom}>
-							Save Changes
-						</button>
+						
+						{#if newRoomType === 'other'}
+							<input
+								type="text"
+								class="room-description-input-inline"
+								bind:value={newRoomCustomDesc}
+								placeholder="Describe the room..."
+							/>
+						{/if}
+						
+						<div class="add-room-actions">
+							<button type="button" class="btn-save-room-small" onclick={saveEditedRoom} disabled={newRoomBedTypesArray.reduce((sum, b) => sum + b.quantity, 0) === 0}>
+								Save
+							</button>
+							<button type="button" class="btn-cancel-room" onclick={() => { editingRoomId = null; isBedTypesDropdownOpen = false; }}>
+								Cancel
+							</button>
+						</div>
 					</div>
 				</div>
 			{:else}
@@ -423,8 +589,13 @@
 					{/if}
 					<div class="room-beds-display">
 						{#each room.beds as bed}
-							<span class="bed-icon-badge" title={bed.bedType}>
-								{getBedIcon(bed.bedType)}
+							{@const meta = getBedIconMeta(bed.bedType)}
+							<span class="bed-icon-badge" title={meta.alt}>
+								{#if meta.url}
+									<img class="bed-icon-badge-img" src={meta.url} alt={meta.alt} />
+								{:else}
+									<span aria-hidden="true">{meta.fallback}</span>
+								{/if}
 							</span>
 						{/each}
 						{#if room.beds.length === 0}
@@ -482,6 +653,7 @@
 		gap: 1rem;
 		height: 100%;
 		min-height: 0;
+		overflow: visible;
 	}
 	
 	.picker-header {
@@ -519,7 +691,7 @@
 		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 		gap: 0.75rem;
 		flex: 1;
-		overflow-y: auto;
+		overflow: visible;
 		min-height: 0;
 		align-content: start;
 	}
@@ -549,9 +721,190 @@
 		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
 	}
 	
-	.room-card.editing {
-		grid-column: span 2;
+	.add-room-editing {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
 		min-height: auto;
+		position: relative;
+		z-index: 100;
+		width: 100%;
+		overflow: visible;
+		box-sizing: border-box;
+	}
+	
+	.add-room-dropdowns {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		width: 100%;
+		overflow: visible;
+	}
+	
+	.dropdown-wrapper {
+		position: relative;
+		width: 100%;
+		overflow: visible;
+		z-index: 1;
+	}
+	
+	.room-type-dropdown {
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border: 1px solid #718096;
+		border-radius: 0;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: #ffffff;
+		background: #1a202c;
+		cursor: pointer;
+		appearance: none;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right 0.75rem center;
+		padding-right: 2.5rem;
+		box-sizing: border-box;
+		overflow-x: hidden;
+	}
+	
+	.room-type-dropdown option[value=""][disabled] {
+		color: #a0aec0;
+	}
+	
+	.room-type-dropdown:invalid {
+		color: #a0aec0;
+	}
+	
+	.room-type-dropdown:focus {
+		outline: none;
+		border-color: #ffffff;
+		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+	}
+	
+	.room-type-dropdown option {
+		background: #1a202c;
+		color: #ffffff;
+	}
+	
+	.bed-types-dropdown-trigger {
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border: 1px solid #718096;
+		border-radius: 0;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: #ffffff;
+		background: #1a202c;
+		cursor: pointer;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		text-align: left;
+		box-sizing: border-box;
+		overflow-x: hidden;
+	}
+	
+	.bed-types-dropdown-trigger:hover {
+		border-color: #ffffff;
+		background: #2d3748;
+	}
+	
+	.bed-types-dropdown-trigger:focus {
+		outline: none;
+		border-color: #ffffff;
+		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+	}
+	
+	.dropdown-arrow {
+		font-size: 0.75rem;
+		color: #cbd5e0;
+	}
+	
+	.bed-types-dropdown-menu {
+		position: fixed;
+		border: 1px solid #718096;
+		background: #1a202c;
+		padding: 0.75rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		z-index: 9999;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+		max-height: 300px;
+		overflow-y: auto;
+		overflow-x: hidden;
+		width: max-content;
+		min-width: 220px;
+		max-width: 220px;
+		box-sizing: border-box;
+	}
+	
+	.room-description-input-inline {
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border: 1px solid #718096;
+		border-radius: 0;
+		font-size: 0.875rem;
+		font-weight: 400;
+		color: #ffffff;
+		background: #1a202c;
+	}
+	
+	.room-description-input-inline::placeholder {
+		color: #a0aec0;
+	}
+	
+	.room-description-input-inline:focus {
+		outline: none;
+		border-color: #ffffff;
+		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+	}
+	
+	.add-room-actions {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.25rem;
+	}
+	
+	.btn-save-room-small {
+		padding: 0.5rem 1rem;
+		background: #ffffff;
+		color: #2d3748;
+		border: none;
+		border-radius: 0;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		flex: 1;
+	}
+	
+	.btn-save-room-small:hover:not(:disabled) {
+		background: #e2e8f0;
+	}
+	
+	.btn-save-room-small:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	
+	.btn-cancel-room {
+		padding: 0.5rem 1rem;
+		background: transparent;
+		color: #cbd5e0;
+		border: 1px solid #718096;
+		border-radius: 0;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		flex: 1;
+	}
+	
+	.btn-cancel-room:hover {
+		border-color: #ffffff;
+		color: #ffffff;
+		background: rgba(255, 255, 255, 0.05);
 	}
 	
 	.add-room-card {
@@ -787,16 +1140,53 @@
 		border: 1px solid #718096;
 		padding: 0.75rem;
 		background: #1a202c;
-		max-height: 200px;
-		overflow-y: auto;
+		position: relative;
+		z-index: 1000;
+		overflow: visible;
 	}
 	
 	.bed-type-checkbox-row {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
 		gap: 0.75rem;
 		padding: 0.375rem 0;
+		width: 100%;
+		flex-wrap: nowrap;
+		min-width: 0;
+	}
+	
+	.bed-quantity-controls {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		flex-shrink: 0;
+	}
+	
+	.bed-quantity-btn {
+		width: 1.5rem;
+		height: 1.25rem;
+		padding: 0;
+		border: 1px solid #718096;
+		background: #2d3748;
+		color: #ffffff;
+		cursor: pointer;
+		font-size: 0.75rem;
+		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s ease;
+		flex-shrink: 0;
+	}
+	
+	.bed-quantity-btn:hover:not(:disabled) {
+		background: #4a5568;
+		border-color: #ffffff;
+	}
+	
+	.bed-quantity-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
 	}
 	
 	.bed-checkbox-label {
@@ -807,6 +1197,21 @@
 		flex: 1;
 		color: #ffffff;
 		font-size: 0.875rem;
+		min-width: 0;
+		flex-shrink: 1;
+		overflow: visible;
+	}
+	
+	.bed-checkbox-label .bed-label {
+		white-space: nowrap;
+		flex: 1;
+	}
+	
+	.bed-quantity-display {
+		font-weight: 600;
+		color: #ffffff;
+		margin-left: auto;
+		flex-shrink: 0;
 	}
 	
 	.bed-checkbox-label input[type="checkbox"] {
@@ -820,26 +1225,18 @@
 		font-size: 1rem;
 	}
 	
+	.bed-icon-img {
+		width: 16px;
+		height: 16px;
+		object-fit: contain;
+		filter: brightness(0) invert(1);
+		flex-shrink: 0;
+	}
+	
 	.bed-label {
 		font-weight: 500;
 	}
 	
-	.bed-quantity-input {
-		width: 60px;
-		padding: 0.375rem 0.5rem;
-		border: 1px solid #718096;
-		border-radius: 0;
-		font-size: 0.8125rem;
-		background: #2d3748;
-		color: #ffffff;
-		text-align: center;
-	}
-	
-	.bed-quantity-input:focus {
-		outline: none;
-		border-color: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-	}
 	
 	.btn-save-room {
 		padding: 0.625rem 1rem;
@@ -936,8 +1333,19 @@
 	}
 	
 	.bed-icon-badge {
-		font-size: 1.25rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
 		line-height: 1;
+	}
+	
+	.bed-icon-badge-img {
+		width: 18px;
+		height: 18px;
+		object-fit: contain;
+		filter: brightness(0) invert(1);
 	}
 	
 	.no-beds {

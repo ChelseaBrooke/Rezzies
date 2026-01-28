@@ -8,7 +8,11 @@
 	
 	// Automatically calculate bedrooms from rooms
 	$effect(() => {
-		draft.bedrooms = draft.rooms.length;
+		if (draft.rooms && Array.isArray(draft.rooms)) {
+			draft.bedrooms = draft.rooms.length;
+		} else {
+			draft.bedrooms = 0;
+		}
 	});
 	
 	function handleCoverPhotoUpload(event: CustomEvent<{ files: FileList }>) {
