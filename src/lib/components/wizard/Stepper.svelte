@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	
 	export interface Step {
 		number: number;
 		label: string;
@@ -6,27 +8,46 @@
 	}
 	
 	let { steps, currentStep }: { steps: Step[]; currentStep: number } = $props();
+	
+	function prevStep() {
+		if (currentStep > 0) {
+			// currentStep is 0-indexed (0,1,2,3), URL is 1-indexed (1,2,3,4)
+			// To go back, we need the previous step number, which is currentStep (since we're going from currentStep+1 to currentStep)
+			const previousStepNumber = currentStep; // This gives us the step number (1-indexed) for the previous step
+			goto(`/trips/new/step/${previousStepNumber}`);
+		} else {
+			// If on step 1 (index 0), go back to /trips/new
+			goto('/trips/new');
+		}
+	}
 </script>
 
 <div class="stepper">
 	<div class="stepper-content">
-		{#each steps as step, index}
-			<div class="step-item" class:completed={index < currentStep} class:current={index === currentStep}>
-				<div class="step-circle" class:completed={index < currentStep} class:current={index === currentStep}>
-					{#if index < currentStep}
-						<span class="checkmark">✓</span>
-					{:else if index === currentStep}
-						<span class="step-number">{step.number}</span>
-					{:else}
-						<span class="step-number">{step.number}</span>
+		{#if currentStep > 0}
+			<button type="button" class="stepper-back-btn" onclick={prevStep}>
+				← Back
+			</button>
+		{/if}
+		<div class="stepper-steps">
+			{#each steps as step, index}
+				<div class="step-item" class:completed={index < currentStep} class:current={index === currentStep}>
+					<div class="step-circle" class:completed={index < currentStep} class:current={index === currentStep}>
+						{#if index < currentStep}
+							<span class="checkmark">✓</span>
+						{:else if index === currentStep}
+							<span class="step-number">{step.number}</span>
+						{:else}
+							<span class="step-number">{step.number}</span>
+						{/if}
+					</div>
+					<span class="step-label">{step.label}</span>
+					{#if index < steps.length - 1}
+						<div class="step-connector" class:completed={index < currentStep}></div>
 					{/if}
 				</div>
-				<span class="step-label">{step.label}</span>
-				{#if index < steps.length - 1}
-					<div class="step-connector" class:completed={index < currentStep}></div>
-				{/if}
-			</div>
-		{/each}
+			{/each}
+		</div>
 	</div>
 </div>
 
@@ -43,11 +64,36 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.5rem;
+		gap: 1.5rem;
 		min-width: min-content;
 		padding: 0 2rem;
 		max-width: 1200px;
 		margin: 0 auto;
+		position: relative;
+	}
+	
+	.stepper-back-btn {
+		background: transparent;
+		color: var(--muted);
+		border: none;
+		padding: 0;
+		font-size: 0.875rem;
+		cursor: pointer;
+		transition: color 0.2s ease;
+		margin-right: auto;
+		white-space: nowrap;
+	}
+	
+	.stepper-back-btn:hover {
+		color: var(--text);
+	}
+	
+	.stepper-steps {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex: 1;
+		justify-content: center;
 	}
 	
 	.step-item {

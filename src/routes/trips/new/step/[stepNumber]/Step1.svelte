@@ -4,8 +4,21 @@
 	import PriceBreakdown from '$lib/components/wizard/PriceBreakdown.svelte';
 	import AddressAutocomplete from '$lib/components/wizard/AddressAutocomplete.svelte';
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
+	import { tripDraft } from '$lib/stores/tripDraft.js';
 	
-	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
+	let { 
+		draft, 
+		autosave,
+		prevStep,
+		handleNextStep,
+		canProceed
+	}: { 
+		draft: TripDraft; 
+		autosave: () => void;
+		prevStep: () => void;
+		handleNextStep: () => void;
+		canProceed: boolean;
+	} = $props();
 	
 	// Automatically calculate bedrooms from rooms
 	$effect(() => {
@@ -182,25 +195,40 @@
 		</div>
 	</div>
 	
-	<!-- Pricing Section - Full Width -->
-	<div class="section-box pricing-section">
-		<div class="pricing-header-row">
-			<h3 class="section-header">Pricing</h3>
-			<div class="pricing-model-selector">
-				<label for="pricingModel" class="form-label">Price Model</label>
-				<select id="pricingModel" class="form-select" bind:value={draft.pricingModel} onchange={autosave}>
-					<option value="per-person">Per Person</option>
-					<option value="per-room">Per Room</option>
-					<option value="per-bed">Per Bed</option>
-				</select>
+	<!-- Pricing Section with Buttons -->
+	<div class="pricing-with-buttons">
+		<div class="section-box pricing-section">
+			<div class="pricing-header-row">
+				<h3 class="section-header">Pricing</h3>
+				<div class="pricing-model-selector">
+					<label for="pricingModel" class="form-label">Price Model</label>
+					<select id="pricingModel" class="form-select" bind:value={draft.pricingModel} onchange={autosave}>
+						<option value="per-person">Per Person</option>
+						<option value="per-room">Per Room</option>
+						<option value="per-bed">Per Bed</option>
+					</select>
+				</div>
 			</div>
+			
+			<PriceBreakdown {draft} />
 		</div>
-		
-		<PriceBreakdown {draft} />
+		<div class="pricing-buttons">
+			<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
+				Save Draft
+			</button>
+			<button
+				type="button"
+				class="btn-next"
+				onclick={handleNextStep}
+				disabled={!canProceed}
+			>
+				Next
+			</button>
+		</div>
 	</div>
 </div>
 
-<style>
+<style lang="css">
 	.step-content {
 		display: flex;
 		flex-direction: column;
@@ -208,6 +236,7 @@
 		background: #f5f5f5;
 		padding: 1.25rem;
 		border-radius: 0.5rem;
+		position: relative;
 	}
 	
 	.section-box {
@@ -596,10 +625,6 @@
 		flex-direction: column;
 	}
 	
-	.pricing-section {
-		width: 100%;
-	}
-	
 	.pricing-header-row {
 		display: flex;
 		justify-content: space-between;
@@ -677,7 +702,90 @@
 		font-style: italic;
 	}
 	
+	.pricing-with-buttons {
+		display: flex;
+		gap: 1rem;
+		align-items: flex-start;
+	}
+	
+	.pricing-section {
+		flex: 1;
+		max-width: 95%;
+	}
+	
+	.pricing-buttons {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		align-items: stretch;
+		margin-top: 2.5rem;
+	}
+	
+	.pricing-buttons .btn-save-draft,
+	.pricing-buttons .btn-next {
+		padding: 0.75rem 1.5rem;
+		border-radius: 0.5rem;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		border: none;
+		font-family: inherit;
+		white-space: nowrap;
+		min-width: 120px;
+	}
+	
+	.pricing-buttons .btn-save-draft {
+		background: white;
+		color: var(--text);
+		border: 1px solid var(--border);
+	}
+	
+	.pricing-buttons .btn-save-draft:hover {
+		background: var(--bg);
+	}
+	
+	.pricing-buttons .btn-next {
+		background: var(--primary);
+		color: white;
+	}
+	
+	.pricing-buttons .btn-next:hover:not(:disabled) {
+		background: var(--primary-dark);
+	}
+	
+	.pricing-buttons .btn-next:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	
+	.validation-error {
+		color: #ef4444;
+		font-size: 0.875rem;
+		margin: 0 0 0.75rem 0;
+		text-align: left;
+	}
+	
 	@media (max-width: 1024px) {
+		.pricing-with-buttons {
+			flex-direction: column;
+		}
+		
+		.pricing-section {
+			max-width: 100%;
+		}
+		
+		.pricing-buttons {
+			flex-direction: row;
+			margin-top: 1rem;
+			width: 100%;
+		}
+		
+		.pricing-buttons .btn-save-draft,
+		.pricing-buttons .btn-next {
+			flex: 1;
+		}
+		
 		.two-column-layout {
 			grid-template-columns: 1fr;
 		}

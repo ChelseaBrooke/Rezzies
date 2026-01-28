@@ -47,7 +47,8 @@
 	
 	let validationError = $state<string | null>(null);
 	
-	function canProceed() {
+	// Pure function that checks if we can proceed (doesn't update state)
+	function checkCanProceed(): boolean {
 		const step = stepNumber();
 		if (step === 1) {
 			// Check for required fields
@@ -58,10 +59,8 @@
 			const hasPhotos = (draft.galleryPhotos && draft.galleryPhotos.length > 0) || 
 			                  draft.rooms.some(room => room.photos && room.photos.length > 0);
 			if (!hasPhotos) {
-				validationError = 'Please upload at least one photo as the main event photo before continuing.';
 				return false;
 			}
-			validationError = null;
 			return true;
 		}
 		if (step === 2) {
@@ -70,8 +69,36 @@
 		return true;
 	}
 	
+	// Derived value for whether we can proceed
+	const canProceed = $derived(checkCanProceed());
+	
+	// Update validation error based on canProceed state
+	$effect(() => {
+		const step = stepNumber();
+		if (step === 1) {
+			if (!canProceed) {
+				// Check what's missing
+				if (!draft.name || !draft.checkInDate || !draft.checkOutDate || draft.rooms.length === 0 || !draft.totalTripCost) {
+					validationError = null; // Don't show error for basic fields, just disable button
+				} else {
+					const hasPhotos = (draft.galleryPhotos && draft.galleryPhotos.length > 0) || 
+					                  draft.rooms.some(room => room.photos && room.photos.length > 0);
+					if (!hasPhotos) {
+						validationError = 'Please upload at least one photo as the main event photo before continuing.';
+					} else {
+						validationError = null;
+					}
+				}
+			} else {
+				validationError = null;
+			}
+		} else {
+			validationError = null;
+		}
+	});
+	
 	function handleNextStep() {
-		if (canProceed()) {
+		if (canProceed) {
 			validationError = null;
 			nextStep();
 		}
@@ -80,51 +107,56 @@
 
 <!-- Step Content - only the form grid changes -->
 {#if stepNumber() === 1}
-	<Step1 bind:draft {autosave} />
+	{#if validationError}
+		<div class="validation-error">{validationError}</div>
+	{/if}
+	<Step1 bind:draft {autosave} {prevStep} {handleNextStep} {canProceed} />
 {:else if stepNumber() === 2}
 	<Step2 bind:draft {autosave} />
 {:else if stepNumber() === 3}
 	<Step3 bind:draft />
 {/if}
 
-<!-- Footer Actions -->
-<div class="card-footer">
-	<button type="button" class="btn-back" onclick={prevStep}>
-		Back
-	</button>
-	<div class="footer-right">
-		{#if validationError}
-			<div class="validation-error">{validationError}</div>
-		{/if}
-		{#if stepNumber() < 4}
-			<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
-				Save Draft
-			</button>
-			<button
-				type="button"
-				class="btn-next"
-				onclick={nextStep}
-				disabled={!canProceed()}
-			>
-				Next
-			</button>
-		{:else}
-			<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
-				Save Draft
-			</button>
-			<button
-				type="button"
-				class="btn-publish"
-				onclick={() => {
-					console.log('Publishing trip:', draft);
-					alert('Publish functionality coming soon!');
-				}}
-			>
-				Publish
-			</button>
-		{/if}
+<!-- Footer Actions (for steps 2+) -->
+{#if stepNumber() > 1}
+	{#if validationError}
+		<div class="validation-error">{validationError}</div>
+	{/if}
+	<div class="card-footer">
+		<button type="button" class="btn-back" onclick={prevStep}>
+			Back
+		</button>
+		<div class="footer-right">
+			{#if stepNumber() < 4}
+				<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
+					Save Draft
+				</button>
+				<button
+					type="button"
+					class="btn-next"
+					onclick={handleNextStep}
+					disabled={!canProceed}
+				>
+					Next
+				</button>
+			{:else}
+				<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
+					Save Draft
+				</button>
+				<button
+					type="button"
+					class="btn-publish"
+					onclick={() => {
+						console.log('Publishing trip:', draft);
+						alert('Publish functionality coming soon!');
+					}}
+				>
+					Publish
+				</button>
+			{/if}
+		</div>
 	</div>
-</div>
+{/if}
 
 <style>
 	.card-footer {
@@ -208,14 +240,18 @@
 		
 		.footer-right {
 			width: 100%;
-			flex-direction: column;
+			flex-direction: row;
+			justify-content: flex-end;
 		}
 		
-		.btn-back,
+		.btn-back {
+			width: 100%;
+		}
+		
 		.btn-save-draft,
 		.btn-next,
 		.btn-publish {
-			width: 100%;
+			flex: 1;
 		}
 	}
 </style>
