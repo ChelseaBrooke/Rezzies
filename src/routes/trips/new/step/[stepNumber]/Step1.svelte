@@ -209,15 +209,14 @@
 	
 	<!-- Pricing Section - Full Width -->
 	<div class="section-box pricing-section">
-		<h3 class="section-header">Pricing</h3>
-		<div class="pricing-inputs-row">
-			<div class="form-section">
+		<div class="pricing-header-row">
+			<h3 class="section-header">Pricing</h3>
+			<div class="pricing-model-selector">
 				<label for="pricingModel" class="form-label">Price Model</label>
 				<select id="pricingModel" class="form-select" bind:value={draft.pricingModel} onchange={autosave}>
 					<option value="per-person">Per Person</option>
 					<option value="per-room">Per Room</option>
 					<option value="per-bed">Per Bed</option>
-					<option value="hybrid">Hybrid</option>
 				</select>
 			</div>
 		</div>
@@ -694,12 +693,54 @@
 		width: 100%;
 	}
 	
-	.pricing-inputs-row {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 0.75rem;
-		margin-bottom: 1rem;
-		max-width: 300px;
+	.pricing-header-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		margin-bottom: 0.25rem;
+		padding-bottom: 0.5rem;
+		border-bottom: 1px solid #f3f4f6;
+	}
+	
+	.pricing-header-row .section-header {
+		margin: 0;
+		padding-bottom: 0;
+		border-bottom: none;
+	}
+	
+	.pricing-model-selector {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		min-width: 150px;
+		align-items: flex-end;
+	}
+	
+	.pricing-model-selector .form-label {
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--text);
+		white-space: nowrap;
+		text-align: right;
+		width: 100%;
+	}
+	
+	.pricing-model-selector .form-select {
+		padding: 0.375rem 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: 0;
+		font-size: 0.8125rem;
+		font-family: inherit;
+		color: var(--text);
+		background: white;
+		transition: all 0.2s ease;
+		width: 100%;
+	}
+	
+	.pricing-model-selector .form-select:focus {
+		outline: none;
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
 	}
 	
 	.currency-input-wrapper {

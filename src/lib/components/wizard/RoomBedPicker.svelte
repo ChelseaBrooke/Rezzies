@@ -834,6 +834,23 @@
 		min-width: 220px;
 		max-width: 220px;
 		box-sizing: border-box;
+		color: white;
+	}
+	
+	.bed-types-dropdown-menu * {
+		color: white;
+	}
+	
+	.bed-checkbox-label {
+		color: white;
+	}
+	
+	.bed-checkbox-label .bed-label {
+		color: white;
+	}
+	
+	.bed-quantity-display {
+		color: white;
 	}
 	
 	.room-description-input-inline {
