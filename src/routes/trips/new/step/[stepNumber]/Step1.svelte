@@ -130,17 +130,20 @@
 						required
 					/>
 				</div>
-			</div>
-			
-			<div class="form-section">
-				<label class="checkbox-label">
-					<input
-						type="checkbox"
-						bind:checked={draft.flexibleDates}
-						onchange={autosave}
-					/>
-					<span>Flexible dates allowed</span>
-				</label>
+				<div class="flexible-dates-wrapper">
+					<label class="checkbox-label-small">
+						<input
+							type="checkbox"
+							bind:checked={draft.flexibleDates}
+							onchange={autosave}
+						/>
+						<span class="flexible-dates-text">Flexible dates allowed</span>
+						<div class="tooltip-container">
+							<span class="tooltip-icon">i</span>
+							<span class="tooltip-text">Allow your guests to select dates for a partial stay</span>
+						</div>
+					</label>
+				</div>
 			</div>
 			
 			<div class="form-section form-row">
@@ -227,7 +230,7 @@
 	.step-content {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1.75rem;
 		background: #f5f5f5;
 		padding: 1.5rem;
 		border-radius: 0.5rem;
@@ -245,9 +248,9 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-start;
-		margin: 0 0 1rem 0;
+		margin: 0 0 0.05rem 0;
 		padding-top: 0;
-		padding-bottom: 0.75rem;
+		padding-bottom: 0.5rem;
 		border-bottom: 1px solid #f3f4f6;
 	}
 	
@@ -255,7 +258,7 @@
 		font-size: 1rem;
 		font-weight: 600;
 		color: var(--text);
-		margin: 0 0 1rem 0;
+		margin: 0 0 1.25rem 0;
 		padding-bottom: 0.75rem;
 		border-bottom: 1px solid #f3f4f6;
 	}
@@ -358,7 +361,7 @@
 	.left-column {
 		display: flex;
 		flex-direction: column;
-		gap: 0.375rem;
+		gap: 0.75rem;
 		flex: 1;
 	}
 	
@@ -371,7 +374,7 @@
 	
 	.basics-bottom-section {
 		margin-top: auto;
-		padding-top: 1rem;
+		padding-top: 0.5rem;
 		border-top: 1px solid #f3f4f6;
 		display: flex;
 		flex-direction: column;
@@ -402,7 +405,7 @@
 	.form-section {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.2rem;
 	}
 	
 	.form-label {
@@ -450,18 +453,122 @@
 	.date-group {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
+		grid-template-rows: auto auto;
 		gap: 0.75rem;
 		align-items: end;
+		position: relative;
 	}
 	
 	.date-input-wrapper {
 		display: flex;
 		flex-direction: column;
-		gap: 0.375rem;
+		gap: 0.2rem;
 	}
 	
 	.date-input {
 		min-width: 0;
+	}
+	
+	.flexible-dates-wrapper {
+		grid-column: 2;
+		grid-row: 2;
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		margin-top: 0.25rem;
+	}
+	
+	.checkbox-label-small {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		cursor: pointer;
+		font-size: 0.7rem;
+		color: var(--text);
+		margin: 0;
+		position: relative;
+	}
+	
+	.checkbox-label-small input[type="checkbox"] {
+		width: 0.875rem;
+		height: 0.875rem;
+		cursor: pointer;
+		accent-color: var(--primary);
+		flex-shrink: 0;
+	}
+
+	.flexible-dates-text {
+		position: relative;
+	}
+
+	.tooltip-container {
+		position: absolute;
+		top: -0.125rem;
+		right: -1.1rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.tooltip-icon {
+		width: 0.75rem;
+		height: 0.75rem;
+		border-radius: 50%;
+		background-color: #9ca3af;
+		color: white;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.5rem;
+		font-weight: 700;
+		font-style: italic;
+		cursor: help;
+		opacity: 0.7;
+		transition: opacity 0.2s ease, background-color 0.2s ease;
+		line-height: 1;
+		padding: 0;
+		margin: 0;
+		text-align: center;
+		transform: translateY(-0.5px);
+	}
+
+	.tooltip-icon:hover {
+		opacity: 1;
+		background-color: #6b7280;
+	}
+
+	.tooltip-text {
+		visibility: hidden;
+		opacity: 0;
+		position: absolute;
+		bottom: 100%;
+		right: 0;
+		margin-bottom: 0.5rem;
+		background-color: #1f2937;
+		color: white;
+		text-align: left;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.375rem;
+		font-size: 0.7rem;
+		white-space: nowrap;
+		z-index: 1000;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		transition: opacity 0.2s ease, visibility 0.2s ease;
+		pointer-events: none;
+	}
+
+	.tooltip-text::after {
+		content: "";
+		position: absolute;
+		top: 100%;
+		right: 0.75rem;
+		border: 4px solid transparent;
+		border-top-color: #1f2937;
+	}
+
+	.tooltip-container:hover .tooltip-text {
+		visibility: visible;
+		opacity: 1;
 	}
 	
 	.checkbox-label {
@@ -484,12 +591,13 @@
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 0.75rem;
+		margin-top: 0.5rem;
 	}
 	
 	.form-group {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.2rem;
 	}
 	
 	.photo-preview {
@@ -590,7 +698,7 @@
 		display: grid;
 		grid-template-columns: 1fr;
 		gap: 0.75rem;
-		margin-bottom: 0.5rem;
+		margin-bottom: 1rem;
 		max-width: 300px;
 	}
 	
