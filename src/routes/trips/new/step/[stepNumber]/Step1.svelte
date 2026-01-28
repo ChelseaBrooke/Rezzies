@@ -2,6 +2,7 @@
 	import FileUploadTile from '$lib/components/wizard/FileUploadTile.svelte';
 	import RoomBedPicker from '$lib/components/wizard/RoomBedPicker.svelte';
 	import PriceBreakdown from '$lib/components/wizard/PriceBreakdown.svelte';
+	import AddressAutocomplete from '$lib/components/wizard/AddressAutocomplete.svelte';
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 	
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
@@ -25,6 +26,28 @@
 			};
 			reader.readAsDataURL(file);
 		}
+	}
+	
+	function handleAddressSelect(address: string, details?: any) {
+		// draft.destinationCity is already updated via bind:value
+		if (details && details.address_components) {
+			// Extract city, state, country from address components
+			const components = details.address_components;
+			let state = '';
+			let country = '';
+			
+			components.forEach((component: any) => {
+				if (component.types.includes('administrative_area_level_1')) {
+					state = component.short_name;
+				} else if (component.types.includes('country')) {
+					country = component.long_name;
+				}
+			});
+			
+			draft.destinationState = state;
+			draft.destinationCountry = country;
+		}
+		autosave();
 	}
 </script>
 
@@ -70,17 +93,27 @@
 				</div>
 			</div>
 			<div class="left-column">
-			<div class="form-section">
-				<label for="name" class="form-label">Trip Name *</label>
-				<input
-					type="text"
-					id="name"
-					class="form-input"
-					bind:value={draft.name}
-					oninput={autosave}
-					placeholder="Enter trip name"
-					required
-				/>
+			<div class="form-section form-row-name-destination">
+				<div class="form-group">
+					<label for="name" class="form-label">Trip Name *</label>
+					<input
+						type="text"
+						id="name"
+						class="form-input"
+						bind:value={draft.name}
+						oninput={autosave}
+						placeholder="Enter trip name"
+						required
+					/>
+				</div>
+				<div class="form-group">
+					<label for="destination" class="form-label">Destination</label>
+					<AddressAutocomplete
+						bind:value={draft.destinationCity}
+						onSelect={handleAddressSelect}
+						placeholder="Enter address"
+					/>
+				</div>
 			</div>
 			
 			<div class="form-section">
@@ -93,18 +126,6 @@
 					rows="4"
 					placeholder="Add any notes or description about this trip"
 				></textarea>
-			</div>
-			
-			<div class="form-section">
-				<label for="destination" class="form-label">Destination</label>
-				<input
-					type="text"
-					id="destination"
-					class="form-input"
-					bind:value={draft.destinationCity}
-					oninput={autosave}
-					placeholder="City, State/Province, Country"
-				/>
 			</div>
 			
 			<div class="form-section date-group">
@@ -591,6 +612,13 @@
 		grid-template-columns: 1fr 1fr;
 		gap: 0.75rem;
 		margin-top: 0.5rem;
+	}
+	
+	.form-row-name-destination {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.75rem;
+		margin-top: 0;
 	}
 	
 	.form-group {
