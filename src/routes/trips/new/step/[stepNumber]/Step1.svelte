@@ -28,188 +28,198 @@
 	}
 </script>
 
-<div class="step-content two-column-layout">
-	<!-- Left Column: Form Inputs -->
-	<div class="left-column">
-		<div class="form-section">
-			<label for="name" class="form-label">Trip Name *</label>
-			<input
-				type="text"
-				id="name"
-				class="form-input"
-				bind:value={draft.name}
-				oninput={autosave}
-				placeholder="Enter trip name"
-				required
-			/>
-		</div>
-		
-		<div class="form-section">
-			<label for="description" class="form-label">Trip Description / Notes</label>
-			<textarea
-				id="description"
-				class="form-textarea"
-				bind:value={draft.description}
-				oninput={autosave}
-				rows="4"
-				placeholder="Add any notes or description about this trip"
-			></textarea>
-		</div>
-		
-		<div class="form-section">
-			<label for="destination" class="form-label">Destination</label>
-			<input
-				type="text"
-				id="destination"
-				class="form-input"
-				bind:value={draft.destinationCity}
-				oninput={autosave}
-				placeholder="City, State/Province, Country"
-			/>
-		</div>
-		
-		<div class="form-section date-group">
-			<div class="date-input-wrapper">
-				<label for="checkInDate" class="form-label">Check-in Date *</label>
-				<input
-					type="date"
-					id="checkInDate"
-					class="form-input date-input"
-					bind:value={draft.checkInDate}
-					oninput={autosave}
-					required
-				/>
-			</div>
-			<span class="date-arrow">→</span>
-			<div class="date-input-wrapper">
-				<label for="checkOutDate" class="form-label">Check-out Date *</label>
-				<input
-					type="date"
-					id="checkOutDate"
-					class="form-input date-input"
-					bind:value={draft.checkOutDate}
-					oninput={autosave}
-					required
-				/>
-			</div>
-		</div>
-		
-		<div class="form-section">
-			<label class="checkbox-label">
-				<input
-					type="checkbox"
-					bind:checked={draft.flexibleDates}
-					onchange={autosave}
-				/>
-				<span>Flexible dates allowed</span>
-			</label>
-		</div>
-		
-		<div class="form-section form-row">
-			<div class="form-group">
-				<label for="expectedGuestCount" class="form-label">Expected Guest Count</label>
-				<input
-					type="number"
-					id="expectedGuestCount"
-					class="form-input"
-					bind:value={draft.expectedGuestCount}
-					oninput={autosave}
-					min="1"
-					placeholder="0"
-				/>
-			</div>
-			<div class="form-group">
-				<label for="maxOccupancy" class="form-label">Max Occupancy</label>
-				<input
-					type="number"
-					id="maxOccupancy"
-					class="form-input"
-					bind:value={draft.maxOccupancy}
-					oninput={autosave}
-					min="1"
-					placeholder="0"
-				/>
-			</div>
-		</div>
-		
-		<div class="form-section">
-			<label class="form-label">Main / Cover Photo *</label>
-			{#if draft.coverPhoto}
-				<div class="photo-preview">
-					<img src={draft.coverPhoto} alt="Cover photo" />
-					<button type="button" class="remove-photo" onclick={() => { draft.coverPhoto = ''; autosave(); }}>
-						Remove
-					</button>
+<div class="step-content">
+	<div class="two-column-layout">
+		<!-- Left Column: Form Inputs -->
+		<div class="section-box basics-section">
+			<div class="basics-header-row">
+				<h3 class="section-header">Trip Basics</h3>
+				<div class="cover-photo-top">
+					<label class="form-label">Main / Cover Photo *</label>
+					{#if draft.coverPhoto}
+						<div class="photo-preview-small">
+							<img src={draft.coverPhoto} alt="Cover photo" />
+							<button type="button" class="remove-photo-small" onclick={() => { draft.coverPhoto = ''; autosave(); }}>
+								×
+							</button>
+						</div>
+					{:else}
+						<label class="cover-photo-upload-small">
+							<input
+								type="file"
+								accept="image/*"
+								onchange={(e) => {
+									const file = (e.target as HTMLInputElement).files?.[0];
+									if (file) {
+										const reader = new FileReader();
+										reader.onload = (e) => {
+											draft.coverPhoto = e.target?.result as string;
+											autosave();
+										};
+										reader.readAsDataURL(file);
+									}
+								}}
+								style="display: none;"
+							/>
+							<div class="upload-tile-small">
+								<span class="upload-icon">📷</span>
+								<span class="upload-text">Upload</span>
+							</div>
+						</label>
+					{/if}
 				</div>
-			{:else}
-				<label class="cover-photo-upload">
+			</div>
+			<div class="left-column">
+			<div class="form-section">
+				<label for="name" class="form-label">Trip Name *</label>
+				<input
+					type="text"
+					id="name"
+					class="form-input"
+					bind:value={draft.name}
+					oninput={autosave}
+					placeholder="Enter trip name"
+					required
+				/>
+			</div>
+			
+			<div class="form-section">
+				<label for="description" class="form-label">Trip Description / Notes</label>
+				<textarea
+					id="description"
+					class="form-textarea"
+					bind:value={draft.description}
+					oninput={autosave}
+					rows="4"
+					placeholder="Add any notes or description about this trip"
+				></textarea>
+			</div>
+			
+			<div class="form-section">
+				<label for="destination" class="form-label">Destination</label>
+				<input
+					type="text"
+					id="destination"
+					class="form-input"
+					bind:value={draft.destinationCity}
+					oninput={autosave}
+					placeholder="City, State/Province, Country"
+				/>
+			</div>
+			
+			<div class="form-section date-group">
+				<div class="date-input-wrapper">
+					<label for="checkInDate" class="form-label">Check-in Date *</label>
 					<input
-						type="file"
-						accept="image/*"
-						onchange={(e) => {
-							const file = (e.target as HTMLInputElement).files?.[0];
-							if (file) {
-								const reader = new FileReader();
-								reader.onload = (e) => {
-									draft.coverPhoto = e.target?.result as string;
-									autosave();
-								};
-								reader.readAsDataURL(file);
-							}
-						}}
-						style="display: none;"
+						type="date"
+						id="checkInDate"
+						class="form-input date-input"
+						bind:value={draft.checkInDate}
+						oninput={autosave}
+						required
 					/>
-					<div class="upload-tile">
-						<span class="upload-icon">📷</span>
-						<span class="upload-text">Upload Cover Photo</span>
-					</div>
+				</div>
+				<div class="date-input-wrapper">
+					<label for="checkOutDate" class="form-label">Check-out Date *</label>
+					<input
+						type="date"
+						id="checkOutDate"
+						class="form-input date-input"
+						bind:value={draft.checkOutDate}
+						oninput={autosave}
+						required
+					/>
+				</div>
+			</div>
+			
+			<div class="form-section">
+				<label class="checkbox-label">
+					<input
+						type="checkbox"
+						bind:checked={draft.flexibleDates}
+						onchange={autosave}
+					/>
+					<span>Flexible dates allowed</span>
 				</label>
-			{/if}
+			</div>
+			
+			<div class="form-section form-row">
+				<div class="form-group">
+					<label for="expectedGuestCount" class="form-label">Expected Guest Count</label>
+					<input
+						type="number"
+						id="expectedGuestCount"
+						class="form-input"
+						bind:value={draft.expectedGuestCount}
+						oninput={autosave}
+						min="1"
+						placeholder="0"
+					/>
+				</div>
+				<div class="form-group">
+					<label for="maxOccupancy" class="form-label">Max Occupancy</label>
+					<input
+						type="number"
+						id="maxOccupancy"
+						class="form-input"
+						bind:value={draft.maxOccupancy}
+						oninput={autosave}
+						min="1"
+						placeholder="0"
+					/>
+				</div>
+			</div>
+			
+			<div class="basics-bottom-section">
+				<div class="form-section">
+					<label for="totalTripCost" class="form-label">Total Trip Cost *</label>
+					<div class="currency-input-wrapper">
+						<span class="currency-symbol">$</span>
+						<input
+							type="number"
+							id="totalTripCost"
+							class="form-input currency-input"
+							bind:value={draft.totalTripCost}
+							oninput={autosave}
+							placeholder="0.00"
+							step="0.01"
+							required
+						/>
+					</div>
+					<p class="cost-note">*Include fees and taxes if you would like your guests to split these costs as well</p>
+				</div>
+			</div>
+			</div>
+		</div>
+		
+		<!-- Right Column: Room/Bed Picker -->
+		<div class="section-box rooms-section">
+			<h3 class="section-header">Rooms & Beds</h3>
+			<div class="right-column">
+				<!-- Rooms & Beds Section - Prominent -->
+				<div class="rooms-beds-section">
+					<RoomBedPicker bind:draft {autosave} />
+				</div>
+			</div>
 		</div>
 	</div>
 	
-	<!-- Right Column: Room/Bed Picker + Price Breakdown -->
-	<div class="right-column">
-		<div class="right-content">
-			<!-- Rooms & Beds Section - Prominent -->
-			<div class="rooms-beds-section">
-				<RoomBedPicker bind:draft {autosave} />
-			</div>
-			
-			<div class="pricing-section">
-				<div class="pricing-inputs-row">
-					<div class="form-section">
-						<label for="pricingModel" class="form-label">Price Model</label>
-						<select id="pricingModel" class="form-select" bind:value={draft.pricingModel} onchange={autosave}>
-							<option value="per-person">Per Person</option>
-							<option value="per-room">Per Room</option>
-							<option value="per-bed">Per Bed</option>
-							<option value="hybrid">Hybrid</option>
-						</select>
-					</div>
-					
-					<div class="form-section">
-						<label for="totalTripCost" class="form-label">Total Trip Cost *</label>
-						<div class="currency-input-wrapper">
-							<span class="currency-symbol">$</span>
-							<input
-								type="number"
-								id="totalTripCost"
-								class="form-input currency-input"
-								bind:value={draft.totalTripCost}
-								oninput={autosave}
-								placeholder="0.00"
-								step="0.01"
-								required
-							/>
-						</div>
-						<p class="cost-note">*Include fees and taxes if you would like your guests to split these costs as well</p>
-					</div>
-				</div>
-				
-				<PriceBreakdown {draft} />
+	<!-- Pricing Section - Full Width -->
+	<div class="section-box pricing-section">
+		<h3 class="section-header">Pricing</h3>
+		<div class="pricing-inputs-row">
+			<div class="form-section">
+				<label for="pricingModel" class="form-label">Price Model</label>
+				<select id="pricingModel" class="form-select" bind:value={draft.pricingModel} onchange={autosave}>
+					<option value="per-person">Per Person</option>
+					<option value="per-room">Per Room</option>
+					<option value="per-bed">Per Bed</option>
+					<option value="hybrid">Hybrid</option>
+				</select>
 			</div>
 		</div>
+		
+		<PriceBreakdown {draft} />
 	</div>
 </div>
 
@@ -217,26 +227,170 @@
 	.step-content {
 		display: flex;
 		flex-direction: column;
-		gap: 0;
+		gap: 1.5rem;
+		background: #f5f5f5;
+		padding: 1.5rem;
+		border-radius: 0.5rem;
+	}
+	
+	.section-box {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 0.75rem;
+		padding: 1.5rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+	}
+	
+	.basics-header-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		margin: 0 0 1rem 0;
+		padding-top: 0;
+		padding-bottom: 0.75rem;
+		border-bottom: 1px solid #f3f4f6;
+	}
+	
+	.section-header {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text);
+		margin: 0 0 1rem 0;
+		padding-bottom: 0.75rem;
+		border-bottom: 1px solid #f3f4f6;
+	}
+	
+	.basics-header-row .section-header {
+		margin: 0;
+		padding-bottom: 0;
+		border-bottom: none;
+		line-height: 1.2;
+	}
+	
+	.cover-photo-top {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	
+	.cover-photo-top .form-label {
+		font-size: 0.75rem;
+		margin: 0;
+		white-space: nowrap;
+	}
+	
+	.photo-preview-small {
+		position: relative;
+		width: 80px;
+		height: 60px;
+		border-radius: 0.25rem;
+		overflow: hidden;
+		border: 1px solid var(--border);
+	}
+	
+	.photo-preview-small img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	
+	.remove-photo-small {
+		position: absolute;
+		top: 0.25rem;
+		right: 0.25rem;
+		width: 1.25rem;
+		height: 1.25rem;
+		background: rgba(0, 0, 0, 0.7);
+		color: white;
+		border: none;
+		border-radius: 50%;
+		cursor: pointer;
+		font-size: 0.75rem;
+		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+	}
+	
+	.cover-photo-upload-small {
+		cursor: pointer;
+		display: block;
+	}
+	
+	.upload-tile-small {
+		border: 2px dashed var(--border);
+		border-radius: 0.25rem;
+		padding: 0.5rem 0.75rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s ease;
+		background: white;
+		gap: 0.25rem;
+		min-width: 80px;
+	}
+	
+	.upload-tile-small:hover {
+		border-color: var(--primary);
+		background: rgba(30, 58, 138, 0.02);
+	}
+	
+	.upload-tile-small .upload-icon {
+		font-size: 1rem;
+	}
+	
+	.upload-tile-small .upload-text {
+		font-size: 0.7rem;
+		color: var(--muted);
+		font-weight: 500;
 	}
 	
 	.two-column-layout {
 		display: grid;
 		grid-template-columns: 35% 65%;
-		gap: 1rem;
-		align-items: start;
+		gap: 1.5rem;
+		align-items: stretch;
 	}
 	
 	.left-column {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.375rem;
+		flex: 1;
+	}
+	
+	.basics-section {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		min-height: 600px;
+	}
+	
+	.basics-bottom-section {
+		margin-top: auto;
+		padding-top: 1rem;
+		border-top: 1px solid #f3f4f6;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+	
+	.rooms-section {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		min-height: 600px;
 	}
 	
 	.right-column {
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
+		flex: 1;
+		height: 100%;
 	}
 	
 	.right-content {
@@ -260,7 +414,7 @@
 	.form-input,
 	.form-textarea,
 	.form-select {
-		padding: 0.4rem 0.6rem;
+		padding: 0.375rem 0.5rem;
 		border: 1px solid var(--border);
 		border-radius: 0;
 		font-size: 0.8125rem;
@@ -295,7 +449,7 @@
 	
 	.date-group {
 		display: grid;
-		grid-template-columns: 1fr auto 1fr;
+		grid-template-columns: 1fr 1fr;
 		gap: 0.75rem;
 		align-items: end;
 	}
@@ -304,13 +458,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.375rem;
-	}
-	
-	.date-arrow {
-		font-size: 1rem;
-		color: var(--muted);
-		margin-bottom: 0.375rem;
-		align-self: center;
 	}
 	
 	.date-input {
@@ -380,17 +527,6 @@
 		background: rgba(0, 0, 0, 0.9);
 	}
 	
-	.rooms-beds-section {
-		background: #4a5568;
-		border: 2px solid #2d3748;
-		border-radius: 0.5rem;
-		padding: 0.75rem;
-		margin-bottom: 0.75rem;
-		height: 500px;
-		overflow-y: auto;
-		display: flex;
-		flex-direction: column;
-	}
 	
 	.cover-photo-upload {
 		cursor: pointer;
@@ -432,16 +568,30 @@
 		font-style: italic;
 	}
 	
+	.rooms-beds-section {
+		background: #fafafa;
+		border: 1px solid #e5e7eb;
+		border-radius: 0.5rem;
+		padding: 0.75rem;
+		flex: 1;
+		min-height: 0;
+		max-height: calc(100% - 1rem);
+		margin-top: 1rem;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+	}
+	
 	.pricing-section {
-		border-top: 1px solid var(--border);
-		padding-top: 0.75rem;
+		width: 100%;
 	}
 	
 	.pricing-inputs-row {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: 1fr;
 		gap: 0.75rem;
 		margin-bottom: 0.5rem;
+		max-width: 300px;
 	}
 	
 	.currency-input-wrapper {
@@ -478,10 +628,6 @@
 		
 		.date-group {
 			grid-template-columns: 1fr;
-		}
-		
-		.date-arrow {
-			display: none;
 		}
 	}
 </style>

@@ -11,31 +11,20 @@
 <div class="stepper">
 	<div class="stepper-content">
 		{#each steps as step, index}
-			<div class="step-wrapper">
-				<div class="step-info">
-					<span class="step-number" class:completed={index < currentStep} class:current={index === currentStep}>
-						{String(step.number).padStart(2, '0')}
-					</span>
-					<span class="step-label" class:completed={index < currentStep} class:current={index === currentStep}>
-						{step.label}
-					</span>
-				</div>
-				<div class="step-marker-wrapper">
-					<div class="step-line" class:completed={index < currentStep}></div>
-					<div
-						class="step-marker"
-						class:completed={index < currentStep}
-						class:current={index === currentStep}
-						class:upcoming={index > currentStep}
-					>
-						{#if index < currentStep}
-							<span class="checkmark">✓</span>
-						{/if}
-					</div>
-					{#if index < steps.length - 1}
-						<div class="step-line-after" class:completed={index < currentStep}></div>
+			<div class="step-item" class:completed={index < currentStep} class:current={index === currentStep}>
+				<div class="step-circle" class:completed={index < currentStep} class:current={index === currentStep}>
+					{#if index < currentStep}
+						<span class="checkmark">✓</span>
+					{:else if index === currentStep}
+						<span class="step-number">{step.number}</span>
+					{:else}
+						<span class="step-number">{step.number}</span>
 					{/if}
 				</div>
+				<span class="step-label">{step.label}</span>
+				{#if index < steps.length - 1}
+					<div class="step-connector" class:completed={index < currentStep}></div>
+				{/if}
 			</div>
 		{/each}
 	</div>
@@ -43,7 +32,7 @@
 
 <style>
 	.stepper {
-		padding: 1rem 0;
+		padding: 1.25rem 0;
 		background: white;
 		overflow-x: auto;
 		-webkit-overflow-scrolling: touch;
@@ -52,132 +41,95 @@
 	
 	.stepper-content {
 		display: flex;
-		align-items: flex-start;
+		align-items: center;
 		justify-content: center;
-		gap: 0;
+		gap: 0.5rem;
 		min-width: min-content;
 		padding: 0 2rem;
+		max-width: 1200px;
+		margin: 0 auto;
 	}
 	
-	.step-wrapper {
+	.step-item {
 		display: flex;
-		flex-direction: column;
 		align-items: center;
 		position: relative;
 		flex: 0 0 auto;
-		min-width: 140px;
+		gap: 0.5rem;
 	}
 	
-	.step-info {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		margin-bottom: 0.5rem;
-		gap: 0.25rem;
-	}
-	
-	.step-number {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: var(--muted);
-		transition: color 0.2s ease;
-	}
-	
-	.step-number.completed,
-	.step-number.current {
-		color: var(--primary);
-	}
-	
-	.step-label {
-		font-size: 0.75rem;
-		font-weight: 400;
-		color: var(--muted);
-		text-align: center;
-		transition: color 0.2s ease;
-	}
-	
-	.step-label.completed,
-	.step-label.current {
-		color: var(--text);
-		font-weight: 500;
-	}
-	
-	.step-time {
-		font-size: 0.75rem;
-		color: var(--muted);
-		margin-top: 0.125rem;
-	}
-	
-	.step-marker-wrapper {
-		position: relative;
-		width: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 2px;
-	}
-	
-	.step-line {
-		position: absolute;
-		left: 0;
-		right: 50%;
-		height: 2px;
-		background: var(--border);
-		z-index: 0;
-	}
-	
-	.step-line.completed {
-		background: var(--primary);
-	}
-	
-	.step-line-after {
-		position: absolute;
-		left: 50%;
-		right: 0;
-		height: 2px;
-		background: var(--border);
-		z-index: 0;
-	}
-	
-	.step-line-after.completed {
-		background: var(--primary);
-	}
-	
-	.step-marker {
-		position: relative;
-		width: 20px;
-		height: 20px;
+	.step-circle {
+		width: 32px;
+		height: 32px;
 		border-radius: 50%;
 		background: white;
 		border: 2px solid var(--border);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		z-index: 1;
+		flex-shrink: 0;
 		transition: all 0.2s ease;
 	}
 	
-	.step-marker.completed {
+	.step-circle.completed {
 		background: var(--primary);
 		border-color: var(--primary);
-		color: white;
 	}
 	
-	.step-marker.current {
+	.step-circle.current {
 		background: white;
 		border-color: var(--primary);
 		border-width: 2px;
+		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
 	}
 	
-	.step-marker.upcoming {
-		background: white;
-		border-color: var(--border);
+	.step-number {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--muted);
+		transition: color 0.2s ease;
+	}
+	
+	.step-circle.completed .step-number {
+		color: white;
+	}
+	
+	.step-circle.current .step-number {
+		color: var(--primary);
+	}
+	
+	.step-label {
+		font-size: 0.8125rem;
+		font-weight: 400;
+		color: var(--muted);
+		white-space: nowrap;
+		transition: color 0.2s ease;
+	}
+	
+	.step-item.completed .step-label,
+	.step-item.current .step-label {
+		color: var(--text);
+		font-weight: 500;
+	}
+	
+	.step-connector {
+		width: 60px;
+		height: 2px;
+		background: var(--border);
+		margin: 0 0.5rem;
+		flex-shrink: 0;
+		transition: background 0.2s ease;
+	}
+	
+	.step-connector.completed {
+		background: var(--primary);
 	}
 	
 	.checkmark {
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		font-weight: bold;
 		color: white;
+		line-height: 1;
 	}
 	
 	@media (max-width: 768px) {
@@ -186,16 +138,16 @@
 			padding: 0 1rem;
 		}
 		
-		.step-wrapper {
-			min-width: 120px;
+		.step-item {
+			min-width: auto;
 		}
 		
 		.step-label {
 			font-size: 0.75rem;
 		}
 		
-		.step-time {
-			display: none;
+		.step-connector {
+			width: 40px;
 		}
 	}
 </style>

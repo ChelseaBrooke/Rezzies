@@ -339,10 +339,6 @@
 </script>
 
 <div class="room-bed-picker">
-	<div class="picker-header">
-		<h3>Rooms & Beds</h3>
-	</div>
-	
 	<div class="rooms-grid">
 		<!-- Add Room Card -->
 		{#if editingRoomId === 'new'}
@@ -665,7 +661,7 @@
 	.picker-header h3 {
 		font-size: 1rem;
 		font-weight: 600;
-		color: #ffffff;
+		color: var(--text);
 		margin: 0;
 	}
 	
@@ -697,10 +693,10 @@
 	}
 	
 	.room-card {
-		border: 1px solid #718096;
+		border: 1px solid var(--border);
 		border-radius: 0;
 		padding: 0.75rem;
-		background: #2d3748;
+		background: #fafafa;
 		transition: all 0.2s ease;
 		display: flex;
 		flex-direction: column;
@@ -712,13 +708,14 @@
 	}
 	
 	.room-card.display:hover {
-		border-color: #cbd5e0;
+		border-color: var(--primary);
+		background: #f5f5f5;
 	}
 	
 	.room-card.display.drag-over {
-		border-color: #ffffff;
-		background: #4a5568;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+		border-color: var(--primary);
+		background: #f0f4ff;
+		box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
 	}
 	
 	.add-room-editing {
@@ -751,15 +748,15 @@
 	.room-type-dropdown {
 		width: 100%;
 		padding: 0.5rem 0.75rem;
-		border: 1px solid #718096;
+		border: 1px solid var(--border);
 		border-radius: 0;
 		font-size: 0.875rem;
 		font-weight: 500;
-		color: #ffffff;
-		background: #1a202c;
+		color: var(--text);
+		background: white;
 		cursor: pointer;
 		appearance: none;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231e293b' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
 		background-repeat: no-repeat;
 		background-position: right 0.75rem center;
 		padding-right: 2.5rem;
@@ -768,33 +765,33 @@
 	}
 	
 	.room-type-dropdown option[value=""][disabled] {
-		color: #a0aec0;
+		color: var(--muted);
 	}
 	
 	.room-type-dropdown:invalid {
-		color: #a0aec0;
+		color: var(--muted);
 	}
 	
 	.room-type-dropdown:focus {
 		outline: none;
-		border-color: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
 	}
 	
 	.room-type-dropdown option {
-		background: #1a202c;
-		color: #ffffff;
+		background: white;
+		color: var(--text);
 	}
 	
 	.bed-types-dropdown-trigger {
 		width: 100%;
 		padding: 0.5rem 0.75rem;
-		border: 1px solid #718096;
+		border: 1px solid var(--border);
 		border-radius: 0;
 		font-size: 0.875rem;
 		font-weight: 500;
-		color: #ffffff;
-		background: #1a202c;
+		color: var(--text);
+		background: white;
 		cursor: pointer;
 		display: flex;
 		justify-content: space-between;
@@ -805,19 +802,19 @@
 	}
 	
 	.bed-types-dropdown-trigger:hover {
-		border-color: #ffffff;
-		background: #2d3748;
+		border-color: var(--primary);
+		background: #fafafa;
 	}
 	
 	.bed-types-dropdown-trigger:focus {
 		outline: none;
-		border-color: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
 	}
 	
 	.dropdown-arrow {
 		font-size: 0.75rem;
-		color: #cbd5e0;
+		color: var(--muted);
 	}
 	
 	.bed-types-dropdown-menu {
@@ -842,22 +839,22 @@
 	.room-description-input-inline {
 		width: 100%;
 		padding: 0.5rem 0.75rem;
-		border: 1px solid #718096;
+		border: 1px solid var(--border);
 		border-radius: 0;
 		font-size: 0.875rem;
 		font-weight: 400;
-		color: #ffffff;
-		background: #1a202c;
+		color: var(--text);
+		background: white;
 	}
 	
 	.room-description-input-inline::placeholder {
-		color: #a0aec0;
+		color: var(--muted);
 	}
 	
 	.room-description-input-inline:focus {
 		outline: none;
-		border-color: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
 	}
 	
 	.add-room-actions {
@@ -891,8 +888,8 @@
 	.btn-cancel-room {
 		padding: 0.5rem 1rem;
 		background: transparent;
-		color: #cbd5e0;
-		border: 1px solid #718096;
+		color: var(--muted);
+		border: 1px solid var(--border);
 		border-radius: 0;
 		font-size: 0.8125rem;
 		font-weight: 500;
@@ -902,14 +899,14 @@
 	}
 	
 	.btn-cancel-room:hover {
-		border-color: #ffffff;
-		color: #ffffff;
-		background: rgba(255, 255, 255, 0.05);
+		border-color: var(--primary);
+		color: var(--text);
+		background: rgba(30, 58, 138, 0.05);
 	}
 	
 	.add-room-card {
-		background: #2d3748;
-		border: 1px solid #718096;
+		background: #fafafa;
+		border: 1px dashed var(--border);
 		cursor: pointer;
 		display: flex;
 		flex-direction: column;
@@ -923,20 +920,20 @@
 	}
 	
 	.add-room-card:hover {
-		border-color: #ffffff;
-		background: #4a5568;
+		border-color: var(--primary);
+		background: #f5f5f5;
 	}
 	
 	.add-icon {
 		font-size: 3.5rem;
-		color: #ffffff;
+		color: var(--muted);
 		font-weight: 200;
 		line-height: 1;
 	}
 	
 	.add-text {
 		font-size: 0.9375rem;
-		color: #ffffff;
+		color: var(--text);
 		font-weight: 500;
 	}
 	
@@ -950,7 +947,7 @@
 	.room-card-header h4 {
 		font-size: 0.9375rem;
 		font-weight: 600;
-		color: #ffffff;
+		color: var(--text);
 		margin: 0;
 	}
 	
@@ -963,8 +960,8 @@
 		width: 1.5rem;
 		height: 1.5rem;
 		background: transparent;
-		color: #cbd5e0;
-		border: 1px solid #718096;
+		color: var(--muted);
+		border: 1px solid var(--border);
 		border-radius: 0;
 		cursor: pointer;
 		font-size: 0.875rem;
@@ -977,16 +974,16 @@
 	}
 	
 	.btn-edit-room:hover {
-		background: rgba(255, 255, 255, 0.1);
-		border-color: #ffffff;
-		color: #ffffff;
+		background: rgba(30, 58, 138, 0.1);
+		border-color: var(--primary);
+		color: var(--primary);
 	}
 	
 	.btn-close {
 		width: 1.5rem;
 		height: 1.5rem;
 		background: transparent;
-		color: #cbd5e0;
+		color: var(--muted);
 		border: none;
 		cursor: pointer;
 		font-size: 1.25rem;
@@ -999,7 +996,7 @@
 	}
 	
 	.btn-close:hover {
-		color: #ffffff;
+		color: var(--text);
 	}
 	
 	.room-type-select {
@@ -1084,62 +1081,18 @@
 	.edit-field label {
 		font-size: 0.75rem;
 		font-weight: 500;
-		color: #cbd5e0;
+		color: var(--muted);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
-	}
-	
-	.room-type-select {
-		padding: 0.5rem 0.75rem;
-		border: 1px solid #718096;
-		border-radius: 0;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: #ffffff;
-		background: #1a202c;
-		cursor: pointer;
-		width: 100%;
-	}
-	
-	.room-type-select:focus {
-		outline: none;
-		border-color: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-	}
-	
-	.room-type-select option {
-		background: #1a202c;
-		color: #ffffff;
-	}
-	
-	.room-description-input {
-		padding: 0.5rem 0.75rem;
-		border: 1px solid #718096;
-		border-radius: 0;
-		font-size: 0.875rem;
-		font-weight: 400;
-		color: #ffffff;
-		background: #1a202c;
-		width: 100%;
-	}
-	
-	.room-description-input::placeholder {
-		color: #a0aec0;
-	}
-	
-	.room-description-input:focus {
-		outline: none;
-		border-color: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 	}
 	
 	.bed-types-multiselect {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-		border: 1px solid #718096;
+		border: 1px solid var(--border);
 		padding: 0.75rem;
-		background: #1a202c;
+		background: white;
 		position: relative;
 		z-index: 1000;
 		overflow: visible;
@@ -1166,9 +1119,9 @@
 		width: 1.5rem;
 		height: 1.25rem;
 		padding: 0;
-		border: 1px solid #718096;
-		background: #2d3748;
-		color: #ffffff;
+		border: 1px solid var(--border);
+		background: white;
+		color: var(--text);
 		cursor: pointer;
 		font-size: 0.75rem;
 		line-height: 1;
@@ -1180,8 +1133,9 @@
 	}
 	
 	.bed-quantity-btn:hover:not(:disabled) {
-		background: #4a5568;
-		border-color: #ffffff;
+		background: #f5f5f5;
+		border-color: var(--primary);
+		color: var(--primary);
 	}
 	
 	.bed-quantity-btn:disabled {
@@ -1195,7 +1149,7 @@
 		gap: 0.5rem;
 		cursor: pointer;
 		flex: 1;
-		color: #ffffff;
+		color: var(--text);
 		font-size: 0.875rem;
 		min-width: 0;
 		flex-shrink: 1;
@@ -1209,7 +1163,7 @@
 	
 	.bed-quantity-display {
 		font-weight: 600;
-		color: #ffffff;
+		color: var(--text);
 		margin-left: auto;
 		flex-shrink: 0;
 	}
@@ -1218,7 +1172,7 @@
 		width: 1.125rem;
 		height: 1.125rem;
 		cursor: pointer;
-		accent-color: #ffffff;
+		accent-color: var(--primary);
 	}
 	
 	.bed-icon {
@@ -1229,7 +1183,6 @@
 		width: 16px;
 		height: 16px;
 		object-fit: contain;
-		filter: brightness(0) invert(1);
 		flex-shrink: 0;
 	}
 	
@@ -1270,13 +1223,13 @@
 		aspect-ratio: 1;
 		border-radius: 0;
 		overflow: hidden;
-		border: 1px solid #718096;
+		border: 1px solid var(--border);
 		cursor: move;
 		transition: all 0.2s ease;
 	}
 	
 	.room-photo-thumbnail:hover {
-		border-color: #ffffff;
+		border-color: var(--primary);
 		transform: scale(1.05);
 	}
 	
@@ -1345,24 +1298,23 @@
 		width: 18px;
 		height: 18px;
 		object-fit: contain;
-		filter: brightness(0) invert(1);
 	}
 	
 	.no-beds {
 		font-size: 0.75rem;
-		color: #a0aec0;
+		color: var(--muted);
 		font-style: italic;
 	}
 	
 	.empty-state {
 		text-align: center;
 		padding: 2rem;
-		color: #cbd5e0;
+		color: var(--muted);
 		font-size: 0.9375rem;
 	}
 	
 	.gallery-section {
-		border-top: 1px solid #718096;
+		border-top: 1px solid var(--border);
 		padding-top: 1rem;
 		margin-top: 1rem;
 	}
@@ -1374,13 +1326,13 @@
 	.gallery-header h4 {
 		font-size: 0.9375rem;
 		font-weight: 600;
-		color: #ffffff;
+		color: var(--text);
 		margin: 0 0 0.25rem 0;
 	}
 	
 	.gallery-description {
 		font-size: 0.75rem;
-		color: #cbd5e0;
+		color: var(--muted);
 		margin: 0;
 		line-height: 1.4;
 	}
@@ -1396,15 +1348,15 @@
 		aspect-ratio: 1;
 		border-radius: 0.5rem;
 		overflow: hidden;
-		border: 2px solid #718096;
+		border: 2px solid var(--border);
 		cursor: move;
 		transition: all 0.2s ease;
 	}
 	
 	.gallery-photo-item:hover {
-		border-color: #ffffff;
+		border-color: var(--primary);
 		transform: scale(1.05);
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+		box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
 	}
 	
 	.gallery-photo-item img {
@@ -1413,9 +1365,39 @@
 		object-fit: cover;
 	}
 	
+	.gallery-photo-item .remove-photo-btn {
+		position: absolute;
+		top: 0.25rem;
+		right: 0.25rem;
+		width: 1.25rem;
+		height: 1.25rem;
+		background: rgba(0, 0, 0, 0.7);
+		color: white;
+		border: none;
+		border-radius: 50%;
+		cursor: pointer;
+		font-size: 0.875rem;
+		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		opacity: 0;
+		transition: opacity 0.2s ease;
+		padding: 0;
+		z-index: 10;
+	}
+	
+	.gallery-photo-item:hover .remove-photo-btn {
+		opacity: 1;
+	}
+	
+	.gallery-photo-item .remove-photo-btn:hover {
+		background: rgba(239, 68, 68, 0.9);
+	}
+	
 	.gallery-upload-tile {
 		aspect-ratio: 1;
-		border: 2px dashed #718096;
+		border: 2px dashed var(--border);
 		border-radius: 0;
 		display: flex;
 		flex-direction: column;
@@ -1423,24 +1405,24 @@
 		justify-content: center;
 		cursor: pointer;
 		transition: all 0.2s ease;
-		background: #1a202c;
+		background: #fafafa;
 		gap: 0.5rem;
 		min-height: 120px;
 	}
 	
 	.gallery-upload-tile:hover {
-		border-color: #ffffff;
-		background: #2d3748;
+		border-color: var(--primary);
+		background: #f5f5f5;
 	}
 	
 	.upload-icon {
 		font-size: 1.5rem;
-		color: #cbd5e0;
+		color: var(--muted);
 	}
 	
 	.upload-text {
 		font-size: 0.8125rem;
-		color: #cbd5e0;
+		color: var(--muted);
 		font-weight: 500;
 	}
 </style>

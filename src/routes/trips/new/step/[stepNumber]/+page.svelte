@@ -5,6 +5,7 @@
 	import Step1 from './Step1.svelte';
 	import Step2 from './Step2.svelte';
 	import Step3 from './Step3.svelte';
+	import Step4 from './Step4.svelte';
 	
 	let { data } = $props();
 	
@@ -33,7 +34,7 @@
 	}
 	
 	function nextStep() {
-		if (stepNumber() < 3) {
+		if (stepNumber() < 4) {
 			goto(`/trips/new/step/${stepNumber() + 1}`);
 		}
 	}
@@ -71,7 +72,7 @@
 		Back
 	</button>
 	<div class="footer-right">
-		{#if stepNumber() < 3}
+		{#if stepNumber() < 4}
 			<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
 				Save Draft
 			</button>

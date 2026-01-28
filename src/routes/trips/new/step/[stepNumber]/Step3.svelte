@@ -1,260 +1,221 @@
 <script lang="ts">
-	import SectionCard from '$lib/components/wizard/SectionCard.svelte';
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 	
-	let { draft }: { draft: TripDraft } = $props();
+	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
 	
-	const numberOfNights = $derived(() => {
-		if (!draft.checkInDate || !draft.checkOutDate) return 0;
-		const checkIn = new Date(draft.checkInDate);
-		const checkOut = new Date(draft.checkOutDate);
-		const diffTime = checkOut.getTime() - checkIn.getTime();
-		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-		return diffDays > 0 ? diffDays : 0;
-	});
+	// Initialize invites if they don't exist
+	if (!draft.invites) {
+		draft.invites = [];
+	}
 	
-	const validationErrors = $derived(() => {
-		const errors: string[] = [];
-		if (!draft.name) errors.push('Trip name is required');
-		if (!draft.checkInDate) errors.push('Check-in date is required');
-		if (!draft.checkOutDate) errors.push('Check-out date is required');
-		if (!draft.coverPhoto) errors.push('Cover photo is required');
-		if (draft.rooms.length === 0) errors.push('At least one room is required');
-		if (!draft.totalTripCost) errors.push('Total trip cost is required');
-		return errors;
-	});
+	function addInvite() {
+		if (!draft.invites) draft.invites = [];
+		draft.invites = [
+			...draft.invites,
+			{ id: crypto.randomUUID(), email: '', name: '', role: 'guest' }
+		];
+		autosave();
+	}
+	
+	function removeInvite(index: number) {
+		if (!draft.invites) return;
+		draft.invites = draft.invites.filter((_, i) => i !== index);
+		autosave();
+	}
 </script>
 
 <div class="step-content">
-	{#if validationErrors().length > 0}
-		<SectionCard title="Validation Errors" icon="⚠️">
-			<div class="errors-list">
-				{#each validationErrors() as error}
-					<div class="error-item">{error}</div>
-				{/each}
-			</div>
-		</SectionCard>
-	{/if}
+	<div class="section-header">
+		<h2>Invite People</h2>
+		<p class="section-description">Add guests and co-hosts to your trip</p>
+	</div>
 	
-	<SectionCard title="Trip Summary" icon="📋">
-		<div class="summary-grid">
-			<div class="summary-item">
-				<span class="summary-label">Trip Name:</span>
-				<span class="summary-value">{draft.name || 'Not set'}</span>
-			</div>
-			<div class="summary-item">
-				<span class="summary-label">Destination:</span>
-				<span class="summary-value">
-					{draft.destinationCity || ''} {draft.destinationState || ''} {draft.destinationCountry || ''}
-				</span>
-			</div>
-			<div class="summary-item">
-				<span class="summary-label">Dates:</span>
-				<span class="summary-value">
-					{draft.checkInDate ? new Date(draft.checkInDate).toLocaleDateString() : 'Not set'} - 
-					{draft.checkOutDate ? new Date(draft.checkOutDate).toLocaleDateString() : 'Not set'}
-					{#if numberOfNights() > 0}
-						({numberOfNights()} night{numberOfNights() !== 1 ? 's' : ''})
-					{/if}
-				</span>
-			</div>
-			<div class="summary-item">
-				<span class="summary-label">Property:</span>
-				<span class="summary-value">
-					{draft.bedrooms || 0} bedrooms, {draft.bathrooms || 0} bathrooms, 
-					Max occupancy: {draft.maxOccupancy || 0}
-				</span>
-			</div>
-			<div class="summary-item">
-				<span class="summary-label">Rooms:</span>
-				<span class="summary-value">{draft.rooms.length} room{draft.rooms.length !== 1 ? 's' : ''}</span>
-			</div>
-			<div class="summary-item">
-				<span class="summary-label">Total Cost:</span>
-				<span class="summary-value">
-					${draft.totalTripCost ? parseFloat(draft.totalTripCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
-				</span>
-			</div>
-			<div class="summary-item">
-				<span class="summary-label">Pricing Model:</span>
-				<span class="summary-value">{draft.pricingModel} ({draft.pricingType})</span>
-			</div>
-			{#if draft.meals && draft.meals.length > 0}
-				<div class="summary-item">
-					<span class="summary-label">Meals:</span>
-					<span class="summary-value">{draft.meals.length} meal{draft.meals.length !== 1 ? 's' : ''}</span>
+	<div class="invites-list">
+		{#if draft.guests && draft.guests.length > 0}
+			{#each draft.guests as invite, index}
+				<div class="invite-card">
+					<div class="invite-header">
+						<span class="invite-number">Person {index + 1}</span>
+						<button type="button" class="btn-remove" onclick={() => removeInvite(index)}>
+							×
+						</button>
+					</div>
+					<div class="invite-form">
+						<div class="form-row">
+							<div class="form-group">
+								<label>Name</label>
+								<input
+									type="text"
+									bind:value={invite.name}
+									oninput={autosave}
+									placeholder="Full name"
+								/>
+							</div>
+							<div class="form-group">
+								<label>Email *</label>
+								<input
+									type="email"
+									bind:value={invite.email}
+									oninput={autosave}
+									placeholder="email@example.com"
+									required
+								/>
+							</div>
+						</div>
+						<div class="form-group">
+							<label>Role</label>
+							<select bind:value={invite.role} onchange={autosave}>
+								<option value="guest">Guest</option>
+								<option value="co-host">Co-Host</option>
+							</select>
+						</div>
+					</div>
 				</div>
-			{/if}
-			{#if draft.activities && draft.activities.length > 0}
-				<div class="summary-item">
-					<span class="summary-label">Activities:</span>
-					<span class="summary-value">{draft.activities.length} activit{draft.activities.length !== 1 ? 'ies' : 'y'}</span>
-				</div>
-			{/if}
-		</div>
-	</SectionCard>
-	
-	{#if draft.description}
-		<SectionCard title="Description" icon="📝">
-			<p class="description-text">{draft.description}</p>
-		</SectionCard>
-	{/if}
-	
-	{#if draft.rooms.length > 0}
-		<SectionCard title="Rooms" icon="🛏️">
-			<div class="rooms-summary">
-				{#each draft.rooms as room}
-					<div class="room-summary-item">
-						<h4>{room.name || 'Unnamed Room'}</h4>
-						<p>Type: {room.type}, Max Occupants: {room.maxOccupants}</p>
-						{#if room.beds.length > 0}
-							<p>Beds: {room.beds.map(b => `${b.count}x ${b.bedType}`).join(', ')}</p>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		</SectionCard>
-	{/if}
-	
-	{#if draft.meals && draft.meals.length > 0}
-		<SectionCard title="Meals" icon="🍽️">
-			<div class="meals-summary">
-				{#each draft.meals as meal}
-					<div class="meal-summary-item">
-						<h4>{meal.name || 'Unnamed Meal'}</h4>
-						{#if meal.date}
-							<p>Date: {new Date(meal.date).toLocaleDateString()}</p>
-						{/if}
-						{#if meal.time}
-							<p>Time: {meal.time}</p>
-						{/if}
-						{#if meal.price}
-							<p>Price: ${parseFloat(meal.price || '0').toFixed(2)}</p>
-						{/if}
-						{#if meal.description}
-							<p>{meal.description}</p>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		</SectionCard>
-	{/if}
-	
-	{#if draft.activities && draft.activities.length > 0}
-		<SectionCard title="Activities" icon="🎯">
-			<div class="activities-summary">
-				{#each draft.activities as activity}
-					<div class="activity-summary-item">
-						<h4>{activity.name || 'Unnamed Activity'}</h4>
-						{#if activity.date}
-							<p>Date: {new Date(activity.date).toLocaleDateString()}</p>
-						{/if}
-						{#if activity.time}
-							<p>Time: {activity.time}</p>
-						{/if}
-						{#if activity.price}
-							<p>Price: ${parseFloat(activity.price || '0').toFixed(2)}</p>
-						{/if}
-						{#if activity.description}
-							<p>{activity.description}</p>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		</SectionCard>
-	{/if}
+			{/each}
+		{/if}
+		<button type="button" class="btn-add-item" onclick={addInvite}>
+			+ Add Person
+		</button>
+	</div>
 </div>
 
 <style>
 	.step-content {
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 2rem;
 	}
 	
-	.errors-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
+	.section-header {
+		margin-bottom: 1rem;
 	}
 	
-	.error-item {
-		padding: 0.75rem 1rem;
-		background: rgba(239, 68, 68, 0.1);
-		color: #ef4444;
-		border-radius: 0.5rem;
-		font-size: 0.9375rem;
-	}
-	
-	.summary-grid {
-		display: grid;
-		grid-template-columns: repeat(1, 1fr);
-		gap: 1rem;
-	}
-	
-	@media (min-width: 768px) {
-		.summary-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
-	}
-	
-	.summary-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		padding: 0.75rem;
-		background: rgba(30, 58, 138, 0.02);
-		border-radius: 0.5rem;
-	}
-	
-	.summary-label {
-		font-size: 0.875rem;
-		color: var(--muted);
-		font-weight: 500;
-	}
-	
-	.summary-value {
-		font-size: 0.9375rem;
-		color: var(--text);
-	}
-	
-	.description-text {
-		color: var(--text);
-		line-height: 1.6;
-		white-space: pre-wrap;
-	}
-	
-	.rooms-summary,
-	.meals-summary,
-	.activities-summary {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-	
-	.room-summary-item,
-	.meal-summary-item,
-	.activity-summary-item {
-		padding: 1rem;
-		background: rgba(30, 58, 138, 0.02);
-		border-radius: 0.5rem;
-		border: 1px solid var(--border);
-	}
-	
-	.room-summary-item h4,
-	.meal-summary-item h4,
-	.activity-summary-item h4 {
-		font-size: 1rem;
+	.section-header h2 {
+		font-size: 1.5rem;
 		font-weight: 600;
 		color: var(--text);
 		margin: 0 0 0.5rem 0;
 	}
 	
-	.room-summary-item p,
-	.meal-summary-item p,
-	.activity-summary-item p {
+	.section-description {
 		font-size: 0.875rem;
 		color: var(--muted);
-		margin: 0.25rem 0;
+		margin: 0;
+	}
+	
+	.invites-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+	
+	.invite-card {
+		border: 1px solid var(--border);
+		border-radius: 0;
+		padding: 1.5rem;
+		background: #fafafa;
+	}
+	
+	.invite-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+	
+	.invite-number {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+	
+	.btn-remove {
+		width: 1.75rem;
+		height: 1.75rem;
+		background: transparent;
+		color: var(--muted);
+		border: 1px solid var(--border);
+		border-radius: 0;
+		cursor: pointer;
+		font-size: 1.25rem;
+		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s ease;
+	}
+	
+	.btn-remove:hover {
+		background: #ef4444;
+		color: white;
+		border-color: #ef4444;
+	}
+	
+	.invite-form {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+	
+	.form-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem;
+	}
+	
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	
+	.form-group label {
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+	
+	.form-group input,
+	.form-group select {
+		padding: 0.5rem 0.75rem;
+		border: 1px solid var(--border);
+		border-radius: 0;
+		font-size: 0.875rem;
+		font-family: inherit;
+		color: var(--text);
+		background: white;
+		transition: all 0.2s ease;
+		width: 100%;
+	}
+	
+	.form-group input:focus,
+	.form-group select:focus {
+		outline: none;
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+	}
+	
+	.btn-add-item {
+		padding: 0.75rem 1.5rem;
+		background: var(--primary);
+		color: white;
+		border: none;
+		border-radius: 0;
+		cursor: pointer;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		transition: background 0.2s ease;
+		width: 100%;
+		margin-top: 0.5rem;
+	}
+	
+	.btn-add-item:hover {
+		background: var(--primary-dark);
+	}
+	
+	@media (max-width: 768px) {
+		.form-row {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>

@@ -7,12 +7,14 @@
 	const steps = [
 		{ number: 1, label: 'Basics & Rooms' },
 		{ number: 2, label: 'Meals & Activities' },
-		{ number: 3, label: 'Review & Publish' }
+		{ number: 3, label: 'Invite People' },
+		{ number: 4, label: 'Review & Publish' }
 	];
 	
 	const stepTitles = [
 		'Basics & Rooms',
 		'Meals & Activities',
+		'Invite People',
 		'Review & Publish'
 	];
 	
