@@ -38,17 +38,14 @@
 	<h3 class="breakdown-title">Price Breakdown</h3>
 	
 	<div class="breakdown-list">
-		{#if draft.pricingType === 'per-night'}
-			<div class="breakdown-item">
-				<span class="item-label">Per Night</span>
-				<span class="item-value">${perNight().toFixed(2)}</span>
-			</div>
-			<div class="breakdown-item">
-				<span class="item-label">Nights</span>
-				<span class="item-value">{calculateNights()}</span>
-			</div>
-		{/if}
-		
+		<div class="breakdown-item">
+			<span class="item-label">Per Night</span>
+			<span class="item-value">${perNight().toFixed(2)}</span>
+		</div>
+		<div class="breakdown-item">
+			<span class="item-label">Nights</span>
+			<span class="item-value">{calculateNights()}</span>
+		</div>
 		<div class="breakdown-item">
 			<span class="item-label">Trip Cost</span>
 			<span class="item-value">${totalTripCost().toFixed(2)}</span>
@@ -80,24 +77,24 @@
 	}
 	
 	.breakdown-title {
-		font-size: 1rem;
+		font-size: 0.9375rem;
 		font-weight: 600;
 		color: var(--text);
-		margin: 0 0 0.75rem 0;
+		margin: 0 0 0.5rem 0;
 	}
 	
 	.breakdown-list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
-		margin-bottom: 0.75rem;
+		gap: 0.375rem;
+		margin-bottom: 0.5rem;
 	}
 	
 	.breakdown-item {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		font-size: 0.9375rem;
+		font-size: 0.8125rem;
 	}
 	
 	.item-label {
@@ -113,18 +110,18 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding-top: 0.75rem;
+		padding-top: 0.5rem;
 		border-top: 2px solid var(--border);
 	}
 	
 	.total-label {
-		font-size: 1rem;
+		font-size: 0.9375rem;
 		font-weight: 600;
 		color: var(--text);
 	}
 	
 	.total-value {
-		font-size: 1.125rem;
+		font-size: 1rem;
 		font-weight: 700;
 		color: var(--primary);
 	}

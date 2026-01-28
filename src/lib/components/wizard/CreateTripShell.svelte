@@ -89,7 +89,7 @@
 		display: flex;
 		flex-direction: column;
 		width: 100%;
-		max-width: 95%;
+		max-width: 85%;
 		margin: 0;
 		min-height: 100vh;
 		overflow-y: auto;
@@ -116,7 +116,7 @@
 	
 	.card-content {
 		flex: 1;
-		padding: 1.5rem 2.5rem 2rem;
+		padding: 1rem 2rem 1.5rem;
 		display: flex;
 		flex-direction: column;
 	}

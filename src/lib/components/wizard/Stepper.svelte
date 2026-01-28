@@ -43,7 +43,7 @@
 
 <style>
 	.stepper {
-		padding: 1.5rem 0;
+		padding: 1rem 0;
 		background: white;
 		overflow-x: auto;
 		-webkit-overflow-scrolling: touch;
@@ -72,12 +72,12 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		margin-bottom: 0.75rem;
+		margin-bottom: 0.5rem;
 		gap: 0.25rem;
 	}
 	
 	.step-number {
-		font-size: 0.875rem;
+		font-size: 0.75rem;
 		font-weight: 600;
 		color: var(--muted);
 		transition: color 0.2s ease;
@@ -89,7 +89,7 @@
 	}
 	
 	.step-label {
-		font-size: 0.875rem;
+		font-size: 0.75rem;
 		font-weight: 400;
 		color: var(--muted);
 		text-align: center;
@@ -145,8 +145,8 @@
 	
 	.step-marker {
 		position: relative;
-		width: 24px;
-		height: 24px;
+		width: 20px;
+		height: 20px;
 		border-radius: 50%;
 		background: white;
 		border: 2px solid var(--border);

@@ -29,6 +29,8 @@ export interface TripDraft {
 	rooms: Array<{
 		id: string;
 		name: string;
+		roomType: 'bedroom' | 'living-room' | 'kitchen' | 'bathroom' | 'dining-room' | 'office' | 'guest-room' | 'master-bedroom' | 'other';
+		customRoomDescription: string;
 		type: 'private' | 'shared';
 		maxOccupants: number;
 		notes: string;

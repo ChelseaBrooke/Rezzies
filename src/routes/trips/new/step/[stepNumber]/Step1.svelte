@@ -173,29 +173,34 @@
 			</div>
 			
 			<div class="pricing-section">
-				<div class="form-section">
-					<label for="pricingModel" class="form-label">Price Model</label>
-					<select id="pricingModel" class="form-select" bind:value={draft.pricingModel} onchange={autosave}>
-						<option value="per-person">Per Person</option>
-						<option value="per-room">Per Room</option>
-						<option value="per-bed">Per Bed</option>
-						<option value="hybrid">Hybrid</option>
-					</select>
-				</div>
-				
-				<div class="form-section">
-					<label for="totalTripCost" class="form-label">Total Trip Cost *</label>
-					<input
-						type="number"
-						id="totalTripCost"
-						class="form-input"
-						bind:value={draft.totalTripCost}
-						oninput={autosave}
-						placeholder="0.00"
-						step="0.01"
-						required
-					/>
-					<p class="cost-note">*Include fees and taxes if you would like your guests to split these costs as well</p>
+				<div class="pricing-inputs-row">
+					<div class="form-section">
+						<label for="pricingModel" class="form-label">Price Model</label>
+						<select id="pricingModel" class="form-select" bind:value={draft.pricingModel} onchange={autosave}>
+							<option value="per-person">Per Person</option>
+							<option value="per-room">Per Room</option>
+							<option value="per-bed">Per Bed</option>
+							<option value="hybrid">Hybrid</option>
+						</select>
+					</div>
+					
+					<div class="form-section">
+						<label for="totalTripCost" class="form-label">Total Trip Cost *</label>
+						<div class="currency-input-wrapper">
+							<span class="currency-symbol">$</span>
+							<input
+								type="number"
+								id="totalTripCost"
+								class="form-input currency-input"
+								bind:value={draft.totalTripCost}
+								oninput={autosave}
+								placeholder="0.00"
+								step="0.01"
+								required
+							/>
+						</div>
+						<p class="cost-note">*Include fees and taxes if you would like your guests to split these costs as well</p>
+					</div>
 				</div>
 				
 				<PriceBreakdown {draft} />
@@ -214,26 +219,26 @@
 	.two-column-layout {
 		display: grid;
 		grid-template-columns: 35% 65%;
-		gap: 1.5rem;
+		gap: 1rem;
 		align-items: start;
 	}
 	
 	.left-column {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.5rem;
 	}
 	
 	.right-column {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.75rem;
 	}
 	
 	.right-content {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.75rem;
 	}
 	
 	.form-section {
@@ -243,7 +248,7 @@
 	}
 	
 	.form-label {
-		font-size: 0.8125rem;
+		font-size: 0.75rem;
 		font-weight: 500;
 		color: var(--text);
 	}
@@ -251,10 +256,10 @@
 	.form-input,
 	.form-textarea,
 	.form-select {
-		padding: 0.5rem 0.75rem;
+		padding: 0.4rem 0.6rem;
 		border: 1px solid var(--border);
 		border-radius: 0;
-		font-size: 0.875rem;
+		font-size: 0.8125rem;
 		font-family: inherit;
 		color: var(--text);
 		background: white;
@@ -277,7 +282,7 @@
 	
 	.form-textarea {
 		resize: vertical;
-		min-height: 70px;
+		min-height: 60px;
 	}
 	
 	.form-select {
@@ -372,11 +377,15 @@
 	}
 	
 	.rooms-beds-section {
-		background: #fafafa;
-		border: 2px solid var(--primary);
+		background: #4a5568;
+		border: 2px solid #2d3748;
 		border-radius: 0.5rem;
-		padding: 1rem;
-		margin-bottom: 1rem;
+		padding: 0.75rem;
+		margin-bottom: 0.75rem;
+		height: 500px;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
 	}
 	
 	.cover-photo-upload {
@@ -387,14 +396,14 @@
 	.upload-tile {
 		border: 2px dashed var(--border);
 		border-radius: 0;
-		padding: 2rem;
+		padding: 1.5rem;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		transition: all 0.2s ease;
 		background: white;
-		gap: 0.5rem;
+		gap: 0.375rem;
 	}
 	
 	.upload-tile:hover {
@@ -403,11 +412,11 @@
 	}
 	
 	.upload-tile .upload-icon {
-		font-size: 2rem;
+		font-size: 1.5rem;
 	}
 	
 	.upload-tile .upload-text {
-		font-size: 0.875rem;
+		font-size: 0.8125rem;
 		color: var(--muted);
 		font-weight: 500;
 	}
@@ -421,7 +430,41 @@
 	
 	.pricing-section {
 		border-top: 1px solid var(--border);
-		padding-top: 1rem;
+		padding-top: 0.75rem;
+	}
+	
+	.pricing-inputs-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.75rem;
+		margin-bottom: 0.5rem;
+	}
+	
+	.currency-input-wrapper {
+		position: relative;
+		display: flex;
+		align-items: center;
+	}
+	
+	.currency-symbol {
+		position: absolute;
+		left: 0.6rem;
+		color: var(--text);
+		font-size: 0.8125rem;
+		font-weight: 500;
+		pointer-events: none;
+		z-index: 1;
+	}
+	
+	.currency-input {
+		padding-left: 1.5rem !important;
+	}
+	
+	.cost-note {
+		font-size: 0.75rem;
+		color: var(--muted);
+		margin: 0 0 0.75rem 0;
+		font-style: italic;
 	}
 	
 	@media (max-width: 1024px) {

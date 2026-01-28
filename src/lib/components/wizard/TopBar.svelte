@@ -17,11 +17,11 @@
 
 <style>
 	.topbar {
-		height: 60px;
+		height: 50px;
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
-		padding: 0 2.5rem;
+		padding: 0 2rem;
 		background: white;
 		border-bottom: 1px solid var(--border);
 	}
