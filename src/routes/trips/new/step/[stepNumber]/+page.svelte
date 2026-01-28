@@ -45,15 +45,36 @@
 		}
 	}
 	
+	let validationError = $state<string | null>(null);
+	
 	function canProceed() {
 		const step = stepNumber();
 		if (step === 1) {
-			return !!draft.name && !!draft.checkInDate && !!draft.checkOutDate && !!draft.coverPhoto && draft.rooms.length > 0 && !!draft.totalTripCost;
+			// Check for required fields
+			if (!draft.name || !draft.checkInDate || !draft.checkOutDate || draft.rooms.length === 0 || !draft.totalTripCost) {
+				return false;
+			}
+			// Check for at least one photo
+			const hasPhotos = (draft.galleryPhotos && draft.galleryPhotos.length > 0) || 
+			                  draft.rooms.some(room => room.photos && room.photos.length > 0);
+			if (!hasPhotos) {
+				validationError = 'Please upload at least one photo as the main event photo before continuing.';
+				return false;
+			}
+			validationError = null;
+			return true;
 		}
 		if (step === 2) {
 			return true; // Meals & Activities is optional
 		}
 		return true;
+	}
+	
+	function handleNextStep() {
+		if (canProceed()) {
+			validationError = null;
+			nextStep();
+		}
 	}
 </script>
 
@@ -72,6 +93,9 @@
 		Back
 	</button>
 	<div class="footer-right">
+		{#if validationError}
+			<div class="validation-error">{validationError}</div>
+		{/if}
 		{#if stepNumber() < 4}
 			<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
 				Save Draft
@@ -114,7 +138,16 @@
 	
 	.footer-right {
 		display: flex;
-		gap: 0.75rem;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.5rem;
+	}
+	
+	.validation-error {
+		color: #ef4444;
+		font-size: 0.875rem;
+		margin: 0;
+		text-align: right;
 	}
 	
 	.btn-back,

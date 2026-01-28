@@ -16,18 +16,6 @@
 		}
 	});
 	
-	function handleCoverPhotoUpload(event: CustomEvent<{ files: FileList }>) {
-		const file = event.detail.files[0];
-		if (file) {
-			const reader = new FileReader();
-			reader.onload = (e) => {
-				draft.coverPhoto = e.target?.result as string;
-				autosave();
-			};
-			reader.readAsDataURL(file);
-		}
-	}
-	
 	function handleAddressSelect(address: string, details?: any) {
 		// draft.destinationCity is already updated via bind:value
 		if (details && details.address_components) {
@@ -57,40 +45,6 @@
 		<div class="section-box basics-section">
 			<div class="basics-header-row">
 				<h3 class="section-header">Trip Basics</h3>
-				<div class="cover-photo-top">
-					<label class="form-label">Main / Cover Photo *</label>
-					{#if draft.coverPhoto}
-						<div class="photo-preview-small">
-							<img src={draft.coverPhoto} alt="Cover photo" />
-							<button type="button" class="remove-photo-small" onclick={() => { draft.coverPhoto = ''; autosave(); }}>
-								×
-							</button>
-						</div>
-					{:else}
-						<label class="cover-photo-upload-small">
-							<input
-								type="file"
-								accept="image/*"
-								onchange={(e) => {
-									const file = (e.target as HTMLInputElement).files?.[0];
-									if (file) {
-										const reader = new FileReader();
-										reader.onload = (e) => {
-											draft.coverPhoto = e.target?.result as string;
-											autosave();
-										};
-										reader.readAsDataURL(file);
-									}
-								}}
-								style="display: none;"
-							/>
-							<div class="upload-tile-small">
-								<span class="upload-icon">📷</span>
-								<span class="upload-text">Upload</span>
-							</div>
-						</label>
-					{/if}
-				</div>
 			</div>
 			<div class="left-column">
 			<div class="form-section form-row-name-destination">
@@ -250,9 +204,9 @@
 	.step-content {
 		display: flex;
 		flex-direction: column;
-		gap: 1.75rem;
+		gap: 1.25rem;
 		background: #f5f5f5;
-		padding: 1.5rem;
+		padding: 1.25rem;
 		border-radius: 0.5rem;
 	}
 	
@@ -290,87 +244,6 @@
 		line-height: 1.2;
 	}
 	
-	.cover-photo-top {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		gap: 0.5rem;
-	}
-	
-	.cover-photo-top .form-label {
-		font-size: 0.75rem;
-		margin: 0;
-		white-space: nowrap;
-	}
-	
-	.photo-preview-small {
-		position: relative;
-		width: 80px;
-		height: 60px;
-		border-radius: 0.25rem;
-		overflow: hidden;
-		border: 1px solid var(--border);
-	}
-	
-	.photo-preview-small img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	
-	.remove-photo-small {
-		position: absolute;
-		top: 0.25rem;
-		right: 0.25rem;
-		width: 1.25rem;
-		height: 1.25rem;
-		background: rgba(0, 0, 0, 0.7);
-		color: white;
-		border: none;
-		border-radius: 50%;
-		cursor: pointer;
-		font-size: 0.75rem;
-		line-height: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0;
-	}
-	
-	.cover-photo-upload-small {
-		cursor: pointer;
-		display: block;
-	}
-	
-	.upload-tile-small {
-		border: 2px dashed var(--border);
-		border-radius: 0.25rem;
-		padding: 0.5rem 0.75rem;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		transition: all 0.2s ease;
-		background: white;
-		gap: 0.25rem;
-		min-width: 80px;
-	}
-	
-	.upload-tile-small:hover {
-		border-color: var(--primary);
-		background: rgba(30, 58, 138, 0.02);
-	}
-	
-	.upload-tile-small .upload-icon {
-		font-size: 1rem;
-	}
-	
-	.upload-tile-small .upload-text {
-		font-size: 0.7rem;
-		color: var(--muted);
-		font-weight: 500;
-	}
-	
 	.two-column-layout {
 		display: grid;
 		grid-template-columns: 35% 65%;
@@ -383,18 +256,19 @@
 		flex-direction: column;
 		gap: 0.75rem;
 		flex: 1;
+		margin-top: 0.5rem;
 	}
 	
 	.basics-section {
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		min-height: 600px;
+		min-height: 450px;
 	}
 	
 	.basics-bottom-section {
-		margin-top: auto;
-		padding-top: 0.5rem;
+		margin-top: 0;
+		padding-top: 0.75rem;
 		border-top: 1px solid #f3f4f6;
 		display: flex;
 		flex-direction: column;
@@ -405,13 +279,18 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		min-height: 600px;
+		min-height: 450px;
+	}
+	
+	.rooms-section .section-header {
+		margin: 0 0 0.5rem 0;
+		padding-bottom: 0.5rem;
 	}
 	
 	.right-column {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.5rem;
 		flex: 1;
 		height: 100%;
 	}
@@ -711,7 +590,7 @@
 		flex: 1;
 		min-height: 0;
 		max-height: calc(100% - 1rem);
-		margin-top: 1rem;
+		margin-top: 0;
 		overflow-y: auto;
 		display: flex;
 		flex-direction: column;

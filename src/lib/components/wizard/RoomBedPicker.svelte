@@ -19,6 +19,23 @@
 	let bedTypesDropdownElement: HTMLElement | null = $state(null);
 	let bedTypesDropdownMenu: HTMLElement | null = $state(null);
 	let dropdownPosition = $state({ top: 0, left: 0 });
+	let isInitialized = $state(false);
+	
+	// Initialize galleryPhotos from draft on mount
+	$effect(() => {
+		if (!isInitialized && draft.galleryPhotos && Array.isArray(draft.galleryPhotos)) {
+			galleryPhotos = [...draft.galleryPhotos];
+			isInitialized = true;
+		}
+	});
+	
+	// Sync local galleryPhotos back to draft when it changes (after initialization)
+	$effect(() => {
+		if (isInitialized) {
+			draft.galleryPhotos = [...galleryPhotos];
+			autosave();
+		}
+	});
 	
 	// Position dropdown when it opens
 	$effect(() => {
@@ -271,17 +288,44 @@
 		const files = input.files;
 		if (!files || files.length === 0) return;
 		
+		const newPhotos: string[] = [];
+		let loadedCount = 0;
+		const totalFiles = files.length;
+		
 		Array.from(files).forEach((file) => {
 			const reader = new FileReader();
 			reader.onload = (e) => {
-				galleryPhotos = [...galleryPhotos, e.target?.result as string];
+				const photoUrl = e.target?.result as string;
+				newPhotos.push(photoUrl);
+				loadedCount++;
+				
+				// When all files are loaded, add them to gallery and set the last one as cover
+				if (loadedCount === totalFiles) {
+					galleryPhotos = [...galleryPhotos, ...newPhotos];
+					// Set the last uploaded photo as the cover photo
+					if (newPhotos.length > 0) {
+						draft.coverPhoto = newPhotos[newPhotos.length - 1];
+						autosave();
+					}
+				}
 			};
 			reader.readAsDataURL(file);
 		});
 	}
 	
 	function removeGalleryPhoto(photoIndex: number) {
+		const removedPhoto = galleryPhotos[photoIndex];
 		galleryPhotos = galleryPhotos.filter((_, i) => i !== photoIndex);
+		// If the removed photo was the cover photo, clear it
+		if (removedPhoto === draft.coverPhoto) {
+			draft.coverPhoto = '';
+			autosave();
+		}
+	}
+	
+	function setAsCoverPhoto(photoUrl: string) {
+		draft.coverPhoto = photoUrl;
+		autosave();
 	}
 	
 	function removePhoto(roomId: string, photoIndex: number) {
@@ -323,8 +367,10 @@
 				});
 				// Add to target room
 				room.photos = [...room.photos, draggedPhoto.url];
-				// Remove from gallery if it's there
-				galleryPhotos = galleryPhotos.filter(url => url !== draggedPhoto.url);
+				// Remove from gallery if it's there (but keep it if it's the cover photo)
+				if (draft.coverPhoto !== draggedPhoto.url) {
+					galleryPhotos = galleryPhotos.filter(url => url !== draggedPhoto.url);
+				}
 				autosave();
 			}
 		}
@@ -607,12 +653,13 @@
 	<div class="gallery-section">
 		<div class="gallery-header">
 			<h4>Photo Gallery</h4>
-			<p class="gallery-description">Upload photos so your guests can see where they're staying. Drag to assign them to the rooms you've built above.</p>
+			<p class="gallery-description">Upload photos so your guests can see where they're staying. Drag to assign them to the rooms you've built above. Click the star icon to set a photo as the cover photo.</p>
 		</div>
 		<div class="gallery-grid" ondrop={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()}>
 			{#each galleryPhotos as photo, photoIndex}
 				<div
 					class="gallery-photo-item"
+					class:cover-photo={draft.coverPhoto === photo}
 					draggable="true"
 					ondragstart={(e) => handleDragStart(e, photo)}
 					ondragend={handleDragEnd}
@@ -620,8 +667,20 @@
 					<img src={photo} alt="Gallery photo" />
 					<button
 						type="button"
+						class="set-cover-btn"
+						onclick={(e) => {
+							e.stopPropagation();
+							setAsCoverPhoto(photo);
+						}}
+						title={draft.coverPhoto === photo ? "Cover photo" : "Set as cover photo"}
+					>
+						{draft.coverPhoto === photo ? '★' : '☆'}
+					</button>
+					<button
+						type="button"
 						class="remove-photo-btn"
 						onclick={() => removeGalleryPhoto(photoIndex)}
+						title="Remove photo"
 					>
 						×
 					</button>
@@ -684,8 +743,8 @@
 	
 	.rooms-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-		gap: 0.75rem;
+		grid-template-columns: repeat(6, 1fr);
+		gap: 0.5rem;
 		flex: 1;
 		overflow: visible;
 		min-height: 0;
@@ -929,10 +988,10 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 0.75rem;
+		gap: 0.5rem;
 		transition: all 0.2s ease;
-		min-height: 150px;
-		padding: 1.5rem;
+		min-height: 100px;
+		padding: 0.75rem;
 		aspect-ratio: 1;
 	}
 	
@@ -962,7 +1021,7 @@
 	}
 	
 	.room-card-header h4 {
-		font-size: 0.9375rem;
+		font-size: 0.8125rem;
 		font-weight: 600;
 		color: var(--text);
 		margin: 0;
@@ -1226,13 +1285,13 @@
 	}
 	
 	.room-photos-display {
-		margin-bottom: 0.75rem;
+		margin-bottom: 0.5rem;
 	}
 	
 	.room-photos-grid {
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
-		gap: 0.375rem;
+		gap: 0.25rem;
 	}
 	
 	.room-photo-thumbnail {
@@ -1306,14 +1365,14 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 22px;
-		height: 22px;
+		width: 18px;
+		height: 18px;
 		line-height: 1;
 	}
 	
 	.bed-icon-badge-img {
-		width: 18px;
-		height: 18px;
+		width: 14px;
+		height: 14px;
 		object-fit: contain;
 	}
 	
@@ -1370,16 +1429,64 @@
 		transition: all 0.2s ease;
 	}
 	
+	.gallery-photo-item.cover-photo {
+		border-color: #fbbf24;
+		border-width: 3px;
+		box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
+	}
+	
 	.gallery-photo-item:hover {
 		border-color: var(--primary);
 		transform: scale(1.05);
 		box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
 	}
 	
+	.gallery-photo-item.cover-photo:hover {
+		border-color: #fbbf24;
+		box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.5);
+	}
+	
 	.gallery-photo-item img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+	}
+	
+	.gallery-photo-item .set-cover-btn {
+		position: absolute;
+		top: 0.25rem;
+		left: 0.25rem;
+		width: 1.5rem;
+		height: 1.5rem;
+		background: rgba(0, 0, 0, 0.7);
+		color: #fbbf24;
+		border: none;
+		border-radius: 50%;
+		cursor: pointer;
+		font-size: 1rem;
+		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		opacity: 0;
+		transition: opacity 0.2s ease, background 0.2s ease;
+		padding: 0;
+		z-index: 10;
+	}
+	
+	.gallery-photo-item.cover-photo .set-cover-btn {
+		opacity: 1;
+		background: rgba(251, 191, 36, 0.9);
+		color: white;
+	}
+	
+	.gallery-photo-item:hover .set-cover-btn {
+		opacity: 1;
+	}
+	
+	.gallery-photo-item .set-cover-btn:hover {
+		background: rgba(251, 191, 36, 0.9);
+		color: white;
 	}
 	
 	.gallery-photo-item .remove-photo-btn {
@@ -1441,5 +1548,23 @@
 		font-size: 0.8125rem;
 		color: var(--muted);
 		font-weight: 500;
+	}
+	
+	@media (max-width: 1400px) {
+		.rooms-grid {
+			grid-template-columns: repeat(4, 1fr);
+		}
+	}
+	
+	@media (max-width: 1024px) {
+		.rooms-grid {
+			grid-template-columns: repeat(3, 1fr);
+		}
+	}
+	
+	@media (max-width: 768px) {
+		.rooms-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
 	}
 </style>
