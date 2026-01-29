@@ -117,7 +117,7 @@
 {:else if stepNumber() === 3}
 	<ActivitiesStep bind:draft {autosave} />
 {:else if stepNumber() === 4}
-	<Step3 bind:draft />
+	<Step3 bind:draft {autosave} />
 {:else if stepNumber() === 5}
 	<Step4 bind:draft />
 {/if}
