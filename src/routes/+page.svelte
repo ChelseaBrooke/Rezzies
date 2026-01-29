@@ -28,6 +28,7 @@
 				<span>US</span>
 			</button>
 			<a href="/our-services" class="header-btn">About Us</a>
+			<a href="/trips" class="header-btn">My Trips</a>
 			<button class="header-btn">
 				<span class="bell-icon">🔔</span>
 				<span>Notifications</span>

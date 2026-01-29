@@ -104,6 +104,36 @@
 			nextStep();
 		}
 	}
+
+	let isPublishing = $state(false);
+	let publishError = $state<string | null>(null);
+
+	async function handlePublish() {
+		publishError = null;
+		isPublishing = true;
+		try {
+			const res = await fetch('/api/trips/publish', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(draft)
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				publishError = data.error || `Publish failed (${res.status})`;
+				return;
+			}
+			if (data.inviteCode) {
+				tripDraft.clear();
+				goto(`/trip/${data.inviteCode}`);
+			} else {
+				publishError = data.error || 'Publish failed';
+			}
+		} catch (e) {
+			publishError = e instanceof Error ? e.message : 'Failed to publish trip';
+		} finally {
+			isPublishing = false;
+		}
+	}
 </script>
 
 <!-- Step Content - only the form grid changes -->
@@ -127,6 +157,9 @@
 	{#if validationError}
 		<div class="validation-error">{validationError}</div>
 	{/if}
+	{#if stepNumber() === 5 && publishError}
+		<div class="validation-error">{publishError}</div>
+	{/if}
 	<div class="card-footer">
 		<button type="button" class="btn-back" onclick={prevStep}>
 			Back
@@ -145,18 +178,16 @@
 					Next
 				</button>
 			{:else}
-				<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
+				<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)} disabled={isPublishing}>
 					Save Draft
 				</button>
 				<button
 					type="button"
 					class="btn-publish"
-					onclick={() => {
-						console.log('Publishing trip:', draft);
-						alert('Publish functionality coming soon!');
-					}}
+					onclick={handlePublish}
+					disabled={isPublishing}
 				>
-					Publish
+					{isPublishing ? 'Publishing…' : 'Publish'}
 				</button>
 			{/if}
 		</div>

@@ -16,7 +16,10 @@
 	<Navigation user={data?.user} />
 {/if}
 
-<main class:no-padding={$page.url.pathname.startsWith('/trips/new/step')}>
+<main
+	class:no-padding={$page.url.pathname.startsWith('/trips/new/step')}
+	class:trip-portal-root={$page.url.pathname.match(/^\/trips\/[^\/]+/)}
+>
 	{@render children()}
 </main>
 
@@ -26,6 +29,12 @@
 	}
 	
 	main.no-padding {
+		min-height: 100vh;
+		padding: 0;
+		margin: 0;
+	}
+
+	main.trip-portal-root {
 		min-height: 100vh;
 		padding: 0;
 		margin: 0;

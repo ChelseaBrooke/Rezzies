@@ -1,0 +1,324 @@
+<script lang="ts">
+	import { page } from '$app/stores';
+	import TripSidebar from './TripSidebar.svelte';
+	import type { TripForSidebar } from '$lib/trips/types.js';
+
+	let {
+		trip,
+		allTrips,
+		onInvite,
+		showToast,
+		children
+	}: {
+		trip: TripForSidebar & { inviteCode?: string };
+		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date }[];
+		onInvite?: () => void;
+		showToast?: (msg: string) => void;
+		children: import('svelte').Snippet;
+	} = $props();
+
+	let sidebarOpen = $state(false);
+	let toastMessage = $state<string | null>(null);
+
+	function openInvite() {
+		sidebarOpen = false;
+		onInvite?.();
+	}
+
+	function showToastLocal(msg: string) {
+		toastMessage = msg;
+		showToast?.(msg);
+		setTimeout(() => (toastMessage = null), 3000);
+	}
+
+	const currentPath = $derived($page.url.pathname);
+	const tripId = $derived(trip?.id ?? '');
+
+	const mobileTabs = [
+		{ href: `/trips/${tripId}`, label: 'Overview', icon: '📊' },
+		{ href: `/trips/${tripId}/guests`, label: 'Guests', icon: '👥' },
+		{ href: `/trips/${tripId}/rooms`, label: 'Rooms', icon: '🛏️' },
+		{ href: `/trips/${tripId}/payments`, label: 'Payments', icon: '💳' },
+		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary', icon: '📋' }
+	];
+
+	function isActive(href: string) {
+		if (href === `/trips/${tripId}`) return currentPath === href;
+		return currentPath.startsWith(href);
+	}
+</script>
+
+<div class="shell">
+	<!-- Desktop: sidebar always visible -->
+	<div class="sidebar-desktop">
+		{#if trip}
+			<TripSidebar
+				{trip}
+				{allTrips}
+				onInvite={openInvite}
+				showToast={showToastLocal}
+			/>
+		{/if}
+	</div>
+
+	<!-- Mobile: hamburger + drawer -->
+	<div class="sidebar-mobile" class:open={sidebarOpen}>
+		<div class="drawer-backdrop" onclick={() => (sidebarOpen = false)} role="presentation"></div>
+		<div class="drawer-panel">
+			{#if trip}
+				<TripSidebar
+					{trip}
+					{allTrips}
+					onInvite={openInvite}
+					showToast={showToastLocal}
+				/>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Main content -->
+	<main class="main">
+		<!-- Mobile header with hamburger -->
+		<header class="mobile-header">
+			<button
+				type="button"
+				class="hamburger"
+				onclick={() => (sidebarOpen = true)}
+				aria-label="Open menu"
+			>
+				<span>☰</span>
+			</button>
+			<span class="mobile-title">{trip?.name ?? 'Trip'}</span>
+		</header>
+
+		<div class="content">
+			{@render children()}
+		</div>
+
+		<!-- Mobile bottom nav -->
+		<nav class="bottom-nav" aria-label="Primary">
+			{#each mobileTabs as tab}
+				<a
+					href={tab.href}
+					class="bottom-nav-item"
+					class:active={isActive(tab.href)}
+				>
+					<span class="bottom-nav-icon">{tab.icon}</span>
+					<span class="bottom-nav-label">{tab.label}</span>
+				</a>
+			{/each}
+		</nav>
+	</main>
+
+	{#if toastMessage}
+		<div class="toast" role="status">{toastMessage}</div>
+	{/if}
+</div>
+
+<style>
+	.shell {
+		display: flex;
+		min-height: 100vh;
+		background: var(--bg);
+		background-image: radial-gradient(
+			ellipse 80% 50% at 0% 0%,
+			rgba(30, 58, 138, 0.04) 0%,
+			transparent 50%
+		);
+		position: relative;
+	}
+
+	.sidebar-desktop {
+		flex-shrink: 0;
+		position: sticky;
+		top: 0;
+		height: 100vh;
+		overflow-y: auto;
+		padding: 1rem;
+	}
+
+	.sidebar-mobile {
+		display: none;
+	}
+
+	.main {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		padding-bottom: 4rem;
+	}
+
+	.mobile-header {
+		display: none;
+	}
+
+	.content {
+		flex: 1;
+		padding: 1.5rem;
+	}
+
+	.bottom-nav {
+		display: none;
+	}
+
+	.toast {
+		position: fixed;
+		bottom: 5rem;
+		left: 50%;
+		transform: translateX(-50%);
+		background: var(--text);
+		color: white;
+		padding: 0.5rem 1rem;
+		border-radius: var(--radius-md, 0.5rem);
+		font-size: 0.875rem;
+		box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0,0,0,0.1));
+		z-index: 100;
+		animation: fadeIn 0.2s ease;
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: translateX(-50%) translateY(0.5rem);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(-50%) translateY(0);
+		}
+	}
+
+	@media (max-width: 1024px) {
+		.sidebar-desktop {
+			display: none;
+		}
+
+		.sidebar-mobile {
+			display: block;
+			position: fixed;
+			inset: 0;
+			z-index: 50;
+			pointer-events: none;
+		}
+
+		.sidebar-mobile.open {
+			pointer-events: auto;
+		}
+
+		.drawer-backdrop {
+			position: absolute;
+			inset: 0;
+			background: rgba(0, 0, 0, 0.3);
+			opacity: 0;
+			transition: opacity 0.2s;
+		}
+
+		.sidebar-mobile.open .drawer-backdrop {
+			opacity: 1;
+		}
+
+		.drawer-panel {
+			position: absolute;
+			left: 0;
+			top: 0;
+			bottom: 0;
+			width: 280px;
+			max-width: 85vw;
+			background: white;
+			box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
+			transform: translateX(-100%);
+			transition: transform 0.25s ease;
+			overflow-y: auto;
+			pointer-events: auto;
+		}
+
+		.sidebar-mobile.open .drawer-panel {
+			transform: translateX(0);
+		}
+
+		.mobile-header {
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+			padding: 0.75rem 1rem;
+			background: white;
+			border-bottom: 1px solid var(--border);
+			flex-shrink: 0;
+		}
+
+		.hamburger {
+			width: 2.5rem;
+			height: 2.5rem;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border: none;
+			background: transparent;
+			border-radius: var(--radius-sm, 0.5rem);
+			cursor: pointer;
+			font-size: 1.25rem;
+			color: var(--text);
+		}
+
+		.hamburger:hover {
+			background: var(--bg);
+		}
+
+		.mobile-title {
+			font-size: 1rem;
+			font-weight: 600;
+			color: var(--text);
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.bottom-nav {
+			display: flex;
+			justify-content: space-around;
+			align-items: center;
+			position: fixed;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			height: 3.5rem;
+			background: white;
+			border-top: 1px solid var(--border);
+			z-index: 40;
+			padding: 0 0.25rem;
+		}
+
+		.bottom-nav-item {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 0.125rem;
+			padding: 0.375rem 0.5rem;
+			text-decoration: none;
+			color: var(--muted);
+			font-size: 0.625rem;
+			font-weight: 500;
+			border-radius: var(--radius-sm, 0.5rem);
+			min-width: 3rem;
+		}
+
+		.bottom-nav-item:hover {
+			color: var(--text);
+		}
+
+		.bottom-nav-item.active {
+			color: var(--primary);
+			background: rgba(30, 58, 138, 0.08);
+		}
+
+		.bottom-nav-icon {
+			font-size: 1.25rem;
+			line-height: 1;
+		}
+
+		.bottom-nav-label {
+			line-height: 1;
+		}
+	}
+</style>

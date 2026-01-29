@@ -3,223 +3,301 @@
 	import { goto } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
+
+	const trip = $derived(data.trip);
+	const memberCount = $derived(trip?.members?.length ?? 0);
+	const totalBeds = $derived(
+		trip?.rooms?.reduce((sum, r) => sum + (r.beds?.length ?? 0), 0) ?? 0
+	);
+	const activityCount = $derived(trip?.activities?.length ?? 0);
+	const unpaidCount = $derived(
+		trip?.invoices?.filter((i) => i.status === 'due').length ?? 0
+	);
+
+	const nextActions = $derived.by(() => {
+		const actions: { label: string; href: string }[] = [];
+		if (data.isHost) {
+			if (memberCount === 0) actions.push({ label: 'Invite guests', href: `/trips/${trip?.id}/guests` });
+			if ((trip?.rooms?.length ?? 0) === 0)
+				actions.push({ label: 'Add rooms', href: `/trips/${trip?.id}/rooms` });
+			if (unpaidCount > 0)
+				actions.push({ label: 'Review payments', href: `/trips/${trip?.id}/payments` });
+			actions.push({ label: 'Edit trip basics', href: `/trips/${trip?.id}/settings#basics` });
+		} else {
+			if (!data.userRsvp) actions.push({ label: 'RSVP & details', href: `/trips/${trip?.id}/rsvp` });
+			actions.push({ label: 'View itinerary', href: `/trips/${trip?.id}/itinerary` });
+			if ((data.userInvoices?.length ?? 0) > 0)
+				actions.push({ label: 'View invoice', href: `/trips/${trip?.id}/invoice` });
+		}
+		return actions;
+	});
 </script>
 
-<div class="trip-page">
-	<div class="container">
-		<div class="trip-header">
-			<div class="trip-hero">
-				{#if data.trip.listingCoverPhoto}
-					<img src={data.trip.listingCoverPhoto} alt={data.trip.name} class="hero-image" />
-				{:else}
-					<div class="hero-placeholder">🏖️</div>
-				{/if}
-			</div>
-			<div class="trip-info">
-				<h1>{data.trip.name}</h1>
-				{#if data.trip.description}
-					<p class="trip-description">{data.trip.description}</p>
-				{/if}
-				<div class="trip-meta">
-					<p class="trip-dates">
-						📅 {data.trip.checkInDate.toLocaleDateString()} - {data.trip.checkOutDate.toLocaleDateString()}
-					</p>
-					{#if data.trip.location}
-						<p class="trip-location">📍 {data.trip.location}</p>
-					{/if}
+<div class="overview-page">
+	<div class="page-header">
+		<h1>Overview</h1>
+		<p class="subtitle">Summary and next steps for this trip</p>
+	</div>
+
+	<div class="summary-grid">
+		<!-- Trip details card -->
+		<div class="card details-card">
+			<h2 class="card-title">Trip details</h2>
+			<dl class="details-list">
+				<dt>Dates</dt>
+				<dd>
+					{trip?.checkInDate
+						? new Date(trip.checkInDate).toLocaleDateString(undefined, {
+								month: 'short',
+								day: 'numeric',
+								year: 'numeric'
+							})
+						: '—'}
+					–
+					{trip?.checkOutDate
+						? new Date(trip.checkOutDate).toLocaleDateString(undefined, {
+								month: 'short',
+								day: 'numeric',
+								year: 'numeric'
+							})
+						: '—'}
+				</dd>
+				<dt>Location</dt>
+				<dd>{trip?.location ?? '—'}</dd>
+				<dt>Status</dt>
+				<dd>
+					<span class="status-pill" class:draft={!trip?.isPublished} class:live={trip?.isPublished}>
+						{trip?.isPublished ? 'Live' : 'Draft'}
+					</span>
+				</dd>
+			</dl>
+		</div>
+
+		<!-- Quick stats -->
+		<div class="card stats-card">
+			<h2 class="card-title">Quick stats</h2>
+			<div class="stats-row">
+				<div class="stat">
+					<span class="stat-value">{memberCount}</span>
+					<span class="stat-label">Guests</span>
+				</div>
+				<div class="stat">
+					<span class="stat-value">{totalBeds}</span>
+					<span class="stat-label">Beds</span>
+				</div>
+				<div class="stat">
+					<span class="stat-value">{activityCount}</span>
+					<span class="stat-label">Itinerary</span>
+				</div>
+				<div class="stat">
+					<span class="stat-value">{unpaidCount > 0 ? unpaidCount : '—'}</span>
+					<span class="stat-label">Outstanding</span>
 				</div>
 			</div>
 		</div>
 
-		{#if data.isHost}
-			<div class="host-actions">
-				<a href="/trips/{data.trip.id}/manage" class="btn btn-primary">Manage Trip</a>
-				<a href="/trips/{data.trip.id}/itinerary" class="btn btn-secondary">View Itinerary</a>
-			</div>
-		{:else}
-			<div class="guest-actions">
-				<a href="/trips/{data.trip.id}/rsvp" class="btn btn-primary">RSVP & Details</a>
-				<a href="/trips/{data.trip.id}/itinerary" class="btn btn-secondary">View Itinerary</a>
-				<a href="/trips/{data.trip.id}/invoice" class="btn btn-secondary">View Invoice</a>
-			</div>
-		{/if}
-
-		<div class="trip-sections">
-			<section class="trip-section">
-				<h2>Members</h2>
-				<div class="members-list">
-					{#each data.trip.members as member}
-						<div class="member-card">
-							<div class="member-avatar">
-								{member.user.name?.[0]?.toUpperCase() || member.user.email[0].toUpperCase()}
-							</div>
-							<div class="member-info">
-								<p class="member-name">{member.user.name || member.user.email}</p>
-								<span class="member-role">{member.role}</span>
-							</div>
-						</div>
-					{/each}
-				</div>
-			</section>
-
-			{#if !data.isHost}
-				<section class="trip-section">
-					<h2>Your RSVP</h2>
-					{#if data.userRsvp}
-						<div class="rsvp-status">
-							<p><strong>Status:</strong> {data.userRsvp.status}</p>
-							{#if data.userRsvp.arrivalDatetime}
-								<p><strong>Arrival:</strong> {data.userRsvp.arrivalDatetime.toLocaleString()}</p>
-							{/if}
-							{#if data.userRsvp.departureDatetime}
-								<p><strong>Departure:</strong> {data.userRsvp.departureDatetime.toLocaleString()}</p>
-							{/if}
-						</div>
-					{:else}
-						<p>You haven't RSVP'd yet.</p>
-					{/if}
-				</section>
-			{/if}
+		<!-- Next actions -->
+		<div class="card actions-card">
+			<h2 class="card-title">Next actions</h2>
+			<ul class="actions-list">
+				{#each nextActions as action}
+					<li>
+						<a href={action.href} class="action-link">{action.label}</a>
+					</li>
+				{/each}
+				{#if nextActions.length === 0}
+					<li class="muted">You’re all set for now.</li>
+				{/if}
+			</ul>
 		</div>
 	</div>
+
+	<!-- Members section (compact) -->
+	{#if trip?.members?.length > 0}
+		<div class="card">
+			<h2 class="card-title">Members</h2>
+			<div class="members-list">
+				{#each trip.members as member}
+					<div class="member-card">
+						<div class="member-avatar">
+							{member.user?.name?.[0]?.toUpperCase() ?? member.user?.email?.[0]?.toUpperCase() ?? '?'}
+						</div>
+						<span class="member-name">{member.user?.name ?? member.user?.email ?? '—'}</span>
+						<span class="member-role">{member.role}</span>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
-	.trip-page {
-		min-height: 100vh;
-		padding: var(--spacing-xl) var(--spacing-md);
+	.overview-page {
+		padding: 0;
 	}
 
-	.container {
-		max-width: 1200px;
-		margin: 0 auto;
+	.page-header {
+		margin-bottom: 1.5rem;
 	}
 
-	.trip-header {
+	.page-header h1 {
+		font-size: 1.5rem;
+		font-weight: 600;
+		margin: 0 0 0.25rem 0;
+	}
+
+	.subtitle {
+		font-size: 0.875rem;
+		color: var(--muted);
+		margin: 0;
+	}
+
+	.summary-grid {
 		display: grid;
-		grid-template-columns: 1fr 2fr;
-		gap: var(--spacing-xl);
-		margin-bottom: var(--spacing-xl);
+		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+		gap: 1rem;
+		margin-bottom: 1.5rem;
 	}
 
-	.trip-hero {
-		border-radius: var(--radius-md);
-		overflow: hidden;
+	.card {
+		background: white;
+		border-radius: var(--radius-lg, 1rem);
+		border: 1px solid var(--border);
+		padding: 1.25rem;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 	}
 
-	.hero-image {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		min-height: 300px;
+	.card-title {
+		font-size: 1rem;
+		font-weight: 600;
+		margin: 0 0 1rem 0;
+		color: var(--text);
 	}
 
-	.hero-placeholder {
-		width: 100%;
-		height: 300px;
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	.details-list {
+		margin: 0;
+		font-size: 0.875rem;
+	}
+
+	.details-list dt {
+		color: var(--muted);
+		margin-top: 0.5rem;
+	}
+
+	.details-list dt:first-child {
+		margin-top: 0;
+	}
+
+	.details-list dd {
+		margin: 0.25rem 0 0 0;
+	}
+
+	.status-pill {
+		display: inline-block;
+		font-size: 0.75rem;
+		font-weight: 500;
+		padding: 0.25rem 0.5rem;
+		border-radius: 9999px;
+	}
+
+	.status-pill.draft {
+		background: var(--border);
+		color: var(--muted);
+	}
+
+	.status-pill.live {
+		background: rgba(34, 197, 94, 0.15);
+		color: #15803d;
+	}
+
+	.stats-row {
 		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 6rem;
+		flex-wrap: wrap;
+		gap: 1rem;
 	}
 
-	.trip-info h1 {
-		margin: 0 0 var(--spacing-md) 0;
-	}
-
-	.trip-description {
-		color: var(--color-text-light);
-		margin-bottom: var(--spacing-md);
-	}
-
-	.trip-meta {
+	.stat {
 		display: flex;
 		flex-direction: column;
-		gap: var(--spacing-xs);
+		gap: 0.25rem;
 	}
 
-	.trip-dates,
-	.trip-location {
+	.stat-value {
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+
+	.stat-label {
+		font-size: 0.75rem;
+		color: var(--muted);
+	}
+
+	.actions-list {
+		list-style: none;
 		margin: 0;
-		color: var(--color-text-light);
+		padding: 0;
 	}
 
-	.host-actions,
-	.guest-actions {
-		display: flex;
-		gap: var(--spacing-md);
-		margin-bottom: var(--spacing-xl);
+	.actions-list li {
+		margin-bottom: 0.5rem;
 	}
 
-	.trip-sections {
-		display: grid;
-		gap: var(--spacing-xl);
+	.actions-list li:last-child {
+		margin-bottom: 0;
 	}
 
-	.trip-section {
-		background: white;
-		padding: var(--spacing-lg);
-		border-radius: var(--radius-md);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	.action-link {
+		font-size: 0.9375rem;
+		color: var(--primary);
+		text-decoration: none;
 	}
 
-	.trip-section h2 {
-		margin: 0 0 var(--spacing-md) 0;
-		font-size: 1.5rem;
+	.action-link:hover {
+		text-decoration: underline;
+	}
+
+	.actions-list .muted {
+		color: var(--muted);
+		font-size: 0.875rem;
 	}
 
 	.members-list {
-		display: grid;
-		gap: var(--spacing-md);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
 	}
 
 	.member-card {
 		display: flex;
 		align-items: center;
-		gap: var(--spacing-md);
-		padding: var(--spacing-md);
-		background: var(--color-bg-light);
-		border-radius: var(--radius-sm);
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		background: var(--bg);
+		border-radius: var(--radius-md, 0.5rem);
+		font-size: 0.875rem;
 	}
 
 	.member-avatar {
-		width: 48px;
-		height: 48px;
+		width: 32px;
+		height: 32px;
 		border-radius: 50%;
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		background: linear-gradient(135deg, var(--primary) 0%, var(--primary-accent, #ea580c) 100%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		color: white;
 		font-weight: 600;
-		font-size: 1.25rem;
-	}
-
-	.member-info {
-		flex: 1;
+		font-size: 0.875rem;
 	}
 
 	.member-name {
-		margin: 0 0 var(--spacing-xs) 0;
 		font-weight: 500;
 	}
 
 	.member-role {
-		font-size: 0.875rem;
-		color: var(--color-text-light);
+		color: var(--muted);
+		font-size: 0.75rem;
 		text-transform: capitalize;
-	}
-
-	.rsvp-status {
-		display: flex;
-		flex-direction: column;
-		gap: var(--spacing-sm);
-	}
-
-	@media (max-width: 768px) {
-		.trip-header {
-			grid-template-columns: 1fr;
-		}
 	}
 </style>

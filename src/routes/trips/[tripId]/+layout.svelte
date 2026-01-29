@@ -1,42 +1,53 @@
 <script lang="ts">
-	import Sidebar from '$lib/components/wizard/Sidebar.svelte';
-	import { page } from '$app/stores';
-	
-	let { children, data } = $props();
+	import type { LayoutData } from './$types';
+	import RezziesHeader from '$lib/components/layout/RezziesHeader.svelte';
+	import TripLayoutShell from '$lib/components/trips/TripLayoutShell.svelte';
+
+	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
+
+	// Serialized dates from server come back as strings; ensure trip options have usable dates
+	const allTrips = $derived(
+		(data.allTrips ?? []).map((t: { id: string; name: string; checkInDate: Date | string; checkOutDate: Date | string }) => ({
+			id: t.id,
+			name: t.name,
+			checkInDate: typeof t.checkInDate === 'string' ? new Date(t.checkInDate) : t.checkInDate,
+			checkOutDate: typeof t.checkOutDate === 'string' ? new Date(t.checkOutDate) : t.checkOutDate
+		}))
+	);
+
+	let inviteModalOpen = $state(false);
+
+	function handleInvite() {
+		inviteModalOpen = true;
+		// Child pages (e.g. guests) can handle modal; for now just navigate to guests
+		import('$app/navigation').then(({ goto }) => goto(`/trips/${data.trip.id}/guests?invite=1`));
+	}
 </script>
 
-<div class="trip-layout">
-	<!-- Sidebar -->
-	<Sidebar user={data?.user} />
-	
-	<!-- Main Content -->
-	<main class="main-content">
+<div class="trip-portal">
+	<RezziesHeader />
+	<TripLayoutShell
+		trip={data.trip}
+		allTrips={allTrips}
+		onInvite={handleInvite}
+	>
 		{@render children()}
-	</main>
+	</TripLayoutShell>
 </div>
 
 <style>
-	.trip-layout {
+	.trip-portal {
 		min-height: 100vh;
-		display: flex;
-		background: var(--bg);
-		position: relative;
-	}
-	
-	.main-content {
-		flex: 1;
-		margin-left: var(--sidebar-width, 280px);
 		display: flex;
 		flex-direction: column;
-		position: relative;
-		z-index: 1;
-		min-height: 100vh;
-		transition: margin-left 0.3s ease;
 	}
-	
-	@media (max-width: 1024px) {
-		.main-content {
-			margin-left: 0;
-		}
+
+	.trip-portal :global(.rezzies-header) {
+		flex-shrink: 0;
+	}
+
+	.trip-portal :global(.shell) {
+		flex: 1;
+		min-height: 0;
 	}
 </style>
