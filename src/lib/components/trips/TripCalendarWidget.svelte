@@ -166,10 +166,44 @@
 </script>
 
 {#if placement === 'sidebar'}
-	<!-- Upper right: single month, screenshot-style -->
+	<!-- Upper right: calendar or day detail in same box -->
 	<div class="calendar-sidebar">
 		{#if !hasValidDates}
 			<p class="calendar-empty-msg">Add trip dates in <a href={tripId ? `/trips/${tripId}/settings` : '#'}>trip settings</a> to see the calendar.</p>
+		{:else if selectedDateKey}
+			<!-- Day detail view (replaces calendar); back button returns to calendar -->
+			<div class="day-detail-view">
+				<button type="button" class="day-detail-back" onclick={() => (selectedDateKey = null)} aria-label="Back to calendar">
+					&larr; Back to calendar
+				</button>
+				<h3 class="day-detail-title">
+					{new Date(selectedDateKey + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+				</h3>
+				{#if activitiesForDay.length === 0 && mealsForDay.length === 0}
+					<p class="day-detail-empty">No activities or meals planned.</p>
+				{:else}
+					{#if activitiesForDay.length > 0}
+						<div class="day-detail-section">
+							<span class="day-detail-label">Activities</span>
+							<ul class="day-detail-list">
+								{#each activitiesForDay as a}
+									<li class="day-detail-item"><span class="item-title">{a.title}</span>{#if a.time}<span class="item-meta">{formatTime(a.time)}</span>{/if}</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+					{#if mealsForDay.length > 0}
+						<div class="day-detail-section">
+							<span class="day-detail-label">Meals</span>
+							<ul class="day-detail-list">
+								{#each mealsForDay as m}
+									<li class="day-detail-item"><span class="item-title">{mealLabel(m.mealType)}</span>{#if m.time}<span class="item-meta">{formatTime(m.time)}</span>{/if}</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+				{/if}
+			</div>
 		{:else if sidebarMonth}
 			<div class="month-calendar sidebar-style">
 				<div class="month-header">
@@ -198,39 +232,7 @@
 					{/each}
 				</div>
 			</div>
-			{#if selectedDateKey}
-				<div class="day-detail">
-					<h3 class="day-detail-title">
-						{new Date(selectedDateKey + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
-					</h3>
-					{#if activitiesForDay.length === 0 && mealsForDay.length === 0}
-						<p class="day-detail-empty">No activities or meals planned.</p>
-					{:else}
-						{#if activitiesForDay.length > 0}
-							<div class="day-detail-section">
-								<span class="day-detail-label">Activities</span>
-								<ul class="day-detail-list">
-									{#each activitiesForDay as a}
-										<li class="day-detail-item"><span class="item-title">{a.title}</span>{#if a.time}<span class="item-meta">{formatTime(a.time)}</span>{/if}</li>
-									{/each}
-								</ul>
-							</div>
-						{/if}
-						{#if mealsForDay.length > 0}
-							<div class="day-detail-section">
-								<span class="day-detail-label">Meals</span>
-								<ul class="day-detail-list">
-									{#each mealsForDay as m}
-										<li class="day-detail-item"><span class="item-title">{mealLabel(m.mealType)}</span>{#if m.time}<span class="item-meta">{formatTime(m.time)}</span>{/if}</li>
-									{/each}
-								</ul>
-							</div>
-						{/if}
-					{/if}
-				</div>
-			{:else}
-				<p class="day-detail-hint">Click a highlighted day for activities and meals.</p>
-			{/if}
+			<p class="day-detail-hint">Click a highlighted day for activities and meals.</p>
 		{/if}
 	</div>
 {:else}
@@ -349,6 +351,11 @@
 		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
 		padding: 1rem;
 		min-width: 280px;
+		height: 360px;
+		min-height: 360px;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.calendar-sidebar .month-calendar.sidebar-style {
@@ -437,20 +444,88 @@
 		color: white;
 	}
 
-	.calendar-sidebar .day-detail {
-		border-top: 1px solid #e2e8f0;
-		margin-top: 0.75rem;
-		padding-top: 0.75rem;
+	.day-detail-view {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		animation: day-view-zoom-in 0.45s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+		transform-origin: center center;
+	}
+
+	@keyframes day-view-zoom-in {
+		from {
+			opacity: 0;
+			transform: scale(0.4);
+		}
+		70% {
+			opacity: 1;
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	.day-detail-back {
+		align-self: flex-start;
+		margin-bottom: 0.25rem;
+		padding: 0.375rem 0;
+		background: none;
+		border: none;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: #2563eb;
+		cursor: pointer;
+		text-decoration: none;
+	}
+
+	.day-detail-back:hover {
+		text-decoration: underline;
+		color: #1d4ed8;
 	}
 
 	.calendar-sidebar .day-detail-title {
-		font-size: 0.875rem;
-		margin-bottom: 0.5rem;
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: #0f172a;
+		margin: 0 0 0.5rem 0;
 	}
 
 	.calendar-sidebar .day-detail-hint,
 	.calendar-sidebar .day-detail-empty {
+		font-size: 0.75rem;
+		color: #64748b;
+		margin: 0.5rem 0 0 0;
+	}
+
+	.calendar-sidebar .day-detail-section {
+		margin-top: 0.25rem;
+	}
+
+	.calendar-sidebar .day-detail-label {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: #64748b;
+		margin-bottom: 0.25rem;
+	}
+
+	.calendar-sidebar .day-detail-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.calendar-sidebar .day-detail-item {
 		font-size: 0.8125rem;
+		padding: 0.25rem 0;
+		border-bottom: 1px solid #f1f5f9;
+		color: #334155;
+	}
+
+	.calendar-sidebar .day-detail-item:last-child {
+		border-bottom: none;
 	}
 
 	.calendar-widget {
@@ -603,9 +678,9 @@
 
 	.day-detail-empty,
 	.day-detail-hint {
-		font-size: 0.8125rem;
+		font-size: 0.75rem;
 		color: #64748b;
-		margin: 0;
+		margin: 0.5rem 0 0 0;
 	}
 
 	.day-detail-section {

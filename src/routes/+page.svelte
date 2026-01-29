@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	
-	// Background image will be in src/lib/assets/images/homepage-bg.jpg
-	// User will add this file
+	import templogo1 from '$lib/assets/images/templogo1.png';
 </script>
 
 <div class="home-page">
@@ -17,7 +15,7 @@
 		<div class="header-left">
 			<a href="/" class="logo-link">
 				<span class="logo-text">rezzies</span>
-				<span class="flamingo-icon">🦩</span>
+				<img src={templogo1} alt="" class="logo-img" />
 			</a>
 			<span class="tagline">for the host that does the most</span>
 		</div>
@@ -126,20 +124,25 @@
 	.logo-link {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.25rem;
 		text-decoration: none;
 		color: white;
 		font-size: 1.5rem;
 		font-weight: 600;
 	}
 
+	.logo-img {
+		display: block;
+		height: 2rem;
+		width: auto;
+		max-width: 4rem;
+		object-fit: contain;
+		flex-shrink: 0;
+	}
+
 	.logo-text {
 		text-transform: lowercase;
 		letter-spacing: -0.5px;
-	}
-
-	.flamingo-icon {
-		font-size: 1.25rem;
 	}
 
 	.tagline {

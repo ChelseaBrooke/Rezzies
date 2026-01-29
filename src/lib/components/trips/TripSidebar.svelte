@@ -6,6 +6,8 @@
 	import TripNavItem from './TripNavItem.svelte';
 	import type { TripForSidebar } from '$lib/trips/types.js';
 
+	import templogo1 from '$lib/assets/images/templogo1.png';
+
 	let {
 		trip,
 		allTrips,
@@ -33,31 +35,17 @@
 		}))
 	);
 
-	const dateRange =
-		trip.checkInDate && trip.checkOutDate
-			? `${new Date(trip.checkInDate).toLocaleDateString(undefined, {
-					month: 'short',
-					day: 'numeric',
-					year: 'numeric'
-				})} – ${new Date(trip.checkOutDate).toLocaleDateString(undefined, {
-					month: 'short',
-					day: 'numeric',
-					year: 'numeric'
-				})}`
-			: '';
 </script>
 
 <aside class="sidebar">
 	<div class="sidebar-overlay" aria-hidden="true"></div>
-	<!-- Trip Header Block (unified profile card, no photo) -->
+	<!-- Rezzies + logo exactly as homepage: rezzies text then logo -->
+	<a href="/trips" class="sidebar-brand">
+		<span class="sidebar-brand-text">rezzies</span>
+		<img src={templogo1} alt="" class="sidebar-brand-logo" />
+	</a>
+	<!-- Trip card: status + switcher (no name/dates) -->
 	<div class="trip-profile-card">
-		<h1 class="trip-name">{trip.name}</h1>
-		{#if dateRange}
-			<p class="trip-meta">{dateRange}</p>
-		{/if}
-		{#if trip.location}
-			<p class="trip-meta destination">{trip.location}</p>
-		{/if}
 		<span class="status-pill" data-status={status}>
 			{status === 'draft' ? 'Draft' : status === 'live' ? 'Live' : 'Locked'}
 		</span>
@@ -112,33 +100,39 @@
 		padding: 1.25rem;
 	}
 
+	/* Same as homepage: rezzies + logo (order, size, typography) */
+	.sidebar-brand {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		text-decoration: none;
+		color: inherit;
+		margin-bottom: 1rem;
+		padding-bottom: 1rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+		font-size: 1.5rem;
+		font-weight: 600;
+	}
+
+	.sidebar-brand-text {
+		text-transform: lowercase;
+		letter-spacing: -0.5px;
+		white-space: nowrap;
+	}
+
+	.sidebar-brand-logo {
+		display: block;
+		height: 2rem;
+		width: auto;
+		max-width: 4rem;
+		object-fit: contain;
+		flex-shrink: 0;
+	}
+
 	.header-block {
 		padding: 0 0 1rem 0;
 		margin-bottom: 0.5rem;
 		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-	}
-
-	.trip-name {
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0 0 0.25rem 0;
-		line-height: 1.3;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
-	}
-
-	.trip-meta {
-		font-size: 0.8125rem;
-		color: var(--muted);
-		margin: 0 0 0.25rem 0;
-	}
-
-	.trip-meta.destination {
-		margin-bottom: 0.5rem;
 	}
 
 	.status-pill {

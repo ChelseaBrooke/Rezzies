@@ -30,11 +30,31 @@
 	);
 	const totalCost = $derived(trip?.totalCost ?? 0);
 
+	/** Full Month Day – Full Month (if diff) Day, Full Year */
+	function formatTripDateRange(start: Date | string, end: Date | string): string {
+		const s = typeof start === 'string' ? new Date(start) : start;
+		const e = typeof end === 'string' ? new Date(end) : end;
+		const startMonth = s.getMonth();
+		const startDay = s.getDate();
+		const endMonth = e.getMonth();
+		const endDay = e.getDate();
+		const year = e.getFullYear();
+		const startStr = s.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+		const endStr =
+			endMonth !== startMonth
+				? e.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
+				: String(endDay);
+		return `${startStr} – ${endStr}, ${year}`;
+	}
+
 	const dateRange = $derived(
 		trip?.checkInDate && trip?.checkOutDate
-			? `${formatShort(trip.checkInDate)} – ${formatShort(trip.checkOutDate)}`
+			? formatTripDateRange(trip.checkInDate, trip.checkOutDate)
 			: trip?.checkInDate
-				? formatShort(trip.checkInDate)
+				? (() => {
+						const d = typeof trip.checkInDate === 'string' ? new Date(trip.checkInDate) : trip.checkInDate;
+						return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+					})()
 				: '—'
 	);
 
@@ -144,7 +164,7 @@
 
 	.dashboard-layout {
 		display: grid;
-		grid-template-columns: 1fr 260px;
+		grid-template-columns: 1fr 320px;
 		grid-template-rows: auto auto;
 		grid-template-areas:
 			'hero right'
@@ -204,10 +224,11 @@
 	}
 
 	.trip-hero-name {
-		margin: 0 0 0.25rem 0;
+		margin: 0 0 0.125rem 0;
 		font-size: 2.25rem;
 		font-weight: 700;
 		line-height: 1.2;
+		color: white;
 		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 	}
 
@@ -215,6 +236,7 @@
 		margin: 0;
 		font-size: 0.8125rem;
 		font-weight: 500;
+		color: white;
 		opacity: 0.95;
 	}
 
@@ -228,8 +250,8 @@
 
 	.stats-row {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 0.75rem;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 1rem;
 	}
 
 	.stats-row :global(article) {
