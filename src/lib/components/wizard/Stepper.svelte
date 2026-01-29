@@ -8,16 +8,14 @@
 		optional?: boolean;
 	}
 	
-	let { steps, currentStep }: { steps: Step[]; currentStep: number } = $props();
+	let { steps, currentStep, backHref }: { steps: Step[]; currentStep: number; backHref?: string } = $props();
 	
 	function prevStep() {
+		if (backHref) return;
 		if (currentStep > 0) {
-			// currentStep is 0-indexed (0,1,2,3), URL is 1-indexed (1,2,3,4)
-			// To go back, we need the previous step number, which is currentStep (since we're going from currentStep+1 to currentStep)
-			const previousStepNumber = currentStep; // This gives us the step number (1-indexed) for the previous step
+			const previousStepNumber = currentStep;
 			goto(`/trips/new/step/${previousStepNumber}`);
 		} else {
-			// If on step 1 (index 0), go back to /trips/new
 			goto('/trips/new');
 		}
 	}
@@ -25,10 +23,14 @@
 
 <div class="stepper">
 	<div class="stepper-content">
-		{#if currentStep > 0}
-			<button type="button" class="stepper-back-btn" onclick={prevStep}>
-				← Back
-			</button>
+		{#if currentStep > 0 || backHref}
+			{#if backHref}
+				<a href={backHref} class="stepper-back-btn">← Back to trip</a>
+			{:else}
+				<button type="button" class="stepper-back-btn" onclick={prevStep}>
+					← Back
+				</button>
+			{/if}
 		{/if}
 		<div class="stepper-steps">
 			{#each steps as step, index}

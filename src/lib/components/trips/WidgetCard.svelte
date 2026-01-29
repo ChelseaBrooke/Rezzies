@@ -21,7 +21,7 @@
 		</button>
 	</header>
 	<div class="widget-body">
-		{#if children}
+		{#if children != null && typeof children === 'function'}
 			{@render children()}
 		{/if}
 	</div>

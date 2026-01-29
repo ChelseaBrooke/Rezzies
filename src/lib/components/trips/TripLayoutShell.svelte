@@ -10,18 +10,23 @@
 		user = null,
 		onInvite,
 		showToast,
-		children
+		children = undefined
 	}: {
 		trip: TripForSidebar & { inviteCode?: string };
 		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date }[];
 		user?: { id: string; name: string | null; email: string } | null;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
-		children: import('svelte').Snippet;
+		children?: import('svelte').Snippet;
 	} = $props();
 
 	let sidebarOpen = $state(false);
 	let toastMessage = $state<string | null>(null);
+
+	// Capture callable children so we never invoke undefined (avoids "undefined is not a function")
+	const childrenFn = $derived(
+		children != null && typeof children === 'function' ? children : undefined
+	);
 
 	function openInvite() {
 		sidebarOpen = false;
@@ -68,7 +73,9 @@
 			{/snippet}
 			{#snippet children()}
 				<div class="main-inner">
-					{@render children()}
+					{#if childrenFn}
+						{@render childrenFn()}
+					{/if}
 				</div>
 			{/snippet}
 		</AppFrame>
@@ -105,7 +112,9 @@
 		</header>
 
 		<div class="content">
-			{@render children()}
+			{#if childrenFn}
+				{@render childrenFn()}
+			{/if}
 		</div>
 
 		<nav class="bottom-nav" aria-label="Primary">
@@ -144,7 +153,9 @@
 		padding: 1.5rem;
 		flex: 1;
 		min-height: 0;
-		overflow-y: auto;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.sidebar-mobile {

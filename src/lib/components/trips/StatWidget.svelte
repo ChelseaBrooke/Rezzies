@@ -27,7 +27,7 @@
 				{/each}
 			</div>
 		{/if}
-		{#if children}
+		{#if children != null && typeof children === 'function'}
 			{@render children()}
 		{/if}
 	</div>

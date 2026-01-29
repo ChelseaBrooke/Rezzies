@@ -31,7 +31,7 @@
 	}
 
 	function handleEditBasics() {
-		goto(`/trips/${tripId}/settings#basics`);
+		goto(`/trips/${tripId}/preview-new`);
 		moreOpen = false;
 	}
 
@@ -58,7 +58,7 @@
 	<button type="button" class="action-btn" title="Copy link" onclick={handleShare}>
 		<span class="action-icon">🔗</span>
 	</button>
-	<button type="button" class="action-btn" title="Edit basics" onclick={handleEditBasics}>
+	<button type="button" class="action-btn" title="Preview new trip form" onclick={handleEditBasics}>
 		<span class="action-icon">✏️</span>
 	</button>
 	<div class="more-wrap">

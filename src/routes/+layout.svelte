@@ -20,7 +20,9 @@
 	class:no-padding={$page.url.pathname.startsWith('/trips/new/step')}
 	class:trip-portal-root={$page.url.pathname.match(/^\/trips\/[^\/]+/)}
 >
-	{@render children()}
+	{#if children != null && typeof children === 'function'}
+		{@render children()}
+	{/if}
 </main>
 
 <style>

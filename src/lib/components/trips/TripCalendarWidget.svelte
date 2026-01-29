@@ -30,16 +30,6 @@
 
 	let { tripId = '', placement = 'grid', checkInDate, checkOutDate, activities = [], mealSlots = [] }: Props = $props();
 
-	/** In sidebar mode, which month index (0-based) we're showing */
-	let sidebarMonthIndex = $state(0);
-	const sidebarMonth = $derived(monthsToShow[sidebarMonthIndex] ?? null);
-	function prevMonth() {
-		if (sidebarMonthIndex > 0) sidebarMonthIndex -= 1;
-	}
-	function nextMonth() {
-		if (sidebarMonthIndex < monthsToShow.length - 1) sidebarMonthIndex += 1;
-	}
-
 	/** Week starts Monday per reference */
 	const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -84,6 +74,16 @@
 		}
 		return list;
 	});
+
+	/** In sidebar mode, which month index (0-based) we're showing */
+	let sidebarMonthIndex = $state(0);
+	const sidebarMonth = $derived(monthsToShow[sidebarMonthIndex] ?? null);
+	function prevMonth() {
+		if (sidebarMonthIndex > 0) sidebarMonthIndex -= 1;
+	}
+	function nextMonth() {
+		if (sidebarMonthIndex < monthsToShow.length - 1) sidebarMonthIndex += 1;
+	}
 
 	/** Monday = 0. JS getDay(): Sun=0, Mon=1, ... Sat=6 → (getDay() + 6) % 7 */
 	function getMondayFirstDow(d: Date): number {
@@ -344,16 +344,17 @@
 {/if}
 
 <style>
-	/* Sidebar (upper right): screenshot-style */
+	/* Sidebar (upper right): fill box with minimal gaps */
 	.calendar-sidebar {
 		background: #ffffff;
 		border-radius: 12px;
 		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
-		padding: 1rem;
-		min-width: 280px;
-		height: 360px;
-		min-height: 360px;
-		overflow-y: auto;
+		padding: 0.35rem;
+		width: 100%;
+		min-width: 0;
+		height: 320px;
+		box-sizing: border-box;
+		overflow: hidden;
 		display: flex;
 		flex-direction: column;
 	}
@@ -361,17 +362,44 @@
 	.calendar-sidebar .month-calendar.sidebar-style {
 		background: transparent;
 		padding: 0;
-		min-width: unset;
+		min-width: 0;
+		width: 100%;
+		max-width: 100%;
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 	}
 
 	.calendar-sidebar .month-header {
-		margin-bottom: 0.75rem;
+		margin-bottom: 0.15rem;
+		flex-shrink: 0;
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	.calendar-sidebar .day-headers {
+		display: grid;
+		grid-template-columns: repeat(7, minmax(0, 1fr));
+		gap: 1px;
+		flex-shrink: 0;
+		margin-bottom: 1px;
+		width: 100%;
+		min-width: 0;
+		box-sizing: border-box;
 	}
 
 	.calendar-sidebar .month-title {
-		font-size: 1rem;
+		font-size: 0.8125rem;
 		font-weight: 700;
 		color: #0f172a;
+	}
+
+	.calendar-sidebar .month-chevron-btn {
+		width: 1.25rem;
+		height: 1.25rem;
+		font-size: 0.75rem;
 	}
 
 	.month-chevron-btn {
@@ -406,15 +434,25 @@
 	}
 
 	.calendar-sidebar .days-grid {
-		gap: 3px;
+		display: grid;
+		grid-template-columns: repeat(7, minmax(0, 1fr));
+		gap: 1px;
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+		min-width: 0;
+		align-content: stretch;
+		grid-auto-rows: minmax(0, 1fr);
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell {
 		font-size: 0.8125rem;
 		font-weight: 500;
-		border-radius: 8px;
+		border-radius: 6px;
 		color: #94a3b8;
 		background: transparent;
+		min-width: 0;
+		min-height: 0;
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell.current-month {
@@ -444,10 +482,12 @@
 		color: white;
 	}
 
-	.day-detail-view {
+	.calendar-sidebar .day-detail-view {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.375rem;
+		min-height: 0;
+		overflow-y: auto;
 		animation: day-view-zoom-in 0.45s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
 		transform-origin: center center;
 	}
@@ -466,6 +506,12 @@
 		}
 	}
 
+	.calendar-sidebar .day-detail-back {
+		align-self: flex-start;
+		margin-bottom: 0.125rem;
+		padding: 0.25rem 0;
+		font-size: 0.75rem;
+	}
 	.day-detail-back {
 		align-self: flex-start;
 		margin-bottom: 0.25rem;
@@ -485,41 +531,46 @@
 	}
 
 	.calendar-sidebar .day-detail-title {
-		font-size: 0.9375rem;
+		font-size: 0.875rem;
 		font-weight: 600;
 		color: #0f172a;
-		margin: 0 0 0.5rem 0;
+		margin: 0 0 0.25rem 0;
 	}
 
 	.calendar-sidebar .day-detail-hint,
 	.calendar-sidebar .day-detail-empty {
-		font-size: 0.75rem;
+		font-size: 0.625rem;
 		color: #64748b;
-		margin: 0.5rem 0 0 0;
+		margin: 0.075rem 0 0 0;
+		text-align: center;
+		flex-shrink: 0;
 	}
 
 	.calendar-sidebar .day-detail-section {
-		margin-top: 0.25rem;
+		margin-top: 0.125rem;
 	}
 
 	.calendar-sidebar .day-detail-label {
-		font-size: 0.6875rem;
+		font-size: 0.625rem;
 		font-weight: 600;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
 		color: #64748b;
-		margin-bottom: 0.25rem;
+		margin-bottom: 0.125rem;
 	}
 
 	.calendar-sidebar .day-detail-list {
 		list-style: none;
 		margin: 0;
 		padding: 0;
+		min-height: 0;
+		overflow-y: auto;
+		flex: 1;
 	}
 
 	.calendar-sidebar .day-detail-item {
-		font-size: 0.8125rem;
-		padding: 0.25rem 0;
+		font-size: 0.75rem;
+		padding: 0.125rem 0;
 		border-bottom: 1px solid #f1f5f9;
 		color: #334155;
 	}
@@ -531,38 +582,58 @@
 	.calendar-widget {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.5rem;
+		min-width: 0;
+		min-height: 0;
+		overflow: hidden;
+		background: #f8fafc;
+		border-radius: 0.75rem;
+		padding: 0.75rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+		box-sizing: border-box;
 	}
 
 	.calendars-row {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 1.5rem;
-		align-items: flex-start;
-	}
-
-	.calendar-widget {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		background: #f8fafc;
-		border-radius: 0.75rem;
-		padding: 1rem;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+		gap: 0.75rem;
+		align-items: stretch;
+		min-width: 0;
+		flex: 1;
+		min-height: 0;
 	}
 
 	.month-calendar {
-		min-width: 220px;
+		min-width: 0;
+		flex: 1 1 200px;
+		max-width: 280px;
 		background: #f8fafc;
-		border-radius: 0.75rem;
-		padding: 1rem;
+		border-radius: 0.5rem;
+		padding: 0.5rem;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		box-sizing: border-box;
+	}
+
+	.calendar-widget .days-grid {
+		flex: 1;
+		min-height: 0;
+		grid-auto-rows: minmax(0, 1fr);
+		align-content: stretch;
+	}
+
+	.calendar-widget .day-cell {
+		aspect-ratio: auto;
+		min-height: 1.5rem;
 	}
 
 	.month-header {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		margin-bottom: 0.75rem;
+		margin-bottom: 0.35rem;
+		flex-shrink: 0;
 	}
 
 	.month-chevron {
@@ -587,8 +658,9 @@
 	.day-headers {
 		display: grid;
 		grid-template-columns: repeat(7, 1fr);
-		gap: 4px;
-		margin-bottom: 6px;
+		gap: 1px;
+		margin-bottom: 2px;
+		flex-shrink: 0;
 	}
 
 	.day-header {
@@ -602,19 +674,21 @@
 	.days-grid {
 		display: grid;
 		grid-template-columns: repeat(7, 1fr);
-		gap: 4px;
+		gap: 1px;
+		min-width: 0;
 	}
 
 	.day-cell {
 		aspect-ratio: 1;
 		min-width: 0;
+		min-height: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 0.8125rem;
+		font-size: 0.75rem;
 		font-weight: 500;
 		border: none;
-		border-radius: 0.5rem;
+		border-radius: 0.375rem;
 		background: transparent;
 		color: #94a3b8;
 		cursor: default;
@@ -648,15 +722,21 @@
 
 	.day-detail {
 		border-top: 1px solid rgba(0, 0, 0, 0.08);
-		padding-top: 1rem;
-		margin-top: 0.25rem;
+		padding-top: 0.5rem;
+		margin-top: 0.125rem;
+		min-height: 0;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		flex-shrink: 0;
 	}
 
 	.day-detail-title {
-		font-size: 0.9375rem;
+		font-size: 0.875rem;
 		font-weight: 600;
 		color: #0f172a;
-		margin: 0 0 0.75rem 0;
+		margin: 0 0 0.5rem 0;
+		flex-shrink: 0;
 	}
 
 	.calendar-empty-msg {
@@ -680,7 +760,9 @@
 	.day-detail-hint {
 		font-size: 0.75rem;
 		color: #64748b;
-		margin: 0.5rem 0 0 0;
+		margin: 0.25rem 0 0 0;
+		text-align: center;
+		flex-shrink: 0;
 	}
 
 	.day-detail-section {
@@ -705,16 +787,20 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
+		min-height: 0;
+		overflow-y: auto;
+		max-height: 12rem;
 	}
 
 	.day-detail-item {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
-		gap: 0.5rem;
+		gap: 0.375rem;
 		font-size: 0.8125rem;
-		padding: 0.375rem 0;
+		padding: 0.25rem 0;
 		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+		min-width: 0;
 	}
 
 	.day-detail-item:last-child {
@@ -724,16 +810,23 @@
 	.item-title {
 		font-weight: 600;
 		color: #334155;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.item-meta {
 		color: #64748b;
 		font-size: 0.75rem;
+		flex-shrink: 0;
 	}
 
 	.item-meta.menu {
 		width: 100%;
 		margin-top: 0.125rem;
 		font-style: italic;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 </style>

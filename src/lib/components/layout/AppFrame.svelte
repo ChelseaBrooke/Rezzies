@@ -10,13 +10,13 @@
 </script>
 
 <div class="app-frame">
-	{#if sidebar}
+	{#if sidebar != null && typeof sidebar === 'function'}
 		<aside class="app-frame-sidebar">
 			{@render sidebar()}
 		</aside>
 	{/if}
 	<div class="app-frame-main">
-		{#if children}
+		{#if children != null && typeof children === 'function'}
 			{@render children()}
 		{/if}
 	</div>
@@ -26,7 +26,8 @@
 	.app-frame {
 		display: flex;
 		width: 100%;
-		min-height: 100vh;
+		height: 100vh;
+		overflow: hidden;
 		/* No rounded box here: sidebar blends into background; only main pane is the soft-edge box */
 	}
 
@@ -35,7 +36,8 @@
 		width: 240px;
 		display: flex;
 		flex-direction: column;
-		min-height: 100%;
+		max-height: 100vh;
+		overflow-y: auto;
 		/* No soft edges; blends into shell background */
 	}
 

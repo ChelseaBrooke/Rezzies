@@ -16,7 +16,7 @@
 <article class="dashboard-card" class:span-2={span === 2}>
 	<h2 class="card-title">{title}</h2>
 	<div class="card-body">
-		{#if children}
+		{#if children != null && typeof children === 'function'}
 			{@render children()}
 		{/if}
 	</div>

@@ -20,7 +20,7 @@
 			{/each}
 		</div>
 		<div class="table-body">
-			{#if children}
+			{#if children != null && typeof children === 'function'}
 				{@render children()}
 			{/if}
 		</div>

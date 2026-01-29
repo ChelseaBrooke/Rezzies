@@ -93,8 +93,18 @@
 			</div>
 		</section>
 
-		<!-- Upper-right: stat cards + calendar -->
+		<!-- Upper-right: calendar at top, then stat cards + promo -->
 		<aside class="dashboard-right">
+			<div class="calendar-wrap">
+				<TripCalendarWidget
+					tripId={trip?.id}
+					placement="sidebar"
+					checkInDate={trip?.checkInDate ?? ''}
+					checkOutDate={trip?.checkOutDate ?? ''}
+					activities={trip?.activities ?? []}
+					mealSlots={trip?.mealSlots ?? []}
+				/>
+			</div>
 			<div class="stats-row">
 				<StatWidget
 					title="Guests"
@@ -107,16 +117,6 @@
 					value={totalCost > 0 ? `$${paidTotal.toFixed(0)} / $${totalCost.toFixed(0)}` : '—'}
 					subtext={unpaidCount > 0 ? `${unpaidCount} unpaid` : 'All set'}
 					barHeights={paymentsBars}
-				/>
-			</div>
-			<div class="calendar-wrap">
-				<TripCalendarWidget
-					tripId={trip?.id}
-					placement="sidebar"
-					checkInDate={trip?.checkInDate ?? ''}
-					checkOutDate={trip?.checkOutDate ?? ''}
-					activities={trip?.activities ?? []}
-					mealSlots={trip?.mealSlots ?? []}
 				/>
 			</div>
 			<div class="promo-wrap">
@@ -156,51 +156,50 @@
 
 <style>
 	.dashboard-page {
-		padding: 1.5rem;
-		min-height: 100%;
+		padding: 0;
+		height: 100%;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
 	}
 
 	.dashboard-layout {
 		display: grid;
-		grid-template-columns: 1fr 320px;
-		grid-template-rows: auto auto;
+		grid-template-columns: 1fr 1fr;
+		grid-template-rows: 50% 1fr;
 		grid-template-areas:
 			'hero right'
 			'bottom-left right';
 		column-gap: 1.25rem;
-		row-gap: 0;
+		row-gap: 1.25rem;
 		flex: 1;
 		min-height: 0;
-		align-items: start;
+		align-items: stretch;
 	}
 
 	.trip-hero {
 		grid-area: hero;
-		min-height: 450px;
-		max-height: 600px;
+		min-height: 0;
 		width: 100%;
 		border-radius: 12px;
 		overflow: hidden;
 		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 		margin-bottom: 0;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.trip-hero-image-wrap {
 		position: relative;
 		width: 100%;
-		height: 100%;
-		min-height: 450px;
-		max-height: 600px;
+		flex: 1;
+		min-height: 0;
 		background: #e2e8f0;
 	}
 
 	.trip-hero-image {
 		width: 100%;
 		height: 100%;
-		min-height: 450px;
-		max-height: 600px;
 		object-fit: cover;
 		display: block;
 	}
@@ -208,8 +207,6 @@
 	.trip-hero-placeholder {
 		width: 100%;
 		height: 100%;
-		min-height: 450px;
-		max-height: 600px;
 		background: linear-gradient(135deg, #94a3b8 0%, #cbd5e1 100%);
 	}
 
@@ -244,6 +241,8 @@
 		grid-area: right;
 		display: flex;
 		flex-direction: column;
+		align-items: flex-end;
+		justify-content: flex-start;
 		gap: 1rem;
 		min-width: 0;
 	}
@@ -260,6 +259,15 @@
 
 	.calendar-wrap {
 		flex-shrink: 0;
+		align-self: flex-end;
+		width: calc((100% - 1rem) / 2);
+		min-width: 0;
+	}
+
+	.stats-row,
+	.promo-wrap {
+		align-self: stretch;
+		width: 100%;
 	}
 
 	.promo-wrap {
