@@ -26,7 +26,9 @@
 		user={data.user}
 		onInvite={handleInvite}
 	>
-		{@render children()}
+		{#snippet children()}
+			{@render children()}
+		{/snippet}
 	</TripLayoutShell>
 </div>
 

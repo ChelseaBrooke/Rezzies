@@ -238,7 +238,7 @@
 			left: 0;
 			top: 0;
 			bottom: 0;
-			width: 280px;
+			width: 240px;
 			max-width: 85vw;
 			background: linear-gradient(to bottom, #cfe4ff 0%, #bbd9ff 100%);
 			box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);

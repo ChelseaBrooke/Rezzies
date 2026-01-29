@@ -32,7 +32,7 @@
 
 	.app-frame-sidebar {
 		flex-shrink: 0;
-		width: 280px;
+		width: 240px;
 		display: flex;
 		flex-direction: column;
 		min-height: 100%;

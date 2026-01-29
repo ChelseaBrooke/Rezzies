@@ -49,15 +49,8 @@
 
 <aside class="sidebar">
 	<div class="sidebar-overlay" aria-hidden="true"></div>
-	<!-- Trip Header Block (unified profile card) -->
+	<!-- Trip Header Block (unified profile card, no photo) -->
 	<div class="trip-profile-card">
-		<div class="cover-wrap">
-			{#if trip.listingCoverPhoto}
-				<img src={trip.listingCoverPhoto} alt="" class="cover-img" />
-			{:else}
-				<div class="cover-fallback"></div>
-			{/if}
-		</div>
 		<h1 class="trip-name">{trip.name}</h1>
 		{#if dateRange}
 			<p class="trip-meta">{dateRange}</p>
@@ -123,26 +116,6 @@
 		padding: 0 0 1rem 0;
 		margin-bottom: 0.5rem;
 		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-	}
-
-	.cover-wrap {
-		width: 100%;
-		aspect-ratio: 16 / 10;
-		border-radius: var(--radius-md, 0.5rem);
-		overflow: hidden;
-		margin-bottom: 0.75rem;
-	}
-
-	.cover-img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-
-	.cover-fallback {
-		width: 100%;
-		height: 100%;
-		background: linear-gradient(135deg, rgba(30, 58, 138, 0.15) 0%, rgba(234, 88, 12, 0.08) 100%);
 	}
 
 	.trip-name {
