@@ -9,11 +9,13 @@
 	let {
 		trip,
 		allTrips,
+		user = null,
 		onInvite,
 		showToast
 	}: {
 		trip: TripForSidebar & { inviteCode?: string };
 		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date }[];
+		user?: { id: string; name: string | null; email: string } | null;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
 	} = $props();
@@ -46,8 +48,9 @@
 </script>
 
 <aside class="sidebar">
-	<!-- Trip Header Block -->
-	<div class="header-block">
+	<div class="sidebar-overlay" aria-hidden="true"></div>
+	<!-- Trip Header Block (unified profile card) -->
+	<div class="trip-profile-card">
 		<div class="cover-wrap">
 			{#if trip.listingCoverPhoto}
 				<img src={trip.listingCoverPhoto} alt="" class="cover-img" />
@@ -108,18 +111,18 @@
 	.sidebar {
 		display: flex;
 		flex-direction: column;
-		width: 280px;
+		width: 100%;
 		min-height: 100%;
-		background: white;
-		border-radius: var(--radius-2xl, 1rem);
-		border: 1px solid var(--border);
-		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+		/* Blends into shell background; no soft edges */
+		background: transparent;
 		overflow: hidden;
+		padding: 1.25rem;
 	}
 
 	.header-block {
-		padding: 1rem;
-		border-bottom: 1px solid var(--border);
+		padding: 0 0 1rem 0;
+		margin-bottom: 0.5rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
 	}
 
 	.cover-wrap {
@@ -196,21 +199,92 @@
 	}
 
 	.actions-row {
-		padding: 0.5rem 1rem;
-		border-bottom: 1px solid var(--border);
+		padding: 0.5rem 0;
+		margin-bottom: 0.5rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
 	}
 
 	.nav {
 		flex: 1;
-		padding: 0.75rem 0.5rem;
+		padding: 0.5rem 0;
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.75rem;
 		overflow-y: auto;
 	}
 
+	.extension-card {
+		background: rgba(255, 255, 255, 0.7);
+		border-radius: 1rem;
+		padding: 1rem;
+		margin: 0.5rem 0;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+	}
+
+	.extension-title {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: #0f172a;
+		margin: 0 0 0.25rem 0;
+	}
+
+	.extension-subtitle {
+		font-size: 0.8125rem;
+		color: #64748b;
+		margin: 0 0 0.75rem 0;
+		line-height: 1.35;
+	}
+
+	.extension-cta {
+		display: inline-block;
+		padding: 0.5rem 1rem;
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: white;
+		background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+		border-radius: 0.5rem;
+		text-decoration: none;
+		transition: opacity 0.2s ease;
+	}
+
+	.extension-cta:hover {
+		opacity: 0.95;
+	}
+
 	.footer {
-		padding: 0.75rem 0.5rem;
-		border-top: 1px solid var(--border);
+		padding: 0.75rem 0 0 0;
+		border-top: 1px solid rgba(255, 255, 255, 0.4);
+		margin-top: auto;
+	}
+
+	.user-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem 0;
+		margin-top: 0.5rem;
+	}
+
+	.user-avatar {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.9);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #334155;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+	}
+
+	.user-name {
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: #334155;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 </style>

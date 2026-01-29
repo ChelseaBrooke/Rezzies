@@ -1,303 +1,340 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { goto } from '$app/navigation';
+	import StatWidget from '$lib/components/trips/StatWidget.svelte';
+	import WidgetCard from '$lib/components/trips/WidgetCard.svelte';
+	import TableWidget from '$lib/components/trips/TableWidget.svelte';
+	import PromoWidget from '$lib/components/trips/PromoWidget.svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	const trip = $derived(data.trip);
 	const memberCount = $derived(trip?.members?.length ?? 0);
-	const totalBeds = $derived(
-		trip?.rooms?.reduce((sum, r) => sum + (r.beds?.length ?? 0), 0) ?? 0
+	const roomCount = $derived(trip?.rooms?.length ?? 0);
+	const totalBedSlots = $derived(
+		trip?.rooms?.reduce((sum, r) => sum + (r.beds?.reduce((s, b) => s + (b.capacitySlots ?? 1), 0) ?? 0), 0) ?? 0
 	);
 	const activityCount = $derived(trip?.activities?.length ?? 0);
-	const unpaidCount = $derived(
-		trip?.invoices?.filter((i) => i.status === 'due').length ?? 0
+	const nextActivities = $derived(
+		(trip?.activities ?? [])
+			.slice()
+			.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+			.slice(0, 5)
+	);
+	const unpaidCount = $derived((trip?.invoices?.filter((i) => i.status === 'due') ?? []).length);
+	const paidTotal = $derived(
+		(trip?.invoices?.filter((i) => i.status === 'paid') ?? []).reduce((s, i) => s + i.totalAmount, 0)
+	);
+	const dueTotal = $derived(
+		(trip?.invoices?.filter((i) => i.status === 'due') ?? []).reduce((s, i) => s + i.totalAmount, 0)
+	);
+	const totalCost = $derived(trip?.totalCost ?? 0);
+
+	const dateRange = $derived(
+		trip?.checkInDate && trip?.checkOutDate
+			? `${formatShort(trip.checkInDate)} – ${formatShort(trip.checkOutDate)}`
+			: trip?.checkInDate
+				? formatShort(trip.checkInDate)
+				: '—'
 	);
 
-	const nextActions = $derived.by(() => {
-		const actions: { label: string; href: string }[] = [];
-		if (data.isHost) {
-			if (memberCount === 0) actions.push({ label: 'Invite guests', href: `/trips/${trip?.id}/guests` });
-			if ((trip?.rooms?.length ?? 0) === 0)
-				actions.push({ label: 'Add rooms', href: `/trips/${trip?.id}/rooms` });
-			if (unpaidCount > 0)
-				actions.push({ label: 'Review payments', href: `/trips/${trip?.id}/payments` });
-			actions.push({ label: 'Edit trip basics', href: `/trips/${trip?.id}/settings#basics` });
-		} else {
-			if (!data.userRsvp) actions.push({ label: 'RSVP & details', href: `/trips/${trip?.id}/rsvp` });
-			actions.push({ label: 'View itinerary', href: `/trips/${trip?.id}/itinerary` });
-			if ((data.userInvoices?.length ?? 0) > 0)
-				actions.push({ label: 'View invoice', href: `/trips/${trip?.id}/invoice` });
-		}
-		return actions;
-	});
+	/** Micro bar heights (visual only), derived from counts or placeholder */
+	const guestsBars = $derived([memberCount ? Math.min(100, memberCount * 15) : 40, 60, 75, 50, 85, 70, 55]);
+	const paymentsBars = $derived(
+		totalCost > 0 ? [65, 80, 70, 90, 75, 85, 70] : [30, 45, 40, 50, 35, 55, 40]
+	);
+	const datesBars = $derived([70, 65, 80, 75, 90, 85, 78]);
+
+	function formatShort(d: Date | string) {
+		const date = typeof d === 'string' ? new Date(d) : d;
+		return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' });
+	}
+
+	function formatDateTime(d: Date | string) {
+		const date = typeof d === 'string' ? new Date(d) : d;
+		return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+	}
 </script>
 
-<div class="overview-page">
-	<div class="page-header">
-		<h1>Overview</h1>
-		<p class="subtitle">Summary and next steps for this trip</p>
-	</div>
-
-	<div class="summary-grid">
-		<!-- Trip details card -->
-		<div class="card details-card">
-			<h2 class="card-title">Trip details</h2>
-			<dl class="details-list">
-				<dt>Dates</dt>
-				<dd>
-					{trip?.checkInDate
-						? new Date(trip.checkInDate).toLocaleDateString(undefined, {
-								month: 'short',
-								day: 'numeric',
-								year: 'numeric'
-							})
-						: '—'}
-					–
-					{trip?.checkOutDate
-						? new Date(trip.checkOutDate).toLocaleDateString(undefined, {
-								month: 'short',
-								day: 'numeric',
-								year: 'numeric'
-							})
-						: '—'}
-				</dd>
-				<dt>Location</dt>
-				<dd>{trip?.location ?? '—'}</dd>
-				<dt>Status</dt>
-				<dd>
-					<span class="status-pill" class:draft={!trip?.isPublished} class:live={trip?.isPublished}>
-						{trip?.isPublished ? 'Live' : 'Draft'}
-					</span>
-				</dd>
-			</dl>
+<div class="dashboard-page">
+	<!-- Top bar: search (left), dates + Edit (right) -->
+	<header class="dashboard-topbar">
+		<div class="search-pill">
+			<span class="search-placeholder">Search in this trip…</span>
 		</div>
-
-		<!-- Quick stats -->
-		<div class="card stats-card">
-			<h2 class="card-title">Quick stats</h2>
-			<div class="stats-row">
-				<div class="stat">
-					<span class="stat-value">{memberCount}</span>
-					<span class="stat-label">Guests</span>
-				</div>
-				<div class="stat">
-					<span class="stat-value">{totalBeds}</span>
-					<span class="stat-label">Beds</span>
-				</div>
-				<div class="stat">
-					<span class="stat-value">{activityCount}</span>
-					<span class="stat-label">Itinerary</span>
-				</div>
-				<div class="stat">
-					<span class="stat-value">{unpaidCount > 0 ? unpaidCount : '—'}</span>
-					<span class="stat-label">Outstanding</span>
-				</div>
-			</div>
+		<div class="topbar-right">
+			<span class="dates-pill">{dateRange}</span>
+			<a href="/trips/{trip?.id}/settings" class="edit-btn">Edit</a>
 		</div>
+	</header>
 
-		<!-- Next actions -->
-		<div class="card actions-card">
-			<h2 class="card-title">Next actions</h2>
-			<ul class="actions-list">
-				{#each nextActions as action}
-					<li>
-						<a href={action.href} class="action-link">{action.label}</a>
-					</li>
-				{/each}
-				{#if nextActions.length === 0}
-					<li class="muted">You’re all set for now.</li>
-				{/if}
-			</ul>
-		</div>
-	</div>
+	<!-- Widget grid (12-column feel, gap-5) -->
+	<div class="widget-grid">
+		<!-- Row 1: 3 stat widgets -->
+		<StatWidget
+			title="Guests"
+			value={memberCount}
+			subtext={memberCount + ' invited'}
+			barHeights={guestsBars}
+		/>
+		<StatWidget
+			title="Payments"
+			value={totalCost > 0 ? `$${paidTotal.toFixed(0)} / $${totalCost.toFixed(0)}` : '—'}
+			subtext={unpaidCount > 0 ? `${unpaidCount} unpaid` : 'All set'}
+			barHeights={paymentsBars}
+		/>
+		<StatWidget
+			title="Trip dates"
+			value={dateRange}
+			subtext={trip?.location ?? '—'}
+			barHeights={datesBars}
+		/>
 
-	<!-- Members section (compact) -->
-	{#if trip?.members?.length > 0}
-		<div class="card">
-			<h2 class="card-title">Members</h2>
-			<div class="members-list">
-				{#each trip.members as member}
-					<div class="member-card">
-						<div class="member-avatar">
-							{member.user?.name?.[0]?.toUpperCase() ?? member.user?.email?.[0]?.toUpperCase() ?? '?'}
+		<!-- Row 2: Quick Chat style (list) + Upcoming activities / Guest RSVP table -->
+		<WidgetCard title="Quick chat" span={2}>
+			<div class="list-widget">
+				{#if trip?.members?.length > 0}
+					{#each trip.members.slice(0, 3) as member}
+						<div class="list-row">
+							<div class="list-avatar">
+								{member.user?.name?.[0]?.toUpperCase() ?? member.user?.email?.[0]?.toUpperCase() ?? '?'}
+							</div>
+							<div class="list-content">
+								<span class="list-name">{member.user?.name ?? member.user?.email ?? '—'}</span>
+								<span class="list-meta">Trip member</span>
+							</div>
 						</div>
-						<span class="member-name">{member.user?.name ?? member.user?.email ?? '—'}</span>
-						<span class="member-role">{member.role}</span>
+					{/each}
+				{:else}
+					<div class="list-row">
+						<div class="list-avatar">—</div>
+						<div class="list-content">
+							<span class="list-name">No messages yet</span>
+							<span class="list-meta">Invite guests to get started</span>
+						</div>
+					</div>
+				{/if}
+			</div>
+		</WidgetCard>
+
+		<TableWidget title="Upcoming activities" headers={['Activity', 'Date', 'Status']} span={1}>
+			{#if nextActivities.length > 0}
+				{#each nextActivities as activity}
+					<div class="table-row">
+						<span class="cell">{activity.title}</span>
+						<span class="cell">{formatShort(activity.date)}</span>
+						<span class="cell status-pill">Upcoming</span>
 					</div>
 				{/each}
-			</div>
-		</div>
-	{/if}
+			{:else}
+				<div class="table-row muted">
+					<span class="cell">No activities yet</span>
+					<span class="cell">—</span>
+					<span class="cell">—</span>
+				</div>
+			{/if}
+		</TableWidget>
+
+		<!-- Row 3: Itinerary/Payments table (wide) + Invite friends promo -->
+		<TableWidget title="Itinerary" headers={['Activity', 'Date & time', 'Status']} span={2}>
+			{#if nextActivities.length > 0}
+				{#each nextActivities as activity}
+					<div class="table-row">
+						<span class="cell">{activity.title}</span>
+						<span class="cell">{formatDateTime(activity.date)}</span>
+						<span class="cell status-pill">Upcoming</span>
+					</div>
+				{/each}
+			{:else}
+				<div class="table-row muted">
+					<span class="cell">No activities added yet</span>
+					<span class="cell">—</span>
+					<span class="cell">—</span>
+				</div>
+			{/if}
+		</TableWidget>
+
+		<PromoWidget
+			title="Invite friends"
+			subtitle="Share your trip and get everyone on the same page."
+			ctaLabel="Invite now"
+			ctaHref="/trips/{trip?.id}/guests"
+		/>
+	</div>
 </div>
 
 <style>
-	.overview-page {
-		padding: 0;
+	.dashboard-page {
+		padding: 1.5rem;
+		min-height: 100%;
 	}
 
-	.page-header {
-		margin-bottom: 1.5rem;
-	}
-
-	.page-header h1 {
-		font-size: 1.5rem;
-		font-weight: 600;
-		margin: 0 0 0.25rem 0;
-	}
-
-	.subtitle {
-		font-size: 0.875rem;
-		color: var(--muted);
-		margin: 0;
-	}
-
-	.summary-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	.dashboard-topbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 		gap: 1rem;
-		margin-bottom: 1.5rem;
+		margin-bottom: 1.25rem;
+		flex-wrap: wrap;
 	}
 
-	.card {
+	.search-pill {
+		height: 44px;
+		min-width: 200px;
+		flex: 1;
+		max-width: 320px;
 		background: white;
-		border-radius: var(--radius-lg, 1rem);
-		border: 1px solid var(--border);
-		padding: 1.25rem;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+		border-radius: 0.75rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+		border: 1px solid rgba(0, 0, 0, 0.05);
+		display: flex;
+		align-items: center;
+		padding: 0 1rem;
 	}
 
-	.card-title {
-		font-size: 1rem;
-		font-weight: 600;
-		margin: 0 0 1rem 0;
-		color: var(--text);
-	}
-
-	.details-list {
-		margin: 0;
+	.search-placeholder {
 		font-size: 0.875rem;
+		color: #94a3b8;
 	}
 
-	.details-list dt {
-		color: var(--muted);
-		margin-top: 0.5rem;
-	}
-
-	.details-list dt:first-child {
-		margin-top: 0;
-	}
-
-	.details-list dd {
-		margin: 0.25rem 0 0 0;
-	}
-
-	.status-pill {
-		display: inline-block;
-		font-size: 0.75rem;
-		font-weight: 500;
-		padding: 0.25rem 0.5rem;
-		border-radius: 9999px;
-	}
-
-	.status-pill.draft {
-		background: var(--border);
-		color: var(--muted);
-	}
-
-	.status-pill.live {
-		background: rgba(34, 197, 94, 0.15);
-		color: #15803d;
-	}
-
-	.stats-row {
+	.topbar-right {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 1rem;
-	}
-
-	.stat {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.stat-value {
-		font-size: 1.25rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-
-	.stat-label {
-		font-size: 0.75rem;
-		color: var(--muted);
-	}
-
-	.actions-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-	}
-
-	.actions-list li {
-		margin-bottom: 0.5rem;
-	}
-
-	.actions-list li:last-child {
-		margin-bottom: 0;
-	}
-
-	.action-link {
-		font-size: 0.9375rem;
-		color: var(--primary);
-		text-decoration: none;
-	}
-
-	.action-link:hover {
-		text-decoration: underline;
-	}
-
-	.actions-list .muted {
-		color: var(--muted);
-		font-size: 0.875rem;
-	}
-
-	.members-list {
-		display: flex;
-		flex-wrap: wrap;
+		align-items: center;
 		gap: 0.75rem;
 	}
 
-	.member-card {
+	.dates-pill {
+		height: 44px;
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 0.75rem;
-		background: var(--bg);
-		border-radius: var(--radius-md, 0.5rem);
+		padding: 0 1rem;
+		background: white;
+		border-radius: 0.75rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 		font-size: 0.875rem;
+		font-weight: 500;
+		color: #334155;
 	}
 
-	.member-avatar {
-		width: 32px;
-		height: 32px;
+	.edit-btn {
+		height: 44px;
+		display: flex;
+		align-items: center;
+		padding: 0 1rem;
+		background: white;
+		border-radius: 0.75rem;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: #334155;
+		text-decoration: none;
+	}
+
+	.edit-btn:hover {
+		background: #f8fafc;
+	}
+
+	.widget-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 1.25rem;
+	}
+
+	.dashboard-topbar {
+		min-height: 44px;
+	}
+
+	@media (max-width: 1024px) {
+		.widget-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (max-width: 640px) {
+		.widget-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	.list-widget {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+	}
+
+	.list-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem 0;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+	}
+
+	.list-row:last-child {
+		border-bottom: none;
+	}
+
+	.list-avatar {
+		width: 36px;
+		height: 36px;
 		border-radius: 50%;
-		background: linear-gradient(135deg, var(--primary) 0%, var(--primary-accent, #ea580c) 100%);
+		background: linear-gradient(135deg, #93c5fd 0%, #3b82f6 100%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: white;
-		font-weight: 600;
 		font-size: 0.875rem;
+		font-weight: 600;
+		color: white;
+		flex-shrink: 0;
 	}
 
-	.member-name {
-		font-weight: 500;
+	.list-content {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		min-width: 0;
 	}
 
-	.member-role {
-		color: var(--muted);
+	.list-name {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #0f172a;
+	}
+
+	.list-meta {
 		font-size: 0.75rem;
-		text-transform: capitalize;
+		color: #64748b;
+	}
+
+	.table-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr auto;
+		gap: 0.5rem;
+		align-items: center;
+		padding: 0.5rem 0;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+		font-size: 0.8125rem;
+	}
+
+	.table-row:last-child {
+		border-bottom: none;
+	}
+
+	.table-row.muted .cell {
+		color: #94a3b8;
+	}
+
+	.cell {
+		color: #334155;
+	}
+
+	.status-pill {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding: 0.2rem 0.4rem;
+		border-radius: 9999px;
+		background: #e0f2fe;
+		color: #0369a1;
 	}
 </style>

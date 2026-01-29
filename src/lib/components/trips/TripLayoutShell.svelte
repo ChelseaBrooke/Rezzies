@@ -1,17 +1,20 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import AppFrame from '$lib/components/layout/AppFrame.svelte';
 	import TripSidebar from './TripSidebar.svelte';
 	import type { TripForSidebar } from '$lib/trips/types.js';
 
 	let {
 		trip,
 		allTrips,
+		user = null,
 		onInvite,
 		showToast,
 		children
 	}: {
 		trip: TripForSidebar & { inviteCode?: string };
 		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date }[];
+		user?: { id: string; name: string | null; email: string } | null;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
 		children: import('svelte').Snippet;
@@ -49,19 +52,29 @@
 </script>
 
 <div class="shell">
-	<!-- Desktop: sidebar always visible -->
-	<div class="sidebar-desktop">
-		{#if trip}
-			<TripSidebar
-				{trip}
-				{allTrips}
-				onInvite={openInvite}
-				showToast={showToastLocal}
-			/>
-		{/if}
+	<!-- Desktop: AppFrame wraps sidebar + main (single rounded container) -->
+	<div class="desktop-wrap">
+		<AppFrame>
+			{#snippet sidebar()}
+				{#if trip}
+					<TripSidebar
+						{trip}
+						{allTrips}
+						{user}
+						onInvite={openInvite}
+						showToast={showToastLocal}
+					/>
+				{/if}
+			{/snippet}
+			{#snippet children()}
+				<div class="main-inner">
+					{@render children()}
+				</div>
+			{/snippet}
+		</AppFrame>
 	</div>
 
-	<!-- Mobile: hamburger + drawer -->
+	<!-- Mobile: hamburger + drawer (no AppFrame) -->
 	<div class="sidebar-mobile" class:open={sidebarOpen}>
 		<div class="drawer-backdrop" onclick={() => (sidebarOpen = false)} role="presentation"></div>
 		<div class="drawer-panel">
@@ -69,6 +82,7 @@
 				<TripSidebar
 					{trip}
 					{allTrips}
+					{user}
 					onInvite={openInvite}
 					showToast={showToastLocal}
 				/>
@@ -76,9 +90,8 @@
 		</div>
 	</div>
 
-	<!-- Main content -->
-	<main class="main">
-		<!-- Mobile header with hamburger -->
+	<!-- Mobile: main content full width -->
+	<main class="main main-mobile">
 		<header class="mobile-header">
 			<button
 				type="button"
@@ -95,7 +108,6 @@
 			{@render children()}
 		</div>
 
-		<!-- Mobile bottom nav -->
 		<nav class="bottom-nav" aria-label="Primary">
 			{#each mobileTabs as tab}
 				<a
@@ -117,24 +129,22 @@
 
 <style>
 	.shell {
-		display: flex;
 		min-height: 100vh;
-		background: var(--bg);
-		background-image: radial-gradient(
-			ellipse 80% 50% at 0% 0%,
-			rgba(30, 58, 138, 0.04) 0%,
-			transparent 50%
-		);
+		background: #e9f1fb;
 		position: relative;
+		padding: 0;
 	}
 
-	.sidebar-desktop {
-		flex-shrink: 0;
-		position: sticky;
-		top: 0;
-		height: 100vh;
+	.desktop-wrap {
+		display: block;
+		width: 100%;
+	}
+
+	.main-inner {
+		padding: 1.5rem;
+		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
-		padding: 1rem;
 	}
 
 	.sidebar-mobile {
@@ -142,8 +152,8 @@
 	}
 
 	.main {
+		display: none;
 		flex: 1;
-		display: flex;
 		flex-direction: column;
 		min-width: 0;
 		padding-bottom: 4rem;
@@ -155,7 +165,9 @@
 
 	.content {
 		flex: 1;
-		padding: 1.5rem;
+		min-width: 0;
+		padding: 0;
+		width: 100%;
 	}
 
 	.bottom-nav {
@@ -189,8 +201,12 @@
 	}
 
 	@media (max-width: 1024px) {
-		.sidebar-desktop {
+		.desktop-wrap {
 			display: none;
+		}
+
+		.main {
+			display: flex;
 		}
 
 		.sidebar-mobile {
@@ -224,7 +240,7 @@
 			bottom: 0;
 			width: 280px;
 			max-width: 85vw;
-			background: white;
+			background: linear-gradient(to bottom, #cfe4ff 0%, #bbd9ff 100%);
 			box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
 			transform: translateX(-100%);
 			transition: transform 0.25s ease;

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
-	import RezziesHeader from '$lib/components/layout/RezziesHeader.svelte';
 	import TripLayoutShell from '$lib/components/trips/TripLayoutShell.svelte';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -15,20 +14,16 @@
 		}))
 	);
 
-	let inviteModalOpen = $state(false);
-
 	function handleInvite() {
-		inviteModalOpen = true;
-		// Child pages (e.g. guests) can handle modal; for now just navigate to guests
 		import('$app/navigation').then(({ goto }) => goto(`/trips/${data.trip.id}/guests?invite=1`));
 	}
 </script>
 
 <div class="trip-portal">
-	<RezziesHeader />
 	<TripLayoutShell
 		trip={data.trip}
 		allTrips={allTrips}
+		user={data.user}
 		onInvite={handleInvite}
 	>
 		{@render children()}
@@ -42,12 +37,10 @@
 		flex-direction: column;
 	}
 
-	.trip-portal :global(.rezzies-header) {
-		flex-shrink: 0;
-	}
-
 	.trip-portal :global(.shell) {
 		flex: 1;
 		min-height: 0;
+		display: flex;
+		flex-direction: column;
 	}
 </style>
