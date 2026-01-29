@@ -878,14 +878,14 @@
 	
 	.bed-types-dropdown-menu {
 		position: fixed;
-		border: 1px solid #718096;
-		background: #1a202c;
+		border: 1px solid #e5e7eb;
+		background: #fff;
 		padding: 0.75rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
 		z-index: 9999;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 		max-height: 300px;
 		overflow-y: auto;
 		overflow-x: hidden;
@@ -893,23 +893,23 @@
 		min-width: 220px;
 		max-width: 220px;
 		box-sizing: border-box;
-		color: white;
+		color: #111;
 	}
 	
 	.bed-types-dropdown-menu * {
-		color: white;
+		color: #111;
 	}
 	
 	.bed-checkbox-label {
-		color: white;
+		color: #111;
 	}
 	
 	.bed-checkbox-label .bed-label {
-		color: white;
+		color: #111;
 	}
 	
 	.bed-quantity-display {
-		color: white;
+		color: #111;
 	}
 	
 	.room-description-input-inline {
