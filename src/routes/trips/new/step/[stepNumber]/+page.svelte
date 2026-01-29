@@ -4,6 +4,7 @@
 	import { tripDraft } from '$lib/stores/tripDraft.js';
 	import Step1 from './Step1.svelte';
 	import Step2 from './Step2.svelte';
+	import ActivitiesStep from './ActivitiesStep.svelte';
 	import Step3 from './Step3.svelte';
 	import Step4 from './Step4.svelte';
 	
@@ -34,7 +35,7 @@
 	}
 	
 	function nextStep() {
-		if (stepNumber() < 4) {
+		if (stepNumber() < 5) {
 			goto(`/trips/new/step/${stepNumber() + 1}`);
 		}
 	}
@@ -114,8 +115,10 @@
 {:else if stepNumber() === 2}
 	<Step2 bind:draft {autosave} />
 {:else if stepNumber() === 3}
-	<Step3 bind:draft />
+	<ActivitiesStep bind:draft {autosave} />
 {:else if stepNumber() === 4}
+	<Step3 bind:draft />
+{:else if stepNumber() === 5}
 	<Step4 bind:draft />
 {/if}
 
@@ -129,7 +132,7 @@
 			Back
 		</button>
 		<div class="footer-right">
-			{#if stepNumber() < 4}
+			{#if stepNumber() < 5}
 				<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
 					Save Draft
 				</button>

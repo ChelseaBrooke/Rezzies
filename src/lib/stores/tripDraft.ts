@@ -76,6 +76,52 @@ export function getDefaultMealsConfig(): MealsConfig {
 	};
 }
 
+// Activities (itinerary items: manual + nearby search)
+export type ActivitySource = 'manual' | 'nearby';
+export type ActivityProvider = 'google' | 'yelp' | 'mapbox' | 'ticketmaster';
+
+export interface ActivityCost {
+	totalAmount: number;
+	currency: string;
+	paidBy: 'host' | 'other';
+	paidByName?: string;
+	splitMethod: 'even_among_attendees';
+}
+
+export interface ActivityItem {
+	id: string;
+	source: ActivitySource;
+	provider?: ActivityProvider;
+	providerPlaceId?: string;
+	title: string;
+	category?: string;
+	date?: string;
+	time?: string;
+	durationMins?: number;
+	locationName?: string;
+	address?: string;
+	lat?: number;
+	lng?: number;
+	linkUrl?: string;
+	notes?: string;
+	hasCost: boolean;
+	cost?: ActivityCost;
+}
+
+export interface ActivitiesConfig {
+	enabled: boolean;
+	allowGuestSuggestions: boolean;
+	items: ActivityItem[];
+}
+
+export function getDefaultActivitiesConfig(): ActivitiesConfig {
+	return {
+		enabled: false,
+		allowGuestSuggestions: true,
+		items: []
+	};
+}
+
 export interface TripDraft {
 	// Step 1: Basics & Source
 	name: string;
@@ -160,8 +206,11 @@ export interface TripDraft {
 	
 	// Meals (optional structured config)
 	meals?: MealsConfig;
-	// Legacy / other
-	activities?: Array<{ id: string; name: string; description: string; price: string; date: string; time: string }>;
+	// Activities (itinerary: manual + nearby)
+	activities?: ActivitiesConfig;
+	// Optional cached coords for nearby search
+	destinationLat?: number;
+	destinationLng?: number;
 }
 
 const defaultDraft: TripDraft = {
@@ -221,7 +270,7 @@ const defaultDraft: TripDraft = {
 	checkOutInstructions: '',
 	accessibilityNotes: '',
 	meals: getDefaultMealsConfig(),
-	activities: []
+	activities: getDefaultActivitiesConfig()
 };
 
 const STORAGE_KEY = 'trip-draft';
@@ -241,7 +290,29 @@ function createTripDraftStore() {
 					: parsed.meals && typeof parsed.meals === 'object' && 'enabled' in parsed.meals
 						? { ...getDefaultMealsConfig(), ...parsed.meals }
 						: defaultDraft.meals;
-				set({ ...defaultDraft, ...parsed, meals });
+				// Normalize activities: if old array format, migrate to new shape
+				let activities = defaultDraft.activities;
+				if (parsed.activities != null) {
+					if (Array.isArray(parsed.activities)) {
+						activities = {
+							enabled: true,
+							allowGuestSuggestions: true,
+							items: parsed.activities.map((a: { id?: string; name?: string; description?: string; price?: string; date?: string; time?: string }) => ({
+								id: a.id ?? crypto.randomUUID(),
+								source: 'manual' as const,
+								title: a.name ?? '',
+								notes: a.description ?? undefined,
+								date: a.date ?? undefined,
+								time: a.time ?? undefined,
+								hasCost: false,
+								...(a.price && !isNaN(parseFloat(a.price)) ? { hasCost: true, cost: { totalAmount: parseFloat(a.price), currency: 'USD', paidBy: 'host' as const, splitMethod: 'even_among_attendees' as const } } : {})
+							}))
+						};
+					} else if (typeof parsed.activities === 'object' && 'items' in parsed.activities) {
+						activities = { ...getDefaultActivitiesConfig(), ...parsed.activities };
+					}
+				}
+				set({ ...defaultDraft, ...parsed, meals, activities });
 			} catch (e) {
 				console.error('Failed to load trip draft from localStorage:', e);
 			}

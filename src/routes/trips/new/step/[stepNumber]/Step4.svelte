@@ -1,11 +1,15 @@
 <script lang="ts">
 	import SectionCard from '$lib/components/wizard/SectionCard.svelte';
-	import type { TripDraft, MealsConfig } from '$lib/stores/tripDraft.js';
+	import type { TripDraft, MealsConfig, ActivitiesConfig } from '$lib/stores/tripDraft.js';
 	
 	let { draft }: { draft: TripDraft } = $props();
 	
 	const mealsConfig = $derived(
 		draft.meals && typeof draft.meals === 'object' && 'enabled' in draft.meals ? (draft.meals as MealsConfig) : null
+	);
+	
+	const activitiesConfig = $derived(
+		draft.activities && typeof draft.activities === 'object' && 'items' in draft.activities ? (draft.activities as ActivitiesConfig) : null
 	);
 	
 	const numberOfNights = $derived(() => {
@@ -89,10 +93,10 @@
 					<span class="summary-value">Enabled</span>
 				</div>
 			{/if}
-			{#if draft.activities && draft.activities.length > 0}
+			{#if activitiesConfig?.enabled && activitiesConfig?.items?.length}
 				<div class="summary-item">
 					<span class="summary-label">Activities:</span>
-					<span class="summary-value">{draft.activities.length} activit{draft.activities.length !== 1 ? 'ies' : 'y'}</span>
+					<span class="summary-value">{activitiesConfig.items.length} activit{activitiesConfig.items.length !== 1 ? 'ies' : 'y'}</span>
 				</div>
 			{/if}
 		</div>
@@ -152,23 +156,23 @@
 		</SectionCard>
 	{/if}
 	
-	{#if draft.activities && draft.activities.length > 0}
+	{#if activitiesConfig?.enabled && activitiesConfig?.items?.length}
 		<SectionCard title="Activities" icon="🎯">
 			<div class="activities-summary">
-				{#each draft.activities as activity}
+				{#each activitiesConfig.items as activity (activity.id)}
 					<div class="activity-summary-item">
-						<h4>{activity.name || 'Unnamed Activity'}</h4>
-						{#if activity.date}
-							<p>Date: {new Date(activity.date).toLocaleDateString()}</p>
+						<h4>{activity.title || 'Unnamed Activity'}</h4>
+						{#if activity.date || activity.time}
+							<p>{[activity.date ? new Date(activity.date).toLocaleDateString() : '', activity.time].filter(Boolean).join(' • ')}</p>
 						{/if}
-						{#if activity.time}
-							<p>Time: {activity.time}</p>
+						{#if activity.locationName || activity.address}
+							<p>{activity.locationName || activity.address}</p>
 						{/if}
-						{#if activity.price}
-							<p>Price: ${parseFloat(activity.price || '0').toFixed(2)}</p>
+						{#if activity.hasCost && activity.cost}
+							<p>Cost: ${Number(activity.cost.totalAmount).toFixed(2)} (split evenly among guests)</p>
 						{/if}
-						{#if activity.description}
-							<p>{activity.description}</p>
+						{#if activity.notes}
+							<p class="notes">{activity.notes}</p>
 						{/if}
 					</div>
 				{/each}
