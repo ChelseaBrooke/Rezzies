@@ -115,6 +115,8 @@
 	<Step2 bind:draft {autosave} />
 {:else if stepNumber() === 3}
 	<Step3 bind:draft />
+{:else if stepNumber() === 4}
+	<Step4 bind:draft />
 {/if}
 
 <!-- Footer Actions (for steps 2+) -->

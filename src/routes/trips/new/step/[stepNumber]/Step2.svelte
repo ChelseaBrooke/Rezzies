@@ -1,337 +1,547 @@
 <script lang="ts">
-	import type { TripDraft } from '$lib/stores/tripDraft.js';
-	
+	import SectionCard from '$lib/components/wizard/SectionCard.svelte';
+	import type { TripDraft, MealsConfig, MealSlot, MealType } from '$lib/stores/tripDraft.js';
+	import { getDefaultMealsConfig } from '$lib/stores/tripDraft.js';
+
+	const MEAL_TYPES: { value: MealType; label: string }[] = [
+		{ value: 'breakfast', label: 'Breakfast' },
+		{ value: 'lunch', label: 'Lunch' },
+		{ value: 'dinner', label: 'Dinner' },
+		{ value: 'snacks', label: 'Snacks' }
+	];
+
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
-	
-	// Initialize meals and activities if they don't exist
-	if (!draft.meals) {
-		draft.meals = [];
+
+	// Ensure meals config exists and is object (run once on mount / when draft loads)
+	$effect(() => {
+		if (!draft.meals || Array.isArray(draft.meals) || !('enabled' in draft.meals)) {
+			draft.meals = { ...getDefaultMealsConfig() };
+		}
+	});
+
+	function ensureMeals() {
+		if (!draft.meals || !('enabled' in draft.meals)) {
+			draft.meals = { ...getDefaultMealsConfig() };
+		}
+		autosave();
 	}
-	if (!draft.activities) {
-		draft.activities = [];
+
+	function setEnabled(enabled: boolean) {
+		ensureMeals();
+		const m = draft.meals as MealsConfig;
+		m.enabled = enabled;
+		if (enabled) {
+			if (!m.modes) m.modes = { signups: true, fund: false, informal: false };
+			if (!m.expectations)
+				m.expectations = {
+					participationLevel: 'optional',
+					allowGuestsToClaimSlots: true,
+					allowGuestsToContributeInstead: true,
+					allowOptOut: true
+				};
+			if (!m.preferences) m.preferences = { collectIndividualPreferencesLater: true };
+		}
+		autosave();
 	}
-	
-	function addMeal() {
-		if (!draft.meals) draft.meals = [];
-		draft.meals = [
-			...draft.meals,
-			{ id: crypto.randomUUID(), name: '', description: '', price: '', date: '', time: '' }
+
+	function setMode(key: 'signups' | 'fund' | 'informal', value: boolean) {
+		ensureMeals();
+		(draft.meals as MealsConfig).modes[key] = value;
+		if (key === 'signups' && value && !(draft.meals as MealsConfig).signupConfig)
+			(draft.meals as MealsConfig).signupConfig = { slots: [], allowHostPreassign: false, includeLunch: false };
+		if (key === 'fund' && value && !(draft.meals as MealsConfig).fundConfig)
+			(draft.meals as MealsConfig).fundConfig = {
+				enabled: true,
+				contributionStyle: 'equal',
+				managers: []
+			};
+		if (key === 'informal' && value && !(draft.meals as MealsConfig).informalConfig)
+			(draft.meals as MealsConfig).informalConfig = { createPlaceholderSlots: false, placeholderSlots: [] };
+		autosave();
+	}
+
+	type MealModeValue = 'signups' | 'fund' | 'informal';
+
+	function getSelectedMealMode(): MealModeValue {
+		const m = draft.meals as MealsConfig | undefined;
+		if (!m?.modes) return 'signups';
+		if (m.modes.signups) return 'signups';
+		if (m.modes.fund) return 'fund';
+		if (m.modes.informal) return 'informal';
+		return 'signups';
+	}
+
+	function setMealModeSingle(value: MealModeValue) {
+		ensureMeals();
+		const m = draft.meals as MealsConfig;
+		m.modes = { signups: value === 'signups', fund: value === 'fund', informal: value === 'informal' };
+		if (value === 'signups' && !m.signupConfig)
+			m.signupConfig = { slots: [], allowHostPreassign: false, includeLunch: false };
+		if (value === 'fund' && !m.fundConfig)
+			m.fundConfig = { enabled: true, contributionStyle: 'equal', managers: [] };
+		if (value === 'informal' && !m.informalConfig)
+			m.informalConfig = { createPlaceholderSlots: false, placeholderSlots: [] };
+		autosave();
+	}
+
+	// Generate default slots from check-in/check-out
+	const canGenerateSlots = $derived(!!draft.checkInDate && !!draft.checkOutDate);
+	const datesChangedAfterSlots = $derived.by(() => {
+		const m = draft.meals as MealsConfig | undefined;
+		const slots = m?.signupConfig?.slots;
+		if (!slots?.length || !draft.checkInDate || !draft.checkOutDate) return false;
+		const checkIn = new Date(draft.checkInDate).getTime();
+		const checkOut = new Date(draft.checkOutDate).getTime();
+		const slotDates = slots.map((s) => new Date(s.date).getTime());
+		return slotDates.some((t) => t < checkIn || t > checkOut);
+	});
+
+	function generateDefaultSlots() {
+		if (!draft.checkInDate || !draft.checkOutDate) return;
+		ensureMeals();
+		const m = draft.meals as MealsConfig;
+		if (!m.signupConfig) m.signupConfig = { slots: [], allowHostPreassign: false, includeLunch: false };
+		const start = new Date(draft.checkInDate);
+		const end = new Date(draft.checkOutDate);
+		const slots: MealSlot[] = [];
+		for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+			const dateStr = d.toISOString().slice(0, 10);
+			for (const mealType of ['breakfast', 'lunch', 'dinner'] as const) {
+				slots.push({
+					id: crypto.randomUUID(),
+					date: dateStr,
+					mealType,
+					title: undefined,
+					notes: undefined,
+					maxVolunteers: undefined,
+					allowCoVolunteers: undefined
+				});
+			}
+		}
+		m.signupConfig.slots = slots;
+		autosave();
+	}
+
+	function addSignupSlot() {
+		ensureMeals();
+		const m = draft.meals as MealsConfig;
+		if (!m.signupConfig) m.signupConfig = { slots: [], allowHostPreassign: false, includeLunch: false };
+		const base = draft.checkInDate ? new Date(draft.checkInDate) : new Date();
+		m.signupConfig.slots = [
+			...m.signupConfig.slots,
+			{
+				id: crypto.randomUUID(),
+				date: base.toISOString().slice(0, 10),
+				mealType: 'dinner',
+				title: undefined,
+				notes: undefined,
+				maxVolunteers: undefined,
+				allowCoVolunteers: undefined
+			}
 		];
 		autosave();
 	}
-	
-	function removeMeal(index: number) {
-		if (!draft.meals) return;
-		draft.meals = draft.meals.filter((_, i) => i !== index);
+
+	function removeSignupSlot(id: string) {
+		const m = draft.meals as MealsConfig;
+		if (!m?.signupConfig) return;
+		m.signupConfig.slots = m.signupConfig.slots.filter((s) => s.id !== id);
 		autosave();
 	}
-	
-	function addActivity() {
-		if (!draft.activities) draft.activities = [];
-		draft.activities = [
-			...draft.activities,
-			{ id: crypto.randomUUID(), name: '', description: '', price: '', date: '', time: '' }
-		];
-		autosave();
-	}
-	
-	function removeActivity(index: number) {
-		if (!draft.activities) return;
-		draft.activities = draft.activities.filter((_, i) => i !== index);
-		autosave();
-	}
+
 </script>
 
-<div class="step-content">
-	<div class="section-header">
-		<h2>Meals</h2>
-		<p class="section-description">Add any planned meals for your trip</p>
-	</div>
-	
-	<div class="items-list">
-		{#if draft.meals && draft.meals.length > 0}
-			{#each draft.meals as meal, index}
-				<div class="item-card">
-					<div class="item-header">
-						<span class="item-number">Meal {index + 1}</span>
-						<button type="button" class="btn-remove" onclick={() => removeMeal(index)}>
-							×
-						</button>
+<div class="step-content meals-step">
+	<!-- Section 1: Enable Meals -->
+	<SectionCard title="Include shared meals" icon="🍽️">
+		<div class="section-1-body">
+			<label class="toggle-row">
+				<input
+					type="checkbox"
+					checked={(draft.meals as MealsConfig)?.enabled ?? false}
+					onchange={(e) => setEnabled((e.currentTarget as HTMLInputElement).checked)}
+				/>
+				<span class="toggle-title">Include shared meals for this trip?</span>
+			</label>
+			<p class="helper-copy">Set expectations for cooking, chipping in, or planning meals together.</p>
+		</div>
+	</SectionCard>
+
+	{#if (draft.meals as MealsConfig)?.enabled}
+		<!-- Section 2: Choose Meal Setup Style (single select, all options visible) -->
+		<SectionCard title="How do you want to handle meals?" icon="📋">
+			<div class="section-2-body">
+				<label class="meal-mode-option">
+					<input
+						type="radio"
+						name="meal-mode"
+						value="signups"
+						checked={getSelectedMealMode() === 'signups'}
+						onchange={() => setMealModeSingle('signups')}
+					/>
+					<span class="meal-mode-label">Meal sign-ups (people volunteer for specific meals)</span>
+				</label>
+				<label class="meal-mode-option">
+					<input
+						type="radio"
+						name="meal-mode"
+						value="fund"
+						checked={getSelectedMealMode() === 'fund'}
+						onchange={() => setMealModeSingle('fund')}
+					/>
+					<span class="meal-mode-label">Shared food fund (everyone chips in for groceries/food)</span>
+				</label>
+				<label class="meal-mode-option">
+					<input
+						type="radio"
+						name="meal-mode"
+						value="informal"
+						checked={getSelectedMealMode() === 'informal'}
+						onchange={() => setMealModeSingle('informal')}
+					/>
+					<span class="meal-mode-label">Informal (no assignments or money—just notes/visibility)</span>
+				</label>
+			</div>
+		</SectionCard>
+
+		<!-- Section 3: Configure (conditional) -->
+		{#if (draft.meals as MealsConfig)?.modes?.signups}
+			<SectionCard title="Meal sign-ups" icon="📅">
+				<div class="section-3-body">
+					{#if !canGenerateSlots}
+						<p class="helper-copy muted">Set dates in Basics & Rooms first to generate default slots.</p>
+					{:else}
+						<button type="button" class="btn-secondary" onclick={generateDefaultSlots}>Generate default slots</button>
+						{#if datesChangedAfterSlots}
+							<p class="warning-copy">Dates changed—review your meal slots.</p>
+						{/if}
+					{/if}
+					<div class="slots-list">
+						{#each ((draft.meals as MealsConfig)?.signupConfig?.slots ?? []) as slot (slot.id)}
+							<div class="slot-row">
+								<input type="date" bind:value={slot.date} oninput={autosave} class="input-small" />
+								<select bind:value={slot.mealType} onchange={autosave} class="input-small">
+									{#each MEAL_TYPES as opt}
+										<option value={opt.value}>{opt.label}</option>
+									{/each}
+								</select>
+								<input type="text" bind:value={slot.title} oninput={autosave} placeholder="Title (optional)" class="input-flex" />
+								<input type="text" bind:value={slot.notes} oninput={autosave} placeholder="Notes (optional)" class="input-flex" />
+								<button type="button" class="btn-remove-slot" onclick={() => removeSignupSlot(slot.id)} title="Remove slot">×</button>
+							</div>
+						{/each}
 					</div>
-					<div class="item-form">
-						<div class="form-row">
-							<div class="form-group">
-								<label>Meal Name</label>
-								<input
-									type="text"
-									bind:value={meal.name}
-									oninput={autosave}
-									placeholder="e.g., Welcome Dinner"
-								/>
-							</div>
-							<div class="form-group">
-								<label>Price (optional)</label>
-								<input
-									type="number"
-									bind:value={meal.price}
-									oninput={autosave}
-									placeholder="0.00"
-									step="0.01"
-								/>
-							</div>
-						</div>
-						<div class="form-group">
-							<label>Description</label>
-							<textarea
-								bind:value={meal.description}
-								oninput={autosave}
-								rows="2"
-								placeholder="Meal details..."
-							></textarea>
-						</div>
-						<div class="form-row">
-							<div class="form-group">
-								<label>Date</label>
-								<input
-									type="date"
-									bind:value={meal.date}
-									oninput={autosave}
-								/>
-							</div>
-							<div class="form-group">
-								<label>Time</label>
-								<input
-									type="time"
-									bind:value={meal.time}
-									oninput={autosave}
-								/>
-							</div>
-						</div>
-					</div>
-				</div>
-			{/each}
-		{/if}
-		<button type="button" class="btn-add-item" onclick={addMeal}>
-			+ Add Meal
-		</button>
-	</div>
-	
-	<div class="section-header">
-		<h2>Activities</h2>
-		<p class="section-description">Add any planned activities or events for your trip</p>
-	</div>
-	
-	<div class="items-list">
-		{#if draft.activities && draft.activities.length > 0}
-			{#each draft.activities as activity, index}
-				<div class="item-card">
-					<div class="item-header">
-						<span class="item-number">Activity {index + 1}</span>
-						<button type="button" class="btn-remove" onclick={() => removeActivity(index)}>
-							×
-						</button>
-					</div>
-					<div class="item-form">
-						<div class="form-row">
-							<div class="form-group">
-								<label>Activity Name</label>
-								<input
-									type="text"
-									bind:value={activity.name}
-									oninput={autosave}
-									placeholder="e.g., Beach Volleyball"
-								/>
-							</div>
-							<div class="form-group">
-								<label>Price (optional)</label>
-								<input
-									type="number"
-									bind:value={activity.price}
-									oninput={autosave}
-									placeholder="0.00"
-									step="0.01"
-								/>
-							</div>
-						</div>
-						<div class="form-group">
-							<label>Description</label>
-							<textarea
-								bind:value={activity.description}
-								oninput={autosave}
-								rows="2"
-								placeholder="Activity details..."
-							></textarea>
-						</div>
-						<div class="form-row">
-							<div class="form-group">
-								<label>Date</label>
-								<input
-									type="date"
-									bind:value={activity.date}
-									oninput={autosave}
-								/>
-							</div>
-							<div class="form-group">
-								<label>Time</label>
-								<input
-									type="time"
-									bind:value={activity.time}
-									oninput={autosave}
-								/>
-							</div>
-						</div>
+					<button type="button" class="btn-add" onclick={addSignupSlot}>+ Add slot</button>
+					<div class="toggles-inline">
+						<label class="toggle-small">
+							<input
+								type="checkbox"
+								checked={(draft.meals as MealsConfig)?.signupConfig?.slots?.some((s) => s.allowCoVolunteers) ?? false}
+								onchange={(e) => {
+									ensureMeals();
+									const m = draft.meals as MealsConfig;
+									if (m.signupConfig)
+										m.signupConfig.slots = (m.signupConfig.slots ?? []).map((s) => ({
+											...s,
+											allowCoVolunteers: (e.currentTarget as HTMLInputElement).checked
+										}));
+									autosave();
+								}}
+							/>
+							<span>Allow co-volunteers</span>
+						</label>
 					</div>
 				</div>
-			{/each}
+			</SectionCard>
 		{/if}
-		<button type="button" class="btn-add-item" onclick={addActivity}>
-			+ Add Activity
-		</button>
-	</div>
+
+		{#if (draft.meals as MealsConfig)?.modes?.fund}
+			<SectionCard title="Shared food fund" icon="💰">
+				<div class="section-3-body">
+					<div class="form-group">
+						<label class="form-label">Contribution per person ($)</label>
+						<input
+							type="number"
+							value={(draft.meals as MealsConfig)?.fundConfig?.suggestedContributionPerPerson ?? ''}
+							oninput={(e) => {
+								ensureMeals();
+								const v = (e.currentTarget as HTMLInputElement).valueAsNumber;
+								(draft.meals as MealsConfig).fundConfig!.suggestedContributionPerPerson = isNaN(v) ? undefined : v;
+								autosave();
+							}}
+							placeholder="0.00"
+							min="0"
+							step="0.01"
+							class="form-input contribution-input"
+						/>
+						<p class="fund-note">This will be added to every guest's tab automatically if this option is chosen.</p>
+					</div>
+					<div class="form-group">
+						<label class="form-label">What does the fund cover?</label>
+						<textarea
+							value={(draft.meals as MealsConfig)?.fundConfig?.notes ?? ''}
+							oninput={(e) => {
+								ensureMeals();
+								(draft.meals as MealsConfig).fundConfig!.notes = (e.currentTarget as HTMLTextAreaElement).value;
+								autosave();
+							}}
+							placeholder="e.g., groceries, group dinners"
+							class="form-textarea"
+							rows="2"
+						></textarea>
+					</div>
+				</div>
+			</SectionCard>
+		{/if}
+
+		{#if (draft.meals as MealsConfig)?.modes?.informal}
+			<SectionCard title="Informal meals" icon="📝">
+				<div class="section-3-body">
+					<div class="form-group">
+						<label class="form-label">Any meal expectations? (e.g., “we’ll mostly eat out”)</label>
+						<textarea
+							value={(draft.meals as MealsConfig)?.informalConfig?.notes ?? ''}
+							oninput={(e) => {
+								ensureMeals();
+								if (!(draft.meals as MealsConfig).informalConfig) (draft.meals as MealsConfig).informalConfig = { createPlaceholderSlots: false, placeholderSlots: [] };
+								(draft.meals as MealsConfig).informalConfig!.notes = (e.currentTarget as HTMLTextAreaElement).value;
+								autosave();
+							}}
+							placeholder="Optional notes"
+							class="form-textarea"
+							rows="2"
+						></textarea>
+					</div>
+				</div>
+			</SectionCard>
+		{/if}
+
+	{/if}
 </div>
 
 <style>
-	.step-content {
+	.meals-step {
 		display: flex;
 		flex-direction: column;
-		gap: 2rem;
+		gap: 1.25rem;
+		max-width: 720px;
 	}
-	
-	.section-header {
-		margin-bottom: 1rem;
+	.section-1-body,
+	.section-2-body,
+	.section-3-body,
+	.section-4-body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
 	}
-	
-	.section-header h2 {
-		font-size: 1.5rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0 0 0.5rem 0;
-	}
-	
-	.section-description {
+	.helper-copy {
 		font-size: 0.875rem;
 		color: var(--muted);
 		margin: 0;
 	}
-	
-	.items-list {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
+	.helper-copy.muted {
+		color: var(--muted);
+		font-style: italic;
 	}
-	
-	.item-card {
-		border: 1px solid var(--border);
-		border-radius: 0;
-		padding: 1.5rem;
-		background: #fafafa;
-	}
-	
-	.item-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 1rem;
-	}
-	
-	.item-number {
+	.warning-copy {
 		font-size: 0.875rem;
-		font-weight: 600;
+		color: #b45309;
+		margin: 0;
+	}
+	.toggle-row,
+	.checkbox-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		cursor: pointer;
+		font-size: 0.9375rem;
 		color: var(--text);
 	}
-	
-	.btn-remove {
-		width: 1.75rem;
-		height: 1.75rem;
-		background: transparent;
-		color: var(--muted);
+	.toggle-title {
+		font-weight: 500;
+	}
+	.tag.recommended {
+		font-size: 0.7rem;
+		padding: 0.15rem 0.4rem;
+		background: rgba(30, 58, 138, 0.12);
+		color: var(--primary);
+		border-radius: 4px;
+		margin-left: 0.25rem;
+	}
+	.btn-secondary {
+		padding: 0.5rem 1rem;
+		background: white;
 		border: 1px solid var(--border);
-		border-radius: 0;
+		border-radius: 0.5rem;
+		font-size: 0.875rem;
 		cursor: pointer;
-		font-size: 1.25rem;
-		line-height: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: all 0.2s ease;
+		color: var(--text);
+		align-self: flex-start;
 	}
-	
-	.btn-remove:hover {
-		background: #ef4444;
-		color: white;
-		border-color: #ef4444;
+	.btn-secondary:hover {
+		background: var(--bg);
 	}
-	
-	.item-form {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-	
-	.form-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-	
-	.form-group {
+	.slots-list {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
 	}
-	
-	.form-group label {
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--text);
+	.slot-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
 	}
-	
-	.form-group input,
-	.form-group textarea {
-		padding: 0.5rem 0.75rem;
+	.input-small {
+		width: 8rem;
+		min-width: 0;
+		padding: 0.375rem 0.5rem;
 		border: 1px solid var(--border);
-		border-radius: 0;
-		font-size: 0.875rem;
-		font-family: inherit;
-		color: var(--text);
+		border-radius: 0.25rem;
+		font-size: 0.8125rem;
+	}
+	.input-flex {
+		flex: 1;
+		min-width: 6rem;
+		padding: 0.375rem 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: 0.25rem;
+		font-size: 0.8125rem;
+	}
+	.input-tiny {
+		width: 4rem;
+		padding: 0.375rem 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: 0.25rem;
+		font-size: 0.8125rem;
+	}
+	.btn-remove-slot {
+		width: 1.75rem;
+		height: 1.75rem;
+		padding: 0;
+		border: 1px solid var(--border);
 		background: white;
-		transition: all 0.2s ease;
-		width: 100%;
+		color: var(--muted);
+		border-radius: 0.25rem;
+		cursor: pointer;
+		font-size: 1.1rem;
+		line-height: 1;
+		flex-shrink: 0;
 	}
-	
-	.form-group input:focus,
-	.form-group textarea:focus {
-		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+	.btn-remove-slot:hover {
+		background: #fef2f2;
+		color: #dc2626;
+		border-color: #fecaca;
 	}
-	
-	.form-group textarea {
-		resize: vertical;
-		min-height: 60px;
-	}
-	
-	.btn-add-item {
-		padding: 0.75rem 1.5rem;
+	.btn-add {
+		padding: 0.5rem 1rem;
 		background: var(--primary);
 		color: white;
 		border: none;
-		border-radius: 0;
+		border-radius: 0.5rem;
+		font-size: 0.875rem;
+		cursor: pointer;
+		align-self: flex-start;
+	}
+	.btn-add:hover {
+		opacity: 0.9;
+	}
+	.btn-add.small {
+		font-size: 0.8125rem;
+		padding: 0.375rem 0.75rem;
+	}
+	.toggles-inline,
+	.toggle-small {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.875rem;
+		color: var(--text);
+		cursor: pointer;
+	}
+	.toggles-inline {
+		flex-wrap: wrap;
+		gap: 1rem;
+	}
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.form-label {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+	.form-input,
+	.form-select,
+	.form-textarea {
+		padding: 0.5rem 0.6rem;
+		border: 1px solid var(--border);
+		border-radius: 0.25rem;
+		font-size: 0.875rem;
+		color: var(--text);
+		background: white;
+		width: 100%;
+		max-width: 320px;
+	}
+	.meal-mode-option {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 		cursor: pointer;
 		font-size: 0.9375rem;
-		font-weight: 500;
-		transition: background 0.2s ease;
-		width: 100%;
-		margin-top: 0.5rem;
+		color: var(--text);
+		padding: 0.35rem 0;
 	}
-	
-	.btn-add-item:hover {
-		background: var(--primary-dark);
+	.meal-mode-option input[type="radio"] {
+		width: 1rem;
+		height: 1rem;
+		cursor: pointer;
+		accent-color: var(--primary);
+		flex-shrink: 0;
 	}
-	
-	@media (max-width: 768px) {
-		.form-row {
-			grid-template-columns: 1fr;
-		}
+	.meal-mode-label {
+		flex: 1;
+	}
+	.form-textarea {
+		resize: vertical;
+		min-height: 60px;
+	}
+	.fund-note {
+		font-size: 0.8125rem;
+		color: var(--muted);
+		margin: 0.35rem 0 0 0;
+		line-height: 1.4;
+	}
+	.managers-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+	.manager-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.input-half {
+		flex: 1;
+		min-width: 0;
+		padding: 0.375rem 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: 0.25rem;
+		font-size: 0.8125rem;
+	}
+	.radio-group {
+		display: flex;
+		gap: 1rem;
+	}
+	.radio-label {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		cursor: pointer;
+		font-size: 0.875rem;
+		color: var(--text);
 	}
 </style>

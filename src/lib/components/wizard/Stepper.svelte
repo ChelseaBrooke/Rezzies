@@ -5,6 +5,7 @@
 		number: number;
 		label: string;
 		timeEstimate?: string;
+		optional?: boolean;
 	}
 	
 	let { steps, currentStep }: { steps: Step[]; currentStep: number } = $props();
@@ -156,6 +157,18 @@
 	.step-item.current .step-label {
 		color: var(--text);
 		font-weight: 500;
+	}
+	
+	.step-optional {
+		display: inline-block;
+		margin-left: 0.35rem;
+		padding: 0.125rem 0.4rem;
+		font-size: 0.65rem;
+		font-weight: 500;
+		color: var(--muted);
+		background: rgba(0, 0, 0, 0.06);
+		border-radius: 4px;
+		vertical-align: middle;
 	}
 	
 	.step-connector {

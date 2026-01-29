@@ -1,6 +1,81 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+
+export interface MealSlot {
+	id: string;
+	date: string;
+	mealType: MealType;
+	title?: string;
+	notes?: string;
+	maxVolunteers?: number;
+	allowCoVolunteers?: boolean;
+}
+
+export interface MealsConfig {
+	enabled: boolean;
+	modes: {
+		signups: boolean;
+		fund: boolean;
+		informal: boolean;
+	};
+	signupConfig?: {
+		slots: MealSlot[];
+		allowHostPreassign: boolean;
+		includeLunch?: boolean;
+	};
+	fundConfig?: {
+		enabled: boolean;
+		contributionStyle: 'equal' | 'custom';
+		suggestedContributionPerPerson?: number;
+		notes?: string;
+		managers: Array<{ name?: string; email?: string }>;
+	};
+	informalConfig?: {
+		notes?: string;
+		createPlaceholderSlots?: boolean;
+		placeholderSlots?: Array<{
+			id: string;
+			date: string;
+			mealType: MealType;
+			title?: string;
+			notes?: string;
+		}>;
+	};
+	preferences?: {
+		dietaryNotes?: string;
+		collectIndividualPreferencesLater: boolean;
+	};
+	expectations?: {
+		participationLevel: 'required' | 'optional';
+		allowGuestsToClaimSlots: boolean;
+		allowGuestsToContributeInstead: boolean;
+		allowOptOut: boolean;
+	};
+}
+
+export function getDefaultMealsConfig(): MealsConfig {
+	return {
+		enabled: false,
+		modes: { signups: true, fund: false, informal: false },
+		signupConfig: { slots: [], allowHostPreassign: false, includeLunch: false },
+		fundConfig: {
+			enabled: false,
+			contributionStyle: 'equal',
+			managers: []
+		},
+		informalConfig: { createPlaceholderSlots: false, placeholderSlots: [] },
+		preferences: { collectIndividualPreferencesLater: true },
+		expectations: {
+			participationLevel: 'optional',
+			allowGuestsToClaimSlots: true,
+			allowGuestsToContributeInstead: true,
+			allowOptOut: true
+		}
+	};
+}
+
 export interface TripDraft {
 	// Step 1: Basics & Source
 	name: string;
@@ -83,8 +158,9 @@ export interface TripDraft {
 	checkOutInstructions: string;
 	accessibilityNotes: string;
 	
-	// Meals & Activities
-	meals?: Array<{ id: string; name: string; description: string; price: string; date: string; time: string }>;
+	// Meals (optional structured config)
+	meals?: MealsConfig;
+	// Legacy / other
 	activities?: Array<{ id: string; name: string; description: string; price: string; date: string; time: string }>;
 }
 
@@ -143,7 +219,9 @@ const defaultDraft: TripDraft = {
 	smokingPolicy: '',
 	checkInInstructions: '',
 	checkOutInstructions: '',
-	accessibilityNotes: ''
+	accessibilityNotes: '',
+	meals: getDefaultMealsConfig(),
+	activities: []
 };
 
 const STORAGE_KEY = 'trip-draft';
@@ -157,7 +235,13 @@ function createTripDraftStore() {
 		if (stored) {
 			try {
 				const parsed = JSON.parse(stored);
-				set({ ...defaultDraft, ...parsed });
+				// Normalize meals: if old array format, use default meals config
+				const meals = Array.isArray(parsed.meals)
+					? getDefaultMealsConfig()
+					: parsed.meals && typeof parsed.meals === 'object' && 'enabled' in parsed.meals
+						? { ...getDefaultMealsConfig(), ...parsed.meals }
+						: defaultDraft.meals;
+				set({ ...defaultDraft, ...parsed, meals });
 			} catch (e) {
 				console.error('Failed to load trip draft from localStorage:', e);
 			}

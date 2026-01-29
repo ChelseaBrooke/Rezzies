@@ -1,8 +1,12 @@
 <script lang="ts">
 	import SectionCard from '$lib/components/wizard/SectionCard.svelte';
-	import type { TripDraft } from '$lib/stores/tripDraft.js';
+	import type { TripDraft, MealsConfig } from '$lib/stores/tripDraft.js';
 	
 	let { draft }: { draft: TripDraft } = $props();
+	
+	const mealsConfig = $derived(
+		draft.meals && typeof draft.meals === 'object' && 'enabled' in draft.meals ? (draft.meals as MealsConfig) : null
+	);
 	
 	const numberOfNights = $derived(() => {
 		if (!draft.checkInDate || !draft.checkOutDate) return 0;
@@ -79,10 +83,10 @@
 				<span class="summary-label">Pricing Model:</span>
 				<span class="summary-value">{draft.pricingModel} ({draft.pricingType})</span>
 			</div>
-			{#if draft.meals && draft.meals.length > 0}
+			{#if mealsConfig?.enabled}
 				<div class="summary-item">
 					<span class="summary-label">Meals:</span>
-					<span class="summary-value">{draft.meals.length} meal{draft.meals.length !== 1 ? 's' : ''}</span>
+					<span class="summary-value">Enabled</span>
 				</div>
 			{/if}
 			{#if draft.activities && draft.activities.length > 0}
@@ -116,26 +120,34 @@
 		</SectionCard>
 	{/if}
 	
-	{#if draft.meals && draft.meals.length > 0}
+	{#if mealsConfig?.enabled}
 		<SectionCard title="Meals" icon="🍽️">
 			<div class="meals-summary">
-				{#each draft.meals as meal}
-					<div class="meal-summary-item">
-						<h4>{meal.name || 'Unnamed Meal'}</h4>
-						{#if meal.date}
-							<p>Date: {new Date(meal.date).toLocaleDateString()}</p>
-						{/if}
-						{#if meal.time}
-							<p>Time: {meal.time}</p>
-						{/if}
-						{#if meal.price}
-							<p>Price: ${parseFloat(meal.price || '0').toFixed(2)}</p>
-						{/if}
-						{#if meal.description}
-							<p>{meal.description}</p>
-						{/if}
-					</div>
-				{/each}
+				<div class="meal-summary-modes">
+					{#if mealsConfig.modes?.signups}
+						<span class="mode-tag">Meal sign-ups</span>
+					{/if}
+					{#if mealsConfig.modes?.fund}
+						<span class="mode-tag">Shared food fund</span>
+					{/if}
+					{#if mealsConfig.modes?.informal}
+						<span class="mode-tag">Informal</span>
+					{/if}
+				</div>
+				{#if mealsConfig.modes?.signups && mealsConfig.signupConfig?.slots?.length}
+					<p class="summary-line"><strong>Sign-up slots:</strong> {mealsConfig.signupConfig.slots.length}</p>
+				{/if}
+				{#if mealsConfig.modes?.fund && mealsConfig.fundConfig}
+					{#if mealsConfig.fundConfig.suggestedContributionPerPerson != null}
+						<p class="summary-line"><strong>Contribution per person:</strong> ${Number(mealsConfig.fundConfig.suggestedContributionPerPerson).toFixed(2)}</p>
+					{/if}
+					{#if mealsConfig.fundConfig.notes}
+						<p class="summary-line notes">{mealsConfig.fundConfig.notes}</p>
+					{/if}
+				{/if}
+				{#if mealsConfig.modes?.informal && mealsConfig.informalConfig?.notes}
+					<p class="summary-line notes">{mealsConfig.informalConfig.notes}</p>
+				{/if}
 			</div>
 		</SectionCard>
 	{/if}
@@ -230,6 +242,33 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+	}
+	
+	.meal-summary-modes {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-bottom: 0.5rem;
+	}
+	
+	.mode-tag {
+		font-size: 0.8125rem;
+		padding: 0.25rem 0.5rem;
+		background: rgba(30, 58, 138, 0.1);
+		color: var(--primary);
+		border-radius: 0.25rem;
+		font-weight: 500;
+	}
+	
+	.summary-line {
+		font-size: 0.875rem;
+		color: var(--text);
+		margin: 0.25rem 0;
+	}
+	
+	.summary-line.notes {
+		color: var(--muted);
+		font-style: italic;
 	}
 	
 	.room-summary-item,
