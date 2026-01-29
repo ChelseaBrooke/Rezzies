@@ -2,7 +2,7 @@
 	import TopBar from './TopBar.svelte';
 	import Stepper from './Stepper.svelte';
 	
-	let { currentStep, children }: { currentStep: number; children: any } = $props();
+	let { currentStep, children, onBack, backHref, previewLabel }: { currentStep: number; children: any; onBack?: () => void; backHref?: string; previewLabel?: string } = $props();
 	
 	const steps = [
 		{ number: 1, label: 'Basics & Rooms' },
@@ -23,21 +23,27 @@
 	const currentTitle = stepTitles[currentStep] || '';
 </script>
 
-<div class="create-trip-shell">
-	<!-- Background -->
+<div class="create-trip-shell" class:contained={!!previewLabel}>
+	<!-- Background (hidden when contained in trip portal) -->
 	<div class="background"></div>
 	
 	<!-- Main Card - starts at top of screen -->
 	<div class="main-card">
-		<!-- Top Bar inside card -->
-		<TopBar />
+		<!-- Top Bar or preview label -->
+		{#if previewLabel}
+			<div class="preview-label">{previewLabel}</div>
+		{:else}
+			<TopBar />
+		{/if}
 		
 		<!-- Stepper inside card -->
-		<Stepper {steps} {currentStep} />
+		<Stepper {steps} {currentStep} {onBack} {backHref} />
 		
 		<!-- Card Content -->
 		<div class="card-content">
-			{@render children()}
+			{#if children != null && typeof children === 'function'}
+				{@render children()}
+			{/if}
 		</div>
 	</div>
 </div>
@@ -53,6 +59,26 @@
 		padding: 0;
 		margin: 0;
 		width: 100%;
+	}
+
+	/* Contained inside trip portal (e.g. preview-new): no full-page background, fit in rounded box */
+	.create-trip-shell.contained {
+		min-height: 0;
+		background: transparent;
+		flex: 1;
+		display: flex;
+		overflow: hidden;
+	}
+	.create-trip-shell.contained .background {
+		display: none;
+	}
+	.create-trip-shell.contained .main-card {
+		max-width: 100%;
+		min-height: 0;
+		flex: 1;
+		align-self: stretch;
+		border-radius: 16px;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 	}
 	
 	.background {
@@ -115,6 +141,14 @@
 	
 	.card-subtitle {
 		font-size: 0.875rem;
+		color: var(--muted);
+	}
+	
+	.preview-label {
+		padding: 1rem 2rem;
+		background: var(--bg, #f5f5f5);
+		border-bottom: 1px solid var(--border);
+		font-size: 0.9375rem;
 		color: var(--muted);
 	}
 	

@@ -344,13 +344,14 @@
 {/if}
 
 <style>
-	/* Sidebar (upper right): fill box with minimal gaps */
+	/* Sidebar (upper right): same width as stats row (Guests + Payments), contained box */
 	.calendar-sidebar {
 		background: #ffffff;
 		border-radius: 12px;
 		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
-		padding: 0.35rem;
+		padding: 0.5rem;
 		width: 100%;
+		max-width: 100%;
 		min-width: 0;
 		height: 320px;
 		box-sizing: border-box;
@@ -382,9 +383,9 @@
 	.calendar-sidebar .day-headers {
 		display: grid;
 		grid-template-columns: repeat(7, minmax(0, 1fr));
-		gap: 1px;
+		gap: 3px;
 		flex-shrink: 0;
-		margin-bottom: 1px;
+		margin-bottom: 4px;
 		width: 100%;
 		min-width: 0;
 		box-sizing: border-box;
@@ -436,13 +437,13 @@
 	.calendar-sidebar .days-grid {
 		display: grid;
 		grid-template-columns: repeat(7, minmax(0, 1fr));
-		gap: 1px;
+		grid-auto-rows: minmax(1.75rem, 1fr);
+		gap: 3px;
 		flex: 1;
 		min-height: 0;
 		width: 100%;
 		min-width: 0;
-		align-content: stretch;
-		grid-auto-rows: minmax(0, 1fr);
+		align-content: start;
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell {
@@ -452,7 +453,11 @@
 		color: #94a3b8;
 		background: transparent;
 		min-width: 0;
-		min-height: 0;
+		min-height: 1.75rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell.current-month {

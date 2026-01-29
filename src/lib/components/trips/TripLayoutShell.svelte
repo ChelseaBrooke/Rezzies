@@ -10,7 +10,7 @@
 		user = null,
 		onInvite,
 		showToast,
-		children = undefined
+		children
 	}: {
 		trip: TripForSidebar & { inviteCode?: string };
 		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date }[];
@@ -20,13 +20,10 @@
 		children?: import('svelte').Snippet;
 	} = $props();
 
+	const childrenFn = $derived(children != null && typeof children === 'function' ? children : undefined);
+
 	let sidebarOpen = $state(false);
 	let toastMessage = $state<string | null>(null);
-
-	// Capture callable children so we never invoke undefined (avoids "undefined is not a function")
-	const childrenFn = $derived(
-		children != null && typeof children === 'function' ? children : undefined
-	);
 
 	function openInvite() {
 		sidebarOpen = false;

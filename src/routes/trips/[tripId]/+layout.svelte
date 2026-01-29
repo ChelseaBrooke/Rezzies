@@ -2,7 +2,7 @@
 	import type { LayoutData } from './$types';
 	import TripLayoutShell from '$lib/components/trips/TripLayoutShell.svelte';
 
-	let { data, children = undefined }: { data: LayoutData; children?: import('svelte').Snippet } = $props();
+	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 
 	// Serialized dates from server come back as strings; ensure trip options have usable dates
 	const allTrips = $derived(
@@ -25,8 +25,11 @@
 		allTrips={allTrips}
 		user={data.user}
 		onInvite={handleInvite}
-		children={children != null && typeof children === 'function' ? children : undefined}
-	/>
+	>
+		{#snippet children()}
+			{@render children()}
+		{/snippet}
+	</TripLayoutShell>
 </div>
 
 <style>

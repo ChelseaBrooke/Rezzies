@@ -30,7 +30,7 @@
 		onCopyLink?.();
 	}
 
-	function handleEditBasics() {
+	function handlePreviewNewTrip() {
 		goto(`/trips/${tripId}/preview-new`);
 		moreOpen = false;
 	}
@@ -58,7 +58,7 @@
 	<button type="button" class="action-btn" title="Copy link" onclick={handleShare}>
 		<span class="action-icon">🔗</span>
 	</button>
-	<button type="button" class="action-btn" title="Preview new trip form" onclick={handleEditBasics}>
+	<button type="button" class="action-btn" title="Preview new trip form" onclick={handlePreviewNewTrip}>
 		<span class="action-icon">✏️</span>
 	</button>
 	<div class="more-wrap">

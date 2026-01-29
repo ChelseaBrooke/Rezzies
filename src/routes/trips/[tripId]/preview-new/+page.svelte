@@ -1,77 +1,122 @@
 <script lang="ts">
-	import type { LayoutData } from '../$types';
-	import Stepper from '$lib/components/wizard/Stepper.svelte';
+	import { goto } from '$app/navigation';
+	import { tripToDraft } from '$lib/stores/tripDraft.js';
+	import CreateTripShell from '$lib/components/wizard/CreateTripShell.svelte';
 	import Step1 from '../../new/step/[stepNumber]/Step1.svelte';
-	import { getSampleDraft } from '$lib/stores/tripDraft.js';
+	import Step2 from '../../new/step/[stepNumber]/Step2.svelte';
+	import ActivitiesStep from '../../new/step/[stepNumber]/ActivitiesStep.svelte';
+	import Step3 from '../../new/step/[stepNumber]/Step3.svelte';
+	import Step4 from '../../new/step/[stepNumber]/Step4.svelte';
+	import type { TripDraft } from '$lib/stores/tripDraft.js';
 
-	let { data }: { data: LayoutData } = $props();
+	let { data } = $props();
+
+	let draft = $state<TripDraft>(tripToDraft(data?.trip ?? null));
+	let currentStep = $state(0);
+
+	$effect(() => {
+		const trip = data?.trip ?? null;
+		draft = tripToDraft(trip);
+		currentStep = 0;
+	});
 
 	const tripId = $derived(data?.trip?.id ?? '');
-	let sampleDraft = $state(getSampleDraft());
-
-	const steps = [
-		{ number: 1, label: 'Basics & Rooms' },
-		{ number: 2, label: 'Meals', optional: true },
-		{ number: 3, label: 'Activities' },
-		{ number: 4, label: 'Invite People' },
-		{ number: 5, label: 'Review & Publish' }
-	];
+	const tripName = $derived(data?.trip?.name ?? 'Trip');
+	const previewLabel = $derived(`Preview: New trip form — ${tripName}`);
 
 	function noop() {}
+	function handleBack() {
+		if (currentStep > 0) {
+			currentStep -= 1;
+		} else {
+			goto(`/trips/${tripId}`);
+		}
+	}
+	function handleNext() {
+		if (currentStep < 4) {
+			currentStep += 1;
+		} else {
+			goto(`/trips/${tripId}`);
+		}
+	}
 </script>
 
-<div class="preview-new">
-	<div class="preview-card">
-		<p class="preview-label">Preview: New trip form (all fields filled)</p>
-		<Stepper {steps} currentStep={0} backHref={tripId ? `/trips/${tripId}` : undefined} />
-		<div class="preview-content">
-			<Step1
-				bind:draft={sampleDraft}
-				autosave={noop}
-				prevStep={noop}
-				handleNextStep={noop}
-				canProceed={true}
-			/>
+<CreateTripShell
+	{currentStep}
+	{previewLabel}
+	onBack={handleBack}
+>
+	{#snippet children()}
+		{#if currentStep === 0}
+			<Step1 bind:draft autosave={noop} prevStep={handleBack} handleNextStep={handleNext} canProceed={true} />
+		{:else if currentStep === 1}
+			<Step2 bind:draft autosave={noop} />
+		{:else if currentStep === 2}
+			<ActivitiesStep bind:draft autosave={noop} />
+		{:else if currentStep === 3}
+			<Step3 bind:draft autosave={noop} />
+		{:else}
+			<Step4 bind:draft />
+		{/if}
+
+		<div class="card-footer">
+			<button type="button" class="btn-back" onclick={handleBack}>
+				Back
+			</button>
+			<div class="footer-right">
+				{#if currentStep < 4}
+					<button type="button" class="btn-next" onclick={handleNext}>
+						Next
+					</button>
+				{:else}
+					<a href="/trips/{tripId}" class="btn-done">Done</a>
+				{/if}
+			</div>
 		</div>
-	</div>
-</div>
+	{/snippet}
+</CreateTripShell>
 
 <style>
-	.preview-new {
-		width: 100%;
-		max-width: 100%;
-		min-height: 0;
-	}
-
-	.preview-card {
-		background: white;
-		border-radius: 0.75rem;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-		overflow: hidden;
+	.card-footer {
+		margin-top: auto;
+		padding-top: 2rem;
+		border-top: 1px solid var(--border);
 		display: flex;
-		flex-direction: column;
+		justify-content: space-between;
+		align-items: center;
 	}
-
-	.preview-label {
-		margin: 0;
+	.footer-right {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.btn-back,
+	.btn-next,
+	.btn-done {
 		padding: 0.75rem 1.5rem;
-		font-size: 0.8125rem;
-		color: var(--muted, #64748b);
-		background: var(--bg, #f8fafc);
-		border-bottom: 1px solid var(--border, #e2e8f0);
+		border-radius: 0.5rem;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		border: none;
+		font-family: inherit;
+		text-decoration: none;
 	}
-
-	.preview-content {
-		flex: 1;
-		padding: 1rem 2rem 1.5rem;
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
+	.btn-back {
+		background: transparent;
+		color: var(--muted);
 	}
-
-	@media (max-width: 768px) {
-		.preview-content {
-			padding: 1rem 1.5rem;
-		}
+	.btn-back:hover {
+		color: var(--text);
+	}
+	.btn-next,
+	.btn-done {
+		background: var(--primary);
+		color: white;
+	}
+	.btn-next:hover,
+	.btn-done:hover {
+		background: var(--primary-dark, #1e3a8a);
 	}
 </style>

@@ -239,15 +239,21 @@
 
 	.dashboard-right {
 		grid-area: right;
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		justify-content: flex-start;
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
 		gap: 1rem;
+		min-width: 0;
+		align-content: start;
+	}
+
+	/* Calendar: same width as Payments box only (second column) */
+	.calendar-wrap {
+		grid-column: 2;
 		min-width: 0;
 	}
 
 	.stats-row {
+		grid-column: 1 / -1;
 		display: grid;
 		grid-template-columns: repeat(2, 1fr);
 		gap: 1rem;
@@ -257,21 +263,9 @@
 		min-width: 0;
 	}
 
-	.calendar-wrap {
-		flex-shrink: 0;
-		align-self: flex-end;
-		width: calc((100% - 1rem) / 2);
+	.promo-wrap {
+		grid-column: 1 / -1;
 		min-width: 0;
-	}
-
-	.stats-row,
-	.promo-wrap {
-		align-self: stretch;
-		width: 100%;
-	}
-
-	.promo-wrap {
-		flex-shrink: 0;
 	}
 
 	.section-bottom-left {
@@ -294,6 +288,14 @@
 				'hero'
 				'right'
 				'bottom-left';
+		}
+
+		.dashboard-right {
+			grid-template-columns: 1fr;
+		}
+
+		.calendar-wrap {
+			grid-column: 1;
 		}
 
 		.stats-row {

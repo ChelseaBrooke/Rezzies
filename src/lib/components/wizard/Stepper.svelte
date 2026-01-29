@@ -8,9 +8,13 @@
 		optional?: boolean;
 	}
 	
-	let { steps, currentStep, backHref }: { steps: Step[]; currentStep: number; backHref?: string } = $props();
+	let { steps, currentStep, backHref, onBack }: { steps: Step[]; currentStep: number; backHref?: string; onBack?: () => void } = $props();
 	
 	function prevStep() {
+		if (onBack) {
+			onBack();
+			return;
+		}
 		if (backHref) return;
 		if (currentStep > 0) {
 			const previousStepNumber = currentStep;
@@ -23,8 +27,12 @@
 
 <div class="stepper">
 	<div class="stepper-content">
-		{#if currentStep > 0 || backHref}
-			{#if backHref}
+		{#if currentStep > 0 || backHref || onBack}
+			{#if onBack}
+				<button type="button" class="stepper-back-btn" onclick={onBack}>
+					{currentStep === 0 ? '← Back to trip' : '← Back'}
+				</button>
+			{:else if backHref}
 				<a href={backHref} class="stepper-back-btn">← Back to trip</a>
 			{:else}
 				<button type="button" class="stepper-back-btn" onclick={prevStep}>

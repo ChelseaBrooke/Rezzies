@@ -273,83 +273,83 @@ const defaultDraft: TripDraft = {
 	activities: getDefaultActivitiesConfig()
 };
 
-/** Sample draft with all fields filled for "new trip" preview in trip portal */
-export function getSampleDraft(): TripDraft {
-	const checkIn = new Date();
-	checkIn.setDate(checkIn.getDate() + 30);
-	const checkOut = new Date(checkIn);
-	checkOut.setDate(checkOut.getDate() + 7);
-	const pad = (n: number) => String(n).padStart(2, '0');
-	const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** Trip shape from layout (Prisma trip with rooms/beds) for converting to draft */
+export interface TripForDraft {
+	id: string;
+	name: string;
+	description?: string | null;
+	listingUrl?: string | null;
+	checkInDate: Date | string;
+	checkOutDate: Date | string;
+	totalCost?: number | null;
+	pricingModel?: string | null;
+	location?: string | null;
+	maxGuests?: number | null;
+	expectedPeopleCount?: number | null;
+	allowPartialStays?: boolean | null;
+	rooms?: Array<{
+		id: number;
+		name: string;
+		description?: string | null;
+		photoUrls?: string[];
+		maxOccupancy?: number | null;
+		beds?: Array<{
+			id: string;
+			bedType: string;
+			capacitySlots?: number | null;
+			capacity?: number | null;
+		}>;
+	}>;
+}
+
+function toYmd(d: Date | string): string {
+	const date = typeof d === 'string' ? new Date(d) : d;
+	if (Number.isNaN(date.getTime())) return '';
+	const y = date.getFullYear();
+	const m = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
+/** Convert current trip (from sidebar/layout) to a TripDraft for the edit preview form */
+export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
+	if (!trip) return { ...defaultDraft };
+	const roomsList = trip.rooms ?? [];
+	const draftRooms: TripDraft['rooms'] = roomsList.map((room, idx) => ({
+		id: String(room.id),
+		name: room.name ?? `Room ${idx + 1}`,
+		roomType: 'bedroom',
+		customRoomDescription: room.description ?? '',
+		type: 'private',
+		maxOccupants: room.maxOccupancy ?? 2,
+		notes: '',
+		photos: room.photoUrls ?? [],
+		beds: (room.beds ?? []).map((bed) => ({
+			id: bed.id,
+			bedType: bed.bedType,
+			count: 1,
+			shared: false,
+			notes: ''
+		}))
+	}));
 	return {
 		...defaultDraft,
-		name: 'Lake House Weekend',
-		description: 'A relaxing weekend at the lake with friends. Bring your swimsuit and board games!',
-		destinationCity: '123 Lakeshore Dr, Lake Tahoe, CA',
-		destinationState: 'CA',
-		destinationCountry: 'United States',
-		propertyAddress: '123 Lakeshore Dr',
-		checkInDate: ymd(checkIn),
-		checkOutDate: ymd(checkOut),
-		flexibleDates: true,
-		expectedGuestCount: 8,
-		maxOccupancy: 10,
-		bedrooms: 4,
-		bathrooms: 3,
-		totalTripCost: '2400',
-		cleaningFee: '150',
-		serviceFee: '0',
-		taxes: '0',
-		refundableDeposit: '500',
-		rooms: [
-			{
-				id: 'room-1',
-				name: 'Master Bedroom',
-				roomType: 'master-bedroom',
-				customRoomDescription: '',
-				type: 'private',
-				maxOccupants: 2,
-				notes: 'Lake view',
-				photos: [],
-				beds: [{ id: 'b1', bedType: 'King', count: 1, shared: false, notes: '' }]
-			},
-			{
-				id: 'room-2',
-				name: 'Guest Room 1',
-				roomType: 'guest-room',
-				customRoomDescription: '',
-				type: 'private',
-				maxOccupants: 2,
-				notes: '',
-				photos: [],
-				beds: [{ id: 'b2', bedType: 'Queen', count: 1, shared: false, notes: '' }]
-			},
-			{
-				id: 'room-3',
-				name: 'Bunk Room',
-				roomType: 'bedroom',
-				customRoomDescription: '',
-				type: 'shared',
-				maxOccupants: 4,
-				notes: 'Kids love it',
-				photos: [],
-				beds: [
-					{ id: 'b3', bedType: 'Twin', count: 2, shared: false, notes: 'Bunk beds' },
-					{ id: 'b4', bedType: 'Full', count: 1, shared: false, notes: '' }
-				]
-			},
-			{
-				id: 'room-4',
-				name: 'Loft',
-				roomType: 'other',
-				customRoomDescription: 'Sleeping loft',
-				type: 'shared',
-				maxOccupants: 2,
-				notes: '',
-				photos: [],
-				beds: [{ id: 'b5', bedType: 'Queen', count: 1, shared: false, notes: '' }]
-			}
-		],
+		name: trip.name ?? '',
+		description: trip.description ?? '',
+		listingUrl: trip.listingUrl ?? '',
+		destinationCity: trip.location ?? '',
+		propertyAddress: trip.location ?? '',
+		checkInDate: toYmd(trip.checkInDate),
+		checkOutDate: toYmd(trip.checkOutDate),
+		flexibleDates: trip.allowPartialStays ?? false,
+		totalTripCost: trip.totalCost != null ? String(trip.totalCost) : '',
+		expectedGuestCount: trip.expectedPeopleCount ?? 0,
+		maxOccupancy: trip.maxGuests ?? 0,
+		bedrooms: draftRooms.length,
+		bathrooms: Math.max(1, draftRooms.length),
+		rooms: draftRooms,
+		partialStayAllowed: trip.allowPartialStays ?? false,
+		pricingModel: (trip.pricingModel === 'per_room' ? 'per-room' : trip.pricingModel === 'per_bed' ? 'per-bed' : trip.pricingModel === 'per_person' || trip.pricingModel === 'per_person_per_night' ? 'per-person' : 'per-person') as TripDraft['pricingModel'],
 		meals: getDefaultMealsConfig(),
 		activities: getDefaultActivitiesConfig()
 	};
