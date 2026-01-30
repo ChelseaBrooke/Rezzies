@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 	
 	let { user, isCollapsed = false }: { user?: { email?: string; name?: string } | null; isCollapsed?: boolean } = $props();
 	
@@ -101,14 +102,9 @@
 	<div class="sidebar-content">
 		<!-- Top Branding Section -->
 		<div class="branding-section">
-			<div class="logo-avatar">
-				<span class="logo-icon">🦩</span>
-			</div>
+			<RezziesLogo href="/trips" class="wizard-brand" compact={collapsed} />
 			{#if !collapsed}
-				<div class="brand-info">
-					<h2 class="brand-name">Rezzies</h2>
-					<p class="brand-subtitle">Group Trip Planning</p>
-				</div>
+				<p class="brand-subtitle">Group Trip Planning</p>
 			{/if}
 		</div>
 		
@@ -236,41 +232,18 @@
 	/* Top Branding Section */
 	.branding-section {
 		display: flex;
-		align-items: center;
-		gap: 0.75rem;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.25rem;
 		margin-bottom: 2rem;
 		padding-bottom: 1.5rem;
 		border-bottom: 1px solid var(--border);
 	}
-	
-	.logo-avatar {
-		width: 48px;
-		height: 48px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, var(--primary) 0%, var(--primary-accent) 100%);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-	
-	.logo-icon {
-		font-size: 1.75rem;
-	}
-	
-	.brand-info {
-		flex: 1;
-		min-width: 0;
-	}
-	
-	.brand-name {
-		font-size: 1.25rem;
-		font-weight: 700;
+
+	.wizard-brand {
 		color: var(--text);
-		margin: 0 0 0.25rem 0;
-		line-height: 1.2;
 	}
-	
+
 	.brand-subtitle {
 		font-size: 0.75rem;
 		color: var(--muted);
@@ -564,7 +537,10 @@
 	}
 	
 	/* Collapsed State Styles */
-	.sidebar.collapsed .brand-info,
+	.sidebar.collapsed .brand-subtitle {
+		display: none;
+	}
+
 	.sidebar.collapsed .nav-label,
 	.sidebar.collapsed .utility-label,
 	.sidebar.collapsed .toggle-switch,
@@ -574,7 +550,7 @@
 	}
 	
 	.sidebar.collapsed .branding-section {
-		justify-content: center;
+		align-items: center;
 		padding-bottom: 1rem;
 		margin-bottom: 1rem;
 	}

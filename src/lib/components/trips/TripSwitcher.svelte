@@ -6,6 +6,7 @@
 		name: string;
 		checkInDate: Date;
 		checkOutDate: Date;
+		isPublished?: boolean;
 	}
 
 	let {
@@ -79,7 +80,10 @@
 					onclick={() => selectTrip(t.id)}
 					role="option"
 				>
-					<span class="switcher-item-name">{t.name}</span>
+					<span class="switcher-item-row">
+						<span class="switcher-item-name">{t.name}</span>
+						<span class="switcher-item-status" data-status={t.isPublished ? 'live' : 'draft'}>{t.isPublished ? 'live' : 'draft'}</span>
+					</span>
 					<span class="switcher-item-dates">{formatDate(t.checkInDate)} – {formatDate(t.checkOutDate)}</span>
 				</button>
 			{/each}
@@ -201,8 +205,35 @@
 		content: attr(data-label);
 	}
 
+	.switcher-item-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+	}
+
 	.switcher-item-name {
 		font-weight: 500;
+	}
+
+	.switcher-item-status {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		text-transform: lowercase;
+		letter-spacing: 0.02em;
+		padding: 0.125rem 0.375rem;
+		border-radius: 9999px;
+		flex-shrink: 0;
+	}
+
+	.switcher-item-status[data-status='draft'] {
+		background: var(--border);
+		color: var(--muted);
+	}
+
+	.switcher-item-status[data-status='live'] {
+		background: rgba(34, 197, 94, 0.15);
+		color: #15803d;
 	}
 
 	.switcher-item-dates {

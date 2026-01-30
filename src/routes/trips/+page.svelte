@@ -1,8 +1,10 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
+	import { enhance } from '$app/forms';
 
 	let { data }: { data: PageData } = $props();
+
 </script>
 
 <div class="trips-page">
@@ -17,12 +19,36 @@
 				<h2>Trips You Host</h2>
 				<div class="trips-grid">
 					{#each data.ownedTrips as trip}
-						<div class="trip-card" on:click={() => goto(`/trips/${trip.id}`)}>
-							{#if trip.listingCoverPhoto}
-								<img src={trip.listingCoverPhoto} alt={trip.name} class="trip-image" />
-							{:else}
-								<div class="trip-image-placeholder">🏖️</div>
-							{/if}
+						<div class="trip-card" onclick={() => goto(`/trips/${trip.id}`)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && goto(`/trips/${trip.id}`)}>
+							<div class="trip-card-image-wrap">
+								{#if trip.listingCoverPhoto}
+									<img src={trip.listingCoverPhoto} alt={trip.name} class="trip-image" />
+								{:else}
+									<div class="trip-image-placeholder">🏖️</div>
+								{/if}
+								<form
+									class="trip-delete-form"
+									method="POST"
+									action="?/deleteTrip"
+									use:enhance={({ cancel }) => {
+										if (!confirm('Delete this trip? This cannot be undone.')) {
+											cancel();
+										}
+									}}
+									onclick={(e) => e.stopPropagation()}
+									onkeydown={(e) => e.stopPropagation()}
+								>
+									<input type="hidden" name="tripId" value={trip.id} />
+									<button type="submit" class="trip-delete-btn" aria-label="Delete trip {trip.name}" title="Delete trip">
+										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+											<polyline points="3 6 5 6 21 6"></polyline>
+											<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+											<line x1="10" y1="11" x2="10" y2="17"></line>
+											<line x1="14" y1="11" x2="14" y2="17"></line>
+										</svg>
+									</button>
+								</form>
+							</div>
 							<div class="trip-content">
 								<h3>{trip.name}</h3>
 								<p class="trip-dates">
@@ -48,7 +74,7 @@
 				<h2>Trips You're Invited To</h2>
 				<div class="trips-grid">
 					{#each data.invitedTrips as trip}
-						<div class="trip-card" on:click={() => goto(`/trips/${trip.id}`)}>
+						<div class="trip-card" onclick={() => goto(`/trips/${trip.id}`)}>
 							{#if trip.listingCoverPhoto}
 								<img src={trip.listingCoverPhoto} alt={trip.name} class="trip-image" />
 							{:else}
@@ -128,6 +154,41 @@
 	.trip-card:hover {
 		transform: translateY(-4px);
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	}
+
+	.trip-card-image-wrap {
+		position: relative;
+	}
+
+	.trip-delete-form {
+		position: absolute;
+		top: 0.5rem;
+		right: 0.5rem;
+		z-index: 2;
+	}
+
+	.trip-delete-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2rem;
+		height: 2rem;
+		padding: 0;
+		border: none;
+		border-radius: var(--radius-sm, 0.375rem);
+		background: rgba(0, 0, 0, 0.5);
+		color: white;
+		cursor: pointer;
+		transition: background 0.2s;
+	}
+
+	.trip-delete-btn:hover {
+		background: rgba(220, 38, 38, 0.9);
+	}
+
+	.trip-delete-btn:focus {
+		outline: 2px solid white;
+		outline-offset: 2px;
 	}
 
 	.trip-image {

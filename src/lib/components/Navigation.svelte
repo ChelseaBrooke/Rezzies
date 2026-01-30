@@ -1,16 +1,14 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	
+	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+
 	let { user } = $props<{ user?: { email: string } | null }>();
 </script>
 
 <nav class="navbar">
 	<div class="nav-container">
-		<a href="/" class="logo">
-			<span class="logo-icon">🏖️</span>
-			<span class="logo-text">Rezzies</span>
-		</a>
+		<RezziesLogo href="/" class="nav-logo" />
 		
 		<div class="nav-links">
 			<a href="/" class="nav-link" class:active={$page.url.pathname === '/'}>Home</a>
@@ -53,20 +51,10 @@
 		gap: var(--spacing-lg);
 	}
 	
-	.logo {
-		display: flex;
-		align-items: center;
-		gap: var(--spacing-xs);
-		font-size: 1.5rem;
-		font-weight: 700;
+	.nav-logo {
 		color: var(--color-primary);
-		text-decoration: none;
 	}
-	
-	.logo-icon {
-		font-size: 2rem;
-	}
-	
+
 	.nav-links {
 		display: flex;
 		align-items: center;

@@ -1,13 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 </script>
 
 <header class="rezzies-header">
 	<div class="header-left">
-		<a href="/" class="logo-link">
-			<span class="logo-text">rezzies</span>
-			<span class="flamingo-icon">🦩</span>
-		</a>
+		<RezziesLogo href="/" class="logo-link" />
 		<span class="tagline">for the host that does the most</span>
 	</div>
 	
@@ -56,13 +54,8 @@
 		font-weight: 600;
 	}
 
-	.logo-text {
-		text-transform: lowercase;
-		letter-spacing: -0.5px;
-	}
-
-	.flamingo-icon {
-		font-size: 1.25rem;
+	.logo-link {
+		color: white;
 	}
 
 	.tagline {

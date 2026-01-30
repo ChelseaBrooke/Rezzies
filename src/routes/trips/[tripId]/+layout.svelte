@@ -6,11 +6,12 @@
 
 	// Serialized dates from server come back as strings; ensure trip options have usable dates
 	const allTrips = $derived(
-		(data.allTrips ?? []).map((t: { id: string; name: string; checkInDate: Date | string; checkOutDate: Date | string }) => ({
+		(data.allTrips ?? []).map((t: { id: string; name: string; checkInDate: Date | string; checkOutDate: Date | string; isPublished?: boolean }) => ({
 			id: t.id,
 			name: t.name,
 			checkInDate: typeof t.checkInDate === 'string' ? new Date(t.checkInDate) : t.checkInDate,
-			checkOutDate: typeof t.checkOutDate === 'string' ? new Date(t.checkOutDate) : t.checkOutDate
+			checkOutDate: typeof t.checkOutDate === 'string' ? new Date(t.checkOutDate) : t.checkOutDate,
+			isPublished: t.isPublished ?? false
 		}))
 	);
 

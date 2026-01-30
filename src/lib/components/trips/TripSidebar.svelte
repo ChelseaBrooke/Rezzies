@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { getTripStatus } from '$lib/trips/types.js';
 	import { getTripBadges } from '$lib/trips/selectors.js';
 	import TripSwitcher from './TripSwitcher.svelte';
 	import TripQuickActions from './TripQuickActions.svelte';
 	import TripNavItem from './TripNavItem.svelte';
+	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 	import type { TripForSidebar } from '$lib/trips/types.js';
-
-	import templogo1 from '$lib/assets/images/templogo1.png';
 
 	let {
 		trip,
@@ -16,13 +14,12 @@
 		showToast
 	}: {
 		trip: TripForSidebar & { inviteCode?: string };
-		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date }[];
+		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date; isPublished?: boolean }[];
 		user?: { id: string; name: string | null; email: string } | null;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
 	} = $props();
 
-	const status = $derived(getTripStatus(trip));
 	const badges = $derived(getTripBadges(trip));
 	const mealsEnabled = $derived(!!trip.mealPlan);
 
@@ -31,7 +28,8 @@
 			id: t.id,
 			name: t.name,
 			checkInDate: t.checkInDate,
-			checkOutDate: t.checkOutDate
+			checkOutDate: t.checkOutDate,
+			isPublished: t.isPublished ?? false
 		}))
 	);
 
@@ -39,16 +37,9 @@
 
 <aside class="sidebar">
 	<div class="sidebar-overlay" aria-hidden="true"></div>
-	<!-- Rezzies + logo exactly as homepage: rezzies text then logo -->
-	<a href="/trips" class="sidebar-brand">
-		<span class="sidebar-brand-text">rezzies</span>
-		<img src={templogo1} alt="" class="sidebar-brand-logo" />
-	</a>
-	<!-- Trip card: status + switcher (no name/dates) -->
+	<RezziesLogo href="/trips" class="sidebar-brand" />
+	<!-- Trip card: switcher only -->
 	<div class="trip-profile-card">
-		<span class="status-pill" data-status={status}>
-			{status === 'draft' ? 'Draft' : status === 'live' ? 'Live' : 'Locked'}
-		</span>
 		<div class="switcher-wrap">
 			<TripSwitcher
 				currentTripId={trip.id}
@@ -100,33 +91,10 @@
 		padding: 1.25rem;
 	}
 
-	/* Same as homepage: rezzies + logo (order, size, typography) */
 	.sidebar-brand {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		text-decoration: none;
-		color: inherit;
 		margin-bottom: 1rem;
 		padding-bottom: 1rem;
 		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-		font-size: 1.5rem;
-		font-weight: 600;
-	}
-
-	.sidebar-brand-text {
-		text-transform: lowercase;
-		letter-spacing: -0.5px;
-		white-space: nowrap;
-	}
-
-	.sidebar-brand-logo {
-		display: block;
-		height: 2rem;
-		width: auto;
-		max-width: 4rem;
-		object-fit: contain;
-		flex-shrink: 0;
 	}
 
 	.header-block {
@@ -135,34 +103,8 @@
 		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
 	}
 
-	.status-pill {
-		display: inline-block;
-		font-size: 0.6875rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 0.25rem 0.5rem;
-		border-radius: 9999px;
-		margin-bottom: 0.75rem;
-	}
-
-	.status-pill[data-status='draft'] {
-		background: var(--border);
-		color: var(--muted);
-	}
-
-	.status-pill[data-status='live'] {
-		background: rgba(34, 197, 94, 0.15);
-		color: #15803d;
-	}
-
-	.status-pill[data-status='locked'] {
-		background: rgba(239, 68, 68, 0.1);
-		color: #dc2626;
-	}
-
 	.switcher-wrap {
-		margin-top: 0.5rem;
+		margin-top: 0;
 	}
 
 	.actions-row {

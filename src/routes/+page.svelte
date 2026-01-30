@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import templogo1 from '$lib/assets/images/templogo1.png';
+	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 </script>
 
 <div class="home-page">
@@ -13,10 +13,7 @@
 	<!-- Header -->
 	<header class="home-header">
 		<div class="header-left">
-			<a href="/" class="logo-link">
-				<span class="logo-text">rezzies</span>
-				<img src={templogo1} alt="" class="logo-img" />
-			</a>
+			<RezziesLogo href="/" class="logo-link" />
 			<span class="tagline">for the host that does the most</span>
 		</div>
 		
@@ -122,27 +119,7 @@
 	}
 
 	.logo-link {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		text-decoration: none;
 		color: white;
-		font-size: 1.5rem;
-		font-weight: 600;
-	}
-
-	.logo-img {
-		display: block;
-		height: 2rem;
-		width: auto;
-		max-width: 4rem;
-		object-fit: contain;
-		flex-shrink: 0;
-	}
-
-	.logo-text {
-		text-transform: lowercase;
-		letter-spacing: -0.5px;
 	}
 
 	.tagline {

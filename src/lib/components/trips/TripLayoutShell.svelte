@@ -13,7 +13,7 @@
 		children
 	}: {
 		trip: TripForSidebar & { inviteCode?: string };
-		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date }[];
+		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date; isPublished?: boolean }[];
 		user?: { id: string; name: string | null; email: string } | null;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
