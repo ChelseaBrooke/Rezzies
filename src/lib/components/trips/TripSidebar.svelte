@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { getTripBadges } from '$lib/trips/selectors.js';
-	import TripSwitcher from './TripSwitcher.svelte';
 	import TripNavItem from './TripNavItem.svelte';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 	import type { TripForSidebar } from '$lib/trips/types.js';
@@ -22,52 +21,33 @@
 	const badges = $derived(getTripBadges(trip));
 	const mealsEnabled = $derived(!!trip.mealPlan);
 
-	const tripOptions = $derived(
-		allTrips.map((t) => ({
-			id: t.id,
-			name: t.name,
-			checkInDate: t.checkInDate,
-			checkOutDate: t.checkOutDate,
-			isPublished: t.isPublished ?? false
-		}))
-	);
-
 </script>
 
 <aside class="sidebar">
 	<div class="sidebar-overlay" aria-hidden="true"></div>
 	<RezziesLogo href="/trips" class="sidebar-brand" />
-	<!-- Trip card: switcher only -->
-	<div class="trip-profile-card">
-		<div class="switcher-wrap">
-			<TripSwitcher
-				currentTripId={trip.id}
-				currentTripName={trip.name}
-				trips={tripOptions}
-				tripsListHref="/trips"
-			/>
-		</div>
-	</div>
 
+	<div class="sidebar-content">
 	<!-- Nav Items -->
 	<nav class="nav">
-		<TripNavItem href="/trips/{trip.id}" icon="📊" label="Overview" />
-		<TripNavItem href="/trips/{trip.id}/guests" icon="👥" label="Guests" badge={badges.guests} />
-		<TripNavItem href="/trips/{trip.id}/rooms" icon="🛏️" label="Rooms & Beds" badge={badges.rooms} />
-		<TripNavItem href="/trips/{trip.id}/payments" icon="💳" label="Payments" badge={badges.payments} />
-		<TripNavItem href="/trips/{trip.id}/itinerary" icon="📋" label="Itinerary" badge={badges.itinerary} />
+		<TripNavItem href="/trips/{trip.id}" iconName="overview" label="Overview" />
+		<TripNavItem href="/trips/{trip.id}/guests" iconName="guests" label="Guests" badge={badges.guests} />
+		<TripNavItem href="/trips/{trip.id}/rooms" iconName="rooms" label="Rooms" badge={badges.rooms} />
+		<TripNavItem href="/trips/{trip.id}/payments" iconName="payments" label="Payments" badge={badges.payments} />
+		<TripNavItem href="/trips/{trip.id}/itinerary" iconName="itinerary" label="Itinerary" badge={badges.itinerary} />
 		{#if mealsEnabled}
-			<TripNavItem href="/trips/{trip.id}/meals" icon="🍽️" label="Meals" badge={badges.meals} />
+			<TripNavItem href="/trips/{trip.id}/meals" iconName="meals" label="Meals" badge={badges.meals} />
 		{/if}
-		<TripNavItem href="/trips/{trip.id}/checklist" icon="☑️" label="Packing list" />
-		<TripNavItem href="/trips/{trip.id}/polls" icon="🗳️" label="Polls" />
-		<TripNavItem href="/trips/{trip.id}/activities" icon="🎯" label="Activities" />
-		<TripNavItem href="/trips/{trip.id}/files" icon="📁" label="Files" badge={badges.files} />
+		<TripNavItem href="/trips/{trip.id}/checklist" iconName="checklist" label="Packing list" />
+		<TripNavItem href="/trips/{trip.id}/polls" iconName="polls" label="Polls" />
+		<TripNavItem href="/trips/{trip.id}/activities" iconName="activities" label="Activities" />
+		<TripNavItem href="/trips/{trip.id}/files" iconName="files" label="Files" badge={badges.files} />
 	</nav>
 
 	<!-- Footer -->
 	<div class="footer">
-		<TripNavItem href="/trips/{trip.id}/settings" icon="⚙️" label="Trip Settings" />
+		<TripNavItem href="/trips/{trip.id}/settings" iconName="settings" label="Trip Settings" />
+	</div>
 	</div>
 </aside>
 
@@ -77,27 +57,41 @@
 		flex-direction: column;
 		width: 100%;
 		min-height: 100%;
-		/* Blends into shell background; no soft edges */
 		background: transparent;
 		overflow: hidden;
 		padding: 1.25rem;
+		padding-top: 1rem;
+		color: white;
 	}
 
 	.sidebar-brand {
-		margin-bottom: 1rem;
-		padding-bottom: 1rem;
-		border-bottom: 1px solid var(--border);
-		color: var(--text);
+		margin-bottom: 0;
+		padding-bottom: 0;
+		border-bottom: none;
+		color: white;
+		flex-shrink: 0;
 	}
 
-	.header-block {
-		padding: 0 0 1rem 0;
-		margin-bottom: 0.5rem;
-		border-bottom: 1px solid var(--border);
+	.sidebar-content {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+		margin-top: 2rem;
+		padding-top: 1rem;
 	}
 
-	.switcher-wrap {
-		margin-top: 0;
+	.sidebar-brand:focus-visible {
+		outline: 2px solid white;
+		outline-offset: 2px;
+	}
+
+	.sidebar :global(.nav) {
+		color: rgba(255, 255, 255, 0.95);
+	}
+
+	.sidebar .footer {
+		border-top-color: rgba(255, 255, 255, 0.25);
 	}
 
 	.nav {

@@ -28,6 +28,7 @@
 		width: 100%;
 		height: 100vh;
 		overflow: hidden;
+		background: transparent;
 		/* No rounded box here: sidebar blends into background; only main pane is the soft-edge box */
 	}
 

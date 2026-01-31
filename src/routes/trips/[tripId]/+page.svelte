@@ -1,10 +1,6 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import type { PageData } from './$types';
-	import StatWidget from '$lib/components/trips/StatWidget.svelte';
-	import WidgetCard from '$lib/components/trips/WidgetCard.svelte';
-	import TableWidget from '$lib/components/trips/TableWidget.svelte';
-	import PromoWidget from '$lib/components/trips/PromoWidget.svelte';
 	import TripCalendarWidget from '$lib/components/trips/TripCalendarWidget.svelte';
 	import TripQuickActions from '$lib/components/trips/TripQuickActions.svelte';
 
@@ -13,455 +9,822 @@
 	const quickActions = getContext<{ onInvite: () => void; showToast: (msg: string) => void }>('tripQuickActions');
 
 	const trip = $derived(data.trip);
-	const memberCount = $derived(trip?.members?.length ?? 0);
-	const roomCount = $derived(trip?.rooms?.length ?? 0);
-	const totalBedSlots = $derived(
-		trip?.rooms?.reduce((sum, r) => sum + (r.beds?.reduce((s, b) => s + (b.capacitySlots ?? 1), 0) ?? 0), 0) ?? 0
-	);
-	const activityCount = $derived(trip?.activities?.length ?? 0);
-	const nextActivities = $derived(
-		(trip?.activities ?? [])
-			.slice()
-			.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-			.slice(0, 5)
-	);
-	const unpaidCount = $derived((trip?.invoices?.filter((i) => i.status === 'due') ?? []).length);
-	const paidTotal = $derived(
-		(trip?.invoices?.filter((i) => i.status === 'paid') ?? []).reduce((s, i) => s + i.totalAmount, 0)
-	);
-	const dueTotal = $derived(
-		(trip?.invoices?.filter((i) => i.status === 'due') ?? []).reduce((s, i) => s + i.totalAmount, 0)
-	);
+	const user = $derived(data.user);
+	const isHost = $derived(data.isHost ?? false);
+	const userRsvp = $derived(data.userRsvp);
+	const userProfile = $derived(data.userProfile);
+	const userInvoices = $derived(data.userInvoices ?? []);
+
+	const members = $derived(trip?.members ?? []);
+	const rsvps = $derived(trip?.rsvps ?? []);
+	const roomAssignments = $derived(trip?.roomAssignments ?? []);
+	const rooms = $derived(trip?.rooms ?? []);
+	const activities = $derived(trip?.activities ?? []);
+	const mealSlots = $derived(trip?.mealSlots ?? []);
 	const totalCost = $derived(trip?.totalCost ?? 0);
 
-	/** Full Month Day – Full Month (if diff) Day, Full Year */
+	const acceptedCount = $derived(rsvps.filter((r) => r.status === 'yes').length);
+	const declinedCount = $derived(rsvps.filter((r) => r.status === 'no').length);
+	const pendingRsvpCount = $derived(members.length - acceptedCount - declinedCount);
+	const rsvpPct = $derived(members.length > 0 ? Math.round((acceptedCount / members.length) * 100) : 0);
+
+	const totalBedSlots = $derived(
+		rooms.reduce((sum, r) => sum + (r.beds?.reduce((s, b) => s + (b.capacitySlots ?? 1), 0) ?? 0), 0)
+	);
+	const claimedSlots = $derived(roomAssignments.reduce((sum, a) => sum + (a.partySize ?? 1), 0));
+	const bedsPct = $derived(totalBedSlots > 0 ? Math.round((claimedSlots / totalBedSlots) * 100) : 0);
+
+	const committedFunds = $derived(
+		(trip?.invoices ?? []).reduce((s, i) => s + (i.status === 'paid' ? i.totalAmount : 0), 0)
+	);
+	const fundingPct = $derived(totalCost > 0 ? Math.round((committedFunds / totalCost) * 100) : 0);
+
+	const guestPreviewList = $derived(members.slice(0, 8));
+
+	const myAssignment = $derived(user ? roomAssignments.find((a) => a.userId === user.id) : null);
+	const myPaidTotal = $derived(
+		userInvoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0)
+	);
+	const myDueTotal = $derived(
+		userInvoices.filter((i) => i.status === 'due').reduce((s, i) => s + i.totalAmount, 0)
+	);
+
+	type ActivityItem = { type: 'room' | 'rsvp'; text: string; at: Date };
+	const recentActivityItems = $derived(
+		(() => {
+			const items: ActivityItem[] = [];
+			roomAssignments.forEach((a) => {
+				items.push({
+					type: 'room',
+					text: `${a.user?.name ?? 'Someone'} claimed ${a.room?.name ?? 'room'}`,
+					at: new Date(a.updatedAt)
+				});
+			});
+			rsvps.forEach((r) => {
+				if (r.status === 'yes')
+					items.push({ type: 'rsvp', text: `${r.user?.name ?? 'Someone'} accepted`, at: new Date(r.updatedAt) });
+			});
+			items.sort((a, b) => b.at.getTime() - a.at.getTime());
+			return items.slice(0, 5);
+		})()
+	);
+
+	const nextUpcomingItem = $derived(
+		activities.slice().sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]
+	);
+
 	function formatTripDateRange(start: Date | string, end: Date | string): string {
 		const s = typeof start === 'string' ? new Date(start) : start;
 		const e = typeof end === 'string' ? new Date(end) : end;
-		const startMonth = s.getMonth();
-		const startDay = s.getDate();
-		const endMonth = e.getMonth();
-		const endDay = e.getDate();
-		const year = e.getFullYear();
-		const startStr = s.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
-		const endStr =
-			endMonth !== startMonth
-				? e.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
-				: String(endDay);
-		return `${startStr} – ${endStr}, ${year}`;
+		return `${s.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} – ${e.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}, ${e.getFullYear()}`;
 	}
 
 	const dateRange = $derived(
 		trip?.checkInDate && trip?.checkOutDate
 			? formatTripDateRange(trip.checkInDate, trip.checkOutDate)
 			: trip?.checkInDate
-				? (() => {
-						const d = typeof trip.checkInDate === 'string' ? new Date(trip.checkInDate) : trip.checkInDate;
-						return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
-					})()
+				? new Date(trip.checkInDate).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
 				: '—'
 	);
 
-	/** Micro bar heights (visual only), derived from counts or placeholder */
-	const guestsBars = $derived([memberCount ? Math.min(100, memberCount * 15) : 40, 60, 75, 50, 85, 70, 55]);
-	const paymentsBars = $derived(
-		totalCost > 0 ? [65, 80, 70, 90, 75, 85, 70] : [30, 45, 40, 50, 35, 55, 40]
-	);
-	const datesBars = $derived([70, 65, 80, 75, 90, 85, 78]);
-
-	function formatShort(d: Date | string) {
-		const date = typeof d === 'string' ? new Date(d) : d;
-		return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' });
+	function initials(name: string | null | undefined): string {
+		if (!name?.trim()) return '?';
+		const parts = name.trim().split(/\s+/);
+		return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
 	}
 
-	function formatDateTime(d: Date | string) {
-		const date = typeof d === 'string' ? new Date(d) : d;
-		return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+	function nudgePending() {
+		quickActions?.showToast?.('Nudge sent to pending guests');
+	}
+
+	function addToCalendar() {
+		quickActions?.showToast?.('Add to calendar — coming soon');
 	}
 </script>
 
-<div class="dashboard-page">
-	<div class="dashboard-layout">
-		<!-- Upper-left: main trip photo with name and date range on top -->
-		<section class="trip-hero">
-			<div class="trip-hero-image-wrap">
-				{#if trip?.listingCoverPhoto}
-					<img src={trip.listingCoverPhoto} alt="" class="trip-hero-image" />
-				{:else}
-					<div class="trip-hero-placeholder"></div>
-				{/if}
-				{#if quickActions && trip}
-					<div class="trip-hero-actions">
-						<TripQuickActions
-							tripId={trip.id}
-							inviteCode={trip.inviteCode}
-							onInvite={quickActions.onInvite}
-							showToast={quickActions.showToast}
-						/>
+<div class="overview-page">
+	<!-- Left: photo, then Trip info + Recent activity + Alerts, then Guests. Right: stats, buttons, calendar, For you -->
+	<div class="hero-and-calendar">
+		<div class="overview-left-column">
+			<div class="hero-photo-box" aria-label="Trip photo">
+				<div class="hero-image-wrap">
+					{#if trip?.listingCoverPhoto}
+						<img src={trip.listingCoverPhoto} alt="" class="hero-image" />
+					{:else}
+						<div class="hero-placeholder"></div>
+					{/if}
+					<div class="hero-overlay">
+						<h1 class="hero-name">{trip?.name ?? 'Trip'}</h1>
+						<p class="hero-dates">
+							<span class="hero-date">{dateRange}</span>
+							{#if trip?.location?.trim()}
+								<span class="hero-sep"> · </span>
+								<span class="hero-destination">{trip.location}</span>
+							{/if}
+						</p>
+						<div class="hero-cta-cluster">
+							{#if quickActions && trip}
+								<TripQuickActions
+									tripId={trip.id}
+									inviteCode={trip.inviteCode}
+									onInvite={quickActions.onInvite}
+									showToast={quickActions.showToast}
+								/>
+							{/if}
+							<button type="button" class="hero-cta-btn" onclick={addToCalendar} title="Add to calendar">
+								Add to calendar
+							</button>
+						</div>
 					</div>
-				{/if}
-				<div class="trip-hero-overlay">
-					<h1 class="trip-hero-name">{trip?.name ?? 'Trip'}</h1>
-					<p class="trip-hero-dates"><span class="trip-hero-date">{dateRange}</span>{#if trip?.location?.trim()}<span class="trip-hero-sep"> | </span><span class="trip-hero-destination">{trip.location}</span>{/if}</p>
 				</div>
 			</div>
-		</section>
-
-		<!-- Upper-right: calendar at top, then stat cards + promo -->
-		<aside class="dashboard-right">
-			<div class="calendar-wrap">
+			<!-- Trip info, Recent activity, Alerts — just below the main photo -->
+			<div class="overview-below-photo">
+				<section class="trip-info-note overview-card" aria-labelledby="trip-info-title">
+					<h2 id="trip-info-title" class="section-title">Trip info</h2>
+					<p class="trip-info-text">Check-in is 4pm. Keys at the lockbox — code in your confirmation.</p>
+					<div class="trip-info-links">
+						<a href="/trips/{trip?.id}/itinerary">Wi‑Fi</a>
+						<a href="/trips/{trip?.id}/itinerary">Check-in</a>
+						<a href="/trips/{trip?.id}/itinerary">Rules</a>
+					</div>
+					<a href="/trips/{trip?.id}/itinerary" class="link-view">View all notes</a>
+				</section>
+				<section class="recent-activity-compact overview-card" aria-labelledby="activity-title">
+					<h2 id="activity-title" class="section-title">Recent activity</h2>
+					{#if recentActivityItems.length > 0}
+						<ul class="activity-list">
+							{#each recentActivityItems as item}
+								<li class="activity-item">{item.text}</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="muted">No recent activity</p>
+					{/if}
+					<a href="/trips/{trip?.id}/itinerary" class="link-view">View activity log</a>
+				</section>
+				<section class="alerts-compact overview-card" aria-labelledby="alerts-title">
+					<h2 id="alerts-title" class="section-title">Alerts</h2>
+					<p class="muted">No conflict warnings or expiring items.</p>
+				</section>
+			</div>
+			<div class="overview-main">
+				<section class="guests-preview-section" aria-labelledby="guests-title">
+					<h2 id="guests-title" class="section-title">Guests</h2>
+					<div class="guests-preview">
+						<div class="avatar-row">
+							{#each guestPreviewList as member}
+								<span class="avatar" title={member.user?.name ?? member.user?.email ?? ''}>{initials(member.user?.name ?? member.user?.email)}</span>
+							{/each}
+						</div>
+						<div class="guests-meta">
+							<span class="pending-badge">{pendingRsvpCount} pending RSVP</span>
+							{#if isHost}
+								<button type="button" class="btn-nudge" onclick={nudgePending}>Nudge pending</button>
+							{/if}
+						</div>
+						<a href="/trips/{trip?.id}/guests" class="link-view">View guests</a>
+					</div>
+				</section>
+			</div>
+		</div>
+		<div class="hero-right-column">
+			<div class="progress-strip-wrap progress-strip-in-column">
+				<div class="progress-strip">
+					<a href="/trips/{trip?.id}/guests" class="progress-metric progress-metric--lead">
+						<span class="progress-label">RSVPs</span>
+						<span class="progress-value">{acceptedCount} / {members.length}</span>
+						<span class="progress-helper">{pendingRsvpCount} pending</span>
+						<div class="progress-bar" role="presentation"><div class="progress-fill" style="width: {rsvpPct}%"></div></div>
+					</a>
+					<span class="progress-divider" aria-hidden="true"></span>
+					<a href="/trips/{trip?.id}/rooms" class="progress-metric">
+						<span class="progress-label">Beds / rooms</span>
+						<span class="progress-value">{totalBedSlots > 0 ? claimedSlots + ' / ' + totalBedSlots : 'Not set'}</span>
+						<span class="progress-helper">{totalBedSlots > 0 ? bedsPct + '% claimed' : '—'}</span>
+						<div class="progress-bar" role="presentation"><div class="progress-fill" style="width: {totalBedSlots > 0 ? bedsPct : 0}%"></div></div>
+					</a>
+					<span class="progress-divider" aria-hidden="true"></span>
+					<a href="/trips/{trip?.id}/payments" class="progress-metric">
+						<span class="progress-label">Funding</span>
+						<span class="progress-value">{totalCost > 0 ? '$' + committedFunds.toFixed(0) + ' / $' + totalCost.toFixed(0) : 'Payments not set'}</span>
+						<span class="progress-helper">{totalCost > 0 ? fundingPct + '% funded' : '—'}</span>
+						<div class="progress-bar" role="presentation"><div class="progress-fill" style="width: {fundingPct}%"></div></div>
+					</a>
+				</div>
+			</div>
+			<div class="quick-actions-box" aria-label="Quick actions">
+				<nav class="quick-actions-section quick-actions-under-stats">
+					<a href="/trips/{trip?.id}/polls" class="chip-orange" title="Create poll">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+						<span>Poll</span>
+					</a>
+					<a href="/trips/{trip?.id}/checklist" class="chip-orange" title="Checklist"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Checklist</span></a>
+					<a href="/trips/{trip?.id}/files" class="chip-orange" title="Upload"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Upload</span></a>
+					<a href="/trips/{trip?.id}/itinerary" class="chip-orange" title="Suggestion"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span>Suggestion</span></a>
+				</nav>
+			</div>
+			<div class="calendar-box" aria-label="Trip calendar">
 				<TripCalendarWidget
 					tripId={trip?.id}
 					placement="sidebar"
 					checkInDate={trip?.checkInDate ?? ''}
 					checkOutDate={trip?.checkOutDate ?? ''}
-					activities={trip?.activities ?? []}
-					mealSlots={trip?.mealSlots ?? []}
+					activities={activities}
+					mealSlots={mealSlots}
 				/>
 			</div>
-			<div class="stats-row">
-				<StatWidget
-					title="Guests"
-					value={memberCount}
-					subtext={memberCount + ' invited'}
-					barHeights={guestsBars}
-				/>
-				<StatWidget
-					title="Payments"
-					value={totalCost > 0 ? `$${paidTotal.toFixed(0)} / $${totalCost.toFixed(0)}` : '—'}
-					subtext={unpaidCount > 0 ? `${unpaidCount} unpaid` : 'All set'}
-					barHeights={paymentsBars}
-				/>
-			</div>
-			<div class="promo-wrap">
-				<PromoWidget
-					title="Invite friends"
-					subtitle="Share your trip and get everyone on the same page."
-					ctaLabel="Invite now"
-					ctaHref="/trips/{trip?.id}/guests"
-				/>
-			</div>
-		</aside>
-
-		<!-- Bottom-left: upcoming list (Upcoming Appointments style) -->
-		<section class="section-bottom-left">
-			<TableWidget title="Upcoming activities" headers={['Activity', 'Date', 'Status']} span={1}>
-				{#if nextActivities.length > 0}
-					{#each nextActivities as activity}
-						<div class="table-row">
-							<span class="cell">{activity.title}</span>
-							<span class="cell">{formatShort(activity.date)}</span>
-							<span class="cell status-pill">Upcoming</span>
+			<section class="for-you-panel for-you-compact" aria-labelledby="for-you-title">
+				<h2 id="for-you-title" class="section-title">For you</h2>
+				<div class="for-you-body">
+					<div class="for-you-row">
+						<span class="for-you-label">Your RSVP</span>
+						<div class="for-you-right">
+							{#if userRsvp?.status === 'yes'}
+								<span class="for-you-value ok">Accepted</span>
+							{:else if userRsvp?.status === 'no'}
+								<span class="for-you-value">Declined</span>
+							{:else}
+								<a href="/trips/{trip?.id}/rsvp" class="btn-for-you">Respond</a>
+							{/if}
 						</div>
-					{/each}
-				{:else}
-					<div class="table-row muted">
-						<span class="cell">No activities yet</span>
-						<span class="cell">—</span>
-						<span class="cell">—</span>
 					</div>
-				{/if}
-			</TableWidget>
-		</section>
-
-		<!-- Bottom-right is the promo card, already in dashboard-right -->
+					<div class="for-you-row">
+						<span class="for-you-label">Room / bed</span>
+						<div class="for-you-right">
+							{#if myAssignment}
+								<span class="for-you-value ok">{myAssignment.room?.name ?? 'Assigned'}</span>
+							{:else}
+								<a href="/trips/{trip?.id}/rooms" class="btn-for-you">Choose</a>
+							{/if}
+						</div>
+					</div>
+					<div class="for-you-row">
+						<span class="for-you-label">Your cost</span>
+						<div class="for-you-right">
+							{#if myDueTotal > 0}
+								<a href="/trips/{trip?.id}/payments" class="btn-for-you">Settle</a>
+							{:else if myPaidTotal > 0}
+								<span class="for-you-value ok">Settled</span>
+							{:else}
+								<span class="for-you-value">—</span>
+							{/if}
+						</div>
+					</div>
+					<div class="for-you-missing">
+						{#if !userProfile?.dietaryRestrictions && !userProfile?.allergies}
+							<span class="missing-item">Dietary / allergies</span>
+						{/if}
+						{#if !userRsvp?.arrivalDatetime && userRsvp?.status === 'yes'}
+							<span class="missing-item">Arrival time</span>
+						{/if}
+					</div>
+					{#if nextUpcomingItem}
+						<div class="for-you-next">
+							<span class="for-you-label">Next up</span>
+							<span class="for-you-value">{nextUpcomingItem.title} — {nextUpcomingItem.date ? new Date(nextUpcomingItem.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}</span>
+						</div>
+					{/if}
+				</div>
+			</section>
+		</div>
 	</div>
 </div>
 
 <style>
-	.dashboard-page {
-		padding: 0;
-		height: 100%;
-		min-height: 0;
+	.overview-page {
+		background: #faf9f7;
+		min-height: 100%;
+		padding: 0.75rem 1.5rem 2rem;
 		display: flex;
 		flex-direction: column;
+		gap: 1.5rem;
 	}
 
-	.dashboard-layout {
+	/* Trip info, Recent activity, Alerts — just below the main photo (left column) */
+	.overview-below-photo {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		grid-template-rows: 50% 1fr;
-		grid-template-areas:
-			'hero right'
-			'bottom-left right';
-		column-gap: 1.25rem;
-		row-gap: 1.25rem;
-		flex: 1;
-		min-height: 0;
-		align-items: stretch;
+		grid-template-columns: 1fr 1fr auto;
+		gap: 1rem;
+		flex-shrink: 0;
 	}
 
-	.trip-hero {
-		grid-area: hero;
-		min-height: 0;
-		width: 100%;
-		border-radius: 12px;
-		overflow: hidden;
-		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-		margin-bottom: 0;
+	.overview-card {
+		background: white;
+		border-radius: var(--radius-xl);
+		padding: 1rem 1.25rem;
+		box-shadow: 0 1px 2px rgba(0, 27, 46, 0.06);
+	}
+
+	.overview-below-photo .section-title {
+		margin-bottom: 0.5rem;
+		font-size: 0.875rem;
+	}
+
+	.overview-below-photo .trip-info-note {
+		background: white;
+	}
+
+	/* Photo (left) | Right column: stats + buttons + calendar — row grows so calendar not clipped */
+	.hero-and-calendar {
+		display: grid;
+		grid-template-columns: 2fr 1fr;
+		grid-template-rows: auto;
+		align-items: start;
+		gap: 1.5rem;
+		flex-shrink: 0;
+	}
+
+	.overview-left-column {
 		display: flex;
 		flex-direction: column;
+		gap: 1rem;
+		min-width: 0;
 	}
 
-	.trip-hero-image-wrap {
+	.hero-photo-box {
+		border-radius: var(--radius-2xl);
+		overflow: hidden;
+		box-shadow: var(--shadow-lg);
+		height: 420px;
+		min-height: 420px;
+		background: var(--surface2);
+	}
+
+	.hero-right-column {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		min-height: 320px;
+		max-height: calc(100vh - 6rem);
+		min-width: 0;
+	}
+
+	.hero-photo-box .hero-image-wrap {
 		position: relative;
 		width: 100%;
-		flex: 1;
-		min-height: 0;
-		background: #e2e8f0;
+		height: 100%;
+		min-height: 400px;
+		background: var(--surface2);
+		overflow: hidden;
 	}
 
-	.trip-hero-actions {
+	.hero-image {
 		position: absolute;
-		top: 0.75rem;
-		right: 0.75rem;
-		z-index: 2;
-	}
-
-	.trip-hero-actions :global(.quick-actions) {
-		gap: 0.375rem;
-	}
-
-	.trip-hero-actions :global(.action-btn) {
-		width: 2.25rem;
-		height: 2.25rem;
-		color: white;
-		background: rgba(0, 0, 0, 0.35);
-		border-radius: var(--radius-md);
-	}
-
-	.trip-hero-actions :global(.action-btn:hover) {
-		background: rgba(0, 0, 0, 0.5);
-		color: white;
-	}
-
-	.trip-hero-image {
+		inset: 0;
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 		display: block;
 	}
-
-	.trip-hero-placeholder {
+	.hero-placeholder {
+		position: absolute;
+		inset: 0;
 		width: 100%;
 		height: 100%;
-		background: linear-gradient(135deg, #94a3b8 0%, #cbd5e1 100%);
+		background: linear-gradient(135deg, var(--slate) 0%, var(--muted) 100%);
 	}
 
-	.trip-hero-overlay {
+	.hero-overlay {
 		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		padding: 0.75rem 1rem;
-		background: linear-gradient(to top, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.4) 60%, transparent 100%);
+		left: 0; right: 0; bottom: 0;
+		padding: 1.25rem 1.5rem;
+		background: linear-gradient(to top, rgba(0, 27, 46, 0.9) 0%, rgba(0, 27, 46, 0.4) 55%, transparent 100%);
 		color: white;
 	}
 
-	.trip-hero-name {
-		margin: 0 0 0.125rem 0;
-		font-size: 2.25rem;
+	.hero-name {
+		margin: 0 0 0.25rem 0;
+		font-size: 1.75rem;
 		font-weight: 700;
 		line-height: 1.2;
 		color: white;
-		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 	}
 
-	.trip-hero-dates {
-		margin: 0;
-		font-size: 0.8125rem;
+	.hero-dates {
+		margin: 0 0 0.75rem 0;
+		font-size: 0.875rem;
 		font-weight: 500;
 		color: white;
 		opacity: 0.95;
 		display: flex;
 		align-items: center;
 		flex-wrap: wrap;
-		gap: 0.125rem;
+		gap: 0.25rem;
 	}
 
-	.trip-hero-sep {
-		margin: 0 0.75rem;
-		opacity: 0.85;
-	}
+	.hero-sep { opacity: 0.85; }
+	.hero-date, .hero-destination { display: inline-block; }
 
-	.trip-hero-date,
-	.trip-hero-destination {
-		display: inline-block;
-	}
-
-	.dashboard-right {
-		grid-area: right;
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 1rem;
-		min-width: 0;
-		align-content: start;
-	}
-
-	/* Calendar: same width as Payments box only (second column) */
-	.calendar-wrap {
-		grid-column: 2;
-		min-width: 0;
-	}
-
-	.stats-row {
-		grid-column: 1 / -1;
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 1rem;
-	}
-
-	.stats-row :global(article) {
-		min-width: 0;
-	}
-
-	.promo-wrap {
-		grid-column: 1 / -1;
-		min-width: 0;
-	}
-
-	.section-bottom-left {
-		grid-area: bottom-left;
-		min-width: 0;
-		width: 100%;
-		margin-top: 0;
-		padding-top: 0;
-	}
-
-	.section-bottom-left :global(article) {
-		margin-top: 0;
-	}
-
-	@media (max-width: 1024px) {
-		.dashboard-layout {
-			grid-template-columns: 1fr;
-			grid-template-rows: auto auto auto auto;
-			grid-template-areas:
-				'hero'
-				'right'
-				'bottom-left';
-		}
-
-		.dashboard-right {
-			grid-template-columns: 1fr;
-		}
-
-		.calendar-wrap {
-			grid-column: 1;
-		}
-
-		.stats-row {
-			grid-template-columns: 1fr;
-		}
-	}
-
-	.widget-grid {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 1.25rem;
-	}
-
-	.dashboard-topbar {
-		min-height: 44px;
-	}
-
-	@media (max-width: 1024px) {
-		.widget-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
-	}
-
-	@media (max-width: 640px) {
-		.widget-grid {
-			grid-template-columns: 1fr;
-		}
-	}
-
-	.list-widget {
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-	}
-
-	.list-row {
+	.hero-cta-cluster {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+		gap: 0.5rem;
+		flex-wrap: wrap;
 	}
 
-	.list-row:last-child {
-		border-bottom: none;
-	}
-
-	.list-avatar {
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #93c5fd 0%, #3b82f6 100%);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.875rem;
-		font-weight: 600;
+	.hero-cta-cluster :global(.quick-actions) { gap: 0.35rem; }
+	.hero-cta-cluster :global(.action-btn) {
+		width: 2rem;
+		height: 2rem;
 		color: white;
+		background: rgba(255, 255, 255, 0.2);
+		border-radius: var(--radius-md);
+		border: none;
+	}
+
+	.hero-cta-btn {
+		font-size: 0.75rem;
+		font-weight: 500;
+		padding: 0.35rem 0.65rem;
+		background: rgba(255, 255, 255, 0.2);
+		color: white;
+		border: 1px solid rgba(255, 255, 255, 0.35);
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		transition: background var(--transition-fast), border-color var(--transition-fast);
+	}
+
+	.hero-cta-btn:hover {
+		background: rgba(255, 255, 255, 0.3);
+		border-color: rgba(255, 255, 255, 0.5);
+	}
+
+	.progress-strip-in-column {
+		flex-shrink: 0;
+		padding: 0;
+		background: transparent;
+	}
+
+	.quick-actions-section {
+		display: flex;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 		flex-shrink: 0;
 	}
 
-	.list-content {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
+	.quick-actions-under-stats {
+		width: 100%;
+	}
+
+	.quick-actions-box {
+		flex-shrink: 0;
+		background: transparent;
+		border: none;
+		border-radius: 0;
+		box-shadow: none;
+		padding: 0.75rem 1rem;
 		min-width: 0;
 	}
 
-	.list-name {
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-
-	.list-meta {
-		font-size: 0.75rem;
-		color: var(--muted);
-	}
-
-	.table-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr auto;
-		gap: 0.5rem;
+	.chip-orange {
+		display: inline-flex;
 		align-items: center;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid var(--border);
+		gap: 0.4rem;
 		font-size: 0.8125rem;
-		transition: background var(--transition-fast);
+		font-weight: 600;
+		padding: 0.5rem 0.875rem;
+		background: var(--primary);
+		color: white;
+		border-radius: var(--radius-md);
+		text-decoration: none;
+		transition: background var(--transition-fast), color var(--transition-fast);
+		border: none;
+	}
+	.chip-orange:hover {
+		background: var(--primaryHover);
+		color: white;
+	}
+	.chip-orange svg {
+		flex-shrink: 0;
 	}
 
-	.table-row:hover {
-		background: var(--surface2);
+	.calendar-box {
+		border-radius: var(--radius-2xl);
+		overflow: auto;
+		box-shadow: var(--shadow-lg);
+		background: white;
+		flex: 1;
+		min-height: 320px;
+		padding: 1rem;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
 	}
 
-	.table-row:last-child {
-		border-bottom: none;
+	.calendar-box :global(.calendar-sidebar) {
+		background: transparent;
+		box-shadow: none;
+		border: none;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+		height: 100%;
+		overflow: auto;
 	}
 
-	.table-row.muted .cell {
-		color: var(--muted);
+	.calendar-box :global(.calendar-sidebar .month-calendar.sidebar-style),
+	.calendar-box :global(.calendar-sidebar .day-detail-view) {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
 	}
 
-	.cell {
+	.calendar-box :global(.calendar-sidebar .days-grid) {
+		flex: 1;
+		align-content: start;
+		grid-auto-rows: minmax(26px, 1fr);
+		min-height: 0;
+	}
+
+	/* 2) Progress strip: white on tinted wrap, reduced height, RSVPs lead */
+	.progress-strip-wrap {
+		background: rgba(0, 27, 46, 0.03);
+		border-radius: var(--radius-2xl);
+		padding: 0.5rem;
+	}
+
+	.progress-strip {
+		display: flex;
+		align-items: stretch;
+		gap: 0;
+		background: white;
+		border-radius: var(--radius-xl);
+		padding: 0.75rem 1.25rem;
+		box-shadow: 0 1px 2px rgba(0, 27, 46, 0.04);
+	}
+
+	.progress-metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		text-decoration: none;
 		color: var(--text);
+		min-width: 0;
+		flex: 1;
 	}
 
-	.status-pill {
+	.progress-metric--lead { flex: 1.15; }
+	.progress-metric--lead .progress-value { font-weight: 700; font-size: 1.125rem; }
+
+	.progress-metric:hover .progress-value { color: var(--primary); }
+
+	.progress-label {
 		font-size: 0.6875rem;
 		font-weight: 600;
-		text-transform: uppercase;
 		letter-spacing: 0.03em;
-		padding: 0.2rem 0.4rem;
-		border-radius: 9999px;
-		background: var(--focusRing);
+		color: var(--muted);
+	}
+
+	.progress-value {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text);
+		transition: color var(--transition-fast);
+	}
+
+	.progress-helper {
+		font-size: 0.6875rem;
+		color: var(--muted);
+	}
+
+	.progress-bar {
+		height: 4px;
+		background: var(--bg);
+		border-radius: 2px;
+		overflow: hidden;
+		margin-top: 0.25rem;
+		max-width: 100%;
+	}
+
+	.progress-fill {
+		height: 100%;
+		background: var(--primary);
+		border-radius: 2px;
+		transition: width var(--transition-base);
+	}
+
+	.progress-divider {
+		width: 1px;
+		background: var(--border);
+		margin: 0 1rem;
+		align-self: stretch;
+	}
+
+	/* Main content (Guests, Trip info) — under photo in left column */
+	.overview-main {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		min-width: 0;
+		flex-shrink: 0;
+	}
+
+	.section-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text);
+		margin: 0 0 0.75rem 0;
+	}
+
+	/* For You: tinted, primary CTAs as buttons */
+	.for-you-panel {
+		background: rgba(191, 78, 48, 0.07);
+		border-radius: var(--radius-2xl);
+		padding: 1.5rem;
+		min-height: 200px;
+	}
+
+	/* For You compact: under calendar in right column */
+	.for-you-compact {
+		flex-shrink: 0;
+		min-height: 0;
+		padding: 0.75rem 1rem;
+		border-radius: var(--radius-xl);
+	}
+	.for-you-compact .section-title { margin-bottom: 0.5rem; font-size: 0.875rem; }
+	.for-you-compact .for-you-body { gap: 0.5rem; }
+	.for-you-compact .for-you-row { gap: 0.5rem; }
+	.for-you-compact .for-you-label { font-size: 0.8125rem; }
+	.for-you-compact .for-you-value { font-size: 0.8125rem; }
+	.for-you-compact .btn-for-you { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+	.for-you-compact .for-you-missing { margin-top: 0.125rem; }
+	.for-you-compact .missing-item { font-size: 0.6875rem; padding: 0.2rem 0.4rem; }
+	.for-you-compact .for-you-next { margin-top: 0.375rem; padding-top: 0.5rem; }
+	.for-you-compact .for-you-next .for-you-value { font-size: 0.75rem; }
+
+	.for-you-body { display: flex; flex-direction: column; gap: 0.875rem; }
+
+	.for-you-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	.for-you-label {
+		font-size: 0.875rem;
+		color: var(--muted);
+		flex-shrink: 0;
+	}
+
+	.for-you-right { margin-left: auto; }
+
+	.for-you-value {
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+	.for-you-value.ok { color: var(--primary); }
+
+	.btn-for-you {
+		display: inline-flex;
+		align-items: center;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		padding: 0.4rem 0.85rem;
+		background: var(--primary);
+		color: white;
+		border-radius: var(--radius-md);
+		text-decoration: none;
+		border: none;
+		cursor: pointer;
+		transition: background var(--transition-fast);
+	}
+	.btn-for-you:hover { background: var(--primaryHover); }
+
+	.for-you-missing { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem; }
+	.missing-item {
+		font-size: 0.75rem;
+		color: var(--muted);
+		background: rgba(255, 255, 255, 0.7);
+		padding: 0.25rem 0.5rem;
+		border-radius: var(--radius-sm);
+	}
+	.for-you-next {
+		margin-top: 0.5rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid rgba(191, 78, 48, 0.15);
+	}
+
+	/* Guests: white, compact */
+	.guests-preview-section {
+		background: white;
+		border-radius: var(--radius-2xl);
+		padding: 1.25rem;
+	}
+
+	.guests-preview { display: flex; flex-direction: column; gap: 0.75rem; }
+	.avatar-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+	.avatar {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		background: linear-gradient(135deg, var(--slate) 0%, var(--primary) 100%);
+		color: white;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+	.guests-meta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+	.pending-badge { font-size: 0.75rem; color: var(--muted); }
+	.btn-nudge {
+		font-size: 0.75rem;
+		font-weight: 600;
 		color: var(--primary);
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+	}
+	.btn-nudge:hover { text-decoration: underline; }
+
+	/* Trip info: note-style, light tint; own box, no overlap */
+	.trip-info-note {
+		background: rgba(0, 27, 46, 0.04);
+		border-radius: var(--radius-2xl);
+		padding: 1.25rem;
+		position: relative;
+		z-index: 0;
+	}
+
+	.trip-info-text { font-size: 0.875rem; color: var(--text); margin: 0 0 0.75rem 0; line-height: 1.5; }
+	.trip-info-links { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+	.trip-info-links a {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--primary);
+		text-decoration: none;
+	}
+	.trip-info-links a:hover { text-decoration: underline; }
+
+	.link-view {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--primary);
+		text-decoration: none;
+	}
+	.link-view:hover { text-decoration: underline; }
+
+	.quick-action-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		padding: 0.5rem 0.875rem;
+		background: white;
+		border-radius: 9999px;
+		color: var(--text);
+		text-decoration: none;
+		transition: background var(--transition-fast), color var(--transition-fast);
+		box-shadow: 0 1px 2px rgba(0, 27, 46, 0.04);
+	}
+	.chip:hover { background: var(--primary); color: white; }
+	.chip svg { flex-shrink: 0; }
+
+	.recent-activity-compact,
+	.alerts-compact {
+		background: white;
+		border-radius: var(--radius-xl);
+		padding: 1rem 1.25rem;
+	}
+
+	.recent-activity-compact .section-title,
+	.alerts-compact .section-title { margin-bottom: 0.5rem; }
+	.activity-list { list-style: none; margin: 0; padding: 0; font-size: 0.8125rem; color: var(--text); }
+	.activity-item { padding: 0.2rem 0; }
+	.muted { font-size: 0.8125rem; color: var(--muted); margin: 0; }
+
+	/* Responsive */
+	@media (max-width: 1024px) {
+		.overview-below-photo { grid-template-columns: 1fr; }
+		.hero-and-calendar { grid-template-columns: 1fr; grid-template-rows: auto; }
+		.hero-photo-box { height: 320px; min-height: 320px; }
+		.hero-photo-box .hero-image-wrap { min-height: 280px; }
+		.hero-right-column { gap: 1rem; }
+		.calendar-box { flex: 1 1 280px; min-height: 280px; }
+		.calendar-box :global(.calendar-sidebar) { min-height: 320px; }
+		.overview-main { flex-direction: column; }
+		.progress-strip { flex-direction: column; gap: 0.75rem; padding: 1rem 1.25rem; }
+		.progress-divider { width: 100%; height: 1px; margin: 0; }
+		.progress-metric--lead { flex: 1; }
+	}
+
+	@media (max-width: 640px) {
+		.overview-page { padding: 1rem 1rem 1.5rem; gap: 1.25rem; }
+		.hero-overlay { padding: 1rem 1.25rem; }
+		.hero-name { font-size: 1.5rem; }
 	}
 </style>

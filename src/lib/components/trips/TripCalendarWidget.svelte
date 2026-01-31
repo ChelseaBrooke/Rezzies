@@ -26,9 +26,12 @@
 		checkOutDate: Date | string;
 		activities?: Activity[];
 		mealSlots?: MealSlot[];
+		/** When provided (sidebar), day view is shown outside; calendar stays month grid and calls this on day click */
+		selectedDateKey?: string | null;
+		onDaySelect?: (dateKey: string) => void;
 	}
 
-	let { tripId = '', placement = 'grid', checkInDate, checkOutDate, activities = [], mealSlots = [] }: Props = $props();
+	let { tripId = '', placement = 'grid', checkInDate, checkOutDate, activities = [], mealSlots = [], selectedDateKey: controlledDateKey, onDaySelect }: Props = $props();
 
 	/** Week starts Monday per reference */
 	const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -137,11 +140,16 @@
 		return new Date(year, month, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 	}
 
-	let selectedDateKey = $state<string | null>(null);
+	let internalDateKey = $state<string | null>(null);
+	const selectedDateKey = $derived(controlledDateKey !== undefined ? controlledDateKey : internalDateKey);
 
 	function selectDay(dateKey: string) {
 		if (!isInTripRange(dateKey)) return;
-		selectedDateKey = dateKey;
+		if (onDaySelect) {
+			onDaySelect(dateKey);
+		} else {
+			internalDateKey = dateKey;
+		}
 	}
 
 	const activitiesForDay = $derived(
@@ -166,14 +174,14 @@
 </script>
 
 {#if placement === 'sidebar'}
-	<!-- Upper right: calendar or day detail in same box -->
+	<!-- Upper right: calendar (or day detail when no onDaySelect) -->
 	<div class="calendar-sidebar">
 		{#if !hasValidDates}
 			<p class="calendar-empty-msg">Add trip dates in <a href={tripId ? `/trips/${tripId}/settings` : '#'}>trip settings</a> to see the calendar.</p>
-		{:else if selectedDateKey}
-			<!-- Day detail view (replaces calendar); back button returns to calendar -->
+		{:else if selectedDateKey && !onDaySelect}
+			<!-- Day detail view (replaces calendar) when day view is not external -->
 			<div class="day-detail-view">
-				<button type="button" class="day-detail-back" onclick={() => (selectedDateKey = null)} aria-label="Back to calendar">
+				<button type="button" class="day-detail-back" onclick={() => (internalDateKey = null)} aria-label="Back to calendar">
 					&larr; Back to calendar
 				</button>
 				<h3 class="day-detail-title">
@@ -203,6 +211,10 @@
 						</div>
 					{/if}
 				{/if}
+				<div class="day-detail-ctas">
+					<a href={tripId ? `/trips/${tripId}/activities` : '#'} class="day-detail-cta">Add activity</a>
+					<a href={tripId ? `/trips/${tripId}/meals` : '#'} class="day-detail-cta">Add meal</a>
+				</div>
 			</div>
 		{:else if sidebarMonth}
 			<div class="month-calendar sidebar-style">
@@ -232,7 +244,7 @@
 					{/each}
 				</div>
 			</div>
-			<p class="day-detail-hint">Click a highlighted day for activities and meals.</p>
+			<p class="day-detail-hint">{onDaySelect ? 'Select a day to see details below.' : 'Click a highlighted day for activities and meals.'}</p>
 		{/if}
 	</div>
 {:else}
@@ -353,9 +365,12 @@
 		width: 100%;
 		max-width: 100%;
 		min-width: 0;
-		height: 320px;
+		min-height: 200px;
+		height: 100%;
+		flex: 1;
 		box-sizing: border-box;
-		overflow: hidden;
+		overflow-y: auto;
+		overflow-x: hidden;
 		display: flex;
 		flex-direction: column;
 	}
@@ -368,13 +383,13 @@
 		max-width: 100%;
 		flex: 1;
 		min-height: 0;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
+		display: grid;
+		grid-template-rows: auto auto 1fr;
+		overflow: auto;
 	}
 
 	.calendar-sidebar .month-header {
-		margin-bottom: 0.15rem;
+		margin-bottom: 0.25rem;
 		flex-shrink: 0;
 		width: 100%;
 		box-sizing: border-box;
@@ -383,12 +398,19 @@
 	.calendar-sidebar .day-headers {
 		display: grid;
 		grid-template-columns: repeat(7, minmax(0, 1fr));
-		gap: 3px;
+		gap: 2px;
 		flex-shrink: 0;
-		margin-bottom: 4px;
+		margin-bottom: 2px;
 		width: 100%;
 		min-width: 0;
 		box-sizing: border-box;
+	}
+
+	.calendar-sidebar .day-header {
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: var(--muted);
+		text-align: center;
 	}
 
 	.calendar-sidebar .month-title {
@@ -428,22 +450,16 @@
 		cursor: default;
 	}
 
-	.calendar-sidebar .day-header {
-		font-size: 0.6875rem;
-		font-weight: 500;
-		color: var(--muted);
-	}
-
 	.calendar-sidebar .days-grid {
 		display: grid;
 		grid-template-columns: repeat(7, minmax(0, 1fr));
-		grid-auto-rows: minmax(1.75rem, 1fr);
-		gap: 3px;
-		flex: 1;
-		min-height: 0;
+		grid-auto-rows: minmax(26px, 26px);
+		gap: 2px;
 		width: 100%;
 		min-width: 0;
+		min-height: 0;
 		align-content: start;
+		box-sizing: border-box;
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell {
@@ -453,7 +469,10 @@
 		color: var(--muted);
 		background: transparent;
 		min-width: 0;
-		min-height: 1.75rem;
+		width: 100%;
+		height: 100%;
+		min-height: 0;
+		aspect-ratio: unset;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -582,6 +601,30 @@
 
 	.calendar-sidebar .day-detail-item:last-child {
 		border-bottom: none;
+	}
+
+	.calendar-sidebar .day-detail-ctas {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 0.75rem;
+		padding-top: 0.5rem;
+		border-top: 1px solid var(--border);
+	}
+	.calendar-sidebar .day-detail-cta {
+		display: inline-flex;
+		align-items: center;
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 0.4rem 0.75rem;
+		background: var(--primary);
+		color: white;
+		border-radius: var(--radius-md);
+		text-decoration: none;
+		transition: background var(--transition-fast);
+	}
+	.calendar-sidebar .day-detail-cta:hover {
+		background: var(--primaryHover);
 	}
 
 	.calendar-widget {

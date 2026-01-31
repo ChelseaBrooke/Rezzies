@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import AppFrame from '$lib/components/layout/AppFrame.svelte';
 	import TripSidebar from './TripSidebar.svelte';
+	import TripSwitcher from './TripSwitcher.svelte';
 	import type { TripForSidebar } from '$lib/trips/types.js';
 
 	let {
@@ -45,6 +46,16 @@
 	const currentPath = $derived($page.url.pathname);
 	const tripId = $derived(trip?.id ?? '');
 
+	const tripOptions = $derived(
+		allTrips.map((t) => ({
+			id: t.id,
+			name: t.name,
+			checkInDate: t.checkInDate,
+			checkOutDate: t.checkOutDate,
+			isPublished: t.isPublished ?? false
+		}))
+	);
+
 	const mobileTabs = [
 		{ href: `/trips/${tripId}`, label: 'Overview', icon: '📊' },
 		{ href: `/trips/${tripId}/guests`, label: 'Guests', icon: '👥' },
@@ -59,6 +70,17 @@
 	function isActive(href: string) {
 		if (href === `/trips/${tripId}`) return currentPath === href;
 		return currentPath.startsWith(href);
+	}
+
+	function initials(name: string | null | undefined, email?: string): string {
+		if (name?.trim()) {
+			const parts = name.trim().split(/\s+/);
+			return parts.length >= 2
+				? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+				: name.slice(0, 2).toUpperCase();
+		}
+		if (email) return email.slice(0, 2).toUpperCase();
+		return '?';
 	}
 </script>
 
@@ -78,10 +100,32 @@
 				{/if}
 			{/snippet}
 			{#snippet children()}
-				<div class="main-inner">
-					{#if childrenFn}
-						{@render childrenFn()}
-					{/if}
+				<div class="trip-main-wrap">
+					<header class="content-pane-top" aria-label="Trip and actions">
+						<div class="trip-top-switcher">
+							{#if trip}
+								<TripSwitcher
+									currentTripId={trip.id}
+									currentTripName={trip.name}
+									trips={tripOptions}
+									tripsListHref="/trips"
+								/>
+							{/if}
+						</div>
+						<div class="trip-top-bar" aria-label="Trip actions">
+							<a href="/trips/{tripId}/notifications" class="trip-notification-bell" aria-label="Notifications" title="Notifications">
+								<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+							</a>
+							<a href="/settings" class="trip-top-avatar" aria-label="Go to my profile" title="My profile">
+								<span class="trip-top-avatar-inner">{user ? initials(user.name, user.email) : '?'}</span>
+							</a>
+						</div>
+					</header>
+					<div class="main-inner">
+						{#if childrenFn}
+							{@render childrenFn()}
+						{/if}
+					</div>
 				</div>
 			{/snippet}
 		</AppFrame>
@@ -115,6 +159,12 @@
 				<span>☰</span>
 			</button>
 			<span class="mobile-title">{trip?.name ?? 'Trip'}</span>
+			<a href="/trips/{tripId}/notifications" class="mobile-notification-bell" aria-label="Notifications" title="Notifications">
+				<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+			</a>
+			<a href="/settings" class="mobile-top-avatar" aria-label="My profile" title="My profile">
+				<span class="trip-top-avatar-inner">{user ? initials(user.name, user.email) : '?'}</span>
+			</a>
 		</header>
 
 		<div class="content">
@@ -145,7 +195,10 @@
 <style>
 	.shell {
 		min-height: 100vh;
-		background: var(--surface);
+		background:
+			radial-gradient(ellipse 120% 80% at 70% 20%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
+			radial-gradient(ellipse 100% 60% at 20% 90%, rgba(0, 0, 0, 0.12) 0%, transparent 55%),
+			linear-gradient(165deg, #8B351E 0%, #A03D24 18%, var(--primary) 45%, rgba(191, 78, 48, 0.95) 75%, rgba(191, 78, 48, 0.88) 100%);
 		position: relative;
 		padding: 0;
 	}
@@ -155,11 +208,92 @@
 		width: 100%;
 	}
 
-	.main-inner {
-		padding: 1.5rem;
+	.trip-main-wrap {
+		display: flex;
+		flex-direction: column;
 		flex: 1;
 		min-height: 0;
-		overflow: hidden;
+		min-width: 0;
+	}
+
+	.content-pane-top {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		min-height: 0;
+		padding: 0.35rem 1rem;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.trip-top-switcher {
+		display: flex;
+		align-items: center;
+		min-width: 0;
+	}
+	.trip-top-switcher :global(.switcher) {
+		min-width: 10rem;
+		max-width: 16rem;
+	}
+	.trip-top-switcher :global(.switcher-trigger) {
+		padding: 0.35rem 0.6rem;
+		font-size: 0.8125rem;
+	}
+
+	.trip-top-bar {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		min-height: 2.25rem;
+		min-width: 0;
+	}
+
+	.trip-notification-bell {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: var(--radius-md);
+		color: var(--text);
+		transition: background var(--transition-fast), color var(--transition-fast);
+	}
+	.trip-notification-bell:hover {
+		background: var(--surface2);
+		color: var(--primary);
+	}
+
+	.trip-top-avatar {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 50%;
+		background: var(--surface2);
+		color: var(--text);
+		font-size: 0.8125rem;
+		font-weight: 600;
+		text-decoration: none;
+		border: 1px solid var(--border);
+		transition: background var(--transition-fast), color var(--transition-fast);
+	}
+	.trip-top-avatar:hover {
+		background: var(--focusRing);
+		color: var(--primary);
+	}
+	.trip-top-avatar-inner {
+		display: block;
+		line-height: 1;
+	}
+
+	.main-inner {
+		padding: 0.75rem 1.5rem 1.5rem;
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
 	}
@@ -306,6 +440,42 @@
 			overflow: hidden;
 			text-overflow: ellipsis;
 			white-space: nowrap;
+		}
+		.mobile-header .mobile-title {
+			flex: 1;
+		}
+
+		.mobile-notification-bell {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 2.5rem;
+			height: 2.5rem;
+			border-radius: var(--radius-md);
+			color: var(--text);
+		}
+		.mobile-notification-bell:hover {
+			background: var(--surface2);
+			color: var(--primary);
+		}
+
+		.mobile-top-avatar {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 2.5rem;
+			height: 2.5rem;
+			border-radius: 50%;
+			background: var(--surface2);
+			color: var(--text);
+			font-size: 0.8125rem;
+			font-weight: 600;
+			text-decoration: none;
+			border: 1px solid var(--border);
+		}
+		.mobile-top-avatar:hover {
+			background: var(--focusRing);
+			color: var(--primary);
 		}
 
 		.bottom-nav {

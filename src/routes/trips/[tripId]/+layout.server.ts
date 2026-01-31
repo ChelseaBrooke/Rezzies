@@ -27,7 +27,14 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 				mealSlots: { include: { assignedUser: { select: { id: true, name: true } } } },
 				activities: true,
 				invoices: true,
-				reservations: true
+				reservations: true,
+				rsvps: { include: { user: { select: { id: true, name: true } } } },
+				roomAssignments: {
+					include: {
+						room: { select: { id: true, name: true } },
+						user: { select: { id: true, name: true } }
+					}
+				}
 			}
 		}),
 		getUserTripMembership(tripId, user.id),
