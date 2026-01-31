@@ -137,7 +137,7 @@
 
 	.status-due {
 		background: rgba(239, 68, 68, 0.1);
-		color: #dc2626;
+		color: var(--danger);
 	}
 
 	.status-paid {

@@ -30,8 +30,9 @@
 <style>
 	.widget-card {
 		background: white;
-		border-radius: 0.75rem;
-		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-sm);
+		border: 1px solid var(--border);
 		padding: 1rem;
 		display: flex;
 		flex-direction: column;
@@ -55,7 +56,7 @@
 		font-weight: 600;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
-		color: #64748b;
+		color: var(--muted);
 	}
 
 	.widget-kebab {
@@ -66,15 +67,15 @@
 		height: 1.75rem;
 		border: none;
 		background: transparent;
-		border-radius: 0.375rem;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
-		color: #64748b;
+		color: var(--muted);
+		transition: all var(--transition-fast);
 	}
 
 	.widget-kebab:hover {
-		background: #f1f5f9;
-		border-radius: 0.375rem;
-		color: #334155;
+		background: var(--surface2);
+		color: var(--text);
 	}
 
 	.widget-body {

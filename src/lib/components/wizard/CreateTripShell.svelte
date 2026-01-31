@@ -53,7 +53,7 @@
 		min-height: 100vh;
 		display: flex;
 		flex-direction: column;
-		background: #1a1a1a;
+		background: var(--bg);
 		position: relative;
 		overflow-x: hidden;
 		padding: 0;
@@ -61,7 +61,6 @@
 		width: 100%;
 	}
 
-	/* Contained inside trip portal (e.g. preview-new): no full-page background, fit in rounded box */
 	.create-trip-shell.contained {
 		min-height: 0;
 		background: transparent;
@@ -77,8 +76,9 @@
 		min-height: 0;
 		flex: 1;
 		align-self: stretch;
-		border-radius: 16px;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+		border-radius: var(--radius-xl);
+		box-shadow: var(--shadow-md);
+		border: 1px solid var(--border);
 	}
 	
 	.background {
@@ -90,12 +90,11 @@
 		z-index: 0;
 		overflow: hidden;
 		pointer-events: none;
-		background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
 		background-image: url('/images/homepage-bg.jpg');
 		background-size: cover;
 		background-position: center;
 		background-repeat: no-repeat;
-		filter: blur(8px) brightness(0.3);
+		filter: blur(8px) brightness(0.5);
 		transform: scale(1.1);
 	}
 	
@@ -106,7 +105,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: rgba(0, 0, 0, 0.6);
+		background: rgba(0, 27, 46, 0.5);
 	}
 	
 	.main-card {
@@ -114,8 +113,8 @@
 		z-index: 1;
 		background: white;
 		border-radius: 0;
-		border: none;
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+		border: 1px solid var(--border);
+		box-shadow: var(--shadow-xl);
 		display: flex;
 		flex-direction: column;
 		width: 100%;
@@ -146,7 +145,7 @@
 	
 	.preview-label {
 		padding: 1rem 2rem;
-		background: var(--bg, #f5f5f5);
+		background: var(--surface2);
 		border-bottom: 1px solid var(--border);
 		font-size: 0.9375rem;
 		color: var(--muted);

@@ -47,11 +47,12 @@
 	.page-header { margin-bottom: 1.5rem; }
 	.page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.25rem 0; }
 	.subtitle { font-size: 0.875rem; color: var(--muted); margin: 0; }
-	.card { background: white; border-radius: 1rem; border: 1px solid var(--border); overflow: hidden; margin-bottom: 1rem; }
+	.card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; margin-bottom: 1rem; }
 	.card-body { padding: 1.5rem; }
 	.section-heading { font-size: 1rem; font-weight: 600; margin: 0 0 0.25rem 0; }
 	.muted { font-size: 0.875rem; color: var(--muted); margin: 0 0 0.75rem 0; }
 	.form-placeholder { display: flex; flex-direction: column; gap: 0.5rem; }
-	.form-placeholder input[type="text"], .form-placeholder textarea { padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.875rem; }
+	.form-placeholder input[type="text"], .form-placeholder textarea { padding: 0.5rem 0.75rem; border: 1px solid var(--border-strong); border-radius: var(--radius-md); font-size: 0.875rem; }
+	.form-placeholder input:focus, .form-placeholder textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--focusRing); }
 	.form-placeholder textarea { resize: vertical; font-family: inherit; }
 </style>

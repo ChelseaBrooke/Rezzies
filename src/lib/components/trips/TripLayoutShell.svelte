@@ -136,7 +136,7 @@
 <style>
 	.shell {
 		min-height: 100vh;
-		background: #e9f1fb;
+		background: var(--bg);
 		position: relative;
 		padding: 0;
 	}
@@ -190,9 +190,9 @@
 		background: var(--text);
 		color: white;
 		padding: 0.5rem 1rem;
-		border-radius: var(--radius-md, 0.5rem);
+		border-radius: var(--radius-md);
 		font-size: 0.875rem;
-		box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0,0,0,0.1));
+		box-shadow: var(--shadow-lg);
 		z-index: 100;
 		animation: fadeIn 0.2s ease;
 	}
@@ -248,8 +248,9 @@
 			bottom: 0;
 			width: 240px;
 			max-width: 85vw;
-			background: linear-gradient(to bottom, #cfe4ff 0%, #bbd9ff 100%);
-			box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
+			background: var(--surface);
+			border-right: 1px solid var(--border);
+			box-shadow: var(--shadow-lg);
 			transform: translateX(-100%);
 			transition: transform 0.25s ease;
 			overflow-y: auto;
@@ -285,7 +286,7 @@
 		}
 
 		.hamburger:hover {
-			background: var(--bg);
+			background: var(--surface2);
 		}
 
 		.mobile-title {
@@ -333,7 +334,8 @@
 
 		.bottom-nav-item.active {
 			color: var(--primary);
-			background: rgba(30, 58, 138, 0.08);
+			background: var(--surface2);
+			border-bottom: 2px solid var(--primary);
 		}
 
 		.bottom-nav-icon {

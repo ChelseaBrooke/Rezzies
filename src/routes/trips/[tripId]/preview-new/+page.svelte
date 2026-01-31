@@ -117,6 +117,6 @@
 	}
 	.btn-next:hover,
 	.btn-done:hover {
-		background: var(--primary-dark, #1e3a8a);
+		background: var(--primary);
 	}
 </style>

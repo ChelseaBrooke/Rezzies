@@ -23,7 +23,7 @@
 <div class="admin-page">
 	<div class="container">
 		<header>
-			<h1>Rezzies - Host Dashboard</h1>
+			<h1>Divvi - Host Dashboard</h1>
 			<div class="header-actions">
 				<a href="/admin/trips/new" class="btn-primary">Create New Trip</a>
 				<form method="POST" action="/admin/logout" use:enhance>

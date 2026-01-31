@@ -88,7 +88,7 @@
 		<div class="info-box">
 			<h4>How Pricing Works</h4>
 			<p>
-				Based on your selected model, Rezzies will automatically calculate each guest's share of the total lodging cost.
+				Based on your selected model, Divvi will automatically calculate each guest's share of the total lodging cost.
 				The system considers room types, bed configurations, and occupancy to ensure fair pricing.
 			</p>
 		</div>

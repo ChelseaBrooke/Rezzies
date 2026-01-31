@@ -265,7 +265,7 @@
 										<select id="channel" name="channel" bind:value={inviteChannel}>
 											<option value="email">Email</option>
 											<option value="sms">SMS</option>
-											<option value="app">App (Rezzies user)</option>
+											<option value="app">App (Divvi user)</option>
 										</select>
 									</div>
 									{#if inviteChannel === 'email'}

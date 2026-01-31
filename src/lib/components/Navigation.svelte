@@ -35,6 +35,7 @@
 	.navbar {
 		background: white;
 		box-shadow: var(--shadow-sm);
+		border-bottom: 1px solid var(--border);
 		position: sticky;
 		top: 0;
 		z-index: 100;
@@ -52,7 +53,7 @@
 	}
 	
 	.nav-logo {
-		color: var(--color-primary);
+		color: var(--text);
 	}
 
 	.nav-links {
@@ -64,18 +65,24 @@
 	}
 	
 	.nav-link {
-		color: var(--color-text);
+		color: var(--muted);
 		font-weight: 500;
 		padding: var(--spacing-xs) var(--spacing-sm);
 		border-radius: var(--radius-sm);
 		transition: all var(--transition-fast);
 		text-decoration: none;
+		border-bottom: 2px solid transparent;
 	}
 	
-	.nav-link:hover,
+	.nav-link:hover {
+		color: var(--text);
+		background: var(--surface2);
+	}
+	
 	.nav-link.active {
-		color: var(--color-primary);
-		background: var(--color-bg-gray);
+		color: var(--primary);
+		border-bottom-color: var(--primary);
+		background: transparent;
 	}
 	
 	.nav-auth {

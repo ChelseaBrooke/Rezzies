@@ -125,7 +125,7 @@
 	.error-item {
 		padding: 0.75rem 1rem;
 		background: rgba(239, 68, 68, 0.1);
-		color: #ef4444;
+		color: var(--danger);
 		border-radius: 0.5rem;
 		font-size: 0.9375rem;
 	}

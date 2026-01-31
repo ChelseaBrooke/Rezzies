@@ -34,7 +34,7 @@
 	.page-header { margin-bottom: 1.5rem; }
 	.page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.25rem 0; }
 	.subtitle { font-size: 0.875rem; color: var(--muted); margin: 0; }
-	.card { background: white; border-radius: 1rem; border: 1px solid var(--border); overflow: hidden; }
+	.card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
 	.card-body { padding: 1.5rem; }
 	.summary { margin: 0 0 1rem 0; }
 	.slots-list { list-style: none; margin: 0; padding: 0; }

@@ -70,10 +70,10 @@
 		}
 	}
 
-	// Placeholder: Rezzies friends list (no backend yet)
-	function pickFromRezzies() {
+	// Placeholder: Divvi friends list (no backend yet)
+	function pickFromDivvi() {
 		// TODO: open modal or navigate to contacts when backend exists
-		alert('Import from Rezzies friends list is coming soon. Add people by email above for now.');
+		alert('Import from Divvi friends list is coming soon. Add people by email above for now.');
 	}
 </script>
 
@@ -166,12 +166,12 @@
 		{/if}
 	</SectionCard>
 
-	<SectionCard title="From Rezzies" icon="👋">
-		<p class="rezzies-desc">Import people you’ve traveled with before from your Rezzies friends list.</p>
-		<button type="button" class="btn-rezzies" onclick={pickFromRezzies}>
+	<SectionCard title="From Divvi" icon="👋">
+		<p class="divvi-desc">Import people you’ve traveled with before from your Divvi friends list.</p>
+		<button type="button" class="btn-divvi" onclick={pickFromDivvi}>
 			Pick from contacts
 		</button>
-		<p class="rezzies-note">Coming soon. Use the email field above to add guests for now.</p>
+		<p class="divvi-note">Coming soon. Use the email field above to add guests for now.</p>
 	</SectionCard>
 </div>
 
@@ -372,19 +372,19 @@
 	}
 
 	.chip-remove:hover {
-		color: #ef4444;
+		color: var(--danger);
 		background: rgba(239, 68, 68, 0.1);
 	}
 
-	/* Rezzies section */
-	.rezzies-desc {
+	/* Divvi section */
+	.divvi-desc {
 		font-size: 0.9375rem;
 		color: var(--text);
 		margin: 0 0 1rem 0;
 		line-height: 1.5;
 	}
 
-	.btn-rezzies {
+	.btn-divvi {
 		padding: 0.75rem 1.25rem;
 		background: white;
 		color: var(--primary);
@@ -396,11 +396,11 @@
 		transition: background 0.2s, color 0.2s;
 	}
 
-	.btn-rezzies:hover {
+	.btn-divvi:hover {
 		background: rgba(30, 58, 138, 0.08);
 	}
 
-	.rezzies-note {
+	.divvi-note {
 		font-size: 0.8125rem;
 		color: var(--muted);
 		margin: 1rem 0 0 0;

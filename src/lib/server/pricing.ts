@@ -1,4 +1,4 @@
-// Pricing calculation logic for Rezzies
+// Pricing calculation logic for Divvi
 // Supports multiple pricing models: per_room, per_bed, per_person, per_person_per_night
 
 import { prisma } from './prisma.js';

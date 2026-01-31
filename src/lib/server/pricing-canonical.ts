@@ -1,4 +1,4 @@
-// Canonical Pricing Model for Rezzies
+// Canonical Pricing Model for Divvi
 // Implements sleep-slot based pricing with bed weights, sharing discounts, and privacy premiums
 
 import { prisma } from './prisma.js';

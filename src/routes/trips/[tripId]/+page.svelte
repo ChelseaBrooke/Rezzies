@@ -367,12 +367,12 @@
 	.list-name {
 		font-size: 0.875rem;
 		font-weight: 600;
-		color: #0f172a;
+		color: var(--text);
 	}
 
 	.list-meta {
 		font-size: 0.75rem;
-		color: #64748b;
+		color: var(--muted);
 	}
 
 	.table-row {
@@ -381,8 +381,13 @@
 		gap: 0.5rem;
 		align-items: center;
 		padding: 0.5rem 0;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+		border-bottom: 1px solid var(--border);
 		font-size: 0.8125rem;
+		transition: background var(--transition-fast);
+	}
+
+	.table-row:hover {
+		background: var(--surface2);
 	}
 
 	.table-row:last-child {
@@ -390,11 +395,11 @@
 	}
 
 	.table-row.muted .cell {
-		color: #94a3b8;
+		color: var(--muted);
 	}
 
 	.cell {
-		color: #334155;
+		color: var(--text);
 	}
 
 	.status-pill {
@@ -404,7 +409,7 @@
 		letter-spacing: 0.03em;
 		padding: 0.2rem 0.4rem;
 		border-radius: 9999px;
-		background: #e0f2fe;
-		color: #0369a1;
+		background: var(--focusRing);
+		color: var(--primary);
 	}
 </style>

@@ -137,7 +137,7 @@
 		background: white;
 		border-color: var(--primary);
 		border-width: 2px;
-		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+		box-shadow: 0 0 0 3px var(--focusRing);
 	}
 	
 	.step-number {

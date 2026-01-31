@@ -43,12 +43,12 @@
 	.stat-value {
 		font-size: 1.5rem;
 		font-weight: 600;
-		color: #0f172a;
+		color: var(--text);
 	}
 
 	.stat-subtext {
 		font-size: 0.75rem;
-		color: #64748b;
+		color: var(--muted);
 	}
 
 	.micro-bars {
@@ -64,7 +64,8 @@
 		min-width: 4px;
 		height: var(--bar-h, 50%);
 		border-radius: 2px;
-		background: linear-gradient(180deg, #bfdbfe 0%, #93c5fd 100%);
-		transition: height 0.2s ease;
+		background: linear-gradient(180deg, var(--slate) 0%, var(--muted) 100%);
+		opacity: 0.6;
+		transition: height var(--transition-base);
 	}
 </style>

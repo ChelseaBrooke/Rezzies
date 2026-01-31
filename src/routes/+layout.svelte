@@ -9,7 +9,7 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<title>Rezzies - Fair Room & Cost Splitting for Group Vacations</title>
+	<title>Divvi - Fair Room & Cost Splitting for Group Vacations</title>
 </svelte:head>
 
 {#if $page.url.pathname !== '/' && !$page.url.pathname.startsWith('/trips/new/step') && !$page.url.pathname.match(/^\/trips\/[^\/]+/)}

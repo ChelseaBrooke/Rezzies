@@ -36,7 +36,7 @@
 	.page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.25rem 0; }
 	.subtitle { font-size: 0.875rem; color: var(--muted); margin: 0 0 1rem 0; }
 	.btn-primary { padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: 0.5rem; font-weight: 500; cursor: pointer; }
-	.card { background: white; border-radius: 1rem; border: 1px solid var(--border); overflow: hidden; }
+	.card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
 	.card-body { padding: 1.5rem; }
 	.upload-zone { border: 2px dashed var(--border); border-radius: 0.5rem; padding: 2rem; text-align: center; color: var(--muted); margin-bottom: 1rem; }
 	.file-list { list-style: none; margin: 0; padding: 0; font-size: 0.875rem; }

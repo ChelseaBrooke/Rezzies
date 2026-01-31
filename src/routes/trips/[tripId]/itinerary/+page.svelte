@@ -198,7 +198,7 @@
 	}
 
 	.event-departure {
-		border-left-color: #ef4444;
+		border-left-color: var(--danger);
 	}
 
 	.event-meal {

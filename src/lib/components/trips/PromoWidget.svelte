@@ -33,14 +33,14 @@
 
 	.promo-subtitle {
 		font-size: 0.8125rem;
-		color: #64748b;
+		color: var(--muted);
 		margin: 0;
 		line-height: 1.4;
 	}
 
 	.promo-visual {
 		min-height: 4rem;
-		border-radius: 0.5rem;
+		border-radius: var(--radius-md);
 		overflow: hidden;
 	}
 
@@ -48,8 +48,8 @@
 		width: 100%;
 		height: 100%;
 		min-height: 4rem;
-		background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
-		opacity: 0.8;
+		background: linear-gradient(135deg, var(--surface2) 0%, var(--border) 100%);
+		opacity: 0.7;
 	}
 
 	.promo-cta {
@@ -61,14 +61,14 @@
 		font-size: 0.875rem;
 		font-weight: 600;
 		color: white;
-		background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-		border-radius: 0.5rem;
+		background: var(--primary);
+		border-radius: var(--radius-md);
 		text-decoration: none;
-		transition: opacity 0.2s ease;
+		transition: background var(--transition-fast);
 		margin-top: auto;
 	}
 
 	.promo-cta:hover {
-		opacity: 0.95;
+		background: var(--primaryHover);
 	}
 </style>

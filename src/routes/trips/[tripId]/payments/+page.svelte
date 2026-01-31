@@ -41,7 +41,7 @@
 	.page-header { margin-bottom: 1.5rem; }
 	.page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.25rem 0; }
 	.subtitle { font-size: 0.875rem; color: var(--muted); margin: 0; }
-	.card { background: white; border-radius: 1rem; border: 1px solid var(--border); overflow: hidden; }
+	.card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
 	.card-body { padding: 1.5rem; }
 	.summary-row { display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
 	.label { color: var(--muted); }
@@ -50,6 +50,7 @@
 	.invoice-list { list-style: none; margin: 0; padding: 0; }
 	.invoice-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
 	.invoice-item .status { text-transform: capitalize; color: var(--muted); font-size: 0.875rem; }
-	.btn-stub { padding: 0.25rem 0.5rem; font-size: 0.8125rem; background: var(--bg); border: 1px solid var(--border); border-radius: 0.375rem; cursor: pointer; }
+	.btn-stub { padding: 0.25rem 0.5rem; font-size: 0.8125rem; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; transition: background var(--transition-fast); }
+	.btn-stub:hover { background: var(--surface); }
 	.empty { color: var(--muted); margin: 1rem 0 0 0; }
 </style>

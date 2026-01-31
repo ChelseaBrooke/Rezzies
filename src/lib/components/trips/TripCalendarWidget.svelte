@@ -394,7 +394,7 @@
 	.calendar-sidebar .month-title {
 		font-size: 0.8125rem;
 		font-weight: 700;
-		color: #0f172a;
+		color: var(--text);
 	}
 
 	.calendar-sidebar .month-chevron-btn {
@@ -410,7 +410,7 @@
 		align-items: center;
 		justify-content: center;
 		font-size: 1rem;
-		color: #94a3b8;
+		color: var(--muted);
 		background: transparent;
 		border: none;
 		border-radius: 0.375rem;
@@ -420,7 +420,7 @@
 
 	.month-chevron-btn:hover:not(:disabled) {
 		color: #64748b;
-		background: #f1f5f9;
+		background: var(--surface2);
 	}
 
 	.month-chevron-btn:disabled {
@@ -431,7 +431,7 @@
 	.calendar-sidebar .day-header {
 		font-size: 0.6875rem;
 		font-weight: 500;
-		color: #475569;
+		color: var(--muted);
 	}
 
 	.calendar-sidebar .days-grid {
@@ -450,7 +450,7 @@
 		font-size: 0.8125rem;
 		font-weight: 500;
 		border-radius: 6px;
-		color: #94a3b8;
+		color: var(--muted);
 		background: transparent;
 		min-width: 0;
 		min-height: 1.75rem;
@@ -461,29 +461,29 @@
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell.current-month {
-		color: #334155;
+		color: var(--text);
 		background: transparent;
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell.trip-day {
-		color: #166534;
-		background: #dcfce7;
+		color: var(--text);
+		background: var(--surface2);
 		cursor: pointer;
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell.trip-day:hover {
-		background: #bbf7d0;
-		color: #14532d;
+		background: var(--focusRing);
+		color: var(--primary);
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell.trip-day.selected {
-		background: #0f172a;
+		background: var(--text);
 		color: white;
 		border-radius: 50%;
 	}
 
 	.calendar-sidebar .day-cell.sidebar-cell.trip-day.selected:hover {
-		background: #1e293b;
+		background: var(--primaryHover);
 		color: white;
 	}
 
@@ -525,7 +525,7 @@
 		border: none;
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: #2563eb;
+		color: var(--primary);
 		cursor: pointer;
 		text-decoration: none;
 	}
@@ -538,7 +538,7 @@
 	.calendar-sidebar .day-detail-title {
 		font-size: 0.875rem;
 		font-weight: 600;
-		color: #0f172a;
+		color: var(--text);
 		margin: 0 0 0.25rem 0;
 	}
 
@@ -576,8 +576,8 @@
 	.calendar-sidebar .day-detail-item {
 		font-size: 0.75rem;
 		padding: 0.125rem 0;
-		border-bottom: 1px solid #f1f5f9;
-		color: #334155;
+		border-bottom: 1px solid var(--border);
+		color: var(--text);
 	}
 
 	.calendar-sidebar .day-detail-item:last-child {
@@ -594,7 +594,7 @@
 		background: #f8fafc;
 		border-radius: 0.75rem;
 		padding: 0.75rem;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+		box-shadow: var(--shadow-sm);
 		box-sizing: border-box;
 	}
 
@@ -648,14 +648,14 @@
 		align-items: center;
 		justify-content: center;
 		font-size: 1rem;
-		color: #94a3b8;
+		color: var(--muted);
 		flex-shrink: 0;
 	}
 
 	.month-title {
 		font-size: 0.9375rem;
 		font-weight: 700;
-		color: #0f172a;
+		color: var(--text);
 		text-align: center;
 		flex: 1;
 	}
@@ -695,38 +695,38 @@
 		border: none;
 		border-radius: 0.375rem;
 		background: transparent;
-		color: #94a3b8;
+		color: var(--muted);
 		cursor: default;
 	}
 
 	.day-cell.current-month {
-		color: #334155;
+		color: var(--text);
 	}
 
 	.day-cell.trip-day {
 		cursor: pointer;
-		background: #dcfce7;
-		color: #166534;
+		background: var(--surface2);
+		color: var(--text);
 	}
 
 	.day-cell.trip-day:hover {
-		background: #bbf7d0;
-		color: #14532d;
+		background: var(--focusRing);
+		color: var(--primary);
 	}
 
 	.day-cell.trip-day.selected {
-		background: #0f172a;
+		background: var(--text);
 		color: white;
 		border-radius: 50%;
 	}
 
 	.day-cell.trip-day.selected:hover {
-		background: #1e293b;
+		background: var(--primaryHover);
 		color: white;
 	}
 
 	.day-detail {
-		border-top: 1px solid rgba(0, 0, 0, 0.08);
+		border-top: 1px solid var(--border);
 		padding-top: 0.5rem;
 		margin-top: 0.125rem;
 		min-height: 0;
@@ -739,7 +739,7 @@
 	.day-detail-title {
 		font-size: 0.875rem;
 		font-weight: 600;
-		color: #0f172a;
+		color: var(--text);
 		margin: 0 0 0.5rem 0;
 		flex-shrink: 0;
 	}
@@ -752,7 +752,7 @@
 	}
 
 	.calendar-empty-msg a {
-		color: #2563eb;
+		color: var(--primary);
 		text-decoration: none;
 		font-weight: 500;
 	}
@@ -804,7 +804,7 @@
 		gap: 0.375rem;
 		font-size: 0.8125rem;
 		padding: 0.25rem 0;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+		border-bottom: 1px solid var(--border);
 		min-width: 0;
 	}
 
@@ -814,7 +814,7 @@
 
 	.item-title {
 		font-weight: 600;
-		color: #334155;
+		color: var(--text);
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;

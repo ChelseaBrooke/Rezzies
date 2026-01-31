@@ -16,11 +16,11 @@
 
 <style>
 	.section-card {
-		background: white;
-		border-radius: 1rem;
+		background: var(--surface);
+		border-radius: var(--radius-lg);
 		border: 1px solid var(--border);
 		padding: 1.5rem;
-		box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+		box-shadow: var(--shadow-sm);
 	}
 	
 	.section-header {
@@ -33,8 +33,8 @@
 	.icon-container {
 		width: 2.5rem;
 		height: 2.5rem;
-		background: rgba(30, 58, 138, 0.1);
-		border-radius: 0.5rem;
+		background: var(--focusRing);
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: center;

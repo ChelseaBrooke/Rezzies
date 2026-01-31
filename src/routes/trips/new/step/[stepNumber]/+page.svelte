@@ -212,7 +212,7 @@
 	}
 	
 	.validation-error {
-		color: #ef4444;
+		color: var(--danger);
 		font-size: 0.875rem;
 		margin: 0;
 		text-align: right;

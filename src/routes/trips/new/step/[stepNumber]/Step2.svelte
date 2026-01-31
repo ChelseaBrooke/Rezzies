@@ -430,7 +430,7 @@
 	}
 	.btn-remove-slot:hover {
 		background: #fef2f2;
-		color: #dc2626;
+		color: var(--danger);
 		border-color: #fecaca;
 	}
 	.btn-add {

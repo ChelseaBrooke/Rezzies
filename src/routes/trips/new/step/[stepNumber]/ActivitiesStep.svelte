@@ -574,7 +574,7 @@
 		color: var(--text);
 	}
 	.required {
-		color: #dc2626;
+		color: var(--danger);
 	}
 	.form-input,
 	.form-select,
@@ -771,7 +771,7 @@
 	}
 	.btn-remove-item:hover {
 		background: #fef2f2;
-		color: #dc2626;
+		color: var(--danger);
 		border-color: #fecaca;
 	}
 	.modal-backdrop {

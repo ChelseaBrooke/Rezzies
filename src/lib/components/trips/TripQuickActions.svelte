@@ -155,6 +155,10 @@
 	}
 
 	.more-item.danger {
-		color: #dc2626;
+		color: var(--danger);
+	}
+
+	.more-item.danger:hover {
+		background: rgba(115, 44, 44, 0.08);
 	}
 </style>

@@ -75,16 +75,17 @@
 	.page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.25rem 0; }
 	.subtitle { font-size: 0.875rem; color: var(--muted); margin: 0 0 1rem 0; }
 	.btn-primary { padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: 0.5rem; font-weight: 500; cursor: pointer; }
-	.card { background: white; border-radius: 1rem; border: 1px solid var(--border); overflow: hidden; }
+	.card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
 	.card-body { padding: 1.5rem; }
 	.room-list { list-style: none; margin: 0; padding: 0; }
-	.room-item { padding: 1rem; border-bottom: 1px solid var(--border); }
+	.room-item { padding: 1rem; border-bottom: 1px solid var(--border); transition: background var(--transition-fast); }
+	.room-item:hover { background: var(--surface2); }
 	.room-item:last-child { border-bottom: none; }
 	.room-name { font-weight: 500; margin-bottom: 0.25rem; }
 	.room-meta { font-size: 0.875rem; color: var(--muted); }
 	.empty { color: var(--muted); margin: 0; }
-	.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; }
-	.modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 1.5rem; border-radius: 1rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); z-index: 101; min-width: 20rem; }
+	.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 27, 46, 0.3); z-index: 100; }
+	.modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-xl); z-index: 101; min-width: 20rem; }
 	.modal h2 { margin: 0 0 1rem 0; font-size: 1.25rem; }
 	.form-group { margin-bottom: 1rem; }
 	.form-group label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }

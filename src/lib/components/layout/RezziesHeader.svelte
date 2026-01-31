@@ -34,7 +34,7 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 1.5rem 2rem;
-		background: rgba(0, 0, 0, 0.2);
+		background: rgba(0, 27, 46, 0.25);
 		backdrop-filter: blur(10px);
 	}
 
@@ -107,7 +107,7 @@
 		width: 40px;
 		height: 40px;
 		border-radius: 50%;
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		background: linear-gradient(135deg, var(--slate) 0%, var(--navy) 100%);
 		border: 2px solid rgba(255, 255, 255, 0.3);
 	}
 

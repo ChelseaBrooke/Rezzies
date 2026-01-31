@@ -381,9 +381,9 @@
 	}
 	
 	.btn-remove-small:hover {
-		background: #ef4444;
+		background: var(--danger);
 		color: white;
-		border-color: #ef4444;
+		border-color: var(--danger);
 	}
 	
 	.btn-add-item {

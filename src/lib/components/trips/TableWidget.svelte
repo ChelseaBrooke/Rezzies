@@ -38,7 +38,7 @@
 		gap: 0.5rem;
 		padding-bottom: 0.5rem;
 		margin-bottom: 0.5rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.th {
@@ -46,7 +46,7 @@
 		font-weight: 600;
 		letter-spacing: 0.03em;
 		text-transform: uppercase;
-		color: #64748b;
+		color: var(--muted);
 	}
 
 	.table-body {

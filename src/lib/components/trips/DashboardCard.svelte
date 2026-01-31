@@ -29,9 +29,10 @@
 
 <style>
 	.dashboard-card {
-		background: white;
-		border-radius: var(--radius-xl, 1.25rem);
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+		background: var(--surface);
+		border-radius: var(--radius-xl);
+		box-shadow: var(--shadow-sm);
+		border: 1px solid var(--border);
 		padding: 1.5rem;
 		display: flex;
 		flex-direction: column;
@@ -57,7 +58,7 @@
 	.card-cta {
 		margin-top: auto;
 		padding-top: 0.75rem;
-		border-top: 1px solid rgba(0, 0, 0, 0.06);
+		border-top: 1px solid var(--border);
 	}
 
 	.cta-link {
@@ -65,9 +66,11 @@
 		font-weight: 500;
 		color: var(--primary);
 		text-decoration: none;
+		transition: color var(--transition-fast);
 	}
 
 	.cta-link:hover {
+		color: var(--primaryHover);
 		text-decoration: underline;
 	}
 

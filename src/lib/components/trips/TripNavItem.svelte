@@ -47,27 +47,29 @@
 		padding: 0 1rem 0 1rem;
 		border: none;
 		background: transparent;
-		border-radius: 0.75rem;
+		border-radius: var(--radius-md);
+		border-left: 3px solid transparent;
 		cursor: pointer;
-		transition: all 0.2s ease;
+		transition: all var(--transition-base);
 		font-family: inherit;
 		font-size: 0.9375rem;
-		color: #334155;
+		color: var(--muted);
 		text-align: left;
 		width: 100%;
 		position: relative;
 	}
 
 	.nav-item:hover {
-		background: rgba(255, 255, 255, 0.25);
-		color: #0f172a;
+		background: var(--surface2);
+		color: var(--text);
 	}
 
 	.nav-item.active {
-		background: rgba(255, 255, 255, 0.85);
-		color: #0f172a;
+		background: var(--surface2);
+		color: var(--text);
 		font-weight: 500;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+		border-left-color: var(--primary);
+		box-shadow: var(--shadow-sm);
 	}
 
 	.nav-icon {
@@ -86,8 +88,9 @@
 	.nav-badge {
 		font-size: 0.75rem;
 		font-weight: 500;
-		color: #334155;
-		background: rgba(255, 255, 255, 0.7);
+		color: var(--muted);
+		background: var(--surface2);
+		border: 1px solid var(--border);
 		padding: 0.125rem 0.5rem;
 		border-radius: 9999px;
 		flex-shrink: 0;

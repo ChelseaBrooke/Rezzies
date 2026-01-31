@@ -94,13 +94,14 @@
 	.sidebar-brand {
 		margin-bottom: 1rem;
 		padding-bottom: 1rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+		border-bottom: 1px solid var(--border);
+		color: var(--text);
 	}
 
 	.header-block {
 		padding: 0 0 1rem 0;
 		margin-bottom: 0.5rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.switcher-wrap {
@@ -110,7 +111,7 @@
 	.actions-row {
 		padding: 0.5rem 0;
 		margin-bottom: 0.5rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+		border-bottom: 1px solid var(--border);
 	}
 
 	.nav {
@@ -123,23 +124,24 @@
 	}
 
 	.extension-card {
-		background: rgba(255, 255, 255, 0.7);
-		border-radius: 1rem;
+		background: var(--surface2);
+		border-radius: var(--radius-lg);
 		padding: 1rem;
 		margin: 0.5rem 0;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+		box-shadow: var(--shadow-sm);
+		border: 1px solid var(--border);
 	}
 
 	.extension-title {
 		font-size: 0.9375rem;
 		font-weight: 600;
-		color: #0f172a;
+		color: var(--text);
 		margin: 0 0 0.25rem 0;
 	}
 
 	.extension-subtitle {
 		font-size: 0.8125rem;
-		color: #64748b;
+		color: var(--muted);
 		margin: 0 0 0.75rem 0;
 		line-height: 1.35;
 	}
@@ -150,19 +152,19 @@
 		font-size: 0.875rem;
 		font-weight: 600;
 		color: white;
-		background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-		border-radius: 0.5rem;
+		background: var(--primary);
+		border-radius: var(--radius-md);
 		text-decoration: none;
-		transition: opacity 0.2s ease;
+		transition: background var(--transition-fast);
 	}
 
 	.extension-cta:hover {
-		opacity: 0.95;
+		background: var(--primaryHover);
 	}
 
 	.footer {
 		padding: 0.75rem 0 0 0;
-		border-top: 1px solid rgba(255, 255, 255, 0.4);
+		border-top: 1px solid var(--border);
 		margin-top: auto;
 	}
 
@@ -178,20 +180,21 @@
 		width: 36px;
 		height: 36px;
 		border-radius: 50%;
-		background: rgba(255, 255, 255, 0.9);
+		background: var(--surface2);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		font-size: 0.875rem;
 		font-weight: 600;
-		color: #334155;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+		color: var(--muted);
+		box-shadow: var(--shadow-sm);
+		border: 1px solid var(--border);
 	}
 
 	.user-name {
 		font-size: 0.875rem;
 		font-weight: 500;
-		color: #334155;
+		color: var(--text);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
