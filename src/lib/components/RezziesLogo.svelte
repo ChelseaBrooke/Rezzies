@@ -1,5 +1,5 @@
 <script lang="ts">
-	import divviLogo from '$lib/assets/images/divvi logo.png';
+	import whiteLogo from '$lib/assets/images/white logo.png';
 
 	interface Props {
 		/** Link href. Default "/" */
@@ -16,7 +16,7 @@
 </script>
 
 <a {href} class={classList} class:compact aria-label="divvi">
-	<img src={divviLogo} alt="" class="divvi-logo-img" />
+	<img src={whiteLogo} alt="" class="divvi-logo-img" />
 </a>
 
 <style>
@@ -29,14 +29,14 @@
 
 	.divvi-logo-img {
 		display: block;
-		height: 2rem;
+		height: 2.75rem;
 		width: auto;
-		max-width: 5rem;
+		max-width: 8rem;
 		object-fit: contain;
 		flex-shrink: 0;
 	}
 
 	.divvi-logo.compact .divvi-logo-img {
-		height: 1.75rem;
+		height: 2.25rem;
 	}
 </style>
