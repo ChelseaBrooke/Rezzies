@@ -2,6 +2,7 @@
 	import { getContext } from 'svelte';
 	import type { PageData } from './$types';
 	import TripCalendarWidget from '$lib/components/trips/TripCalendarWidget.svelte';
+	import TripGoalCircle from '$lib/components/trips/TripGoalCircle.svelte';
 	import TripQuickActions from '$lib/components/trips/TripQuickActions.svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -189,29 +190,22 @@
 			</div>
 		</div>
 		<div class="hero-right-column">
-			<div class="progress-strip-wrap progress-strip-in-column">
-				<div class="progress-strip">
-					<a href="/trips/{trip?.id}/guests" class="progress-metric progress-metric--lead">
-						<span class="progress-label">RSVPs</span>
-						<span class="progress-value">{acceptedCount} / {members.length}</span>
-						<span class="progress-helper">{pendingRsvpCount} pending</span>
-						<div class="progress-bar" role="presentation"><div class="progress-fill" style="width: {rsvpPct}%"></div></div>
-					</a>
-					<span class="progress-divider" aria-hidden="true"></span>
-					<a href="/trips/{trip?.id}/rooms" class="progress-metric">
-						<span class="progress-label">Beds / rooms</span>
-						<span class="progress-value">{totalBedSlots > 0 ? claimedSlots + ' / ' + totalBedSlots : 'Not set'}</span>
-						<span class="progress-helper">{totalBedSlots > 0 ? bedsPct + '% claimed' : '—'}</span>
-						<div class="progress-bar" role="presentation"><div class="progress-fill" style="width: {totalBedSlots > 0 ? bedsPct : 0}%"></div></div>
-					</a>
-					<span class="progress-divider" aria-hidden="true"></span>
-					<a href="/trips/{trip?.id}/payments" class="progress-metric">
-						<span class="progress-label">Funding</span>
-						<span class="progress-value">{totalCost > 0 ? '$' + committedFunds.toFixed(0) + ' / $' + totalCost.toFixed(0) : 'Payments not set'}</span>
-						<span class="progress-helper">{totalCost > 0 ? fundingPct + '% funded' : '—'}</span>
-						<div class="progress-bar" role="presentation"><div class="progress-fill" style="width: {fundingPct}%"></div></div>
-					</a>
-				</div>
+			<div class="goal-circle-wrap">
+				<TripGoalCircle
+					rsvpCurrent={acceptedCount}
+					rsvpTotal={members.length}
+					rsvpPct={rsvpPct}
+					bedsCurrent={claimedSlots}
+					bedsTotal={totalBedSlots}
+					bedsPct={bedsPct}
+					fundingCurrent={Math.round(committedFunds)}
+					fundingTotal={Math.round(totalCost)}
+					fundingPct={fundingPct}
+					fundingDisplay={totalCost > 0 ? `$${committedFunds.toFixed(0)} / $${totalCost.toFixed(0)}` : 'Not set'}
+					guestsHref="/trips/{trip?.id}/guests"
+					roomsHref="/trips/{trip?.id}/rooms"
+					paymentsHref="/trips/{trip?.id}/payments"
+				/>
 			</div>
 			<div class="quick-actions-box" aria-label="Quick actions">
 				<nav class="quick-actions-section quick-actions-under-stats">
@@ -295,17 +289,17 @@
 	.overview-page {
 		background: #faf9f7;
 		min-height: 100%;
-		padding: 0.75rem 1.5rem 2rem;
+		padding: 0.5rem 1rem 1.5rem;
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1rem;
 	}
 
 	/* Trip info, Recent activity, Alerts — just below the main photo (left column) */
 	.overview-below-photo {
 		display: grid;
 		grid-template-columns: 1fr 1fr auto;
-		gap: 1rem;
+		gap: 0.75rem;
 		flex-shrink: 0;
 	}
 
@@ -331,14 +325,14 @@
 		grid-template-columns: 2fr 1fr;
 		grid-template-rows: auto;
 		align-items: start;
-		gap: 1.5rem;
+		gap: 1rem;
 		flex-shrink: 0;
 	}
 
 	.overview-left-column {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.75rem;
 		min-width: 0;
 	}
 
@@ -354,8 +348,8 @@
 	.hero-right-column {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
-		min-height: 320px;
+		gap: 0.75rem;
+		min-height: 280px;
 		max-height: calc(100vh - 6rem);
 		min-width: 0;
 	}
@@ -475,7 +469,7 @@
 		border: none;
 		border-radius: 0;
 		box-shadow: none;
-		padding: 0.75rem 1rem;
+		padding: 0.5rem 0.75rem;
 		min-width: 0;
 	}
 
@@ -502,13 +496,13 @@
 	}
 
 	.calendar-box {
-		border-radius: var(--radius-2xl);
+		border-radius: var(--radius-xl);
 		overflow: auto;
 		box-shadow: var(--shadow-lg);
 		background: white;
 		flex: 1;
-		min-height: 320px;
-		padding: 1rem;
+		min-height: 260px;
+		padding: 0.75rem 1rem;
 		display: flex;
 		flex-direction: column;
 		min-width: 0;
@@ -540,80 +534,6 @@
 		align-content: start;
 		grid-auto-rows: minmax(26px, 1fr);
 		min-height: 0;
-	}
-
-	/* 2) Progress strip: white on tinted wrap, reduced height, RSVPs lead */
-	.progress-strip-wrap {
-		background: rgba(0, 27, 46, 0.03);
-		border-radius: var(--radius-2xl);
-		padding: 0.5rem;
-	}
-
-	.progress-strip {
-		display: flex;
-		align-items: stretch;
-		gap: 0;
-		background: white;
-		border-radius: var(--radius-xl);
-		padding: 0.75rem 1.25rem;
-		box-shadow: 0 1px 2px rgba(0, 27, 46, 0.04);
-	}
-
-	.progress-metric {
-		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
-		text-decoration: none;
-		color: var(--text);
-		min-width: 0;
-		flex: 1;
-	}
-
-	.progress-metric--lead { flex: 1.15; }
-	.progress-metric--lead .progress-value { font-weight: 700; font-size: 1.125rem; }
-
-	.progress-metric:hover .progress-value { color: var(--primary); }
-
-	.progress-label {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		letter-spacing: 0.03em;
-		color: var(--muted);
-	}
-
-	.progress-value {
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--text);
-		transition: color var(--transition-fast);
-	}
-
-	.progress-helper {
-		font-size: 0.6875rem;
-		color: var(--muted);
-	}
-
-	.progress-bar {
-		height: 4px;
-		background: var(--bg);
-		border-radius: 2px;
-		overflow: hidden;
-		margin-top: 0.25rem;
-		max-width: 100%;
-	}
-
-	.progress-fill {
-		height: 100%;
-		background: var(--primary);
-		border-radius: 2px;
-		transition: width var(--transition-base);
-	}
-
-	.progress-divider {
-		width: 1px;
-		background: var(--border);
-		margin: 0 1rem;
-		align-self: stretch;
 	}
 
 	/* Main content (Guests, Trip info) — under photo in left column */
@@ -817,9 +737,6 @@
 		.calendar-box { flex: 1 1 280px; min-height: 280px; }
 		.calendar-box :global(.calendar-sidebar) { min-height: 320px; }
 		.overview-main { flex-direction: column; }
-		.progress-strip { flex-direction: column; gap: 0.75rem; padding: 1rem 1.25rem; }
-		.progress-divider { width: 100%; height: 1px; margin: 0; }
-		.progress-metric--lead { flex: 1; }
 	}
 
 	@media (max-width: 640px) {
