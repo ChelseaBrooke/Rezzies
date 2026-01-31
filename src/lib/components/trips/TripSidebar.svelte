@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { getTripBadges } from '$lib/trips/selectors.js';
 	import TripSwitcher from './TripSwitcher.svelte';
-	import TripQuickActions from './TripQuickActions.svelte';
 	import TripNavItem from './TripNavItem.svelte';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 	import type { TripForSidebar } from '$lib/trips/types.js';
@@ -50,16 +49,6 @@
 		</div>
 	</div>
 
-	<!-- Quick Actions -->
-	<div class="actions-row">
-		<TripQuickActions
-			tripId={trip.id}
-			inviteCode={trip.inviteCode}
-			onInvite={onInvite}
-			showToast={showToast}
-		/>
-	</div>
-
 	<!-- Nav Items -->
 	<nav class="nav">
 		<TripNavItem href="/trips/{trip.id}" icon="📊" label="Overview" />
@@ -70,6 +59,9 @@
 		{#if mealsEnabled}
 			<TripNavItem href="/trips/{trip.id}/meals" icon="🍽️" label="Meals" badge={badges.meals} />
 		{/if}
+		<TripNavItem href="/trips/{trip.id}/checklist" icon="☑️" label="Packing list" />
+		<TripNavItem href="/trips/{trip.id}/polls" icon="🗳️" label="Polls" />
+		<TripNavItem href="/trips/{trip.id}/activities" icon="🎯" label="Activities" />
 		<TripNavItem href="/trips/{trip.id}/files" icon="📁" label="Files" badge={badges.files} />
 	</nav>
 
@@ -106,12 +98,6 @@
 
 	.switcher-wrap {
 		margin-top: 0;
-	}
-
-	.actions-row {
-		padding: 0.5rem 0;
-		margin-bottom: 0.5rem;
-		border-bottom: 1px solid var(--border);
 	}
 
 	.nav {

@@ -1,12 +1,16 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
 	import type { PageData } from './$types';
 	import StatWidget from '$lib/components/trips/StatWidget.svelte';
 	import WidgetCard from '$lib/components/trips/WidgetCard.svelte';
 	import TableWidget from '$lib/components/trips/TableWidget.svelte';
 	import PromoWidget from '$lib/components/trips/PromoWidget.svelte';
 	import TripCalendarWidget from '$lib/components/trips/TripCalendarWidget.svelte';
+	import TripQuickActions from '$lib/components/trips/TripQuickActions.svelte';
 
 	let { data }: { data: PageData } = $props();
+
+	const quickActions = getContext<{ onInvite: () => void; showToast: (msg: string) => void }>('tripQuickActions');
 
 	const trip = $derived(data.trip);
 	const memberCount = $derived(trip?.members?.length ?? 0);
@@ -86,9 +90,19 @@
 				{:else}
 					<div class="trip-hero-placeholder"></div>
 				{/if}
+				{#if quickActions && trip}
+					<div class="trip-hero-actions">
+						<TripQuickActions
+							tripId={trip.id}
+							inviteCode={trip.inviteCode}
+							onInvite={quickActions.onInvite}
+							showToast={quickActions.showToast}
+						/>
+					</div>
+				{/if}
 				<div class="trip-hero-overlay">
 					<h1 class="trip-hero-name">{trip?.name ?? 'Trip'}</h1>
-					<p class="trip-hero-dates">{dateRange}</p>
+					<p class="trip-hero-dates"><span class="trip-hero-date">{dateRange}</span>{#if trip?.location?.trim()}<span class="trip-hero-sep"> | </span><span class="trip-hero-destination">{trip.location}</span>{/if}</p>
 				</div>
 			</div>
 		</section>
@@ -197,6 +211,30 @@
 		background: #e2e8f0;
 	}
 
+	.trip-hero-actions {
+		position: absolute;
+		top: 0.75rem;
+		right: 0.75rem;
+		z-index: 2;
+	}
+
+	.trip-hero-actions :global(.quick-actions) {
+		gap: 0.375rem;
+	}
+
+	.trip-hero-actions :global(.action-btn) {
+		width: 2.25rem;
+		height: 2.25rem;
+		color: white;
+		background: rgba(0, 0, 0, 0.35);
+		border-radius: var(--radius-md);
+	}
+
+	.trip-hero-actions :global(.action-btn:hover) {
+		background: rgba(0, 0, 0, 0.5);
+		color: white;
+	}
+
 	.trip-hero-image {
 		width: 100%;
 		height: 100%;
@@ -235,6 +273,20 @@
 		font-weight: 500;
 		color: white;
 		opacity: 0.95;
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.125rem;
+	}
+
+	.trip-hero-sep {
+		margin: 0 0.75rem;
+		opacity: 0.85;
+	}
+
+	.trip-hero-date,
+	.trip-hero-destination {
+		display: inline-block;
 	}
 
 	.dashboard-right {

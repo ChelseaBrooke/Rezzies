@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { setContext } from 'svelte';
 	import { page } from '$app/stores';
 	import AppFrame from '$lib/components/layout/AppFrame.svelte';
 	import TripSidebar from './TripSidebar.svelte';
@@ -36,6 +37,11 @@
 		setTimeout(() => (toastMessage = null), 3000);
 	}
 
+	setContext('tripQuickActions', {
+		onInvite: openInvite,
+		showToast: showToastLocal
+	});
+
 	const currentPath = $derived($page.url.pathname);
 	const tripId = $derived(trip?.id ?? '');
 
@@ -44,7 +50,10 @@
 		{ href: `/trips/${tripId}/guests`, label: 'Guests', icon: '👥' },
 		{ href: `/trips/${tripId}/rooms`, label: 'Rooms', icon: '🛏️' },
 		{ href: `/trips/${tripId}/payments`, label: 'Payments', icon: '💳' },
-		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary', icon: '📋' }
+		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary', icon: '📋' },
+		{ href: `/trips/${tripId}/checklist`, label: 'List', icon: '☑️' },
+		{ href: `/trips/${tripId}/polls`, label: 'Polls', icon: '🗳️' },
+		{ href: `/trips/${tripId}/activities`, label: 'Activities', icon: '🎯' }
 	];
 
 	function isActive(href: string) {
@@ -136,7 +145,7 @@
 <style>
 	.shell {
 		min-height: 100vh;
-		background: var(--bg);
+		background: var(--surface);
 		position: relative;
 		padding: 0;
 	}
@@ -176,6 +185,7 @@
 		min-width: 0;
 		padding: 0;
 		width: 100%;
+		background: white;
 	}
 
 	.bottom-nav {

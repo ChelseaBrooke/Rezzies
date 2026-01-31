@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { tripToDraft } from '$lib/stores/tripDraft.js';
 	import CreateTripShell from '$lib/components/wizard/CreateTripShell.svelte';
@@ -9,7 +10,9 @@
 	import Step4 from '../../new/step/[stepNumber]/Step4.svelte';
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 
-	let { data } = $props();
+	let { data, form }: { data: import('./$types').PageData; form: import('./$types').ActionData } = $props();
+
+	const saveResult = $derived(form?.saveTrip);
 
 	let draft = $state<TripDraft>(tripToDraft(data?.trip ?? null));
 	let currentStep = $state(0);
@@ -64,6 +67,22 @@
 				Back
 			</button>
 			<div class="footer-right">
+				<form method="POST" action="?/saveTrip" use:enhance={() => {
+					return async ({ result }) => {
+						if (result.type === 'success' && result.data?.saveTrip?.success) {
+							await import('$app/navigation').then(({ invalidateAll }) => invalidateAll());
+						}
+					};
+				}} class="save-form">
+					<input type="hidden" name="draft" value={JSON.stringify(draft)} />
+					<button type="submit" class="btn-save">Save</button>
+				</form>
+				{#if saveResult?.error}
+					<span class="footer-error">{saveResult.error}</span>
+				{/if}
+				{#if saveResult?.success}
+					<span class="footer-success">Saved.</span>
+				{/if}
 				{#if currentStep < 4}
 					<button type="button" class="btn-next" onclick={handleNext}>
 						Next
@@ -89,7 +108,23 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		flex-wrap: wrap;
 	}
+	.save-form { display: inline-flex; align-items: center; }
+	.btn-save {
+		padding: 0.75rem 1.5rem;
+		border-radius: 0.5rem;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		cursor: pointer;
+		border: 1px solid var(--border-strong);
+		background: var(--surface2);
+		color: var(--text);
+		font-family: inherit;
+	}
+	.btn-save:hover { background: var(--surface); }
+	.footer-error { font-size: 0.8125rem; color: var(--danger); }
+	.footer-success { font-size: 0.8125rem; color: var(--muted); }
 	.btn-back,
 	.btn-next,
 	.btn-done {

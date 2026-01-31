@@ -51,7 +51,7 @@
 		margin-left: 0.75rem;
 		border-radius: var(--radius-2xl);
 		overflow: hidden;
-		background: var(--surface);
+		background: white;
 		border: 1px solid var(--border);
 		box-shadow: var(--shadow-lg);
 	}
