@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 </script>
 
 <div class="home-page">
@@ -28,9 +31,9 @@
 				<span class="bell-icon">🔔</span>
 				<span>Notifications</span>
 			</button>
-			<button class="avatar-btn">
+			<a href={data?.user ? '/profile' : '/login'} class="avatar-btn" aria-label={data?.user ? 'My profile' : 'Log in'}>
 				<div class="avatar-circle"></div>
-			</button>
+			</a>
 		</div>
 	</header>
 
@@ -161,10 +164,15 @@
 	}
 
 	.avatar-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		background: transparent;
 		border: none;
 		cursor: pointer;
 		padding: 0;
+		text-decoration: none;
+		color: inherit;
 	}
 
 	.avatar-circle {

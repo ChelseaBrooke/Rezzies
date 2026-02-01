@@ -20,6 +20,7 @@
 		<div class="nav-auth">
 			{#if user}
 				<a href="/trips" class="nav-link">My Trips</a>
+				<a href="/profile" class="nav-link" class:active={$page.url.pathname === '/profile'}>Profile</a>
 				<form method="POST" action="/logout" style="display: inline;">
 					<button type="submit" class="btn btn-secondary">Log Out</button>
 				</form>
