@@ -414,7 +414,7 @@
 	}
 
 	.calendar-sidebar .month-title {
-		font-size: 0.8125rem;
+		font-size: 1.125rem;
 		font-weight: 700;
 		color: var(--text);
 	}

@@ -98,9 +98,29 @@
 		quickActions?.showToast?.('Nudge sent to pending guests');
 	}
 
-	function addToCalendar() {
-		quickActions?.showToast?.('Add to calendar — coming soon');
-	}
+	/** Google Calendar "Add event" URL for trip dates (all-day). */
+	const calendarAddUrl = $derived.by(() => {
+		if (!trip?.checkInDate || !trip?.checkOutDate) return null;
+		const start = new Date(trip.checkInDate);
+		const end = new Date(trip.checkOutDate);
+		const pad = (n: number) => String(n).padStart(2, '0');
+		const startStr = `${start.getFullYear()}${pad(start.getMonth() + 1)}${pad(start.getDate())}`;
+		const endStr = `${end.getFullYear()}${pad(end.getMonth() + 1)}${pad(end.getDate())}`;
+		const text = encodeURIComponent(trip?.name ?? 'Trip');
+		return `https://www.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${startStr}/${endStr}`;
+	});
+
+	/** Google Maps search URL for destination. */
+	const mapsUrl = $derived(
+		trip?.location?.trim()
+			? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location)}`
+			: null
+	);
+
+	const tripInfoContent = $derived(
+		'Check-in is 4pm. Keys at the lockbox — code in your confirmation.\n\n' +
+		'Wi‑Fi, Check-in, and Rules are in the itinerary.'
+	);
 </script>
 
 <div class="overview-page">
@@ -117,10 +137,18 @@
 					<div class="hero-overlay">
 						<h1 class="hero-name">{trip?.name ?? 'Trip'}</h1>
 						<p class="hero-dates">
-							<span class="hero-date">{dateRange}</span>
+							{#if calendarAddUrl}
+								<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="hero-date hero-link" title="Add to calendar">{dateRange}</a>
+							{:else}
+								<span class="hero-date">{dateRange}</span>
+							{/if}
 							{#if trip?.location?.trim()}
 								<span class="hero-sep"> · </span>
-								<span class="hero-destination">{trip.location}</span>
+								{#if mapsUrl}
+									<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="hero-destination hero-link" title="Open in Google Maps">{trip.location}</a>
+								{:else}
+									<span class="hero-destination">{trip.location}</span>
+								{/if}
 							{/if}
 						</p>
 						<div class="hero-cta-cluster">
@@ -130,27 +158,16 @@
 									inviteCode={trip.inviteCode}
 									onInvite={quickActions.onInvite}
 									showToast={quickActions.showToast}
+									tripInfoContent={tripInfoContent}
+									isHost={isHost}
 								/>
 							{/if}
-							<button type="button" class="hero-cta-btn" onclick={addToCalendar} title="Add to calendar">
-								Add to calendar
-							</button>
 						</div>
 					</div>
 				</div>
 			</div>
-			<!-- Trip info, Recent activity, Alerts — just below the main photo -->
+			<!-- Recent activity, Alerts — just below the main photo (trip info moved to hero info button) -->
 			<div class="overview-below-photo">
-				<section class="trip-info-note overview-card" aria-labelledby="trip-info-title">
-					<h2 id="trip-info-title" class="section-title">Trip info</h2>
-					<p class="trip-info-text">Check-in is 4pm. Keys at the lockbox — code in your confirmation.</p>
-					<div class="trip-info-links">
-						<a href="/trips/{trip?.id}/itinerary">Wi‑Fi</a>
-						<a href="/trips/{trip?.id}/itinerary">Check-in</a>
-						<a href="/trips/{trip?.id}/itinerary">Rules</a>
-					</div>
-					<a href="/trips/{trip?.id}/itinerary" class="link-view">View all notes</a>
-				</section>
 				<section class="recent-activity-compact overview-card" aria-labelledby="activity-title">
 					<h2 id="activity-title" class="section-title">Recent activity</h2>
 					{#if recentActivityItems.length > 0}
@@ -295,10 +312,10 @@
 		gap: 1rem;
 	}
 
-	/* Trip info, Recent activity, Alerts — just below the main photo (left column) */
+	/* Recent activity, Alerts — just below the main photo (left column) */
 	.overview-below-photo {
 		display: grid;
-		grid-template-columns: 1fr 1fr auto;
+		grid-template-columns: 1fr 1fr;
 		gap: 0.75rem;
 		flex-shrink: 0;
 	}
@@ -313,10 +330,6 @@
 	.overview-below-photo .section-title {
 		margin-bottom: 0.5rem;
 		font-size: 0.875rem;
-	}
-
-	.overview-below-photo .trip-info-note {
-		background: white;
 	}
 
 	/* Photo (left) | Right column: stats + buttons + calendar — row grows so calendar not clipped */
@@ -410,6 +423,15 @@
 
 	.hero-sep { opacity: 0.85; }
 	.hero-date, .hero-destination { display: inline-block; }
+	.hero-link {
+		color: inherit;
+		text-decoration: none;
+		opacity: 0.95;
+	}
+	.hero-link:hover {
+		text-decoration: underline;
+		opacity: 1;
+	}
 
 	.hero-cta-cluster {
 		display: flex;
@@ -471,6 +493,9 @@
 		box-shadow: none;
 		padding: 0.5rem 0.75rem;
 		min-width: 0;
+		width: 100%;
+		display: flex;
+		justify-content: center;
 	}
 
 	.chip-orange {
@@ -667,25 +692,6 @@
 		padding: 0;
 	}
 	.btn-nudge:hover { text-decoration: underline; }
-
-	/* Trip info: note-style, light tint; own box, no overlap */
-	.trip-info-note {
-		background: rgba(0, 27, 46, 0.04);
-		border-radius: var(--radius-2xl);
-		padding: 1.25rem;
-		position: relative;
-		z-index: 0;
-	}
-
-	.trip-info-text { font-size: 0.875rem; color: var(--text); margin: 0 0 0.75rem 0; line-height: 1.5; }
-	.trip-info-links { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
-	.trip-info-links a {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: var(--primary);
-		text-decoration: none;
-	}
-	.trip-info-links a:hover { text-decoration: underline; }
 
 	.link-view {
 		font-size: 0.8125rem;

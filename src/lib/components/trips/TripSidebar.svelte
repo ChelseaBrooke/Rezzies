@@ -30,7 +30,7 @@
 	<div class="sidebar-content">
 	<!-- Nav Items -->
 	<nav class="nav">
-		<TripNavItem href="/trips/{trip.id}" iconName="overview" label="Overview" />
+		<TripNavItem href="/trips/{trip.id}" iconName="overview" label="Dashboard" />
 		<TripNavItem href="/trips/{trip.id}/guests" iconName="guests" label="Guests" badge={badges.guests} />
 		<TripNavItem href="/trips/{trip.id}/rooms" iconName="rooms" label="Rooms" badge={badges.rooms} />
 		<TripNavItem href="/trips/{trip.id}/payments" iconName="payments" label="Payments" badge={badges.payments} />
