@@ -121,6 +121,15 @@
 		'Check-in is 4pm. Keys at the lockbox — code in your confirmation.\n\n' +
 		'Wi‑Fi, Check-in, and Rules are in the itinerary.'
 	);
+
+	const pendingPaymentTotal = $derived(Math.max(0, totalCost - committedFunds));
+	const mealSlotsCount = $derived(mealSlots.length);
+	const activitiesCount = $derived(activities.length);
+	const tripInfoEmptyCount = $derived(
+		[trip?.description, trip?.location, trip?.listingUrl, trip?.listingTitle].filter(
+			(v) => v == null || String(v).trim() === ''
+		).length
+	);
 </script>
 
 {#if trip}
@@ -175,6 +184,11 @@
 			roomsHref="/trips/{trip.id}/rooms"
 			paymentsHref="/trips/{trip.id}/payments"
 			{nudgePending}
+			{pendingPaymentTotal}
+			{mealSlotsCount}
+			{activitiesCount}
+			pollPendingCount={0}
+			{tripInfoEmptyCount}
 		/>
 	</AppShell>
 {/if}

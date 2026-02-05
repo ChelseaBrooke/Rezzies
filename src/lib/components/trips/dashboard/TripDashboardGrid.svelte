@@ -31,6 +31,16 @@
 		roomsHref: string;
 		paymentsHref: string;
 		nudgePending?: () => void;
+		/** For sticky tasks: amount still due from guests (e.g. total cost - committed). */
+		pendingPaymentTotal?: number;
+		/** Meal slots count; show "add meals" task only if < 3 */
+		mealSlotsCount?: number;
+		/** Activities count; show "add activities" task only if < 3 */
+		activitiesCount?: number;
+		/** Pending poll decisions count */
+		pollPendingCount?: number;
+		/** Count of empty trip info fields (description, location, etc.) */
+		tripInfoEmptyCount?: number;
 	}
 
 	let {
@@ -60,7 +70,12 @@
 		guestsHref,
 		roomsHref,
 		paymentsHref,
-		nudgePending
+		nudgePending,
+		pendingPaymentTotal = 0,
+		mealSlotsCount = 0,
+		activitiesCount = 0,
+		pollPendingCount = 0,
+		tripInfoEmptyCount = 0
 	}: Props = $props();
 
 	function initials(name: string | null | undefined, email?: string | null): string {
@@ -76,25 +91,59 @@
 
 	const hasMissingDietary = $derived(!userProfile?.dietaryRestrictions && !userProfile?.allergies);
 	const hasMissingArrival = $derived(!userRsvp?.arrivalDatetime && userRsvp?.status === 'yes');
+
+	/** Sticky note tasks for host: max 6, each with label and href */
+	const stickyTasks = $derived.by(() => {
+		if (!isHost) return [];
+		const tasks: { label: string; href: string }[] = [];
+		if (pendingRsvpCount > 0) {
+			tasks.push({
+				label: `Nudge guests to RSVP (${pendingRsvpCount})`,
+				href: guestsHref
+			});
+		}
+		if (pendingPaymentTotal > 0) {
+			const amt = `$${Math.round(pendingPaymentTotal)}`;
+			tasks.push({
+				label: `Nudge guests to make payments (${amt})`,
+				href: paymentsHref
+			});
+		}
+		if (mealSlotsCount < 3) {
+			tasks.push({
+				label: 'Add some meals to your trip or enlist help',
+				href: `/trips/${tripId}/meals`
+			});
+		}
+		if (activitiesCount < 3) {
+			tasks.push({
+				label: 'Add some activities to your trip',
+				href: `/trips/${tripId}/activities`
+			});
+		}
+		if (pollPendingCount > 0) {
+			tasks.push({
+				label: `Make poll decision (${pollPendingCount} pending)`,
+				href: `/trips/${tripId}/polls`
+			});
+		}
+		if (tripInfoEmptyCount > 0) {
+			tasks.push({
+				label: `Complete trip info (${tripInfoEmptyCount} missing)`,
+				href: `/trips/${tripId}/settings`
+			});
+		}
+		return tasks.slice(0, 6);
+	});
 </script>
 
 <div class="dashboard-wrapper">
-	{#snippet stickyHostIcon()}
-		<span class="sticky-card-icon" aria-hidden="true">
-			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-				<polyline points="14 2 14 8 20 8"></polyline>
-				<line x1="16" y1="13" x2="8" y2="13"></line>
-				<line x1="16" y1="17" x2="8" y2="17"></line>
-				<polyline points="10 9 9 9 8 9"></polyline>
-			</svg>
-		</span>
-	{/snippet}
-	{#snippet stickyForYouIcon()}
-		<span class="sticky-card-icon" aria-hidden="true">
-			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-				<circle cx="12" cy="7" r="4"></circle>
+	{#snippet stickyPinIcon()}
+		<span class="sticky-card-icon sticky-pin-icon" aria-hidden="true">
+			<span class="pin-circle"></span>
+			<svg class="pin-svg" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+				<circle cx="12" cy="7" r="4"/>
+				<path d="M12 11v11"/>
 			</svg>
 		</span>
 	{/snippet}
@@ -102,30 +151,21 @@
 	<div class="sticky-card-wrapper">
 		<DashboardCard
 			variant="sticky"
-			title={isHost ? 'Host reminders' : 'For you'}
-			headerLeft={isHost ? stickyHostIcon : stickyForYouIcon}
+			title="Reminders"
+			headerLeft={stickyPinIcon}
 		>
 			{#if isHost}
 				<div class="sticky-content">
-					<div class="sticky-reminder">
-						<strong>{pendingRsvpCount}</strong> pending RSVP{pendingRsvpCount !== 1 ? 's' : ''}
-					</div>
-					<ul class="sticky-list">
-						{#if pendingRsvpCount > 0}
-							<li>Send reminders to guests who haven't responded</li>
-						{/if}
-						<li>Review room assignments</li>
-						<li>Check payment status</li>
+					<ul class="sticky-task-list">
+						{#each stickyTasks as task}
+							<li>
+								<a href={task.href} class="sticky-task-link">{task.label}</a>
+							</li>
+						{/each}
 					</ul>
-					<div class="sticky-actions">
-						{#if nudgePending}
-							<button type="button" class="pill-btn pill-btn-primary" onclick={nudgePending}>
-								Nudge pending
-							</button>
-						{/if}
-						<a href="/trips/{tripId}/polls" class="pill-btn pill-btn-secondary">Polls</a>
-						<a href="/trips/{tripId}/checklist" class="pill-btn pill-btn-secondary">Checklist</a>
-					</div>
+					{#if stickyTasks.length === 0}
+						<p class="sticky-no-tasks">No reminders right now.</p>
+					{/if}
 				</div>
 			{:else}
 				<div class="sticky-content">
@@ -301,16 +341,27 @@
 	.sticky-card-wrapper {
 		position: absolute;
 		left: 2.5rem;
-		top: -14rem;
-		width: 420px;
-		max-width: 36%;
+		top: -10rem;
+		width: 392px;
+		max-width: 34%;
 		z-index: 10;
 	}
 
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
 		max-height: none;
-		min-height: 480px;
+		min-height: 420px;
 		width: 100%;
+		/* Equal inset so icon is equidistant from top and left edges */
+		padding: 1rem 0.625rem 0.5rem 1rem;
+	}
+
+	.sticky-card-wrapper :global(.card-header) {
+		gap: 0.375rem;
+		justify-content: flex-start;
+	}
+
+	.sticky-card-wrapper :global(.card-header-left) {
+		margin-right: 0.25rem;
 	}
 
 	/* Quick actions (Poll, Checklist, etc.) - bottom center of main photo */
@@ -361,10 +412,10 @@
 
 	@media (min-width: 1025px) {
 		.dashboard-grid {
-			/* Sticky ends at 2.5rem + 420px = 460px; 1.5rem (24px) gap = 484px */
-			margin-left: 484px;
-			width: calc(100% - 484px);
-			max-width: calc(100% - 484px);
+			/* Sticky ends at 2.5rem + 392px + 1.5rem gap = 456px */
+			margin-left: 456px;
+			width: calc(100% - 456px);
+			max-width: calc(100% - 456px);
 		}
 	}
 
@@ -398,12 +449,50 @@
 		}
 	}
 
+	.sticky-card-wrapper :global(.card-body) {
+		padding-top: 2.5rem;
+	}
+
 	.sticky-content {
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;
 		flex: 1;
 		min-height: 0;
+	}
+
+	.sticky-task-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.sticky-task-list li {
+		margin: 0;
+		padding: 0;
+	}
+
+	.sticky-task-link {
+		font-size: 0.8125rem;
+		color: var(--text);
+		text-decoration: none;
+		line-height: 1.4;
+		display: block;
+		transition: color var(--transition-fast);
+	}
+
+	.sticky-task-link:hover {
+		color: var(--primary);
+		text-decoration: underline;
+	}
+
+	.sticky-no-tasks {
+		font-size: 0.8125rem;
+		color: var(--muted);
+		margin: 0;
 	}
 
 	.sticky-card-icon {
@@ -415,6 +504,27 @@
 
 	.sticky-card-icon svg {
 		display: block;
+	}
+
+	.sticky-pin-icon {
+		position: relative;
+		width: 28px;
+		height: 28px;
+		flex-shrink: 0;
+	}
+
+	.pin-circle {
+		position: absolute;
+		inset: 0;
+		background: #111827;
+		border-radius: 50%;
+	}
+
+	.sticky-pin-icon .pin-svg {
+		position: relative;
+		z-index: 1;
+		color: rgba(255, 255, 255, 0.95);
+		stroke: rgba(255, 255, 255, 0.95);
 	}
 
 	.sticky-reminder {

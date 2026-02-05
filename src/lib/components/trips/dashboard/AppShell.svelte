@@ -271,7 +271,7 @@
 		overflow-x: hidden;
 		box-sizing: border-box;
 		min-width: 0;
-		padding: 1rem 2rem 2rem;
+		padding: 0.5rem 2rem 2rem;
 		max-width: 100%;
 		background: var(--bg);
 		position: relative;
@@ -279,7 +279,7 @@
 
 	.top-bell {
 		position: absolute;
-		top: 1rem;
+		top: 0.5rem;
 		right: 2rem;
 		width: 44px;
 		height: 44px;

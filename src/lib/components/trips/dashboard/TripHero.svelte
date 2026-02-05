@@ -233,20 +233,20 @@
 		/* More transparent frosted glass: dark at top for text, fades to lighter below */
 		background: linear-gradient(
 			to bottom,
-			rgba(0, 27, 46, 0.28) 0%,
-			rgba(0, 27, 46, 0.16) 22%,
-			rgba(255, 255, 255, 0.2) 55%,
-			rgba(255, 255, 255, 0.1) 100%
+			rgba(0, 27, 46, 0.2) 0%,
+			rgba(0, 27, 46, 0.1) 22%,
+			rgba(255, 255, 255, 0.14) 55%,
+			rgba(255, 255, 255, 0.06) 100%
 		);
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
 		border-radius: var(--radius-lg);
 		border: none;
-		box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 		padding: 0.75rem 0.5rem;
-		width: 360px;
-		min-width: 360px;
-		min-height: 320px;
+		width: 300px;
+		min-width: 300px;
+		min-height: 300px;
 		font-size: 0.8125rem;
 		display: flex;
 		flex-direction: column;
@@ -295,9 +295,13 @@
 		margin-bottom: 0;
 	}
 
-	.hero-calendar-wrap :global(.month-header),
+	.hero-calendar-wrap :global(.month-header) {
+		color: white;
+	}
+
 	.hero-calendar-wrap :global(.month-title) {
-		font-size: 0.8125rem;
+		font-size: 1.0625rem;
+		font-weight: 700;
 		color: white;
 	}
 
@@ -321,6 +325,12 @@
 
 	.hero-calendar-wrap :global(.month-chevron-btn) {
 		color: white;
+	}
+
+	.hero-calendar-wrap :global(.day-detail-hint) {
+		color: white;
+		font-size: 0.7rem;
+		opacity: 0.95;
 	}
 
 	.hero-content {
