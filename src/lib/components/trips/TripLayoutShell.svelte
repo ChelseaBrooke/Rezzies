@@ -45,6 +45,11 @@
 
 	const currentPath = $derived($page.url.pathname);
 	const tripId = $derived(trip?.id ?? '');
+	const isDashboardRoute = $derived(
+		currentPath === `/trips/${tripId}` ||
+		currentPath === `/trips/${tripId}/host` ||
+		currentPath === `/trips/${tripId}/guest`
+	);
 
 	const tripOptions = $derived(
 		allTrips.map((t) => ({
@@ -84,51 +89,61 @@
 	}
 </script>
 
-<div class="shell">
+	<div class="shell" class:dashboard-mode={isDashboardRoute}>
 	<!-- Desktop: AppFrame wraps sidebar + main (single rounded container) -->
-	<div class="desktop-wrap">
-		<AppFrame>
-			{#snippet sidebar()}
-				{#if trip}
-					<TripSidebar
-						{trip}
-						{allTrips}
-						{user}
-						onInvite={openInvite}
-						showToast={showToastLocal}
-					/>
+	<div class="desktop-wrap" class:dashboard-mode={isDashboardRoute}>
+		{#if isDashboardRoute}
+			<!-- Dashboard: Full-width, no container -->
+			<div class="dashboard-full-width">
+				{#if childrenFn}
+					{@render childrenFn()}
 				{/if}
-			{/snippet}
-			{#snippet children()}
-				<div class="trip-main-wrap">
-					<header class="content-pane-top" aria-label="Trip and actions">
-						<div class="trip-top-switcher">
-							{#if trip}
-								<TripSwitcher
-									currentTripId={trip.id}
-									currentTripName={trip.name}
-									trips={tripOptions}
-									tripsListHref="/trips"
-								/>
+			</div>
+		{:else}
+			<!-- Other routes: Use AppFrame container -->
+			<AppFrame>
+				{#snippet sidebar()}
+					{#if trip}
+						<TripSidebar
+							{trip}
+							{allTrips}
+							{user}
+							onInvite={openInvite}
+							showToast={showToastLocal}
+						/>
+					{/if}
+				{/snippet}
+				{#snippet children()}
+					<div class="trip-main-wrap">
+						<header class="content-pane-top" aria-label="Trip and actions">
+							<div class="trip-top-switcher">
+								{#if trip}
+									<TripSwitcher
+										currentTripId={trip.id}
+										currentTripName={trip.name}
+										trips={tripOptions}
+										tripsListHref="/trips"
+									/>
+								{/if}
+							</div>
+							<div class="trip-top-bar" aria-label="Trip actions">
+								<a href="/trips/{tripId}/notifications" class="trip-notification-bell" aria-label="Notifications" title="Notifications">
+									<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+								</a>
+								<a href="/profile" class="trip-top-avatar" aria-label="Go to my profile" title="My profile">
+									<span class="trip-top-avatar-inner">{user ? initials(user.name, user.email) : '?'}</span>
+								</a>
+							</div>
+						</header>
+						<div class="main-inner">
+							{#if childrenFn}
+								{@render childrenFn()}
 							{/if}
 						</div>
-						<div class="trip-top-bar" aria-label="Trip actions">
-							<a href="/trips/{tripId}/notifications" class="trip-notification-bell" aria-label="Notifications" title="Notifications">
-								<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-							</a>
-							<a href="/profile" class="trip-top-avatar" aria-label="Go to my profile" title="My profile">
-								<span class="trip-top-avatar-inner">{user ? initials(user.name, user.email) : '?'}</span>
-							</a>
-						</div>
-					</header>
-					<div class="main-inner">
-						{#if childrenFn}
-							{@render childrenFn()}
-						{/if}
 					</div>
-				</div>
-			{/snippet}
-		</AppFrame>
+				{/snippet}
+			</AppFrame>
+		{/if}
 	</div>
 
 	<!-- Mobile: hamburger + drawer (no AppFrame) -->
@@ -201,6 +216,21 @@
 			linear-gradient(165deg, #8B351E 0%, #A03D24 18%, var(--primary) 45%, rgba(191, 78, 48, 0.95) 75%, rgba(191, 78, 48, 0.88) 100%);
 		position: relative;
 		padding: 0;
+	}
+
+	.shell.dashboard-mode {
+		background: var(--bg);
+	}
+
+	.desktop-wrap.dashboard-mode {
+		background: var(--bg);
+	}
+
+	.dashboard-full-width {
+		width: 100%;
+		height: 100vh;
+		overflow-y: auto;
+		background: var(--bg);
 	}
 
 	.desktop-wrap {

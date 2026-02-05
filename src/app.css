@@ -1,5 +1,4 @@
 /* Modern Design System for Divvi - semantic tokens from theme.css */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import './styles/theme.css';
 @import './styles/wizard-forms.css';
 
@@ -10,7 +9,7 @@
 }
 
 html {
-	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 	font-size: 16px;
 	line-height: 1.6;
 	color: var(--text);
@@ -27,6 +26,7 @@ h1, h2, h3, h4, h5, h6 {
 	font-weight: 600;
 	line-height: 1.2;
 	color: var(--text);
+	letter-spacing: -0.02em;
 }
 
 h1 {
