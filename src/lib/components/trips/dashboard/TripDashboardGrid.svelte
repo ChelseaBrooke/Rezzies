@@ -79,9 +79,32 @@
 </script>
 
 <div class="dashboard-wrapper">
+	{#snippet stickyHostIcon()}
+		<span class="sticky-card-icon" aria-hidden="true">
+			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+				<polyline points="14 2 14 8 20 8"></polyline>
+				<line x1="16" y1="13" x2="8" y2="13"></line>
+				<line x1="16" y1="17" x2="8" y2="17"></line>
+				<polyline points="10 9 9 9 8 9"></polyline>
+			</svg>
+		</span>
+	{/snippet}
+	{#snippet stickyForYouIcon()}
+		<span class="sticky-card-icon" aria-hidden="true">
+			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+				<circle cx="12" cy="7" r="4"></circle>
+			</svg>
+		</span>
+	{/snippet}
 	<!-- Sticky Note Card - positioned separately, overlaps hero -->
 	<div class="sticky-card-wrapper">
-		<DashboardCard variant="sticky" title={isHost ? 'Host reminders' : 'For you'}>
+		<DashboardCard
+			variant="sticky"
+			title={isHost ? 'Host reminders' : 'For you'}
+			headerLeft={isHost ? stickyHostIcon : stickyForYouIcon}
+		>
 			{#if isHost}
 				<div class="sticky-content">
 					<div class="sticky-reminder">
@@ -286,7 +309,7 @@
 
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
 		max-height: none;
-		min-height: 390px;
+		min-height: 480px;
 		width: 100%;
 	}
 
@@ -328,6 +351,7 @@
 		z-index: 0;
 		margin-left: 0;
 		min-width: 0;
+		min-height: 320px;
 	}
 
 	.dashboard-grid > :global(article) {
@@ -377,7 +401,20 @@
 	.sticky-content {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 1.25rem;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.sticky-card-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text);
+	}
+
+	.sticky-card-icon svg {
+		display: block;
 	}
 
 	.sticky-reminder {

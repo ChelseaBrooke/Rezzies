@@ -9,17 +9,24 @@
 		variant?: 'default' | 'sticky' | 'glass';
 		/** Optional CTA at bottom of card */
 		cta?: { label: string; href: string };
+		/** Optional content before title (e.g. icon) */
+		headerLeft?: Snippet;
 		/** Optional header right content */
 		headerRight?: Snippet;
 		children?: Snippet;
 	}
 
-	let { title, span = 1, variant = 'default', cta, headerRight, children }: Props = $props();
+	let { title, span = 1, variant = 'default', cta, headerLeft, headerRight, children }: Props = $props();
 </script>
 
 <article class="dashboard-card" class:span-2={span === 2} class:variant-sticky={variant === 'sticky'} class:variant-glass={variant === 'glass'}>
 	{#if title}
 		<div class="card-header">
+			{#if headerLeft != null && typeof headerLeft === 'function'}
+				<div class="card-header-left">
+					{@render headerLeft()}
+				</div>
+			{/if}
 			<h2 class="card-title">{title}</h2>
 			{#if headerRight != null && typeof headerRight === 'function'}
 				<div class="card-header-right">
@@ -89,6 +96,12 @@
 		color: var(--text);
 		margin: 0;
 		letter-spacing: -0.01em;
+	}
+
+	.card-header-left {
+		display: flex;
+		align-items: center;
+		margin-right: 0.5rem;
 	}
 
 	.card-header-right {

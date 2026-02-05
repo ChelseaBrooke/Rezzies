@@ -86,8 +86,18 @@
 		</div>
 	</aside>
 	<main class="main-content">
+		{#if currentPath !== `/trips/${tripId}`}
+			<a href="/trips/{tripId}/notifications" class="top-bell" aria-label="Notifications" title="Notifications">
+				<svg class="bell-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+					<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+				</svg>
+			</a>
+		{/if}
 		{#if children != null && typeof children === 'function'}
-			{@render children()}
+			<div class="main-content-inner">
+				{@render children()}
+			</div>
 		{/if}
 	</main>
 </div>
@@ -261,9 +271,43 @@
 		overflow-x: hidden;
 		box-sizing: border-box;
 		min-width: 0;
-		padding: 2rem;
+		padding: 1rem 2rem 2rem;
 		max-width: 100%;
 		background: var(--bg);
+		position: relative;
+	}
+
+	.top-bell {
+		position: absolute;
+		top: 1rem;
+		right: 2rem;
+		width: 44px;
+		height: 44px;
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: #d1d5db;
+		color: #374151;
+		text-decoration: none;
+		transition: all var(--transition-fast);
+		z-index: 5;
+	}
+
+	.top-bell:hover {
+		background: rgba(0, 0, 0, 0.06);
+		color: #111827;
+	}
+
+	.top-bell .bell-icon {
+		display: block;
+		flex-shrink: 0;
+	}
+
+	.main-content-inner {
+		width: 100%;
+		min-width: 0;
+		display: block;
 	}
 
 	@media (max-width: 1024px) {
@@ -300,7 +344,7 @@
 		.main-content {
 			margin: 8px 8px 8px 72px;
 			height: calc(100vh - 16px);
-			padding: 1rem 1.5rem;
+			padding: 0.75rem 1.5rem 1.5rem;
 		}
 	}
 

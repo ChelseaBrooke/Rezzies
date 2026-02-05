@@ -40,42 +40,18 @@
 		mealSlots = []
 	}: Props = $props();
 
-	// Extract simple region label from location if possible (e.g., "Santorini, Greece" -> "Greece")
-	const regionLabel = $derived(() => {
-		if (!trip.location) return 'Trip';
-		const parts = trip.location.split(',').map((s) => s.trim());
-		return parts.length > 1 ? parts[parts.length - 1] : parts[0];
-	});
 </script>
 
-<div class="trip-hero">
-	<div class="hero-image-wrap">
-		{#if trip.listingCoverPhoto}
-			<img src={trip.listingCoverPhoto} alt="" class="hero-image" />
-		{:else}
-			<div class="hero-placeholder"></div>
-		{/if}
-		<div class="hero-overlay">
-			<div class="hero-top">
-				<div class="hero-label-pill">
-					<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-						<circle cx="12" cy="10" r="3"></circle>
-					</svg>
-					<span>{regionLabel()}</span>
-				</div>
-				<div class="hero-calendar-wrap">
-					<TripCalendarWidget
-						tripId={trip.id}
-						placement="sidebar"
-						{checkInDate}
-						{checkOutDate}
-						{activities}
-						{mealSlots}
-					/>
-				</div>
-			</div>
-			<div class="hero-content">
+<div class="hero-with-calendar">
+	<div class="trip-hero">
+		<div class="hero-image-wrap">
+			{#if trip.listingCoverPhoto}
+				<img src={trip.listingCoverPhoto} alt="" class="hero-image" />
+			{:else}
+				<div class="hero-placeholder"></div>
+			{/if}
+			<div class="hero-overlay">
+				<div class="hero-content">
 				<h1 class="hero-name">{trip.name ?? 'Trip'}</h1>
 				<div class="hero-subline">
 					{#if calendarAddUrl}
@@ -120,6 +96,7 @@
 					{/if}
 				</div>
 			</div>
+			</div>
 			<div class="hero-actions">
 				<TripQuickActions
 					tripId={trip.id}
@@ -132,9 +109,36 @@
 			</div>
 		</div>
 	</div>
+	<!-- Calendar and bell layered over hero -->
+	<div class="hero-calendar-layer">
+		<div class="hero-calendar-wrap">
+			<TripCalendarWidget
+				tripId={trip.id}
+				placement="sidebar"
+				{checkInDate}
+				{checkOutDate}
+				{activities}
+				{mealSlots}
+			/>
+		</div>
+		<a href="/trips/{trip.id}/notifications" class="hero-bell" aria-label="Notifications" title="Notifications">
+			<svg class="hero-bell-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+				<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+			</svg>
+		</a>
+	</div>
 </div>
 
 <style>
+	.hero-with-calendar {
+		position: relative;
+		width: 100%;
+		overflow: visible;
+		/* Reserve space so calendar/bell (top: -3rem) aren’t clipped by main-content */
+		margin-top: 3rem;
+	}
+
 	.trip-hero {
 		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
 		border-radius: var(--radius-3xl);
@@ -147,6 +151,7 @@
 		z-index: 0;
 		margin-bottom: 0;
 		width: 100%;
+ /* Slight inset so calendar top isn’t clipped by radius */
 	}
 
 	.hero-image-wrap {
@@ -185,81 +190,133 @@
 		padding: 1.5rem 2rem;
 	}
 
-	.hero-top {
+	.hero-calendar-layer {
 		position: absolute;
-		top: 1.5rem;
-		left: 2rem;
-		right: 2rem;
+		top: -3rem;
+		right: 1rem;
+		left: auto;
 		display: flex;
-		justify-content: space-between;
+		flex-direction: row;
 		align-items: flex-start;
 		gap: 1rem;
+		z-index: 2;
 		pointer-events: none;
 	}
 
-	.hero-top > * {
+	.hero-calendar-layer > * {
 		pointer-events: auto;
 	}
 
-	.hero-label-pill {
-		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-		display: inline-flex;
+	.hero-bell {
+		flex-shrink: 0;
+		width: 44px;
+		height: 44px;
+		border-radius: 8px;
+		display: flex;
 		align-items: center;
-		gap: 0.375rem;
-		padding: 0.5rem 0.875rem;
-		background: rgba(255, 255, 255, 0.25);
-		backdrop-filter: blur(10px);
-		border-radius: 9999px;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: white;
-		border: 1px solid rgba(255, 255, 255, 0.3);
+		justify-content: center;
+		background: transparent;
+		color: #111827;
+		text-decoration: none;
+		transition: opacity var(--transition-fast);
 	}
 
-	.hero-label-pill svg {
-		flex-shrink: 0;
+	.hero-bell:hover {
+		opacity: 0.75;
+	}
+
+	.hero-bell .hero-bell-icon {
+		display: block;
 	}
 
 	.hero-calendar-wrap {
-		background: rgba(255, 255, 255, 0.2);
-		backdrop-filter: blur(10px);
+		/* More transparent frosted glass: dark at top for text, fades to lighter below */
+		background: linear-gradient(
+			to bottom,
+			rgba(0, 27, 46, 0.28) 0%,
+			rgba(0, 27, 46, 0.16) 22%,
+			rgba(255, 255, 255, 0.2) 55%,
+			rgba(255, 255, 255, 0.1) 100%
+		);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
 		border-radius: var(--radius-lg);
-		border: 1px solid rgba(255, 255, 255, 0.25);
-		padding: 0.5rem;
-		max-width: 280px;
-		font-size: 0.75rem;
+		border: none;
+		box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+		padding: 0.75rem 0.5rem;
+		width: 360px;
+		min-width: 360px;
+		min-height: 320px;
+		font-size: 0.8125rem;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 	}
 
 	.hero-calendar-wrap :global(.calendar-sidebar) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 		background: transparent;
 		box-shadow: none;
 		border: none;
 		padding: 0;
 		min-width: 0;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.hero-calendar-wrap :global(.day-detail-view) {
+		overflow-y: auto;
+		min-height: 0;
+		flex: 1;
 	}
 
 	.hero-calendar-wrap :global(.month-calendar.sidebar-style) {
 		font-size: inherit;
+		display: flex;
+		flex-direction: column;
+		gap: 0.625rem;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.hero-calendar-wrap :global(.month-calendar.sidebar-style .days-grid) {
+		flex: 1;
+		min-height: 0;
+		align-content: space-evenly;
+		grid-auto-rows: minmax(28px, 1fr);
+		gap: 4px;
+	}
+
+	.hero-calendar-wrap :global(.month-header) {
+		margin-bottom: 0;
 	}
 
 	.hero-calendar-wrap :global(.month-header),
 	.hero-calendar-wrap :global(.month-title) {
-		font-size: 0.7rem;
+		font-size: 0.8125rem;
 		color: white;
 	}
 
+	.hero-calendar-wrap :global(.day-headers) {
+		margin-bottom: 0;
+	}
+
 	.hero-calendar-wrap :global(.day-header) {
-		font-size: 0.6rem;
-		color: rgba(255, 255, 255, 0.9);
+		font-size: 0.7rem;
+		color: rgba(255, 255, 255, 0.92);
 	}
 
 	.hero-calendar-wrap :global(.day-cell) {
-		font-size: 0.65rem;
+		font-size: 0.75rem;
 		color: white;
 	}
 
 	.hero-calendar-wrap :global(.day-cell.trip-day) {
-		background: rgba(255, 255, 255, 0.35);
+		background: rgba(255, 255, 255, 0.28);
 	}
 
 	.hero-calendar-wrap :global(.month-chevron-btn) {
