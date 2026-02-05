@@ -77,41 +77,46 @@
 			</div>
 			<div class="hero-content">
 				<h1 class="hero-name">{trip.name ?? 'Trip'}</h1>
-				<p class="hero-subline">
+				<div class="hero-subline">
 					{#if calendarAddUrl}
-						<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="hero-link" title="Add to calendar">{dateRange}</a>
-					{:else}
-						<span>{dateRange}</span>
-					{/if}
-					{#if trip.location?.trim()}
-						<span class="hero-sep"> · </span>
-						{#if mapsUrl}
-							<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="hero-link" title="Open in Google Maps">{trip.location}</a>
-						{:else}
-							<span>{trip.location}</span>
-						{/if}
-					{/if}
-				</p>
-				<div class="hero-pills">
-					{#if calendarAddUrl}
-						<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="hero-pill">
-							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Add to calendar">
+							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 								<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
 								<line x1="16" y1="2" x2="16" y2="6"></line>
 								<line x1="8" y1="2" x2="8" y2="6"></line>
 								<line x1="3" y1="10" x2="21" y2="10"></line>
 							</svg>
-							<span>Add to calendar</span>
+							<span>{dateRange}</span>
 						</a>
-					{/if}
-					{#if mapsUrl}
-						<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="hero-pill">
-							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-								<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-								<circle cx="12" cy="10" r="3"></circle>
+					{:else}
+						<span class="hero-meta-text">
+							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+								<line x1="16" y1="2" x2="16" y2="6"></line>
+								<line x1="8" y1="2" x2="8" y2="6"></line>
+								<line x1="3" y1="10" x2="21" y2="10"></line>
 							</svg>
-							<span>Open maps</span>
-						</a>
+							<span>{dateRange}</span>
+						</span>
+					{/if}
+					{#if trip.location?.trim()}
+						{#if mapsUrl}
+							<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Open in Google Maps">
+								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+									<circle cx="12" cy="10" r="3"></circle>
+								</svg>
+								<span>{trip.location}</span>
+							</a>
+						{:else}
+							<span class="hero-meta-text">
+								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+									<circle cx="12" cy="10" r="3"></circle>
+								</svg>
+								<span>{trip.location}</span>
+							</span>
+						{/if}
 					{/if}
 				</div>
 			</div>
@@ -175,15 +180,25 @@
 		color: white;
 		display: flex;
 		flex-direction: column;
-		justify-content: space-between;
+		justify-content: center;
+		align-items: center;
 		padding: 1.5rem 2rem;
 	}
 
 	.hero-top {
+		position: absolute;
+		top: 1.5rem;
+		left: 2rem;
+		right: 2rem;
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-start;
 		gap: 1rem;
+		pointer-events: none;
+	}
+
+	.hero-top > * {
+		pointer-events: auto;
 	}
 
 	.hero-label-pill {
@@ -252,7 +267,6 @@
 	}
 
 	.hero-content {
-		flex: 1;
 		display: flex;
 		flex-direction: column;
 		justify-content: center;
@@ -283,62 +297,33 @@
 		align-items: center;
 		justify-content: center;
 		flex-wrap: wrap;
-		gap: 0.25rem;
+		gap: 1.25rem;
 		line-height: 1.5;
 		max-width: 600px;
 	}
 
-	.hero-pills {
-		display: flex;
-		justify-content: center;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-		margin-top: 1rem;
+	.hero-meta-link,
+	.hero-meta-text {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		color: rgba(255, 255, 255, 0.95);
 	}
 
-	.hero-sep {
-		opacity: 0.85;
-	}
-
-	.hero-link {
-		color: inherit;
+	.hero-meta-link {
 		text-decoration: none;
-		opacity: 0.95;
 		transition: opacity var(--transition-fast);
 	}
 
-	.hero-link:hover {
+	.hero-meta-link:hover {
 		opacity: 1;
 		text-decoration: underline;
 	}
 
-	.hero-pill {
-		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.625rem 1rem;
-		background: rgba(255, 255, 255, 0.95);
-		backdrop-filter: blur(10px);
-		border: 1px solid rgba(255, 255, 255, 0.4);
-		border-radius: var(--radius-md);
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--text);
-		text-decoration: none;
-		transition: all var(--transition-fast);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-	}
-
-	.hero-pill:hover {
-		background: white;
-		border-color: rgba(255, 255, 255, 0.6);
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	}
-
-	.hero-pill svg {
+	.hero-meta-link svg,
+	.hero-meta-text svg {
 		flex-shrink: 0;
+		opacity: 0.9;
 	}
 
 	.hero-actions {
@@ -403,10 +388,7 @@
 
 		.hero-subline {
 			font-size: 0.875rem;
-		}
-
-		.hero-pills {
-			flex-direction: column;
+			gap: 1rem;
 		}
 
 		.hero-actions {

@@ -51,6 +51,8 @@
 		flex-direction: column;
 		gap: 0.375rem;
 		transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+		min-width: 0;
+		overflow: hidden;
 	}
 
 	.dashboard-card:hover {
@@ -96,6 +98,8 @@
 	.card-body {
 		flex: 1;
 		min-height: 0;
+		min-width: 0;
+		overflow: hidden;
 	}
 
 	.card-cta {

@@ -270,16 +270,18 @@
 	.dashboard-wrapper {
 		position: relative;
 		width: 100%;
+		max-width: 100%;
+		box-sizing: border-box;
 	}
 
 	/* Sticky card wrapper - positioned separately, overlaps hero */
 	.sticky-card-wrapper {
 		position: absolute;
 		left: 2.5rem;
-		top: -12rem;
+		top: -14rem;
 		width: 420px;
 		max-width: 36%;
-		z-index: 2;
+		z-index: 10;
 	}
 
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
@@ -315,13 +317,13 @@
 		color: inherit;
 	}
 
-	/* Main grid - clear sticky note, compact so three cards fit in one row */
+	/* Main grid - vertical and horizontal spacing both 1.5rem for consistency */
 	.dashboard-grid {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 1.25rem;
 		width: 100%;
-		margin-top: 3.5rem;
+		margin-top: 1.5rem;
 		position: relative;
 		z-index: 0;
 		margin-left: 0;
@@ -329,13 +331,16 @@
 	}
 
 	.dashboard-grid > :global(article) {
-		min-height: 200px;
+		min-height: 300px;
 		min-width: 0;
 	}
 
 	@media (min-width: 1025px) {
 		.dashboard-grid {
-			margin-left: 480px; /* 420px sticky card + 60px gap */
+			/* Sticky ends at 2.5rem + 420px = 460px; 1.5rem (24px) gap = 484px */
+			margin-left: 484px;
+			width: calc(100% - 484px);
+			max-width: calc(100% - 484px);
 		}
 	}
 
@@ -365,7 +370,7 @@
 		}
 
 		.dashboard-grid > :global(article) {
-			min-height: 200px;
+			min-height: 280px;
 		}
 	}
 

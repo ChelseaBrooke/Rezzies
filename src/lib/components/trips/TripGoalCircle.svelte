@@ -194,6 +194,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+		min-width: 0;
+		overflow: hidden;
 	}
 
 	.goal-top {
@@ -202,6 +204,7 @@
 		justify-content: space-between;
 		gap: 0.5rem;
 		flex-wrap: wrap;
+		min-width: 0;
 	}
 
 	.goal-title {
@@ -209,6 +212,10 @@
 		font-size: 0.875rem;
 		font-weight: 700;
 		color: var(--text);
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.goal-stats {
@@ -217,6 +224,7 @@
 		font-size: 0.75rem;
 		color: var(--muted);
 		font-weight: 500;
+		flex-shrink: 0;
 	}
 
 	.goal-stat {
@@ -294,6 +302,7 @@
 		padding: 0.15rem 0;
 		border-radius: var(--radius-sm);
 		transition: background var(--transition-fast);
+		min-width: 0;
 	}
 
 	.goal-list-link:hover {
@@ -317,6 +326,10 @@
 		font-weight: 600;
 		color: var(--text);
 		font-size: 0.6875rem;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.goal-list-pct {

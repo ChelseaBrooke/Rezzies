@@ -258,6 +258,7 @@
 		margin: 12px 12px 12px 84px;
 		height: calc(100vh - 24px);
 		overflow-y: auto;
+		overflow-x: hidden;
 		box-sizing: border-box;
 		min-width: 0;
 		padding: 2rem;
