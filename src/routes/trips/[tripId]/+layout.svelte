@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
 	import AppShell from '$lib/components/trips/dashboard/AppShell.svelte';
+	import TripChat from '$lib/components/trips/TripChat.svelte';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 
@@ -14,3 +15,7 @@
 		{@render children()}
 	{/snippet}
 </AppShell>
+
+{#if data.canChat && data.user}
+	<TripChat tripId={data.trip.id} userId={data.user.id} />
+{/if}

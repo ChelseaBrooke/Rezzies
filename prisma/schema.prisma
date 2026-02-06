@@ -57,6 +57,7 @@ model Trip {
   guestProfiles        GuestProfile[]
   invoices             Invoice[]
   notifications        Notification[]
+  chatMessages         ChatMessage[]
 
   @@index([inviteCode])
   @@index([isPublished])
@@ -200,6 +201,7 @@ model User {
   invoices             Invoice[]
   notifications        Notification[]
   sessions             Session[]
+  chatMessages         ChatMessage[]
 
   @@index([email])
 }
@@ -494,4 +496,20 @@ model Notification {
   @@index([userId])
   @@index([read])
   @@index([createdAt])
+}
+
+// Chat Messages (group chat for trip RSVPs)
+model ChatMessage {
+  id        String   @id @default(uuid())
+  tripId   String
+  userId   String
+  message  String
+  createdAt DateTime @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([createdAt])
+  @@index([tripId, createdAt])
 }
