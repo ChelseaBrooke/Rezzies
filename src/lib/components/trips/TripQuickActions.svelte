@@ -2,6 +2,16 @@
 	import { goto } from '$app/navigation';
 	import { onDestroy } from 'svelte';
 
+	/** Move this element to document.body so it's never clipped by overflow/transform. */
+	function portal(node: HTMLElement) {
+		document.body.appendChild(node);
+		return {
+			destroy() {
+				if (node.parentNode) node.parentNode.removeChild(node);
+			}
+		};
+	}
+
 	let {
 		tripId,
 		inviteCode,
@@ -34,7 +44,7 @@
 	let editMenuStyle = $state<{ top: string; left: string } | null>(null);
 	let infoMenuStyle = $state<{ top: string; left: string } | null>(null);
 
-	const CLOSE_DELAY_MS = 200;
+	const CLOSE_DELAY_MS = 250;
 	let closeTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 	function clearCloseSchedule() {
@@ -170,9 +180,27 @@
 		positionMenu(infoTriggerEl, (s) => (infoMenuStyle = s));
 	}
 
-	/** Click opens if closed (hover may have already opened it); closing is via backdrop or menu action. */
-	function onShareClick() {
-		if (!shareOpen) openShare();
+	/** Hover opens share menu; click toggles. */
+	function onShareMouseEnter() {
+		clearCloseSchedule();
+		openShare();
+		requestAnimationFrame(() => {
+			positionMenu(shareTriggerEl, (s) => (shareMenuStyle = s));
+		});
+	}
+
+	function onShareClick(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (shareOpen) {
+			shareOpen = false;
+			shareMenuStyle = null;
+			return;
+		}
+		openShare();
+		requestAnimationFrame(() => {
+			positionMenu(shareTriggerEl, (s) => (shareMenuStyle = s));
+		});
 	}
 
 	function onEditClick() {
@@ -192,7 +220,7 @@
 			class="action-btn"
 			title="Share trip"
 			bind:this={shareTriggerEl}
-			onmouseenter={openShare}
+			onmouseenter={onShareMouseEnter}
 			onmouseleave={scheduleClose}
 			onclick={onShareClick}
 			aria-expanded={shareOpen}
@@ -203,21 +231,33 @@
 			</span>
 		</button>
 		{#if shareOpen}
-			<!-- Backdrop is pointer-events: none so it doesn't steal hover from the trigger; click-outside is handled by document listener -->
-			<div class="dropdown-backdrop" aria-hidden="true"></div>
+			<!-- Portal menu to body so it's never clipped; click-outside handled by document listener -->
 			<div
-				bind:this={shareMenuEl}
-				class="dropdown-menu dropdown-menu-fixed"
-				role="menu"
-				style={shareMenuStyle ? `top: ${shareMenuStyle.top}; left: ${shareMenuStyle.left};` : ''}
-				onmouseenter={clearCloseSchedule}
-				onmouseleave={scheduleClose}
+				use:portal
+				class="share-menu-portal"
+				role="presentation"
 			>
-				{#if onInvite}
-					<button type="button" class="dropdown-item" role="menuitem" onclick={() => { onInvite?.(); shareOpen = false; shareMenuStyle = null; }}>Invite guests</button>
-				{/if}
-				<button type="button" class="dropdown-item" role="menuitem" onclick={handleEmailLink}>Email link</button>
-				<button type="button" class="dropdown-item" role="menuitem" onclick={handleCopyLink}>Copy link</button>
+				<div
+					class="dropdown-backdrop dropdown-backdrop-modal"
+					aria-hidden="true"
+					onclick={() => { shareOpen = false; shareMenuStyle = null; }}
+					role="button"
+					tabindex="-1"
+				></div>
+				<div
+					bind:this={shareMenuEl}
+					class="dropdown-menu dropdown-menu-fixed dropdown-menu-portaled"
+					role="menu"
+					style={shareMenuStyle ? `top: ${shareMenuStyle.top}; left: ${shareMenuStyle.left};` : ''}
+					onmouseenter={clearCloseSchedule}
+					onmouseleave={scheduleClose}
+				>
+					{#if onInvite}
+						<button type="button" class="dropdown-item" role="menuitem" onclick={() => { onInvite?.(); shareOpen = false; shareMenuStyle = null; }}>Invite guests</button>
+					{/if}
+					<button type="button" class="dropdown-item" role="menuitem" onclick={handleEmailLink}>Email link</button>
+					<button type="button" class="dropdown-item" role="menuitem" onclick={handleCopyLink}>Copy link</button>
+				</div>
 			</div>
 		{/if}
 	</div>
@@ -338,6 +378,20 @@
 		inset: 0;
 		z-index: 9998;
 		pointer-events: none; /* don't block hover on trigger or menu */
+	}
+
+	.share-menu-portal {
+		position: fixed;
+		inset: 0;
+		z-index: 10000;
+		pointer-events: none;
+	}
+	.share-menu-portal .dropdown-backdrop-modal {
+		pointer-events: auto;
+		cursor: default;
+	}
+	.share-menu-portal .dropdown-menu-portaled {
+		pointer-events: auto;
 	}
 
 	.dropdown-menu {

@@ -2,6 +2,41 @@
 	import TripQuickActions from '$lib/components/trips/TripQuickActions.svelte';
 	import TripCalendarWidget from '$lib/components/trips/TripCalendarWidget.svelte';
 
+	/** Move node to document.body */
+	function portal(node: HTMLElement) {
+		document.body.appendChild(node);
+		return {
+			destroy() {
+				if (node.parentNode) node.parentNode.removeChild(node);
+			}
+		};
+	}
+
+	/** Position this node (portaled to body) so its bottom-right matches the sentinel; update on scroll/resize */
+	function positionFromSentinel(node: HTMLElement, sentinel: HTMLElement) {
+		function update() {
+			const rect = sentinel.getBoundingClientRect();
+			node.style.position = 'fixed';
+			node.style.right = `${window.innerWidth - rect.right}px`;
+			node.style.bottom = `${window.innerHeight - rect.bottom}px`;
+			node.style.zIndex = '10000';
+		}
+		update();
+		const ro = new ResizeObserver(update);
+		ro.observe(sentinel);
+		window.addEventListener('scroll', update, true);
+		window.addEventListener('resize', update);
+		return {
+			destroy() {
+				ro.disconnect();
+				window.removeEventListener('scroll', update, true);
+				window.removeEventListener('resize', update);
+			}
+		};
+	}
+
+	let heroActionsSentinel: HTMLDivElement | null = $state(null);
+
 	interface Props {
 		trip: {
 			id: string;
@@ -97,18 +132,27 @@
 				</div>
 			</div>
 			</div>
-			<div class="hero-actions">
-				<TripQuickActions
-					tripId={trip.id}
-					{inviteCode}
-					onInvite={quickActions.onInvite}
-					showToast={quickActions.showToast}
-					{tripInfoContent}
-					{isHost}
-				/>
-			</div>
+			<!-- Sentinel for positioning portaled actions; grid layers on top so we portal buttons to body -->
+			<div class="hero-actions hero-actions-sentinel" bind:this={heroActionsSentinel} aria-hidden="true"></div>
 		</div>
 	</div>
+	{#if heroActionsSentinel && typeof document !== 'undefined'}
+		<div
+			class="hero-actions-portal"
+			use:portal
+			use:positionFromSentinel={heroActionsSentinel}
+			role="presentation"
+		>
+			<TripQuickActions
+				tripId={trip.id}
+				{inviteCode}
+				onInvite={quickActions.onInvite}
+				showToast={quickActions.showToast}
+				{tripInfoContent}
+				{isHost}
+			/>
+		</div>
+	{/if}
 	<!-- Calendar and bell layered over hero -->
 	<div class="hero-calendar-layer">
 		<div class="hero-calendar-wrap">
@@ -395,13 +439,15 @@
 		opacity: 0.9;
 	}
 
-	.hero-actions {
+	.hero-actions,
+	.hero-actions-sentinel {
 		position: absolute;
 		right: 1.5rem;
 		bottom: 1.5rem;
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+		z-index: 10;
 	}
 
 	.hero-actions :global(.quick-actions) {
@@ -414,6 +460,24 @@
 	}
 
 	.hero-actions :global(.action-btn) {
+		width: 2rem;
+		height: 2rem;
+		color: white;
+		background: rgba(255, 255, 255, 0.2);
+		border-radius: var(--radius-md);
+		border: none;
+	}
+
+	/* Portaled copy of hero-actions (same look) */
+	.hero-actions-portal :global(.quick-actions) {
+		background: rgba(255, 255, 255, 0.15);
+		backdrop-filter: blur(10px);
+		border-radius: var(--radius-xl);
+		padding: 0.5rem;
+		gap: 0.35rem;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+	}
+	.hero-actions-portal :global(.action-btn) {
 		width: 2rem;
 		height: 2rem;
 		color: white;

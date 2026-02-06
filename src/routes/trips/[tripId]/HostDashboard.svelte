@@ -186,6 +186,8 @@
 		<TripDashboardGrid
 			isHost={true}
 			tripId={trip.id}
+			inviteCode={trip.inviteCode}
+			showToast={quickActions?.showToast}
 			currentUserId={user.id}
 			{members}
 			{rsvps}

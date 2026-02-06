@@ -45,6 +45,8 @@
 		roomsHref: string;
 		paymentsHref: string;
 		nudgePending?: () => void;
+		inviteCode?: string;
+		showToast?: (msg: string) => void;
 		/** Checklist stats for role-based checklists */
 		checklistStats: ChecklistStats;
 	}
@@ -78,6 +80,8 @@
 		roomsHref,
 		paymentsHref,
 		nudgePending,
+		inviteCode,
+		showToast,
 		checklistStats
 	}: Props = $props();
 
@@ -187,7 +191,7 @@
 		</div>
 	</div>
 
-	<!-- Quick actions (Poll, Checklist, etc.) - bottom center of main photo -->
+	<!-- Quick actions (Poll, Share, Upload, etc.) - bottom center of main photo -->
 	<div class="quick-actions-hero-wrapper">
 		<div class="quick-actions-grid quick-actions-hero-pills">
 			<a href="/trips/{tripId}/polls" class="action-pill" title="Create poll">
@@ -411,33 +415,6 @@
 		margin-right: 0.25rem;
 	}
 
-	/* Quick actions (Poll, Checklist, etc.) - bottom center of main photo */
-	.quick-actions-hero-wrapper {
-		position: absolute;
-		left: 50%;
-		transform: translateX(-50%);
-		top: -7rem;
-		z-index: 2;
-		width: 100%;
-		max-width: 420px;
-	}
-
-	.quick-actions-hero-wrapper .action-pill {
-		background: rgba(255, 255, 255, 0.12);
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		color: white;
-	}
-
-	.quick-actions-hero-wrapper .action-pill:hover {
-		background: rgba(255, 255, 255, 0.25);
-		color: white;
-		border-color: rgba(255, 255, 255, 0.35);
-	}
-
-	.quick-actions-hero-wrapper .action-pill svg {
-		color: inherit;
-	}
-
 	@media (max-width: 1024px) {
 		.dashboard-wrapper {
 			padding-left: 0;
@@ -481,15 +458,6 @@
 			grid-column: 1;
 			grid-row: 4;
 			margin-top: 1rem;
-		}
-
-		.quick-actions-hero-wrapper {
-			position: relative;
-			top: 0;
-			left: auto;
-			transform: none;
-			max-width: 100%;
-			margin-bottom: 2rem;
 		}
 
 		.goals-cell :global(.dashboard-card),
@@ -779,6 +747,40 @@
 		color: var(--muted);
 	}
 
+	/* Quick actions (pills) - bottom center of main photo */
+	.quick-actions-hero-wrapper {
+		position: absolute;
+		left: 50%;
+		transform: translateX(-50%);
+		top: -7rem;
+		z-index: 2;
+		width: 100%;
+		max-width: 420px;
+		pointer-events: none;
+	}
+
+	.quick-actions-hero-wrapper .action-pill {
+		pointer-events: auto;
+		background: rgba(255, 255, 255, 0.12);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		color: white;
+	}
+	.quick-actions-hero-wrapper button.action-pill {
+		cursor: pointer;
+		font: inherit;
+		text-decoration: none;
+	}
+
+	.quick-actions-hero-wrapper .action-pill:hover {
+		background: rgba(255, 255, 255, 0.25);
+		color: white;
+		border-color: rgba(255, 255, 255, 0.35);
+	}
+
+	.quick-actions-hero-wrapper .action-pill svg {
+		color: inherit;
+	}
+
 	.quick-actions-grid {
 		display: flex;
 		flex-wrap: nowrap;
@@ -815,6 +817,15 @@
 	}
 
 	@media (max-width: 1024px) {
+		.quick-actions-hero-wrapper {
+			position: relative;
+			top: 0;
+			left: auto;
+			transform: none;
+			max-width: 100%;
+			margin-bottom: 2rem;
+		}
+
 		.quick-actions-grid {
 			flex-wrap: wrap;
 			justify-content: center;
