@@ -4,9 +4,11 @@ import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
 import { z } from 'zod';
 
+const hexColorRe = /^#[0-9A-Fa-f]{6}$/;
 const updateProfileSchema = z.object({
 	name: z.string().max(200).optional(),
-	avatarUrl: z.union([z.string().url(), z.literal('')]).optional()
+	avatarUrl: z.union([z.string().url(), z.literal('')]).optional(),
+	chatBubbleColor: z.union([z.string().regex(hexColorRe), z.literal('')]).optional()
 });
 
 export const load: PageServerLoad = async ({ cookies }) => {
@@ -15,7 +17,6 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		throw redirect(303, '/login?redirect=/profile');
 	}
 
-	// Select without avatarUrl so profile works before migration has added the column
 	const userRow = await prisma.user.findUnique({
 		where: { id: user.id },
 		select: {
@@ -23,10 +24,12 @@ export const load: PageServerLoad = async ({ cookies }) => {
 			email: true,
 			name: true,
 			phone: true,
+			avatarUrl: true,
+			chatBubbleColor: true,
 			createdAt: true
 		}
 	});
-	const userData = userRow ? { ...userRow, avatarUrl: null as string | null } : null;
+	const userData = userRow ?? null;
 
 	// Counts for quick stats (mock-friendly; real counts from DB)
 	const [tripsHosted, tripsJoined, rsvpCount, inviteCount, notifCount] = await Promise.all([
@@ -59,14 +62,19 @@ export const actions: Actions = {
 		const name = (formData.get('name') as string)?.trim() || null;
 		const avatarUrlRaw = (formData.get('avatarUrl') as string)?.trim() || '';
 		const avatarUrl = avatarUrlRaw === '' ? null : avatarUrlRaw;
+		const chatBubbleColorRaw = (formData.get('chatBubbleColor') as string)?.trim() || '';
+		const chatBubbleColor = chatBubbleColorRaw === '' ? null : chatBubbleColorRaw;
 
-		const parsed = updateProfileSchema.safeParse({ name, avatarUrl: avatarUrl ?? '' });
+		const parsed = updateProfileSchema.safeParse({
+			name,
+			avatarUrl: avatarUrl ?? '',
+			chatBubbleColor: chatBubbleColor ?? ''
+		});
 		if (!parsed.success) {
-			return fail(400, { updateProfileError: 'Invalid name or avatar URL.' });
+			return fail(400, { updateProfileError: 'Invalid name, avatar URL, or chat color.' });
 		}
 
-		// Update name always; only update avatarUrl if the column exists (try/catch)
-		const updateData: { name?: string | null; avatarUrl?: string | null } = {
+		const updateData: { name?: string | null; avatarUrl?: string | null; chatBubbleColor?: string | null } = {
 			name: parsed.data.name ?? undefined
 		};
 		if (parsed.data.avatarUrl !== undefined && parsed.data.avatarUrl !== '') {
@@ -74,18 +82,15 @@ export const actions: Actions = {
 		} else if (parsed.data.avatarUrl === '') {
 			updateData.avatarUrl = null;
 		}
-		try {
-			await prisma.user.update({
-				where: { id: user.id },
-				data: updateData
-			});
-		} catch {
-			// avatarUrl column may not exist yet; retry with name only
-			await prisma.user.update({
-				where: { id: user.id },
-				data: { name: parsed.data.name ?? undefined }
-			});
+		if (parsed.data.chatBubbleColor !== undefined && parsed.data.chatBubbleColor !== '') {
+			updateData.chatBubbleColor = parsed.data.chatBubbleColor;
+		} else if (parsed.data.chatBubbleColor === '') {
+			updateData.chatBubbleColor = null;
 		}
+		await prisma.user.update({
+			where: { id: user.id },
+			data: updateData
+		});
 		return { updateProfileSuccess: true };
 	}
 };

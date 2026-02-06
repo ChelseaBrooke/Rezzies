@@ -107,6 +107,7 @@
 	let editForm = $state({
 		displayName: data.user?.name ?? '',
 		avatarUrl: data.user?.avatarUrl ?? '',
+		chatBubbleColor: data.user?.chatBubbleColor ?? '#3b82f6',
 		handle: MOCK_PROFILE.handle,
 		pronouns: MOCK_PROFILE.pronouns,
 		dietaryTags: MOCK_PROFILE.dietaryTags.join(', '),
@@ -153,6 +154,7 @@
 		editForm = {
 			displayName: data.user?.name ?? '',
 			avatarUrl: data.user?.avatarUrl ?? profile.avatarUrl ?? '',
+			chatBubbleColor: data.user?.chatBubbleColor ?? '#3b82f6',
 			handle: profile.handle,
 			pronouns: profile.pronouns,
 			dietaryTags: profile.dietaryTags.join(', '),
@@ -662,6 +664,14 @@
 					<label for="edit-avatar">Avatar image URL</label>
 					<input id="edit-avatar" type="url" name="avatarUrl" bind:value={editForm.avatarUrl} placeholder="https://…" />
 					<small class="field-hint">Paste a link to a profile image (e.g. from imgur.com or your photo host).</small>
+				</div>
+				<div class="form-group">
+					<label for="edit-chat-color">Chat bubble color</label>
+					<div class="color-picker-row">
+						<input id="edit-chat-color" type="color" name="chatBubbleColor" bind:value={editForm.chatBubbleColor} class="color-input" />
+						<span class="color-hex">{editForm.chatBubbleColor}</span>
+					</div>
+					<small class="field-hint">Used as your message color in trip group chats.</small>
 				</div>
 				<div class="form-group">
 					<label for="edit-handle">Handle</label>
@@ -1325,6 +1335,25 @@
 		display: block;
 		margin-top: 0.25rem;
 		font-size: 0.75rem;
+		color: var(--muted, #64748b);
+	}
+	.color-picker-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	.color-input {
+		width: 2.5rem;
+		height: 2.5rem;
+		padding: 2px;
+		border: 1px solid var(--color-border, #e2e8f0);
+		border-radius: 6px;
+		cursor: pointer;
+		background: #fff;
+	}
+	.color-hex {
+		font-size: 0.875rem;
+		font-family: ui-monospace, monospace;
 		color: var(--muted, #64748b);
 	}
 

@@ -14,6 +14,8 @@
 		message: string;
 		userId: string;
 		userName: string | null;
+		isHost?: boolean;
+		chatBubbleColor?: string | null;
 		createdAt: string;
 	}>>([]);
 	let newMessage = $state('');
@@ -223,9 +225,21 @@
 				{:else}
 					{#each messages as message}
 						<div class="message" class:own={message.userId === userId}>
-							<div class="message-content">
+							<div
+								class="message-content"
+								class:has-color={!!message.chatBubbleColor}
+								style={message.chatBubbleColor ? `--bubble-color: ${message.chatBubbleColor}` : ''}
+							>
 								<div class="message-header">
-									<span class="message-author">{message.userName || 'Guest'}</span>
+									<span class="message-author">
+										{message.userName || 'Guest'}
+										{#if message.isHost}
+											<svg class="host-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="Host">
+												<title>Host</title>
+												<path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm0 2v2h14v-2H5z"/>
+											</svg>
+										{/if}
+									</span>
 									<span class="message-time">{formatTime(message.createdAt)}</span>
 								</div>
 								<p class="message-text">{message.message}</p>
@@ -432,6 +446,14 @@
 		box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 	}
 
+	.message-content.has-color,
+	.message.own .message-content.has-color {
+		background: var(--bubble-color) !important;
+		color: white;
+		border-color: rgba(255, 255, 255, 0.25);
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+	}
+
 	.message-content {
 		max-width: 75%;
 		background: white;
@@ -450,9 +472,31 @@
 	}
 
 	.message-author {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
 		font-size: 0.75rem;
 		font-weight: 600;
 		color: var(--muted, #6b7280);
+	}
+
+	.message-author .host-icon {
+		flex-shrink: 0;
+		opacity: 0.9;
+	}
+
+	.message-content.has-color .message-author,
+	.message.own .message-content .message-author {
+		color: rgba(255, 255, 255, 0.95);
+	}
+
+	.message-content.has-color .message-author .host-icon {
+		color: rgba(255, 255, 255, 0.95);
+	}
+
+	.message-content.has-color .message-text,
+	.message-content.has-color .message-time {
+		color: rgba(255, 255, 255, 0.95);
 	}
 
 	.message.own .message-author {

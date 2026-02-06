@@ -36,6 +36,13 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 		throw error(403, 'You must RSVP "yes" to participate in the chat');
 	}
 
+	// Trip members for this trip (userId -> role) so we can show host badge
+	const tripMembers = await prisma.tripMember.findMany({
+		where: { tripId, inviteStatus: 'accepted' },
+		select: { userId: true, role: true }
+	});
+	const memberRoleByUserId = new Map(tripMembers.map((m) => [m.userId, m.role]));
+
 	// Get all messages for this trip
 	const messages = await prisma.chatMessage.findMany({
 		where: { tripId },
@@ -44,7 +51,8 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 				select: {
 					id: true,
 					name: true,
-					email: true
+					email: true,
+					chatBubbleColor: true
 				}
 			}
 		},
@@ -59,7 +67,9 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 			id: msg.id,
 			message: msg.message,
 			userId: msg.userId,
-			userName: msg.user.name,
+			userName: msg.user.name || msg.user.email,
+			isHost: memberRoleByUserId.get(msg.userId) === 'host',
+			chatBubbleColor: msg.user.chatBubbleColor ?? null,
 			createdAt: msg.createdAt.toISOString()
 		}))
 	});
@@ -120,7 +130,8 @@ export const POST: RequestHandler = async ({ params, cookies, request }) => {
 				select: {
 					id: true,
 					name: true,
-					email: true
+					email: true,
+					chatBubbleColor: true
 				}
 			}
 		}
@@ -131,7 +142,9 @@ export const POST: RequestHandler = async ({ params, cookies, request }) => {
 			id: chatMessage.id,
 			message: chatMessage.message,
 			userId: chatMessage.userId,
-			userName: chatMessage.user.name,
+			userName: chatMessage.user.name || chatMessage.user.email,
+			isHost: membership?.role === 'host',
+			chatBubbleColor: chatMessage.user.chatBubbleColor ?? null,
 			createdAt: chatMessage.createdAt.toISOString()
 		}
 	});
