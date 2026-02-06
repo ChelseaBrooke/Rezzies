@@ -160,7 +160,7 @@
 
 		<div class="guests-row">
 			<div class="guests-card-wrapper">
-				<DashboardCard title="Guests" cta={{ label: 'View guests', href: `/trips/${tripId}/guests` }}>
+				<DashboardCard title="Guests" titleHref={`/trips/${tripId}/guests`}>
 					<div class="guests-preview">
 						<div class="avatar-row">
 							{#each guestPreviewList as member}
@@ -229,18 +229,23 @@
 		padding-left: 2.5rem;
 	}
 
-	/* Grid: row1 = reminders | goals | recent, row2 = guests. Gap from photo; taller row so recent + reminders match. */
+	/*
+	 * LAYOUT RULES (keep when changing styles):
+	 * - Row 1: Reminders (col 1) | Trip goals (col 3) | Recent activity (col 5). Reminders and goals MUST line up: row height = sticky card height, goals cell stretches to match.
+	 * - Row 2: Guests ONLY under Reminders + Goals (grid-column 1/4). Guests sit directly underneath with a small gap (margin-top). Do not span guests under Recent.
+	 * - Recent activity stays in its own column, row 1–3; it does not affect reminders/goals/guests alignment.
+	 */
 	.dashboard-layout {
 		display: grid;
 		grid-template-columns: minmax(0, 392px) 1.5rem minmax(0, 2fr) 1.25rem minmax(0, 1fr);
-		grid-template-rows: 280px auto;
+		grid-template-rows: auto auto;
 		gap: 0;
 		margin-top: 1.5rem;
 		position: relative;
 		z-index: 0;
 		width: 100%;
 		min-width: 0;
-		align-items: start;
+		align-items: stretch;
 	}
 
 	.left-column {
@@ -258,19 +263,22 @@
 		z-index: 10;
 	}
 
+	/* Rule: same height as row 1 (sticky); goals end where sticky ends */
 	.goals-cell {
 		grid-column: 3;
 		grid-row: 1;
 		min-width: 0;
-		min-height: 0;
 		margin-top: -1rem;
 	}
 
+	/* Recent activity: 50% of full span height (320px) */
 	.recent-cell {
 		grid-column: 5;
-		grid-row: 1;
+		grid-row: 1 / 3;
 		min-width: 0;
-		min-height: 0;
+		align-self: start;
+		height: 320px;
+		min-height: 320px;
 	}
 
 	.goals-cell :global(.dashboard-card),
@@ -279,11 +287,11 @@
 		height: 100%;
 	}
 
-	/* Guests pulled up so its bottom lines up with bottom of recent activity (280px row) */
+	/* Rule: guests directly below reminders + goals; column 1–4 only (not under recent) */
 	.guests-row {
 		grid-column: 1 / 4;
 		grid-row: 2;
-		margin-top: -120px;
+		margin-top: 0.5rem;
 		min-width: 0;
 	}
 
@@ -293,8 +301,8 @@
 	}
 
 	.guests-card-wrapper :global(.dashboard-card) {
-		min-height: 80px;
-		max-height: 120px;
+		min-height: 56px;
+		max-height: 88px;
 	}
 
 	/* Trip goals: no background */
@@ -318,43 +326,79 @@
 		box-shadow: none;
 	}
 
-	/* Trip goals fits 280px row */
-	.goals-cell :global(.viz-title) {
-		margin-bottom: 0.5rem;
+	/* Trip goals: fill cell height (same as sticky); boxes end where sticky ends */
+	.goals-cell :global(.dashboard-card) {
+		height: 100%;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+	.goals-cell :global(.dashboard-card .card-body) {
+		flex: 1;
+		min-height: 0;
+		min-width: 0;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+	}
+	.goals-cell :global(.viz) {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
 	}
 	.goals-cell :global(.viz-grid) {
-		gap: 0.65rem;
+		flex: 1;
+		gap: 1rem;
+		align-items: stretch;
+		min-height: 0;
 	}
 	.goals-cell :global(.viz-card) {
-		padding: 0.65rem 0.5rem;
+		padding: 1.8rem 0.75rem;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+	.goals-cell :global(.viz-title) {
+		margin-bottom: 1.1rem;
+		flex-shrink: 0;
 	}
 	.goals-cell :global(.card-gauge) {
-		margin-bottom: 0.4rem;
-		width: 56px;
-		height: 32px;
+		margin-bottom: 0.95rem;
+		width: 87px;
+		height: 64px;
+		flex-shrink: 0;
 	}
 	.goals-cell :global(.card-gauge .gauge-svg) {
-		width: 56px;
-		height: 32px;
+		width: 87px;
+		height: 64px;
 	}
 	.goals-cell :global(.card-metric) {
-		font-size: 0.875rem;
+		font-size: 1rem;
 	}
 	.goals-cell :global(.card-label),
 	.goals-cell :global(.card-cta),
 	.goals-cell :global(.card-done) {
-		font-size: 0.625rem;
+		font-size: 0.6875rem;
 	}
 
-	/* Recent activity: fill row height */
+	/* Recent activity card: fill cell (320px) */
 	.recent-cell :global(.dashboard-card) {
-		min-height: 280px;
+		height: 100%;
+		min-height: 320px;
+		display: flex;
+		flex-direction: column;
+	}
+	.recent-cell :global(.dashboard-card .card-body) {
+		flex: 1;
+		min-height: 0;
 	}
 
-	/* Reminders tall enough to reach bottom of trip goals row (280px visible + overlap) */
+	/* Reminders tall: fills row and overlaps hero (400px visible + 10rem overlap) */
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
-		max-height: 408px;
-		min-height: 280px;
+		max-height: 560px;
+		min-height: 400px;
 		width: 100%;
 		overflow-y: auto;
 		/* Equal inset so icon is equidistant from top and left edges */
@@ -410,6 +454,7 @@
 			margin-bottom: 1.5rem;
 		}
 
+		/* Stacked: reminders → goals → recent → guests (guests still "under" reminders+goals) */
 		.dashboard-layout {
 			grid-template-columns: 1fr;
 			grid-template-rows: auto auto auto auto;

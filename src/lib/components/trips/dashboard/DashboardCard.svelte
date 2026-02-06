@@ -3,6 +3,8 @@
 
 	interface Props {
 		title?: string;
+		/** When set, title is rendered as a link to this href */
+		titleHref?: string;
 		/** CSS grid column span: 1 or 2 */
 		span?: 1 | 2;
 		/** Variant styling */
@@ -16,7 +18,7 @@
 		children?: Snippet;
 	}
 
-	let { title, span = 1, variant = 'default', cta, headerLeft, headerRight, children }: Props = $props();
+	let { title, titleHref, span = 1, variant = 'default', cta, headerLeft, headerRight, children }: Props = $props();
 </script>
 
 <article class="dashboard-card" class:span-2={span === 2} class:variant-sticky={variant === 'sticky'} class:variant-glass={variant === 'glass'}>
@@ -27,7 +29,13 @@
 					{@render headerLeft()}
 				</div>
 			{/if}
-			<h2 class="card-title">{title}</h2>
+			<h2 class="card-title">
+				{#if titleHref}
+					<a href={titleHref} class="card-title-link">{title}</a>
+				{:else}
+					{title}
+				{/if}
+			</h2>
 			{#if headerRight != null && typeof headerRight === 'function'}
 				<div class="card-header-right">
 					{@render headerRight()}
@@ -101,6 +109,17 @@
 		color: var(--text);
 		margin: 0;
 		letter-spacing: -0.01em;
+	}
+
+	.card-title-link {
+		color: inherit;
+		text-decoration: none;
+		transition: color var(--transition-fast);
+	}
+
+	.card-title-link:hover {
+		color: var(--primary);
+		text-decoration: underline;
 	}
 
 	.card-header-left {
