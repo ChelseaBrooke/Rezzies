@@ -106,17 +106,40 @@
 			</svg>
 		</span>
 	{/snippet}
-	<!-- Sticky Note Card - positioned separately, overlaps hero -->
-	<div class="sticky-card-wrapper">
-		<DashboardCard
-			variant="sticky"
-			title="Reminders"
-			headerLeft={stickyPinIcon}
-		>
-			<div class="sticky-content">
-				<Checklist role={isHost ? 'host' : 'guest'} {tripId} {currentUserId} computedStats={checklistStats} />
-			</div>
-		</DashboardCard>
+	<!-- Left column: Sticky note + Guests (same width) -->
+	<div class="left-column">
+		<div class="sticky-card-wrapper">
+			<DashboardCard
+				variant="sticky"
+				title="Reminders"
+				headerLeft={stickyPinIcon}
+			>
+				<div class="sticky-content">
+					<Checklist role={isHost ? 'host' : 'guest'} {tripId} {currentUserId} computedStats={checklistStats} />
+				</div>
+			</DashboardCard>
+		</div>
+		<div class="guests-card-wrapper">
+			<DashboardCard title="Guests" cta={{ label: 'View guests', href: `/trips/${tripId}/guests` }}>
+				<div class="guests-preview">
+					<div class="avatar-row">
+						{#each guestPreviewList as member}
+							<span class="avatar" title={member.user?.name ?? member.user?.email ?? ''}>
+								{initials(member.user?.name, member.user?.email)}
+							</span>
+						{/each}
+					</div>
+					<div class="guests-meta">
+						<span class="pending-badge">{pendingRsvpCount} pending RSVP</span>
+						{#if isHost && nudgePending}
+							<button type="button" class="pill-btn pill-btn-text" onclick={nudgePending}>
+								Nudge pending
+							</button>
+						{/if}
+					</div>
+				</div>
+			</DashboardCard>
+		</div>
 	</div>
 
 	<!-- Quick actions (Poll, Checklist, etc.) - bottom center of main photo -->
@@ -154,8 +177,28 @@
 		</div>
 	</div>
 
-	<!-- Main grid - equal-sized boxes, ~sticky note size -->
+	<!-- Main grid: Trip goals (wider, no bg) + Recent activity -->
 	<div class="dashboard-grid">
+		<div class="goals-card-wrap">
+			<DashboardCard>
+				<TripGoalCircle
+					{rsvpCurrent}
+					{rsvpTotal}
+					{rsvpPct}
+					{bedsCurrent}
+					{bedsTotal}
+					{bedsPct}
+					{fundingCurrent}
+					{fundingTotal}
+					{fundingPct}
+					{fundingDisplay}
+					{guestsHref}
+					{roomsHref}
+					{paymentsHref}
+				/>
+			</DashboardCard>
+		</div>
+
 		<DashboardCard title="Recent activity" cta={{ label: 'View activity log', href: `/trips/${tripId}/itinerary` }}>
 			{#if recentActivityItems.length > 0}
 				<ul class="activity-list">
@@ -166,44 +209,6 @@
 			{:else}
 				<p class="muted">No recent activity</p>
 			{/if}
-		</DashboardCard>
-
-		<DashboardCard title="Guests" cta={{ label: 'View guests', href: `/trips/${tripId}/guests` }}>
-			<div class="guests-preview">
-				<div class="avatar-row">
-					{#each guestPreviewList as member}
-						<span class="avatar" title={member.user?.name ?? member.user?.email ?? ''}>
-							{initials(member.user?.name, member.user?.email)}
-						</span>
-					{/each}
-				</div>
-				<div class="guests-meta">
-					<span class="pending-badge">{pendingRsvpCount} pending RSVP</span>
-					{#if isHost && nudgePending}
-						<button type="button" class="pill-btn pill-btn-text" onclick={nudgePending}>
-							Nudge pending
-						</button>
-					{/if}
-				</div>
-			</div>
-		</DashboardCard>
-
-		<DashboardCard>
-			<TripGoalCircle
-				{rsvpCurrent}
-				{rsvpTotal}
-				{rsvpPct}
-				{bedsCurrent}
-				{bedsTotal}
-				{bedsPct}
-				{fundingCurrent}
-				{fundingTotal}
-				{fundingPct}
-				{fundingDisplay}
-				{guestsHref}
-				{roomsHref}
-				{paymentsHref}
-			/>
 		</DashboardCard>
 	</div>
 </div>
@@ -216,14 +221,56 @@
 		box-sizing: border-box;
 	}
 
-	/* Sticky card wrapper - positioned separately, overlaps hero */
-	.sticky-card-wrapper {
+	/* Left column: sticky note + guests stacked */
+	.left-column {
 		position: absolute;
 		left: 2.5rem;
-		top: -10rem;
+		top: -14rem;
 		width: 392px;
 		max-width: 34%;
 		z-index: 10;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.sticky-card-wrapper {
+		position: relative;
+		top: 0;
+		width: 100%;
+		z-index: 10;
+	}
+
+	.guests-card-wrapper {
+		width: 100%;
+		min-height: 0;
+	}
+
+	.guests-card-wrapper :global(.dashboard-card) {
+		min-height: 120px;
+		max-height: 200px;
+	}
+
+	/* Trip goals: wider, no background */
+	.goals-card-wrap {
+		grid-column: span 1;
+		min-width: 0;
+	}
+
+	.goals-card-wrap :global(.dashboard-card) {
+		background: transparent;
+		border: none;
+		box-shadow: none;
+	}
+
+	.goals-card-wrap :global(.dashboard-card:hover) {
+		transform: none;
+		box-shadow: none;
+	}
+
+	.goals-card-wrap :global(.goal-card) {
+		background: transparent;
+		box-shadow: none;
 	}
 
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
@@ -270,10 +317,10 @@
 		color: inherit;
 	}
 
-	/* Main grid - vertical and horizontal spacing both 1.5rem for consistency */
+	/* Main grid: Trip goals (wider) + Recent activity */
 	.dashboard-grid {
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		grid-template-columns: 2fr 1fr;
 		gap: 1.25rem;
 		width: 100%;
 		margin-top: 1.5rem;
@@ -284,14 +331,15 @@
 		min-height: 320px;
 	}
 
-	.dashboard-grid > :global(article) {
+	.dashboard-grid > :global(article),
+	.dashboard-grid > .goals-card-wrap {
 		min-height: 300px;
 		min-width: 0;
 	}
 
 	@media (min-width: 1025px) {
 		.dashboard-grid {
-			/* Sticky ends at 2.5rem + 392px + 1.5rem gap = 456px */
+			/* Left column: 2.5rem + 392px + 1.5rem gap = 456px */
 			margin-left: 456px;
 			width: calc(100% - 456px);
 			max-width: calc(100% - 456px);
@@ -299,12 +347,23 @@
 	}
 
 	@media (max-width: 1024px) {
-		.sticky-card-wrapper {
+		.left-column {
 			position: relative;
 			top: 0;
 			width: 100%;
 			max-width: 100%;
 			margin-bottom: 2rem;
+		}
+
+		.sticky-card-wrapper {
+			position: relative;
+			top: 0;
+			width: 100%;
+			max-width: 100%;
+		}
+
+		.dashboard-grid {
+			grid-template-columns: 1fr;
 		}
 
 		.quick-actions-hero-wrapper {
