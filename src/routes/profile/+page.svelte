@@ -518,7 +518,7 @@
 							<div class="empty-state">
 								<span class="empty-icon" aria-hidden="true">📋</span>
 								<p>No templates yet.</p>
-								<p class="muted">Room choice, packing list, and dietary presets will appear here.</p>
+								<p class="muted">Room choice and dietary presets will appear here.</p>
 							</div>
 						{/if}
 					</div>

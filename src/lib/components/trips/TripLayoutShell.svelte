@@ -67,7 +67,6 @@
 		{ href: `/trips/${tripId}/rooms`, label: 'Rooms', icon: '🛏️' },
 		{ href: `/trips/${tripId}/payments`, label: 'Payments', icon: '💳' },
 		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary', icon: '📋' },
-		{ href: `/trips/${tripId}/checklist`, label: 'List', icon: '☑️' },
 		{ href: `/trips/${tripId}/polls`, label: 'Polls', icon: '🗳️' },
 		{ href: `/trips/${tripId}/activities`, label: 'Activities', icon: '🎯' }
 	];

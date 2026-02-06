@@ -19,7 +19,7 @@
 	} = $props();
 
 	const badges = $derived(getTripBadges(trip));
-	const mealsEnabled = $derived(!!trip.mealPlan);
+	const mealsEnabled = $derived(!!trip.mealPlan?.enabled);
 
 </script>
 
@@ -35,10 +35,7 @@
 		<TripNavItem href="/trips/{trip.id}/rooms" iconName="rooms" label="Rooms" badge={badges.rooms} />
 		<TripNavItem href="/trips/{trip.id}/payments" iconName="payments" label="Payments" badge={badges.payments} />
 		<TripNavItem href="/trips/{trip.id}/itinerary" iconName="itinerary" label="Itinerary" badge={badges.itinerary} />
-		{#if mealsEnabled}
-			<TripNavItem href="/trips/{trip.id}/meals" iconName="meals" label="Meals" badge={badges.meals} />
-		{/if}
-		<TripNavItem href="/trips/{trip.id}/checklist" iconName="checklist" label="Packing list" />
+		<TripNavItem href="/trips/{trip.id}/meals" iconName="meals" label="Meals" badge={mealsEnabled ? badges.meals : undefined} />
 		<TripNavItem href="/trips/{trip.id}/polls" iconName="polls" label="Polls" />
 		<TripNavItem href="/trips/{trip.id}/activities" iconName="activities" label="Activities" />
 		<TripNavItem href="/trips/{trip.id}/files" iconName="files" label="Files" badge={badges.files} />
