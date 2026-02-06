@@ -1,100 +1,241 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import type { PageData } from './$types';
+	import Stepper from '$lib/components/wizard/Stepper.svelte';
+	import Step1 from './steps/Step1.svelte';
+	import Step2 from './steps/Step2.svelte';
+	import Step3 from './steps/Step3.svelte';
+	import Step4 from './steps/Step4.svelte';
 
 	let { data, form }: { data: PageData; form: import('./$types').ActionData } = $props();
 
-	let name = $state(data.trip?.name ?? '');
-	let location = $state(data.trip?.location ?? '');
-	let description = $state(data.trip?.description ?? '');
+	type Step = 'basics' | 'rooms' | 'pricing-policies' | 'review';
 
-	// Sync when data changes (e.g. after navigation)
-	$effect(() => {
-		name = data.trip?.name ?? '';
-		location = data.trip?.location ?? '';
-		description = data.trip?.description ?? '';
+	const stepParam = $derived($page.url.searchParams.get('step') || 'basics');
+	const currentStep = $derived((['basics', 'rooms', 'pricing-policies', 'review'].includes(stepParam) ? stepParam : 'basics') as Step);
+
+	const steps = [
+		{ number: 1, label: 'Trip Basics' },
+		{ number: 2, label: 'Rooms' },
+		{ number: 3, label: 'Pricing & Policies' },
+		{ number: 4, label: 'Review' }
+	];
+
+	const currentStepIndex = $derived(['basics', 'rooms', 'pricing-policies', 'review'].indexOf(currentStep));
+
+	// Form data initialized from trip
+	let formData = $state({
+		name: data.trip?.name ?? '',
+		description: data.trip?.description ?? '',
+		location: data.trip?.location ?? '',
+		checkInDate: data.trip?.checkInDate ? new Date(data.trip.checkInDate).toISOString().split('T')[0] : '',
+		checkOutDate: data.trip?.checkOutDate ? new Date(data.trip.checkOutDate).toISOString().split('T')[0] : '',
+		listingUrl: data.trip?.listingUrl ?? '',
+		listingTitle: data.trip?.listingTitle ?? '',
+		listingCoverPhoto: data.trip?.listingCoverPhoto ?? '',
+		totalCost: data.trip?.totalCost ? String(data.trip.totalCost) : '',
+		pricingModel: data.trip?.pricingModel ?? 'PER_PERSON',
+		allowPartialStays: data.trip?.allowPartialStays ?? false,
+		// Rooms will be handled separately
+		rooms: data.trip?.rooms ?? []
 	});
 
-	const updateResult = $derived(form?.updateBasics);
+	// Sync when data changes
+	$effect(() => {
+		if (data.trip) {
+			formData.name = data.trip.name ?? '';
+			formData.description = data.trip.description ?? '';
+			formData.location = data.trip.location ?? '';
+			formData.checkInDate = data.trip.checkInDate ? new Date(data.trip.checkInDate).toISOString().split('T')[0] : '';
+			formData.checkOutDate = data.trip.checkOutDate ? new Date(data.trip.checkOutDate).toISOString().split('T')[0] : '';
+			formData.listingUrl = data.trip.listingUrl ?? '';
+			formData.listingTitle = data.trip.listingTitle ?? '';
+			formData.listingCoverPhoto = data.trip.listingCoverPhoto ?? '';
+			formData.totalCost = data.trip.totalCost ? String(data.trip.totalCost) : '';
+			formData.pricingModel = data.trip.pricingModel ?? 'PER_PERSON';
+			formData.allowPartialStays = data.trip.allowPartialStays ?? false;
+			formData.rooms = data.trip.rooms ?? [];
+		}
+	});
+
+	function goToStep(step: Step) {
+		goto(`/trips/${data.trip?.id}/settings?step=${step}`);
+	}
+
+	function nextStep() {
+		const stepOrder: Step[] = ['basics', 'rooms', 'pricing-policies', 'review'];
+		const currentIdx = stepOrder.indexOf(currentStep);
+		if (currentIdx < stepOrder.length - 1) {
+			goToStep(stepOrder[currentIdx + 1]);
+		}
+	}
+
+	function prevStep() {
+		const stepOrder: Step[] = ['basics', 'rooms', 'pricing-policies', 'review'];
+		const currentIdx = stepOrder.indexOf(currentStep);
+		if (currentIdx > 0) {
+			goToStep(stepOrder[currentIdx - 1]);
+		} else {
+			goto(`/trips/${data.trip?.id}`);
+		}
+	}
+
+	const numberOfNights = $derived(() => {
+		if (!formData.checkInDate || !formData.checkOutDate) return 0;
+		const checkIn = new Date(formData.checkInDate);
+		const checkOut = new Date(formData.checkOutDate);
+		const diffTime = checkOut.getTime() - checkIn.getTime();
+		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+		return diffDays > 0 ? diffDays : 0;
+	});
+
+	// Redirect non-hosts
+	$effect(() => {
+		if (!data.isHost && data.trip?.id) {
+			goto(`/trips/${data.trip.id}`);
+		}
+	});
 </script>
 
-<div class="page">
-	<form method="POST" action="?/updateBasics" use:enhance={() => {
-		return async ({ result }) => {
-			if (result.type === 'success' && result.data?.updateBasics?.success) {
-				await import('$app/navigation').then(({ invalidateAll }) => invalidateAll());
-			}
-		};
-	}}>
-		<div class="page-header">
-			<div class="page-header-top">
-				<div>
-					<h1>Trip Settings</h1>
-					<p class="subtitle">Basics, policies, and permissions</p>
-				</div>
-				<button type="submit" class="btn btn-primary">Save</button>
-			</div>
-		</div>
-
-		<div class="card" id="basics">
-			<div class="card-body">
-				<h2 class="section-heading">Basics</h2>
-				<p class="muted">Trip name, dates, and destination. Changes show on the trip overview.</p>
-				{#if updateResult?.error}
-					<p class="form-error">{updateResult.error}</p>
+{#if data.isHost}
+<div class="settings-page">
+	<div class="settings-card">
+		<Stepper {steps} currentStep={currentStepIndex} onBack={prevStep} />
+		
+		<div class="settings-content">
+			{#if currentStep === 'basics'}
+				<Step1 {formData} tripId={data.trip?.id ?? ''} {numberOfNights} />
+			{:else if currentStep === 'rooms'}
+				<Step2 {formData} tripId={data.trip?.id ?? ''} />
+			{:else if currentStep === 'pricing-policies'}
+				<Step3 {formData} tripId={data.trip?.id ?? ''} />
+			{:else if currentStep === 'review'}
+				<Step4 {formData} tripId={data.trip?.id ?? ''} {numberOfNights} />
+			{/if}
+			
+			<div class="step-actions">
+				{#if currentStep !== 'basics'}
+					<button type="button" class="btn-secondary" onclick={prevStep}>Back</button>
 				{/if}
-				{#if updateResult?.success}
-					<p class="form-success">Saved. Your trip overview will update.</p>
+				{#if currentStep !== 'review'}
+					<button type="button" class="btn-primary" onclick={nextStep}>Next</button>
+				{:else}
+					<form method="POST" action="?/updateBasics" use:enhance={() => {
+						return async ({ result }) => {
+							if (result.type === 'success') {
+								await import('$app/navigation').then(({ invalidateAll }) => invalidateAll());
+								goto(`/trips/${data.trip?.id}`);
+							}
+						};
+					}}>
+						<input type="hidden" name="name" value={formData.name} />
+						<input type="hidden" name="location" value={formData.location} />
+						<input type="hidden" name="description" value={formData.description} />
+						<input type="hidden" name="checkInDate" value={formData.checkInDate} />
+						<input type="hidden" name="checkOutDate" value={formData.checkOutDate} />
+						<input type="hidden" name="listingUrl" value={formData.listingUrl} />
+						<input type="hidden" name="listingTitle" value={formData.listingTitle} />
+						<input type="hidden" name="listingCoverPhoto" value={formData.listingCoverPhoto} />
+						<input type="hidden" name="totalCost" value={formData.totalCost} />
+						<input type="hidden" name="pricingModel" value={formData.pricingModel} />
+						<input type="hidden" name="allowPartialStays" value={formData.allowPartialStays ? 'true' : 'false'} />
+						<button type="submit" class="btn-primary">Save Changes</button>
+					</form>
 				{/if}
-				<div class="form-placeholder">
-					<label for="trip-name">Trip name</label>
-					<input id="trip-name" name="name" type="text" placeholder="Trip name" bind:value={name} />
-					<label for="trip-location">Destination</label>
-					<input id="trip-location" name="location" type="text" placeholder="e.g. Lake Tahoe" bind:value={location} />
-					<label for="trip-description">Description (optional)</label>
-					<textarea id="trip-description" name="description" placeholder="A short note about the trip" rows="3" bind:value={description}></textarea>
-				</div>
-			</div>
-		</div>
-	</form>
-
-	<div class="card" id="policies">
-		<div class="card-body">
-			<h2 class="section-heading">Policies</h2>
-			<p class="muted">House rules, cancellation (placeholder)</p>
-			<div class="form-placeholder">
-				<textarea placeholder="House rules" rows="3" disabled></textarea>
-			</div>
-		</div>
-	</div>
-
-	<div class="card" id="permissions">
-		<div class="card-body">
-			<h2 class="section-heading">Permissions</h2>
-			<p class="muted">Who can edit, invite (placeholder)</p>
-			<div class="form-placeholder">
-				<label><input type="checkbox" checked disabled /> Only hosts can edit</label>
 			</div>
 		</div>
 	</div>
 </div>
 
 <style>
-	.page { padding: 0; }
-	.page-header { margin-bottom: 1.5rem; }
-	.page-header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-	.page-header-top .btn { flex-shrink: 0; }
-	.page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.25rem 0; }
-	.subtitle { font-size: 0.875rem; color: var(--muted); margin: 0; }
-	.card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; margin-bottom: 1rem; }
-	.card-body { padding: 1.5rem; }
-	.section-heading { font-size: 1rem; font-weight: 600; margin: 0 0 0.25rem 0; }
-	.muted { font-size: 0.875rem; color: var(--muted); margin: 0 0 0.75rem 0; }
-	.form-placeholder { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
-	.form-placeholder label { font-size: 0.875rem; font-weight: 500; }
-	.form-placeholder input[type="text"], .form-placeholder textarea { padding: 0.5rem 0.75rem; border: 1px solid var(--border-strong); border-radius: var(--radius-md); font-size: 0.875rem; }
-	.form-placeholder input:focus, .form-placeholder textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--focusRing); }
-	.form-placeholder textarea { resize: vertical; font-family: inherit; }
-	.form-error { font-size: 0.875rem; color: var(--danger); margin: 0 0 0.75rem 0; }
-	.form-success { font-size: 0.875rem; color: var(--muted); margin: 0 0 0.75rem 0; }
+	.settings-page {
+		min-height: 100%;
+		padding: 0;
+	}
+
+	.settings-card {
+		background: var(--surfaceSolid);
+		border-radius: var(--radius-xl);
+		border: 1px solid var(--border);
+		box-shadow: var(--shadow-md);
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		min-height: 600px;
+	}
+
+	.settings-content {
+		flex: 1;
+		padding: 2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 2rem;
+	}
+
+	.step-actions {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-top: auto;
+		padding-top: 2rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.btn-primary,
+	.btn-secondary {
+		padding: 0.625rem 1.25rem;
+		border-radius: var(--radius-md);
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+		border: none;
+	}
+
+	.btn-primary {
+		background: var(--primary);
+		color: white;
+		margin-left: auto;
+	}
+
+	.btn-primary:hover {
+		background: var(--primaryHover);
+	}
+
+	.btn-secondary {
+		background: var(--surface2);
+		color: var(--text);
+		border: 1px solid var(--border);
+	}
+
+	.btn-secondary:hover {
+		background: var(--border-soft);
+	}
+
+	.error-message {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 1rem;
+		padding: 3rem;
+		text-align: center;
+		min-height: 400px;
+	}
+
+	.error-message p {
+		font-size: 1rem;
+		color: var(--text);
+		margin: 0;
+	}
 </style>
+{:else}
+<div class="settings-page">
+	<div class="error-message">
+		<p>You don't have permission to edit trip settings. Only hosts can edit settings.</p>
+		<a href="/trips/{data.trip?.id}" class="btn-primary">Back to Trip</a>
+	</div>
+</div>
+{/if}

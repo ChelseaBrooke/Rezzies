@@ -1,49 +1,16 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
-	import TripLayoutShell from '$lib/components/trips/TripLayoutShell.svelte';
+	import AppShell from '$lib/components/trips/dashboard/AppShell.svelte';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
-
-	// Serialized dates from server come back as strings; ensure trip options have usable dates
-	const allTrips = $derived(
-		(data.allTrips ?? []).map((t: { id: string; name: string; checkInDate: Date | string; checkOutDate: Date | string; isPublished?: boolean }) => ({
-			id: t.id,
-			name: t.name,
-			checkInDate: typeof t.checkInDate === 'string' ? new Date(t.checkInDate) : t.checkInDate,
-			checkOutDate: typeof t.checkOutDate === 'string' ? new Date(t.checkOutDate) : t.checkOutDate,
-			isPublished: t.isPublished ?? false
-		}))
-	);
 
 	function handleInvite() {
 		import('$app/navigation').then(({ goto }) => goto(`/trips/${data.trip.id}/guests?invite=1`));
 	}
 </script>
 
-<div class="trip-portal">
-	<TripLayoutShell
-		trip={data.trip}
-		allTrips={allTrips}
-		user={data.user}
-		onInvite={handleInvite}
-	>
-		{#snippet children()}
-			{@render children()}
-		{/snippet}
-	</TripLayoutShell>
-</div>
-
-<style>
-	.trip-portal {
-		min-height: 100vh;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.trip-portal :global(.shell) {
-		flex: 1;
-		min-height: 0;
-		display: flex;
-		flex-direction: column;
-	}
-</style>
+<AppShell tripId={data.trip.id} user={data.user} onInvite={handleInvite}>
+	{#snippet children()}
+		{@render children()}
+	{/snippet}
+</AppShell>

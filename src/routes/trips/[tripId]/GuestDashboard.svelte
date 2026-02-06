@@ -2,7 +2,6 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import type { PageData } from './$types';
-	import AppShell from '$lib/components/trips/dashboard/AppShell.svelte';
 	import TripHero from '$lib/components/trips/dashboard/TripHero.svelte';
 	import TripDashboardGrid from '$lib/components/trips/dashboard/TripDashboardGrid.svelte';
 
@@ -120,8 +119,7 @@
 </script>
 
 {#if trip}
-	<AppShell tripId={trip.id} user={user}>
-		<TripHero
+	<TripHero
 			trip={{
 				id: trip.id,
 				name: trip.name,
@@ -171,5 +169,4 @@
 			roomsHref="/trips/{trip.id}/rooms"
 			paymentsHref="/trips/{trip.id}/payments"
 		/>
-	</AppShell>
 {/if}
