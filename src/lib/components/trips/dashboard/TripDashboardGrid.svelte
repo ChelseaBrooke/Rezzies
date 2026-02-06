@@ -1,10 +1,24 @@
 <script lang="ts">
 	import DashboardCard from './DashboardCard.svelte';
 	import TripGoalCircle from '$lib/components/trips/TripGoalCircle.svelte';
+	import Checklist from './Checklist.svelte';
+
+	interface ChecklistStats {
+		rsvp_pending?: number;
+		payment_pending?: number;
+		trip_meals_total?: number;
+		trip_activities_total?: number;
+		missing_trip_details_count?: number;
+		missing_trip_details_summary?: string;
+		current_user_rsvp_status?: string | null;
+		guest_meals_contributed?: number;
+		guest_activities_contributed?: number;
+	}
 
 	interface Props {
 		isHost: boolean;
 		tripId: string;
+		currentUserId: string;
 		members: Array<{ user?: { name: string | null; email: string | null } | null }>;
 		rsvps: Array<{ status: string; user?: { name: string | null } | null; arrivalDatetime?: string | null }>;
 		guestPreviewList: Array<{ user?: { name: string | null; email: string | null } | null }>;
@@ -31,21 +45,14 @@
 		roomsHref: string;
 		paymentsHref: string;
 		nudgePending?: () => void;
-		/** For sticky tasks: amount still due from guests (e.g. total cost - committed). */
-		pendingPaymentTotal?: number;
-		/** Meal slots count; show "add meals" task only if < 3 */
-		mealSlotsCount?: number;
-		/** Activities count; show "add activities" task only if < 3 */
-		activitiesCount?: number;
-		/** Pending poll decisions count */
-		pollPendingCount?: number;
-		/** Count of empty trip info fields (description, location, etc.) */
-		tripInfoEmptyCount?: number;
+		/** Checklist stats for role-based checklists */
+		checklistStats: ChecklistStats;
 	}
 
 	let {
 		isHost,
 		tripId,
+		currentUserId,
 		members,
 		rsvps,
 		guestPreviewList,
@@ -71,11 +78,7 @@
 		roomsHref,
 		paymentsHref,
 		nudgePending,
-		pendingPaymentTotal = 0,
-		mealSlotsCount = 0,
-		activitiesCount = 0,
-		pollPendingCount = 0,
-		tripInfoEmptyCount = 0
+		checklistStats
 	}: Props = $props();
 
 	function initials(name: string | null | undefined, email?: string | null): string {
@@ -91,50 +94,6 @@
 
 	const hasMissingDietary = $derived(!userProfile?.dietaryRestrictions && !userProfile?.allergies);
 	const hasMissingArrival = $derived(!userRsvp?.arrivalDatetime && userRsvp?.status === 'yes');
-
-	/** Sticky note tasks for host: max 6, each with label and href */
-	const stickyTasks = $derived.by(() => {
-		if (!isHost) return [];
-		const tasks: { label: string; href: string }[] = [];
-		if (pendingRsvpCount > 0) {
-			tasks.push({
-				label: `Nudge guests to RSVP (${pendingRsvpCount})`,
-				href: guestsHref
-			});
-		}
-		if (pendingPaymentTotal > 0) {
-			const amt = `$${Math.round(pendingPaymentTotal)}`;
-			tasks.push({
-				label: `Nudge guests to make payments (${amt})`,
-				href: paymentsHref
-			});
-		}
-		if (mealSlotsCount < 3) {
-			tasks.push({
-				label: 'Add some meals to your trip or enlist help',
-				href: `/trips/${tripId}/meals`
-			});
-		}
-		if (activitiesCount < 3) {
-			tasks.push({
-				label: 'Add some activities to your trip',
-				href: `/trips/${tripId}/activities`
-			});
-		}
-		if (pollPendingCount > 0) {
-			tasks.push({
-				label: `Make poll decision (${pollPendingCount} pending)`,
-				href: `/trips/${tripId}/polls`
-			});
-		}
-		if (tripInfoEmptyCount > 0) {
-			tasks.push({
-				label: `Complete trip info (${tripInfoEmptyCount} missing)`,
-				href: `/trips/${tripId}/settings`
-			});
-		}
-		return tasks.slice(0, 6);
-	});
 </script>
 
 <div class="dashboard-wrapper">
@@ -154,89 +113,9 @@
 			title="Reminders"
 			headerLeft={stickyPinIcon}
 		>
-			{#if isHost}
-				<div class="sticky-content">
-					<ul class="sticky-task-list">
-						{#each stickyTasks as task}
-							<li>
-								<a href={task.href} class="sticky-task-link">{task.label}</a>
-							</li>
-						{/each}
-					</ul>
-					{#if stickyTasks.length === 0}
-						<p class="sticky-no-tasks">No reminders right now.</p>
-					{/if}
-				</div>
-			{:else}
-				<div class="sticky-content">
-					<div class="for-you-row">
-						<span class="for-you-label">Your RSVP</span>
-						<div class="for-you-right">
-							{#if userRsvp?.status === 'yes'}
-								<span class="for-you-value ok">Accepted</span>
-							{:else if userRsvp?.status === 'no'}
-								<span class="for-you-value">Declined</span>
-							{:else}
-								<a href="/trips/{tripId}/rsvp" class="pill-btn pill-btn-primary">RSVP</a>
-							{/if}
-						</div>
-					</div>
-					<div class="for-you-row">
-						<span class="for-you-label">Room / bed</span>
-						<div class="for-you-right">
-							{#if myAssignment}
-								<span class="for-you-value ok">{myAssignment.room?.name ?? 'Assigned'}</span>
-							{:else}
-								<a href="/trips/{tripId}/rooms" class="pill-btn pill-btn-primary">Choose bed</a>
-							{/if}
-						</div>
-					</div>
-					<div class="for-you-row">
-						<span class="for-you-label">Your cost</span>
-						<div class="for-you-right">
-							{#if myDueTotal > 0}
-								<a href="/trips/{tripId}/payments" class="pill-btn pill-btn-primary">Settle</a>
-							{:else if myPaidTotal > 0}
-								<span class="for-you-value ok">Settled</span>
-							{:else}
-								<span class="for-you-value">—</span>
-							{/if}
-						</div>
-					</div>
-					{#if hasMissingDietary || hasMissingArrival}
-						<div class="missing-items">
-							{#if hasMissingDietary}
-								<span class="missing-chip">Dietary / allergies</span>
-							{/if}
-							{#if hasMissingArrival}
-								<span class="missing-chip">Arrival time</span>
-							{/if}
-						</div>
-					{/if}
-					{#if nextUpcomingItem}
-						<div class="for-you-next">
-							<span class="for-you-label">Next up</span>
-							<span class="for-you-value">
-								{nextUpcomingItem.title}
-								{#if nextUpcomingItem.date}
-									— {new Date(nextUpcomingItem.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-								{/if}
-							</span>
-						</div>
-					{/if}
-					<div class="sticky-actions">
-						{#if !userRsvp?.status || userRsvp.status !== 'yes'}
-							<a href="/trips/{tripId}/rsvp" class="pill-btn pill-btn-secondary">RSVP</a>
-						{/if}
-						{#if !myAssignment}
-							<a href="/trips/{tripId}/rooms" class="pill-btn pill-btn-secondary">Choose bed</a>
-						{/if}
-						{#if hasMissingArrival}
-							<a href="/trips/{tripId}/rsvp" class="pill-btn pill-btn-secondary">Add arrival time</a>
-						{/if}
-					</div>
-				</div>
-			{/if}
+			<div class="sticky-content">
+				<Checklist role={isHost ? 'host' : 'guest'} {tripId} {currentUserId} computedStats={checklistStats} />
+			</div>
 		</DashboardCard>
 	</div>
 

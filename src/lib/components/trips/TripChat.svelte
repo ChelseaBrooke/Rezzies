@@ -264,7 +264,7 @@
 	.chat-widget {
 		position: fixed;
 		bottom: 0;
-		right: 2rem;
+		right: 3.5rem;
 		z-index: 1000;
 		font-family: inherit;
 	}
@@ -338,7 +338,7 @@
 
 	.chat-window {
 		width: 500px;
-		height: 420px;
+		height: 360px;
 		background: white;
 		border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
 		box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);

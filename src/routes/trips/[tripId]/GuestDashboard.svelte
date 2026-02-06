@@ -116,6 +116,23 @@
 		'Check-in is 4pm. Keys at the lockbox — code in your confirmation.\n\n' +
 		'Wi‑Fi, Check-in, and Rules are in the itinerary.'
 	);
+	
+	// Compute guest checklist stats
+	const guestMealsContributed = $derived(
+		mealSlots.filter(m => m.assignedUserId === user?.id).length
+	);
+	
+	const guestActivitiesContributed = $derived(
+		activities.filter(a => 
+			a.participants?.some(p => p.userId === user?.id)
+		).length
+	);
+	
+	const checklistStats = $derived({
+		current_user_rsvp_status: userRsvp?.status ?? null,
+		guest_meals_contributed: guestMealsContributed,
+		guest_activities_contributed: guestActivitiesContributed
+	});
 </script>
 
 {#if trip}
@@ -144,6 +161,7 @@
 		<TripDashboardGrid
 			isHost={false}
 			tripId={trip.id}
+			currentUserId={user.id}
 			{members}
 			{rsvps}
 			{guestPreviewList}
@@ -168,5 +186,6 @@
 			guestsHref="/trips/{trip.id}/guests"
 			roomsHref="/trips/{trip.id}/rooms"
 			paymentsHref="/trips/{trip.id}/payments"
+			{checklistStats}
 		/>
 {/if}

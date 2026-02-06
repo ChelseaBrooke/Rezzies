@@ -124,11 +124,40 @@
 	const pendingPaymentTotal = $derived(Math.max(0, totalCost - committedFunds));
 	const mealSlotsCount = $derived(mealSlots.length);
 	const activitiesCount = $derived(activities.length);
-	const tripInfoEmptyCount = $derived(
-		[trip?.description, trip?.location, trip?.listingUrl, trip?.listingTitle].filter(
-			(v) => v == null || String(v).trim() === ''
-		).length
+	
+	// Compute missing trip details
+	const missingTripDetails = $derived.by(() => {
+		const missing: string[] = [];
+		// Check if any room lacks photos
+		if (rooms.some(r => !r.photoUrls || r.photoUrls.length === 0)) {
+			missing.push('room photos');
+		}
+		// Check destination
+		if (!trip?.location || trip.location.trim() === '') {
+			missing.push('destination');
+		}
+		return missing;
+	});
+	
+	const missingTripDetailsCount = $derived(missingTripDetails.length);
+	const missingTripDetailsSummary = $derived(
+		missingTripDetailsCount === 0 ? 'complete' : missingTripDetails.join(' & ')
 	);
+	
+	// Compute payment pending (invoices with status "due")
+	const paymentPending = $derived(
+		(trip?.invoices ?? []).filter(i => i.status === 'due').length
+	);
+	
+	// Checklist stats for host
+	const checklistStats = $derived({
+		rsvp_pending: pendingRsvpCount,
+		payment_pending: paymentPending,
+		trip_meals_total: mealSlotsCount,
+		trip_activities_total: activitiesCount,
+		missing_trip_details_count: missingTripDetailsCount,
+		missing_trip_details_summary: missingTripDetailsSummary
+	});
 </script>
 
 {#if trip}
@@ -157,6 +186,7 @@
 		<TripDashboardGrid
 			isHost={true}
 			tripId={trip.id}
+			currentUserId={user.id}
 			{members}
 			{rsvps}
 			{guestPreviewList}
@@ -182,10 +212,6 @@
 			roomsHref="/trips/{trip.id}/rooms"
 			paymentsHref="/trips/{trip.id}/payments"
 			{nudgePending}
-			{pendingPaymentTotal}
-			{mealSlotsCount}
-			{activitiesCount}
-			pollPendingCount={0}
-			{tripInfoEmptyCount}
+			{checklistStats}
 		/>
 {/if}
