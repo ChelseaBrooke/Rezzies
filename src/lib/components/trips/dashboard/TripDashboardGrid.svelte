@@ -19,9 +19,9 @@
 		isHost: boolean;
 		tripId: string;
 		currentUserId: string;
-		members: Array<{ user?: { name: string | null; email: string | null } | null }>;
+		members: Array<{ user?: { name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
 		rsvps: Array<{ status: string; user?: { name: string | null } | null; arrivalDatetime?: string | null }>;
-		guestPreviewList: Array<{ user?: { name: string | null; email: string | null } | null }>;
+		guestPreviewList: Array<{ user?: { name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
 		pendingRsvpCount: number;
 		recentActivityItems: Array<{ text: string }>;
 		userRsvp?: { status?: string; arrivalDatetime?: string | null } | null;
@@ -178,7 +178,11 @@
 						<div class="avatar-row">
 							{#each guestPreviewList as member}
 								<span class="avatar" title={member.user?.name ?? member.user?.email ?? ''}>
-									{initials(member.user?.name, member.user?.email)}
+									{#if member.user?.avatarUrl}
+										<img src={member.user.avatarUrl} alt="" class="avatar-img" />
+									{:else}
+										{initials(member.user?.name, member.user?.email)}
+									{/if}
 								</span>
 							{/each}
 						</div>
@@ -733,6 +737,13 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
+		overflow: hidden;
+	}
+
+	.avatar :global(.avatar-img) {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 
 	.guests-meta {

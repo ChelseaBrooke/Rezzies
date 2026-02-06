@@ -13,13 +13,24 @@
 	}: {
 		trip: TripForSidebar & { inviteCode?: string };
 		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date; isPublished?: boolean }[];
-		user?: { id: string; name: string | null; email: string } | null;
+		user?: { id: string; name: string | null; email: string; avatarUrl?: string | null } | null;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
 	} = $props();
 
 	const badges = $derived(getTripBadges(trip));
 	const mealsEnabled = $derived(!!trip.mealPlan?.enabled);
+
+	function initials(name: string | null | undefined, email?: string): string {
+		if (name?.trim()) {
+			const parts = name.trim().split(/\s+/);
+			return parts.length >= 2
+				? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+				: name.slice(0, 2).toUpperCase();
+		}
+		if (email) return email.slice(0, 2).toUpperCase();
+		return '?';
+	}
 
 </script>
 
@@ -41,8 +52,20 @@
 		<TripNavItem href="/trips/{trip.id}/files" iconName="files" label="Files" badge={badges.files} />
 	</nav>
 
-	<!-- Footer -->
+	<!-- Footer: avatar above settings -->
 	<div class="footer">
+		{#if user}
+			<a href="/profile" class="user-row" aria-label="My profile" title="My profile">
+				<span class="user-avatar">
+					{#if user.avatarUrl}
+						<img src={user.avatarUrl} alt="" class="user-avatar-img" />
+					{:else}
+						{initials(user.name, user.email)}
+					{/if}
+				</span>
+				<span class="user-name">{user.name || user.email || 'Profile'}</span>
+			</a>
+		{/if}
 		<TripNavItem href="/trips/{trip.id}/settings" iconName="settings" label="Trip Settings" />
 	</div>
 	</div>
@@ -166,6 +189,14 @@
 		color: var(--muted);
 		box-shadow: var(--shadow-sm);
 		border: 1px solid var(--border);
+		overflow: hidden;
+		flex-shrink: 0;
+	}
+
+	.user-avatar :global(.user-avatar-img) {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 
 	.user-name {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -93,7 +94,10 @@
 		roles: ['host', 'guest']
 	};
 
-	let profile = $state<UserProfile>({ ...MOCK_PROFILE });
+	let profile = $state<UserProfile>({
+		...MOCK_PROFILE,
+		avatarUrl: data.user?.avatarUrl ?? MOCK_PROFILE.avatarUrl
+	});
 	let activeTab = $state<'preferences' | 'saved' | 'history' | 'security'>('preferences');
 	let savedSubTab = $state<'trips' | 'templates'>('trips');
 	let toast = $state<{ message: string } | null>(null);
@@ -102,6 +106,7 @@
 	let reportModalOpen = $state(false);
 	let editForm = $state({
 		displayName: data.user?.name ?? '',
+		avatarUrl: data.user?.avatarUrl ?? '',
 		handle: MOCK_PROFILE.handle,
 		pronouns: MOCK_PROFILE.pronouns,
 		dietaryTags: MOCK_PROFILE.dietaryTags.join(', '),
@@ -147,6 +152,7 @@
 	function openEditModal() {
 		editForm = {
 			displayName: data.user?.name ?? '',
+			avatarUrl: data.user?.avatarUrl ?? profile.avatarUrl ?? '',
 			handle: profile.handle,
 			pronouns: profile.pronouns,
 			dietaryTags: profile.dietaryTags.join(', '),
@@ -159,6 +165,7 @@
 	function saveEdit() {
 		profile = {
 			...profile,
+			avatarUrl: editForm.avatarUrl?.trim() || null,
 			handle: editForm.handle,
 			pronouns: editForm.pronouns,
 			dietaryTags: editForm.dietaryTags ? editForm.dietaryTags.split(',').map((s) => s.trim()).filter(Boolean) : [],
@@ -635,10 +642,26 @@
 	<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
 		<div class="modal">
 			<h2 id="edit-modal-title" class="modal-title">Edit profile</h2>
-			<form onsubmit={(e) => { e.preventDefault(); saveEdit(); }}>
+			<form method="POST" action="?/updateProfile" use:enhance={() => {
+				return ({ result }) => {
+					if (result.type === 'success' && result.data?.updateProfileSuccess) {
+						profile = { ...profile, avatarUrl: editForm.avatarUrl?.trim() || null };
+						editModalOpen = false;
+						showToast('Profile updated!');
+					}
+					if (result.type === 'failure' && result.data?.updateProfileError) {
+						showToast(result.data.updateProfileError as string);
+					}
+				};
+			}}>
 				<div class="form-group">
 					<label for="edit-name">Display name</label>
-					<input id="edit-name" type="text" bind:value={editForm.displayName} />
+					<input id="edit-name" type="text" name="name" bind:value={editForm.displayName} />
+				</div>
+				<div class="form-group">
+					<label for="edit-avatar">Avatar image URL</label>
+					<input id="edit-avatar" type="url" name="avatarUrl" bind:value={editForm.avatarUrl} placeholder="https://…" />
+					<small class="field-hint">Paste a link to a profile image (e.g. from imgur.com or your photo host).</small>
 				</div>
 				<div class="form-group">
 					<label for="edit-handle">Handle</label>
@@ -1298,6 +1321,13 @@
 		background: #ffffff;
 		color: #0f172a;
 	}
+	.field-hint {
+		display: block;
+		margin-top: 0.25rem;
+		font-size: 0.75rem;
+		color: var(--muted, #64748b);
+	}
+
 	.form-group input:focus,
 	.form-group textarea:focus {
 		outline: none;

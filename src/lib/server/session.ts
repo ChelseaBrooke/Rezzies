@@ -36,16 +36,17 @@ export async function getSessionUser(cookies: Cookies) {
 		return null;
 	}
 
-	// Look up session in database
 	const session = await prisma.session.findUnique({
 		where: { token: sessionToken },
-		include: { user: true }
+		include: {
+			user: {
+				select: { id: true, email: true, name: true, avatarUrl: true }
+			}
+		}
 	});
 
 	if (!session || session.expiresAt < new Date()) {
-		// Session expired or doesn't exist
 		if (session) {
-			// Clean up expired session
 			await prisma.session.delete({ where: { id: session.id } });
 		}
 		return null;
@@ -54,7 +55,8 @@ export async function getSessionUser(cookies: Cookies) {
 	return {
 		id: session.user.id,
 		email: session.user.email,
-		name: session.user.name
+		name: session.user.name,
+		avatarUrl: session.user.avatarUrl
 	};
 }
 

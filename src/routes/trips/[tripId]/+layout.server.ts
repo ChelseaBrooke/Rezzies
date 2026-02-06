@@ -22,7 +22,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 			where: { id: tripId },
 			include: {
 				rooms: { include: { beds: true } },
-				members: { include: { user: { select: { id: true, email: true, name: true } } } },
+				members: { include: { user: { select: { id: true, email: true, name: true, avatarUrl: true } } } },
 				mealPlan: true,
 				mealSlots: { include: { assignedUser: { select: { id: true, name: true } } } },
 				activities: { include: { participants: { select: { userId: true } } } },
@@ -62,6 +62,6 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		membership,
 		isHost: membership?.role === 'host',
 		userRsvp,
-		canChat: userRsvp?.status === 'yes'
+		canChat: userRsvp?.status === 'yes' || membership?.role === 'host'
 	};
 };

@@ -6,7 +6,7 @@
 
 	interface Props {
 		tripId: string;
-		user?: { id: string; name: string | null; email: string } | null;
+		user?: { id: string; name: string | null; email: string; avatarUrl?: string | null } | null;
 		children?: Snippet;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
@@ -101,7 +101,11 @@
 		<div class="rail-bottom">
 			{#if user}
 				<a href="/profile" class="user-avatar" aria-label="My profile" title="My profile">
-					<span class="avatar-inner">{initials(user.name, user.email)}</span>
+					{#if user.avatarUrl}
+						<img src={user.avatarUrl} alt="" class="avatar-img" />
+					{:else}
+						<span class="avatar-inner">{initials(user.name, user.email)}</span>
+					{/if}
 				</a>
 			{/if}
 			<a href="/trips/{tripId}/settings" class="rail-util" aria-label="Settings" title="Settings">
@@ -272,6 +276,14 @@
 	.avatar-inner {
 		display: block;
 		line-height: 1;
+	}
+
+	.user-avatar .avatar-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		border-radius: inherit;
+		display: block;
 	}
 
 	.rail-util {

@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/prisma.js';
 import { getSessionUser } from '$lib/server/session.js';
-import { isTripMember } from '$lib/server/trip-access.js';
+import { getUserTripMembership, isTripMember } from '$lib/server/trip-access.js';
 
 export const GET: RequestHandler = async ({ params, cookies }) => {
 	const user = await getSessionUser(cookies);
@@ -21,17 +21,18 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 		throw error(403, 'You must be a member of this trip to access chat');
 	}
 
-	// Check if user has RSVP'd
-	const rsvp = await prisma.rSVP.findUnique({
-		where: {
-			tripId_userId: {
-				tripId,
-				userId: user.id
+	const [membership, rsvp] = await Promise.all([
+		getUserTripMembership(tripId, user.id),
+		prisma.rSVP.findUnique({
+			where: {
+				tripId_userId: { tripId, userId: user.id }
 			}
-		}
-	});
+		})
+	]);
 
-	if (!rsvp || rsvp.status !== 'yes') {
+	// Allow: hosts always, or any member who RSVP'd yes (including guests)
+	const canChat = membership?.role === 'host' || rsvp?.status === 'yes';
+	if (!canChat) {
 		throw error(403, 'You must RSVP "yes" to participate in the chat');
 	}
 
@@ -81,17 +82,18 @@ export const POST: RequestHandler = async ({ params, cookies, request }) => {
 		throw error(403, 'You must be a member of this trip to send messages');
 	}
 
-	// Check if user has RSVP'd
-	const rsvp = await prisma.rSVP.findUnique({
-		where: {
-			tripId_userId: {
-				tripId,
-				userId: user.id
+	const [membership, rsvp] = await Promise.all([
+		getUserTripMembership(tripId, user.id),
+		prisma.rSVP.findUnique({
+			where: {
+				tripId_userId: { tripId, userId: user.id }
 			}
-		}
-	});
+		})
+	]);
 
-	if (!rsvp || rsvp.status !== 'yes') {
+	// Allow: hosts always, or any member who RSVP'd yes (including guests)
+	const canChat = membership?.role === 'host' || rsvp?.status === 'yes';
+	if (!canChat) {
 		throw error(403, 'You must RSVP "yes" to send messages');
 	}
 

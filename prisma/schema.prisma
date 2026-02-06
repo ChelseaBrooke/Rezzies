@@ -186,6 +186,7 @@ model User {
   passwordHash String
   name         String?
   phone        String?
+  avatarUrl    String?  // Profile image URL (e.g. from image host or Gravatar)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
