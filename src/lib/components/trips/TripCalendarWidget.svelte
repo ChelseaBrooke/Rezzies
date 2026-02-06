@@ -33,8 +33,8 @@
 
 	let { tripId = '', placement = 'grid', checkInDate, checkOutDate, activities = [], mealSlots = [], selectedDateKey: controlledDateKey, onDaySelect }: Props = $props();
 
-	/** Week starts Monday per reference */
-	const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+	/** Week starts Sunday */
+	const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 	function toDateKey(d: Date | string): string {
 		const date = typeof d === 'string' ? new Date(d) : d;
@@ -88,16 +88,16 @@
 		if (sidebarMonthIndex < monthsToShow.length - 1) sidebarMonthIndex += 1;
 	}
 
-	/** Monday = 0. JS getDay(): Sun=0, Mon=1, ... Sat=6 → (getDay() + 6) % 7 */
-	function getMondayFirstDow(d: Date): number {
-		return (d.getDay() + 6) % 7;
+	/** Sunday = 0. JS getDay(): Sun=0, Mon=1, ... Sat=6 */
+	function getSundayFirstDow(d: Date): number {
+		return d.getDay();
 	}
 
 	/** For a given year/month, produce 35 or 42 cells (5–6 rows × 7): { dateKey, dayNum, isCurrentMonth, isTripDay } */
 	function getMonthCells(year: number, month: number): { dateKey: string; dayNum: number; isCurrentMonth: boolean; isTripDay: boolean }[] {
 		const first = new Date(year, month, 1);
 		const last = new Date(year, month + 1, 0);
-		const startDow = getMondayFirstDow(first);
+		const startDow = getSundayFirstDow(first);
 		const daysInMonth = last.getDate();
 		const cells: { dateKey: string; dayNum: number; isCurrentMonth: boolean; isTripDay: boolean }[] = [];
 		// leading (previous month)
@@ -564,7 +564,7 @@
 	.calendar-sidebar .day-detail-hint,
 	.calendar-sidebar .day-detail-empty {
 		font-size: 0.625rem;
-		color: #64748b;
+		color: var(--surface2);
 		margin: 0.075rem 0 0 0;
 		text-align: center;
 		flex-shrink: 0;
@@ -807,7 +807,7 @@
 	.day-detail-empty,
 	.day-detail-hint {
 		font-size: 0.75rem;
-		color: #64748b;
+		color: var(--surface2);
 		margin: 0.25rem 0 0 0;
 		text-align: center;
 		flex-shrink: 0;

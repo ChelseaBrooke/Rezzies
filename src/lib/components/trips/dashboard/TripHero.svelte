@@ -373,8 +373,9 @@
 		color: #475569;
 	}
 
+	/* Match hint text to the trip-day box fill (white/off-white) */
 	.hero-calendar-wrap :global(.day-detail-hint) {
-		color: #475569;
+		color: #f1f5f9;
 		font-size: 0.7rem;
 		opacity: 0.95;
 	}

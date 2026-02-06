@@ -1,12 +1,13 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { prisma } from '$lib/server/prisma.js';
+import { getSessionUser } from '$lib/server/session.js';
 import { reservationSchema } from '$lib/server/validation.js';
 import { calculateReservationPrice, computeRoomPricing } from '$lib/server/pricing-canonical.js';
 import { sendTemplateEmail } from '$lib/server/email/sendgrid.js';
 import { TEMPLATE_KEYS } from '$lib/server/email/templates.js';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, cookies }) => {
 	const trip = await prisma.trip.findUnique({
 		where: { inviteCode: params.inviteCode },
 		include: {
@@ -29,7 +30,29 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw redirect(303, '/');
 	}
 
-	// Get existing reservations to check availability
+	// If user is logged in, add them as a trip member (guest) if not already, then send to trip dashboard
+	const user = await getSessionUser(cookies);
+	if (user) {
+		const existing = await prisma.tripMember.findUnique({
+			where: {
+				tripId_userId: { tripId: trip.id, userId: user.id }
+			}
+		});
+		if (existing) {
+			throw redirect(303, `/trips/${trip.id}`);
+		}
+		await prisma.tripMember.create({
+			data: {
+				tripId: trip.id,
+				userId: user.id,
+				role: 'guest',
+				inviteStatus: 'accepted'
+			}
+		});
+		throw redirect(303, `/trips/${trip.id}`);
+	}
+
+	// Not logged in: show reservation/landing page
 	const reservations = await prisma.reservation.findMany({
 		where: { tripId: trip.id },
 		select: {

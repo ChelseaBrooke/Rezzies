@@ -28,6 +28,34 @@ export async function isTripMember(tripId: string, userId: string): Promise<bool
 
 export async function getUserTrips(userId: string) {
 	try {
+		// Backfill TripMember for any trip where this user has a Reservation (same email) but no membership
+		// so guests who booked via /trip/CODE see the trip in their list
+		const user = await prisma.user.findUnique({
+			where: { id: userId },
+			select: { email: true }
+		});
+		if (user?.email) {
+			const reservationsByEmail = await prisma.reservation.findMany({
+				where: { email: { equals: user.email, mode: 'insensitive' } },
+				select: { tripId: true },
+				distinct: ['tripId']
+			});
+			for (const { tripId } of reservationsByEmail) {
+				await prisma.tripMember.upsert({
+					where: {
+						tripId_userId: { tripId, userId }
+					},
+					create: {
+						tripId,
+						userId,
+						role: 'guest',
+						inviteStatus: 'accepted'
+					},
+					update: {}
+				});
+			}
+		}
+
 		// Get trips where user is a member
 		const memberships = await prisma.tripMember.findMany({
 			where: {
