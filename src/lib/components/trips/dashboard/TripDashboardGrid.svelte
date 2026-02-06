@@ -106,6 +106,11 @@
 			</svg>
 		</span>
 	{/snippet}
+	{#snippet guestsNudgeButton()}
+		<button type="button" class="pill-btn pill-btn-text" onclick={nudgePending}>
+			Nudge pending
+		</button>
+	{/snippet}
 	<!-- Layout: row1 = reminders | goals | recent, row2 = guests under reminders + goals only -->
 	<div class="dashboard-layout">
 		<div class="left-column">
@@ -160,7 +165,11 @@
 
 		<div class="guests-row">
 			<div class="guests-card-wrapper">
-				<DashboardCard title="Guests" titleHref={`/trips/${tripId}/guests`}>
+				<DashboardCard
+					title="Guests"
+					titleHref={`/trips/${tripId}/guests`}
+					headerRight={isHost && nudgePending ? guestsNudgeButton : undefined}
+				>
 					<div class="guests-preview">
 						<div class="avatar-row">
 							{#each guestPreviewList as member}
@@ -171,11 +180,6 @@
 						</div>
 						<div class="guests-meta">
 							<span class="pending-badge">{pendingRsvpCount} pending RSVP</span>
-							{#if isHost && nudgePending}
-								<button type="button" class="pill-btn pill-btn-text" onclick={nudgePending}>
-									Nudge pending
-								</button>
-							{/if}
 						</div>
 					</div>
 				</DashboardCard>
@@ -752,6 +756,8 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
+		margin-top: 0.35rem;
+		margin-left: 0.5rem;
 	}
 
 	.avatar {

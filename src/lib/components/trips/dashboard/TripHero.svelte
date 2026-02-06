@@ -230,19 +230,18 @@
 	}
 
 	.hero-calendar-wrap {
-		/* More transparent frosted glass: dark at top for text, fades to lighter below */
+		/* Lighter, more transparent frosted glass; subtle tint so text stays readable */
 		background: linear-gradient(
 			to bottom,
-			rgba(0, 27, 46, 0.2) 0%,
-			rgba(0, 27, 46, 0.1) 22%,
-			rgba(255, 255, 255, 0.14) 55%,
+			rgba(255, 255, 255, 0.18) 0%,
+			rgba(255, 255, 255, 0.12) 40%,
 			rgba(255, 255, 255, 0.06) 100%
 		);
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
+		backdrop-filter: blur(14px);
+		-webkit-backdrop-filter: blur(14px);
 		border-radius: var(--radius-lg);
-		border: none;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+		border: 1px solid rgba(203, 213, 225, 0.45);
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
 		padding: 0.75rem 0.5rem;
 		width: 300px;
 		min-width: 300px;
@@ -296,13 +295,15 @@
 	}
 
 	.hero-calendar-wrap :global(.month-header) {
-		color: white;
+		color: #1e293b;
+		text-shadow: 0 0 1px rgba(255, 255, 255, 0.8);
 	}
 
 	.hero-calendar-wrap :global(.month-title) {
 		font-size: 1.0625rem;
 		font-weight: 700;
-		color: white;
+		color: #1e293b;
+		text-shadow: 0 0 1px rgba(255, 255, 255, 0.8);
 	}
 
 	.hero-calendar-wrap :global(.day-headers) {
@@ -311,24 +312,25 @@
 
 	.hero-calendar-wrap :global(.day-header) {
 		font-size: 0.7rem;
-		color: rgba(255, 255, 255, 0.92);
+		color: rgba(30, 41, 59, 0.85);
 	}
 
 	.hero-calendar-wrap :global(.day-cell) {
 		font-size: 0.75rem;
-		color: white;
+		color: #334155;
 	}
 
 	.hero-calendar-wrap :global(.day-cell.trip-day) {
-		background: rgba(255, 255, 255, 0.28);
+		background: rgba(30, 41, 59, 0.14);
+		color: #1e293b;
 	}
 
 	.hero-calendar-wrap :global(.month-chevron-btn) {
-		color: white;
+		color: #475569;
 	}
 
 	.hero-calendar-wrap :global(.day-detail-hint) {
-		color: white;
+		color: #475569;
 		font-size: 0.7rem;
 		opacity: 0.95;
 	}
