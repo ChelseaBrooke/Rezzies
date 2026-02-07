@@ -1,9 +1,15 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
+	import type { Snippet } from 'svelte';
 	import AppShell from '$lib/components/trips/dashboard/AppShell.svelte';
 	import TripChat from '$lib/components/trips/TripChat.svelte';
 
-	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
+	let { data, children }: { data: LayoutData; children: Snippet } = $props();
+
+	// Only treat as callable when it's actually a function (avoids "undefined is not a function" on refresh)
+	const safeChildren = $derived(
+		typeof children === 'function' ? (children as () => unknown) : null
+	);
 
 	function handleInvite() {
 		import('$app/navigation').then(({ goto }) => goto(`/trips/${data.trip.id}/guests?invite=1`));
@@ -19,8 +25,8 @@
 
 <AppShell tripId={data.trip.id} user={data.user} onInvite={handleInvite}>
 	{#snippet children()}
-		{#if children != null && typeof children === 'function'}
-			{@render children()}
+		{#if safeChildren}
+			{@render safeChildren()}
 		{/if}
 	{/snippet}
 </AppShell>

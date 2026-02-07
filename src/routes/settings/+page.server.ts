@@ -11,14 +11,17 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		throw redirect(303, '/login?redirect=/settings');
 	}
 
-	// Get full user data
+	// Get full user data including notification preferences
 	const userData = await prisma.user.findUnique({
 		where: { id: user.id },
 		select: {
 			id: true,
 			email: true,
 			name: true,
-			phone: true
+			phone: true,
+			emailTripInvites: true,
+			emailTripUpdates: true,
+			inAppNotifications: true
 		}
 	});
 
@@ -77,5 +80,26 @@ export const actions: Actions = {
 		});
 
 		return { success: true };
+	},
+
+	updateNotifications: async ({ request, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+
+		const formData = await request.formData();
+		const emailTripInvites = formData.getAll('emailTripInvites').includes('true');
+		const emailTripUpdates = formData.getAll('emailTripUpdates').includes('true');
+		const inAppNotifications = formData.getAll('inAppNotifications').includes('true');
+
+		await prisma.user.update({
+			where: { id: user.id },
+			data: {
+				emailTripInvites,
+				emailTripUpdates,
+				inAppNotifications
+			}
+		});
+
+		return { success: true, from: 'notifications' };
 	}
 };

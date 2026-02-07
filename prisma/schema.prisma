@@ -188,6 +188,10 @@ model User {
   phone        String?
   avatarUrl       String?  // Profile image URL (e.g. from image host or Gravatar)
   chatBubbleColor String?  // Hex color for chat bubble in group chats (e.g. #3b82f6)
+  // Notification preferences
+  emailTripInvites     Boolean @default(true)  // Email when invited to a trip
+  emailTripUpdates     Boolean @default(true)  // Email for trip updates, new activity
+  inAppNotifications   Boolean @default(true)  // Show in-app notification tray
   createdAt       DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

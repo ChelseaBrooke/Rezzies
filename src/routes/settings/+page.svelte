@@ -26,6 +26,12 @@
 			>
 				Password
 			</button>
+			<button 
+				class="tab {activeTab === 'notifications' ? 'active' : ''}"
+				onclick={() => activeTab = 'notifications'}
+			>
+				Notifications
+			</button>
 		</div>
 
 		<div class="tab-content">
@@ -76,6 +82,57 @@
 							<small>Must be at least 8 characters</small>
 						</div>
 						<button type="submit" class="btn btn-primary">Change Password</button>
+					</form>
+				</section>
+			{:else if activeTab === 'notifications'}
+				<section class="settings-section">
+					<h2>Notification settings</h2>
+					<p class="section-description">Choose how you want to be notified about trip activity.</p>
+					{#if form?.success && form?.from === 'notifications'}
+						<div class="success-message">Notification settings saved.</div>
+					{/if}
+					{#if form?.error && form?.from === 'notifications'}
+						<div class="error-message">{form.error}</div>
+					{/if}
+					<form method="POST" action="?/updateNotifications" use:enhance>
+						<!-- Hidden inputs so unchecked boxes submit as false -->
+						<input type="hidden" name="emailTripInvites" value="false" />
+						<input type="hidden" name="emailTripUpdates" value="false" />
+						<input type="hidden" name="inAppNotifications" value="false" />
+						<div class="form-group checkbox-group">
+							<label class="checkbox-label">
+								<input
+									type="checkbox"
+									name="emailTripInvites"
+									value="true"
+									checked={data.user?.emailTripInvites ?? true}
+								/>
+								<span>Email when someone invites you to a trip</span>
+							</label>
+						</div>
+						<div class="form-group checkbox-group">
+							<label class="checkbox-label">
+								<input
+									type="checkbox"
+									name="emailTripUpdates"
+									value="true"
+									checked={data.user?.emailTripUpdates ?? true}
+								/>
+								<span>Email for trip updates and activity</span>
+							</label>
+						</div>
+						<div class="form-group checkbox-group">
+							<label class="checkbox-label">
+								<input
+									type="checkbox"
+									name="inAppNotifications"
+									value="true"
+									checked={data.user?.inAppNotifications ?? true}
+								/>
+								<span>Show in-app notifications (bell icon in the trip portal)</span>
+							</label>
+						</div>
+						<button type="submit" class="btn btn-primary">Save notification settings</button>
 					</form>
 				</section>
 			{/if}
@@ -133,7 +190,26 @@
 	}
 
 	.settings-section h2 {
+		margin: 0 0 var(--spacing-sm) 0;
+	}
+	.section-description {
+		color: var(--color-text-light);
 		margin: 0 0 var(--spacing-lg) 0;
+		font-size: 0.9375rem;
+	}
+	.checkbox-group {
+		margin-bottom: var(--spacing-lg);
+	}
+	.checkbox-label {
+		display: flex;
+		align-items: center;
+		gap: var(--spacing-sm);
+		cursor: pointer;
+		font-weight: 400;
+	}
+	.checkbox-label input[type="checkbox"] {
+		width: auto;
+		margin: 0;
 	}
 
 	.form-group {
