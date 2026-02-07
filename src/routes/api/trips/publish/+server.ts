@@ -103,8 +103,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				maxGuests: maxOccupancy,
 				allowPartialStays: partialStayAllowed,
 				timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-				location: propertyAddress || null,
-				scrapePayload: null
+				location: propertyAddress || null
 			}
 		});
 

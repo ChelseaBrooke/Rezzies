@@ -27,7 +27,6 @@ model Trip {
   hostId            String? // AdminUser who created this trip
   timezone          String   @default("UTC")
   location          String?
-  scrapePayload     String? // JSON payload from scraping
 
   // New pricing fields
   expectedPeopleCount Int? // Expected number of people (for PER_PERSON mode)

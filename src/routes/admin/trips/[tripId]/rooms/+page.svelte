@@ -25,7 +25,6 @@
 
 	// Photo selection for extracted rooms
 	let selectedPhotos = $state<string[][]>([]);
-	let isRetryingExtraction = $state(false);
 	let extractedDataOverride = $state<any>(null);
 	let draggedPhoto = $state<string | null>(null);
 	let dragOverRoomIndex = $state<number | null>(null);
@@ -92,28 +91,6 @@
 			}
 		}
 		return null;
-	}
-
-	async function retryExtraction() {
-		if (!data.trip.listingUrl) return;
-		
-		isRetryingExtraction = true;
-		try {
-			const response = await fetch(`/api/extract-rooms?url=${encodeURIComponent(data.trip.listingUrl)}`);
-			const result = await response.json();
-			
-			if (result.ok && result.data) {
-				extractedDataOverride = result.data;
-				selectedPhotos = result.data.rooms.map(() => []);
-			} else {
-				error = result.message || 'Failed to extract rooms';
-			}
-		} catch (e) {
-			error = 'Error extracting rooms. Please check the server logs.';
-			console.error('Extraction error:', e);
-		} finally {
-			isRetryingExtraction = false;
-		}
 	}
 
 	// Use override if available, otherwise use server data
@@ -183,35 +160,12 @@
 					{#if displayExtractedData && displayExtractedData.rooms.length > 0}
 						<p class="extracted-subtitle">We found {displayExtractedData.rooms.length} room(s) from your listing. Review and import them below.</p>
 					{:else}
-						<p class="extracted-subtitle error-text">
-							⚠️ Could not automatically extract rooms from the listing.
-						</p>
-						{#if displayExtractedData?.error}
-							<div class="error-details">
-								<strong>Error:</strong> {displayExtractedData.error}
-							</div>
-						{/if}
 						<p class="extracted-subtitle">
-							<small>Listing URL: {data.trip.listingUrl}</small>
+							Add rooms manually below.
 						</p>
-						<div class="troubleshooting">
-							<p><strong>Possible reasons:</strong></p>
-							<ul>
-								<li>Zyte API key not configured in environment variables</li>
-								<li>Zyte API request failed (check server logs)</li>
-								<li>Room information not found in the listing HTML</li>
-								<li>HTML structure has changed and extraction patterns need updating</li>
-							</ul>
-							<p><strong>Solution:</strong> You can add rooms manually below, or check the server console logs for detailed error information.</p>
-						</div>
-						<button 
-							type="button" 
-							class="btn-primary"
-							onclick={retryExtraction}
-							disabled={isRetryingExtraction}
-						>
-							{isRetryingExtraction ? 'Extracting...' : '🔄 Retry Extraction'}
-						</button>
+						{#if data.trip.listingUrl}
+							<p class="extracted-subtitle"><small>Listing URL: {data.trip.listingUrl}</small></p>
+						{/if}
 					{/if}
 				</div>
 

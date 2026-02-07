@@ -13,9 +13,6 @@
 	type Step = 'basics' | 'rooms' | 'pricing-policies' | 'invite-people' | 'review';
 	
 	let currentStep = $state<Step>('basics');
-	let isAutofilling = $state(false);
-	let autofillError = $state<string | null>(null);
-	let showAutofillInput = $state(false);
 	let coverPhotoUploading = $state(false);
 	
 	// Form data state
@@ -30,7 +27,7 @@
 		coverPhoto: data.draft?.coverPhoto || '',
 		listingUrl: data.draft?.listingUrl || '',
 		
-		// Rooms (will be populated from autofill or manual entry)
+		// Rooms
 		rooms: data.draft?.rooms || [],
 		
 		// Pricing & Policies
@@ -108,77 +105,7 @@
 	$effect(() => {
 		autosave();
 	});
-	
-	// Handle autofill
-	async function handleAutofill() {
-		if (!formData.listingUrl.trim()) {
-			autofillError = 'Please enter a listing URL';
-			return;
-		}
-		
-		isAutofilling = true;
-		autofillError = null;
-		
-		try {
-			const response = await fetch('/api/autofill', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ listingUrl: formData.listingUrl.trim() })
-			});
-			
-			const result = await response.json();
-			
-			if (!response.ok) {
-				throw new Error(result.error || 'Failed to fetch property data');
-			}
-			
-			// Populate form with autofilled data
-			if (result.data) {
-				const { propertyInfo, rooms, photos } = result.data;
-				
-				// Map property info
-				if (propertyInfo) {
-					if (propertyInfo.title) formData.name = propertyInfo.title;
-					if (propertyInfo.checkInDate) formData.checkInDate = propertyInfo.checkInDate;
-					if (propertyInfo.checkOutDate) formData.checkOutDate = propertyInfo.checkOutDate;
-					if (propertyInfo.totalPrice) formData.totalCost = String(propertyInfo.totalPrice);
-					if (propertyInfo.coverPhoto) formData.coverPhoto = propertyInfo.coverPhoto;
-					if (propertyInfo.location) formData.destination = propertyInfo.location;
-				}
-				
-				// Use photos array if available
-				if (photos && photos.length > 0) {
-					formData.coverPhoto = photos[0] || formData.coverPhoto;
-				}
-				
-				// Map rooms from autofill response
-				if (rooms && Array.isArray(rooms)) {
-					formData.rooms = rooms.map((room: any) => ({
-						id: crypto.randomUUID(),
-						name: room.name || 'Room',
-						roomType: 'PRIVATE',
-						maxOccupants: room.maxOccupants || 2,
-						photos: room.photos || [],
-						beds: (room.beds || []).map((bed: any) => ({
-							id: crypto.randomUUID(),
-							bedType: bed.bedType?.toUpperCase() || 'QUEEN',
-							customType: bed.customType || '',
-							quantity: bed.quantity || 1
-						}))
-					}));
-				}
-			}
-			
-			showAutofillInput = false;
-			autosave();
-		} catch (error) {
-			autofillError = error instanceof Error ? error.message : 'Failed to autofill property data';
-			console.error('Autofill error:', error);
-		} finally {
-			isAutofilling = false;
-		}
-	}
-	
+
 	function nextStep() {
 		const nextIndex = currentStepIndex + 1;
 		if (nextIndex < steps.length) {
@@ -230,55 +157,6 @@
 			{#if currentStep === 'basics'}
 				<!-- Step 1: Trip Basics & Source -->
 				<h1 class="step-title">Trip Basics & Source</h1>
-				
-				<!-- Subtle Autofill Link -->
-				<div class="autofill-section">
-					{#if !showAutofillInput}
-						<button
-							type="button"
-							class="autofill-link"
-							onclick={() => showAutofillInput = true}
-						>
-							Have an Airbnb or VRBO link?
-						</button>
-					{:else}
-						<div class="autofill-input-wrapper">
-							<input
-								type="url"
-								placeholder="Paste listing URL"
-								bind:value={formData.listingUrl}
-								class="autofill-input"
-								disabled={isAutofilling}
-								onkeydown={(e) => {
-									if (e.key === 'Enter' && formData.listingUrl.trim()) {
-										handleAutofill();
-									}
-								}}
-							/>
-							<button
-								type="button"
-								class="autofill-btn"
-								onclick={handleAutofill}
-								disabled={isAutofilling || !formData.listingUrl.trim()}
-							>
-								{isAutofilling ? 'Loading...' : 'Autofill'}
-							</button>
-							<button
-								type="button"
-								class="autofill-cancel"
-								onclick={() => {
-									showAutofillInput = false;
-									formData.listingUrl = '';
-								}}
-							>
-								Cancel
-							</button>
-						</div>
-						{#if autofillError}
-							<p class="autofill-error">{autofillError}</p>
-						{/if}
-					{/if}
-				</div>
 				
 				<!-- Trip Name -->
 				<div class="form-section">
@@ -519,94 +397,6 @@
 		color: #000;
 		letter-spacing: -0.02em;
 		line-height: 1.1;
-	}
-	
-	.autofill-section {
-		margin-bottom: 3rem;
-		padding-bottom: 2rem;
-		border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-	}
-	
-	.autofill-link {
-		background: none;
-		border: none;
-		color: rgba(0, 0, 0, 0.5);
-		font-size: 0.95rem;
-		cursor: pointer;
-		text-decoration: underline;
-		text-underline-offset: 3px;
-		text-decoration-color: rgba(0, 0, 0, 0.2);
-		transition: color 0.2s ease;
-		padding: 0;
-		font-family: inherit;
-	}
-	
-	.autofill-link:hover {
-		color: rgba(0, 0, 0, 0.7);
-		text-decoration-color: rgba(0, 0, 0, 0.4);
-	}
-	
-	.autofill-input-wrapper {
-		display: flex;
-		gap: 0.75rem;
-		align-items: center;
-	}
-	
-	.autofill-input {
-		flex: 1;
-		padding: 0.75rem 1rem;
-		border: 1px solid rgba(0, 0, 0, 0.1);
-		border-radius: 8px;
-		font-size: 0.95rem;
-		font-family: inherit;
-		background: white;
-	}
-	
-	.autofill-input:focus {
-		outline: none;
-		border-color: rgba(0, 0, 0, 0.3);
-	}
-	
-	.autofill-btn {
-		padding: 0.75rem 1.5rem;
-		background: #000;
-		color: white;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.95rem;
-		font-weight: 500;
-		cursor: pointer;
-		font-family: inherit;
-		transition: background 0.2s ease;
-	}
-	
-	.autofill-btn:hover:not(:disabled) {
-		background: #333;
-	}
-	
-	.autofill-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-	
-	.autofill-cancel {
-		background: none;
-		border: none;
-		color: rgba(0, 0, 0, 0.5);
-		font-size: 0.9rem;
-		cursor: pointer;
-		padding: 0.75rem 0.5rem;
-		font-family: inherit;
-	}
-	
-	.autofill-cancel:hover {
-		color: rgba(0, 0, 0, 0.7);
-	}
-	
-	.autofill-error {
-		margin-top: 0.75rem;
-		color: #d32f2f;
-		font-size: 0.875rem;
 	}
 	
 	.form-section {

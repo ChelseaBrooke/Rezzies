@@ -119,8 +119,7 @@ export const actions: Actions = {
 						isPublished: false,
 						maxGuests: data.maxGuests ? parseInt(data.maxGuests) : null,
 						allowPartialStays: data.allowPartialStays || false,
-						timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-						scrapePayload: JSON.stringify(data) // Store full form data for reference
+						timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 					}
 				});
 

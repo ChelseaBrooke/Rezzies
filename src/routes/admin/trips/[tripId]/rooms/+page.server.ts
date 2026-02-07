@@ -3,7 +3,6 @@ import type { PageServerLoad, Actions } from './$types';
 import { prisma } from '$lib/server/prisma.js';
 import { roomCreationSchema, bedCreationSchema } from '$lib/server/validation.js';
 import { calculatePricingDisplay } from '$lib/server/pricing-display.js';
-import { extractPropertyRoomsAndPhotos } from '$lib/server/room-extractor.js';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const trip = await prisma.trip.findUnique({
@@ -24,52 +23,19 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw redirect(303, '/admin');
 	}
 
-	// Calculate pricing display
 	let pricingDisplay = null;
-	let extractedData = null;
-	
 	try {
 		if (trip.rooms.length > 0) {
 			pricingDisplay = await calculatePricingDisplay(params.tripId);
 		}
-		
-		// If trip has listingUrl and no rooms yet, fetch extracted data
-		if (trip.listingUrl && trip.rooms.length === 0) {
-			try {
-				console.log(`[Room Setup] Attempting to extract rooms from: ${trip.listingUrl}`);
-				extractedData = await extractPropertyRoomsAndPhotos(trip.listingUrl);
-				console.log(`[Room Setup] Extraction result:`, {
-					roomsFound: extractedData?.rooms?.length || 0,
-					photosFound: extractedData?.photos?.length || 0,
-					rooms: extractedData?.rooms
-				});
-				
-				if (!extractedData || extractedData.rooms.length === 0) {
-					console.warn('[Room Setup] No rooms extracted. Check server logs for details.');
-				}
-			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				console.error('[Room Setup] Error extracting rooms/photos:', errorMsg);
-				console.error('[Room Setup] Error details:', error);
-				// Store error message so UI can display it
-				extractedData = {
-					rooms: [],
-					photos: [],
-					error: errorMsg
-				};
-			}
-		} else {
-			console.log(`[Room Setup] Skipping extraction - listingUrl: ${trip.listingUrl ? 'exists' : 'missing'}, rooms.length: ${trip.rooms.length}`);
-		}
 	} catch (error) {
 		console.error('Error calculating pricing:', error);
-		// Continue without pricing display
 	}
 
 	return {
 		trip,
 		pricingDisplay,
-		extractedData
+		extractedData: null
 	};
 };
 

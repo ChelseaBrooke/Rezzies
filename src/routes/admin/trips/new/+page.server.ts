@@ -176,8 +176,7 @@ export const actions: Actions = {
 					sharingExponentAlpha: validationResult.data.sharingExponentAlpha,
 					privacyPremiumP: validationResult.data.privacyPremiumP,
 					isPublished: false,
-					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-					scrapePayload: formData.get('scrapePayload') as string || null
+					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 				}
 			});
 
@@ -202,25 +201,6 @@ export const actions: Actions = {
 						mode: 'slots'
 					}
 				});
-			}
-
-			// Store selected room photos in scrapePayload for later use
-			if (selectedRoomPhotosStr) {
-				try {
-					const roomPhotos = JSON.parse(selectedRoomPhotosStr);
-					const currentPayload = trip.scrapePayload ? JSON.parse(trip.scrapePayload) : {};
-					await prisma.trip.update({
-						where: { id: trip.id },
-						data: {
-							scrapePayload: JSON.stringify({
-								...currentPayload,
-								selectedRoomPhotos: roomPhotos
-							})
-						}
-					});
-				} catch (e) {
-					console.error('Error storing room photos:', e);
-				}
 			}
 
 			// Redirect to room setup

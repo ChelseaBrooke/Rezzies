@@ -1,25 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
 	import type { ActionData } from './$types';
-	import AutofillLoader from '$lib/components/AutofillLoader.svelte';
 
 	let { form } = $props();
-	
-	let isAutofillMode = $derived($page.url.searchParams.get('autofill') === 'true');
-	
-	// Loading state
-	let isLoading = $state(false);
-	let loadingProgress = $state(0);
-	let loadingStatus = $state('Starting...');
-	
-	// Scraped data
-	let scrapedData = $state<{
-		propertyInfo: any;
-		rooms: any[];
-		photos: string[];
-	} | null>(null);
 	
 	let formData = $state({
 		name: '',
@@ -46,16 +29,15 @@
 	let selectedCoverPhoto = $state<string | null>(null);
 	let customRooms = $state<Array<{ id: string; name: string; beds: Array<{ bedType: string; quantity: number }> }>>([]);
 	
-	// Combine scraped rooms and custom rooms
-	let allRooms = $derived.by(() => {
-		const scraped = scrapedData?.rooms || [];
-		const custom = customRooms.map((room) => ({
+	// Rooms (manual only)
+	let allRooms = $derived.by(() =>
+		customRooms.map((room) => ({
 			id: room.id,
 			name: room.name,
-			beds: room.beds.map(bed => ({ type: bed.bedType, quantity: bed.quantity }))
-		}));
-		return [...scraped, ...custom];
-	});
+			beds: room.beds.map(bed => ({ type: bed.bedType, quantity: bed.quantity })),
+			isCustom: true
+		}))
+	);
 
 	// Photo gallery state
 	let showPhotoGallery = $state(false);
@@ -64,230 +46,6 @@
 	let showAddRoomModal = $state(false);
 	let newRoomName = $state('');
 	let newRoomBeds = $state<Array<{ bedType: string; quantity: number }>>([{ bedType: 'sofa', quantity: 1 }]);
-
-	// Trigger autofill on mount - check if we're on the autofill route
-	onMount(async () => {
-		// Check if we're on the autofill route or have autofill param
-		const isAutofillRoute = window.location.pathname.includes('/autofill') || 
-		                         new URLSearchParams(window.location.search).get('autofill') === 'true';
-		
-		if (isAutofillRoute) {
-			const url = sessionStorage.getItem('autofillUrl');
-			
-			if (url) {
-				try {
-					await performAutofill(url);
-				} catch (err) {
-					error = err instanceof Error ? err.message : 'Failed to extract property data';
-					isLoading = false;
-				}
-			} else {
-				error = 'No listing URL found. Please go back and try again.';
-			}
-		}
-	});
-
-	async function performAutofill(listingUrl: string) {
-		console.log('=== PERFORM AUTOFILL CALLED ===', listingUrl);
-		isLoading = true;
-		loadingProgress = 0;
-		loadingStatus = 'Starting extraction...';
-		console.log('isLoading set to:', isLoading);
-		
-		// Simulate progress updates
-		const progressInterval = setInterval(() => {
-			if (loadingProgress < 90) {
-				loadingProgress += Math.random() * 10;
-				if (loadingProgress > 90) loadingProgress = 90;
-			}
-		}, 500);
-		
-		try {
-			loadingProgress = 10;
-			loadingStatus = 'Connecting to listing...';
-			await new Promise(resolve => setTimeout(resolve, 300));
-			
-			loadingProgress = 20;
-			loadingStatus = 'Fetching property information...';
-			
-			const response = await fetch('/api/autofill', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ listingUrl })
-			});
-			
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-				throw new Error(errorData.message || `Server error: ${response.status}`);
-			}
-			
-			loadingProgress = 60;
-			loadingStatus = 'Extracting rooms and photos...';
-			
-			const result = await response.json();
-			
-			if (!result.ok) {
-				throw new Error(result.message || 'Failed to extract property data');
-			}
-			
-			// Step 2: Process data
-			loadingProgress = 85;
-			loadingStatus = 'Processing data...';
-			
-			scrapedData = result.data;
-			console.log('[Autofill] Scraped data:', scrapedData);
-			const { propertyInfo, rooms, photos } = result.data;
-			
-			// Populate form data
-			formData.listingUrl = listingUrl;
-			formData.listingTitle = propertyInfo.title || '';
-			formData.listingCoverPhoto = propertyInfo.coverPhoto || '';
-			
-			// Set default cover photo if available
-			if (propertyInfo.coverPhoto) {
-				selectedCoverPhoto = propertyInfo.coverPhoto;
-			} else if (photos && photos.length > 0) {
-				selectedCoverPhoto = photos[0];
-			}
-			
-			// Extract dates and guests from URL if not in propertyInfo
-			try {
-				const url = new URL(listingUrl);
-				const params = url.searchParams;
-				const isVRBO = listingUrl.includes('vrbo.com');
-				
-				// Try to get dates from URL
-				let checkIn = propertyInfo.checkInDate || params.get('chkin') || params.get('checkIn') || params.get('check_in') || params.get('startDate');
-				let checkOut = propertyInfo.checkOutDate || params.get('chkout') || params.get('checkOut') || params.get('check_out') || params.get('endDate');
-				
-				// For VRBO checkout URLs, check legacyUrl
-				if ((!checkIn || !checkOut) && params.has('legacyUrl')) {
-					try {
-						const legacyUrl = decodeURIComponent(params.get('legacyUrl') || '');
-						const queryString = legacyUrl.includes('?') ? legacyUrl.split('?')[1] : legacyUrl;
-						const legacyParams = new URLSearchParams(queryString);
-						
-						const arrivalDate = legacyParams.get('arrivalDate');
-						const departureDate = legacyParams.get('departureDate');
-						
-						if (arrivalDate && !checkIn) {
-							const [month, day, year] = decodeURIComponent(arrivalDate).split('/');
-							if (month && day && year) {
-								checkIn = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-							}
-						}
-						
-						if (departureDate && !checkOut) {
-							const [month, day, year] = decodeURIComponent(departureDate).split('/');
-							if (month && day && year) {
-								checkOut = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-							}
-						}
-					} catch (e) {
-						// Ignore legacy URL parsing errors
-					}
-				}
-				
-				if (checkIn) formData.checkInDate = checkIn;
-				if (checkOut) formData.checkOutDate = checkOut;
-				
-				// Get guests
-				const guests = propertyInfo.guests || params.get('adults') || params.get('guests');
-				if (guests) {
-					const guestCount = parseInt(guests.toString(), 10);
-					if (!isNaN(guestCount)) {
-						formData.expectedPeopleCount = guestCount.toString();
-					}
-				}
-			} catch (e) {
-				// URL parsing failed, use propertyInfo values
-				if (propertyInfo.checkInDate) formData.checkInDate = propertyInfo.checkInDate;
-				if (propertyInfo.checkOutDate) formData.checkOutDate = propertyInfo.checkOutDate;
-				if (propertyInfo.guests) formData.expectedPeopleCount = propertyInfo.guests.toString();
-			}
-			
-			if (propertyInfo.maxGuests) formData.maxGuests = propertyInfo.maxGuests.toString();
-			if (propertyInfo.totalPrice) formData.totalCost = (propertyInfo.totalPrice / 100).toFixed(2);
-			if (!formData.name) formData.name = propertyInfo.title || '';
-			
-			// Initialize room photo selections
-			rooms.forEach((room: any, idx: number) => {
-				selectedRoomPhotos[`room-${idx}`] = [];
-			});
-			
-			clearInterval(progressInterval);
-			loadingProgress = 100;
-			loadingStatus = 'Complete!';
-			
-			// Small delay to show 100%
-			await new Promise(resolve => setTimeout(resolve, 500));
-			isLoading = false;
-			
-			// Clear sessionStorage
-			sessionStorage.removeItem('autofillUrl');
-		} catch (err) {
-			clearInterval(progressInterval);
-			const errorMessage = err instanceof Error ? err.message : 'Failed to extract property data';
-			error = errorMessage;
-			isLoading = false;
-			loadingProgress = 0;
-			loadingStatus = 'Error occurred';
-		}
-	}
-
-	// Re-scrape if dates or guests change (only in autofill mode)
-	let rescrapeTimeout: ReturnType<typeof setTimeout> | null = null;
-	
-	async function handleDateOrGuestChange() {
-		if (!isAutofillMode || !formData.listingUrl) return;
-		
-		// Debounce rescraping
-		if (rescrapeTimeout) clearTimeout(rescrapeTimeout);
-		
-		rescrapeTimeout = setTimeout(async () => {
-			if (formData.checkInDate && formData.checkOutDate && formData.expectedPeopleCount) {
-				// Update URL with new dates/guests
-				try {
-					const url = new URL(formData.listingUrl);
-					const isVRBO = formData.listingUrl.includes('vrbo.com');
-					
-					if (isVRBO) {
-						url.searchParams.set('chkin', formData.checkInDate);
-						url.searchParams.set('chkout', formData.checkOutDate);
-						url.searchParams.set('adults', formData.expectedPeopleCount);
-					} else {
-						url.searchParams.set('check_in', formData.checkInDate);
-						url.searchParams.set('check_out', formData.checkOutDate);
-						url.searchParams.set('guests', formData.expectedPeopleCount);
-					}
-					
-					formData.listingUrl = url.toString();
-					
-					// Re-scrape for new price
-					isLoading = true;
-					loadingProgress = 50;
-					loadingStatus = 'Updating price for new dates...';
-					
-					const response = await fetch('/api/autofill', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ listingUrl: formData.listingUrl })
-					});
-					
-					const result = await response.json();
-					
-					if (result.ok && result.data?.propertyInfo?.totalPrice) {
-						formData.totalCost = (result.data.propertyInfo.totalPrice / 100).toFixed(2);
-					}
-					
-					isLoading = false;
-				} catch (err) {
-					console.error('Error re-scraping:', err);
-					isLoading = false;
-				}
-			}
-		}, 1000);
-	}
 
 	function calculateNights(): number {
 		if (!formData.checkInDate || !formData.checkOutDate) return 0;
@@ -300,7 +58,7 @@
 		const totalCost = parseFloat(formData.totalCost) || 0;
 		const nights = calculateNights();
 		const expectedGuests = parseInt(formData.expectedPeopleCount) || 0;
-		const roomCount = scrapedData?.rooms?.length || 0;
+		const roomCount = allRooms.length;
 
 		if (!totalCost || !nights || !expectedGuests) {
 			return null;
@@ -422,23 +180,6 @@
 	}
 </script>
 
-{#if isLoading}
-	<div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: white; z-index: 9999; display: flex; align-items: center; justify-content: center;">
-		<div style="text-align: center;">
-			<p>LOADING: {loadingStatus}</p>
-			<p>Progress: {loadingProgress}%</p>
-			<AutofillLoader progress={loadingProgress} status={loadingStatus} />
-		</div>
-	</div>
-{:else if error && isAutofillMode}
-	<div class="error-container">
-		<div class="error-card card">
-			<h2>❌ Error</h2>
-			<p>{error}</p>
-			<a href="/host-vacation" class="btn btn-primary">Go Back</a>
-		</div>
-	</div>
-{:else}
 	<div class="trip-form-page">
 		<div class="container container-narrow">
 			<div class="page-header">
@@ -450,141 +191,79 @@
 			{/if}
 
 			<form method="POST" action="?/create" use:enhance={handleSubmit}>
-				<!-- Listing URL Input (always visible if not in autofill mode) -->
-				{#if !formData.listingUrl && !isAutofillMode}
-					<div class="form-section card">
-						<div class="section-header">
-							<h2>Property Listing</h2>
-						</div>
-						<div class="form-field">
-							<label for="listingUrlInput">Listing URL (Optional)</label>
-							<div class="url-input-group">
-								<input
-									type="url"
-									id="listingUrlInput"
-									placeholder="https://www.vrbo.com/123456 or https://www.airbnb.com/rooms/123456"
-									bind:value={formData.listingUrl}
-									class="url-input"
-								/>
-								<button
-									type="button"
-									class="btn btn-primary"
-									onclick={() => {
-										if (formData.listingUrl.trim()) {
-											performAutofill(formData.listingUrl.trim());
-										}
-									}}
-									disabled={!formData.listingUrl.trim() || isLoading}
-								>
-									{isLoading ? 'Processing...' : 'Autofill'}
-								</button>
-							</div>
-							<small>Paste your VRBO or Airbnb listing URL and click "Autofill" to automatically extract property details</small>
-						</div>
+				<!-- Listing URL (optional) and Dates/Guests/Cost -->
+				<div class="form-section card">
+					<div class="section-header">
+						<h2>Property & Dates</h2>
 					</div>
-				{/if}
-				
-				<!-- Listing URL (read-only if autofilled) -->
-				{#if formData.listingUrl}
-					<div class="form-section card">
-						<div class="section-header">
-							<h2>Property Information</h2>
+					<div class="form-field">
+						<label for="listingUrlInput">Listing URL (Optional)</label>
+						<input
+							type="url"
+							id="listingUrlInput"
+							name="listingUrl"
+							placeholder="https://www.vrbo.com/... or https://www.airbnb.com/..."
+							bind:value={formData.listingUrl}
+							class="url-input"
+						/>
+						{#if formData.listingUrl}
+							<p class="listing-url"><small>🔗 <a href={formData.listingUrl} target="_blank" rel="noopener noreferrer">{formData.listingUrl}</a></small></p>
+						{/if}
+					</div>
+
+					<div class="dates-guests-grid">
+						<div class="form-field">
+							<label for="checkInDate">Check-in Date *</label>
+							<input
+								type="date"
+								id="checkInDate"
+								name="checkInDate"
+								bind:value={formData.checkInDate}
+								required
+								min={new Date().toISOString().split('T')[0]}
+							/>
 						</div>
 						
-						<div class="property-header">
-							<div class="cover-photo-section">
-								{#if selectedCoverPhoto}
-									<img src={selectedCoverPhoto} alt={scrapedData?.propertyInfo?.title || 'Property'} class="property-cover" />
-								{:else if scrapedData?.propertyInfo?.coverPhoto}
-									<img src={scrapedData.propertyInfo.coverPhoto} alt={scrapedData.propertyInfo.title} class="property-cover" />
-								{/if}
-								{#if scrapedData?.photos && scrapedData.photos.length > 0}
-									<button
-										type="button"
-										class="btn btn-secondary btn-small cover-photo-btn"
-										onclick={() => showCoverPhotoGallery = true}
-									>
-										📷 {selectedCoverPhoto ? 'Change Cover Photo' : 'Select Cover Photo'}
-									</button>
-								{/if}
-							</div>
-							<div class="property-details">
-								<h3>{scrapedData?.propertyInfo?.title || formData.listingTitle || 'Property'}</h3>
-								<div class="property-meta">
-									{#if scrapedData?.propertyInfo?.roomCount}
-										<span>🛏️ {scrapedData.propertyInfo.roomCount} {scrapedData.propertyInfo.roomCount === 1 ? 'Bedroom' : 'Bedrooms'}</span>
-									{/if}
-									{#if scrapedData?.propertyInfo?.maxGuests}
-										<span>👥 Sleeps {scrapedData.propertyInfo.maxGuests}</span>
-									{/if}
-								</div>
-								<p class="listing-url">
-									<small>🔗 <a href={formData.listingUrl} target="_blank" rel="noopener noreferrer">{formData.listingUrl}</a></small>
-								</p>
-							</div>
+						<div class="form-field">
+							<label for="checkOutDate">Check-out Date *</label>
+							<input
+								type="date"
+								id="checkOutDate"
+								name="checkOutDate"
+								bind:value={formData.checkOutDate}
+								required
+								min={formData.checkInDate || new Date().toISOString().split('T')[0]}
+							/>
 						</div>
-
-						<!-- Dates and Guests -->
-						<div class="dates-guests-grid">
-							<div class="form-field">
-								<label for="checkInDate">Check-in Date *</label>
-								<input
-									type="date"
-									id="checkInDate"
-									name="checkInDate"
-									bind:value={formData.checkInDate}
-									required
-									onchange={handleDateOrGuestChange}
-									min={new Date().toISOString().split('T')[0]}
-								/>
-							</div>
-							
-							<div class="form-field">
-								<label for="checkOutDate">Check-out Date *</label>
-								<input
-									type="date"
-									id="checkOutDate"
-									name="checkOutDate"
-									bind:value={formData.checkOutDate}
-									required
-									onchange={handleDateOrGuestChange}
-									min={formData.checkInDate || new Date().toISOString().split('T')[0]}
-								/>
-							</div>
-							
-							<div class="form-field">
-								<label for="expectedPeopleCount">Number of Guests *</label>
-								<input
-									type="number"
-									id="expectedPeopleCount"
-									name="expectedPeopleCount"
-									bind:value={formData.expectedPeopleCount}
-									required
-									min="1"
-									max={scrapedData?.propertyInfo?.maxGuests || 20}
-									onchange={handleDateOrGuestChange}
-								/>
-								{#if scrapedData?.propertyInfo?.maxGuests}
-									<small>Max: {scrapedData.propertyInfo.maxGuests} guests</small>
-								{/if}
-							</div>
-							
-							<div class="form-field">
-								<label for="totalCost">Total Cost ($) *</label>
-								<input
-									type="number"
-									id="totalCost"
-									name="totalCost"
-									bind:value={formData.totalCost}
-									required
-									step="0.01"
-									min="0"
-								/>
-								<small>Total rental cost including taxes and fees</small>
-							</div>
+						
+						<div class="form-field">
+							<label for="expectedPeopleCount">Number of Guests *</label>
+							<input
+								type="number"
+								id="expectedPeopleCount"
+								name="expectedPeopleCount"
+								bind:value={formData.expectedPeopleCount}
+								required
+								min="1"
+								max="20"
+							/>
+						</div>
+						
+						<div class="form-field">
+							<label for="totalCost">Total Cost ($) *</label>
+							<input
+								type="number"
+								id="totalCost"
+								name="totalCost"
+								bind:value={formData.totalCost}
+								required
+								step="0.01"
+								min="0"
+							/>
+							<small>Total rental cost including taxes and fees</small>
 						</div>
 					</div>
-				{/if}
+				</div>
 
 				<!-- Trip Details -->
 				<div class="form-section card">
@@ -711,58 +390,14 @@
 											{/if}
 										</div>
 										
-										{#if scrapedData?.photos && scrapedData.photos.length > 0}
-											<button
-												type="button"
-												class="btn btn-secondary btn-small"
-												onclick={() => openPhotoGallery(room.id)}
-											>
-												Select Photos
-											</button>
-										{/if}
 									</div>
 								{/each}
 							</div>
 						{:else}
-							<p class="section-help">No rooms found. Add rooms manually or use autofill to extract from listing.</p>
+							<p class="section-help">No rooms yet. Add rooms manually below.</p>
 						{/if}
 					</div>
 
-					<!-- Photo Gallery Section -->
-					{#if scrapedData?.photos && scrapedData.photos.length > 0}
-						<div class="form-section card">
-							<div class="section-header">
-								<h2>📷 Available Photos ({scrapedData.photos.length})</h2>
-							</div>
-							<p class="section-help">Click photos to assign them to rooms above, or set as cover photo.</p>
-							<div class="photo-gallery-inline">
-								{#each scrapedData.photos as photo, photoIdx}
-									{@const isCoverPhoto = selectedCoverPhoto === photo}
-									{@const isAssigned = allRooms.some(room => selectedRoomPhotos[room.id]?.includes(photo))}
-									<div class="photo-item {isCoverPhoto ? 'is-cover' : ''} {isAssigned ? 'is-assigned' : ''}">
-										<img src={photo} alt={`Property photo ${photoIdx + 1}`} />
-										{#if isCoverPhoto}
-											<div class="photo-badge cover-badge">Cover</div>
-										{/if}
-										{#if isAssigned}
-											<div class="photo-badge assigned-badge">Assigned</div>
-										{/if}
-										<div class="photo-overlay">
-											<div class="photo-actions">
-												<button
-													type="button"
-													class="btn btn-small"
-													onclick={() => selectCoverPhoto(photo)}
-												>
-													{isCoverPhoto ? '✓ Cover' : 'Set Cover'}
-												</button>
-											</div>
-										</div>
-									</div>
-								{/each}
-							</div>
-						</div>
-					{/if}
 				</div>
 
 				<!-- Meals Section -->
@@ -820,7 +455,6 @@
 				</div>
 
 				<!-- Hidden fields -->
-				<input type="hidden" name="listingUrl" value={formData.listingUrl} />
 				<input type="hidden" name="listingTitle" value={formData.listingTitle} />
 				<input type="hidden" name="listingCoverPhoto" value={selectedCoverPhoto || formData.listingCoverPhoto} />
 				<input type="hidden" name="maxGuests" value={formData.maxGuests} />
@@ -838,70 +472,6 @@
 			</form>
 		</div>
 	</div>
-{/if}
-
-<!-- Cover Photo Gallery Modal -->
-{#if showCoverPhotoGallery && scrapedData?.photos}
-	<div class="modal-overlay" onclick={() => showCoverPhotoGallery = false}>
-		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
-			<div class="modal-header">
-				<h2>Select Cover Photo</h2>
-				<button type="button" class="modal-close" onclick={() => showCoverPhotoGallery = false}>×</button>
-			</div>
-			<div class="photo-gallery-grid">
-				{#each scrapedData.photos as photo}
-					{@const isSelected = selectedCoverPhoto === photo}
-					<div
-						class="photo-thumbnail {isSelected ? 'selected' : ''}"
-						onclick={() => selectCoverPhoto(photo)}
-					>
-						<img src={photo} alt="Property photo" />
-						{#if isSelected}
-							<div class="photo-check">✓</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn btn-primary" onclick={() => showCoverPhotoGallery = false}>
-					Done
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- Photo Gallery Modal -->
-{#if showPhotoGallery && galleryRoomId && scrapedData?.photos}
-	{@const currentRoom = allRooms.find(r => r.id === galleryRoomId)}
-	<div class="modal-overlay" onclick={closePhotoGallery}>
-		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
-			<div class="modal-header">
-				<h2>Select Photos for {currentRoom?.name || 'Room'}</h2>
-				<button type="button" class="modal-close" onclick={closePhotoGallery}>×</button>
-			</div>
-			<div class="photo-gallery-grid">
-				{#each scrapedData.photos as photo}
-					{@const isSelected = selectedRoomPhotos[galleryRoomId]?.includes(photo)}
-					<div
-						class="photo-thumbnail {isSelected ? 'selected' : ''}"
-						onclick={() => togglePhotoForRoom(galleryRoomId, photo)}
-					>
-						<img src={photo} alt="Property photo" />
-						{#if isSelected}
-							<div class="photo-check">✓</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
-			<div class="modal-footer">
-				<button type="button" class="btn btn-primary" onclick={closePhotoGallery}>
-					Done ({selectedRoomPhotos[galleryRoomId]?.length || 0} selected)
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
 
 <style>
 	.trip-form-page {

@@ -129,7 +129,6 @@ export interface TripDraft {
 	visibility: 'private' | 'invite-only';
 	sourceType: 'airbnb' | 'vrbo' | 'manual';
 	listingUrl: string;
-	scrapeStatus: 'idle' | 'scraping' | 'connected' | 'error';
 	
 	// Step 2: Location, Dates & Media
 	destinationCity: string;
@@ -219,7 +218,6 @@ const defaultDraft: TripDraft = {
 	visibility: 'invite-only',
 	sourceType: 'manual',
 	listingUrl: '',
-	scrapeStatus: 'idle',
 	destinationCity: '',
 	destinationState: '',
 	destinationCountry: '',
