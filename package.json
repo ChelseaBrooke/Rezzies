@@ -14,7 +14,8 @@
 		"db:dev": "prisma migrate dev",
 		"db:studio": "prisma studio",
 		"db:seed": "tsx prisma/seed.ts",
-		"prisma:generate": "prisma generate"
+		"prisma:generate": "prisma generate",
+		"postinstall": "prisma generate"
 	},
 	"dependencies": {
 		"@googlemaps/js-api-loader": "^2.0.2",
@@ -36,5 +37,8 @@
 		"tsx": "^4.19.2",
 		"typescript": "^5.9.3",
 		"vite": "^7.2.6"
+	},
+	"engines": {
+		"node": "20.x"
 	}
 }
