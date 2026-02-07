@@ -117,6 +117,16 @@
 						required
 					/>
 				</div>
+				<div class="date-input-wrapper rsvp-by-wrapper">
+					<label for="rsvpByDate" class="form-label">RSVP-by Date (optional)</label>
+					<input
+						type="date"
+						id="rsvpByDate"
+						class="form-input date-input"
+						bind:value={draft.rsvpByDate}
+						oninput={autosave}
+					/>
+				</div>
 				<div class="flexible-dates-wrapper">
 					<label class="checkbox-label-small">
 						<input
@@ -352,6 +362,11 @@
 		gap: 0.75rem;
 		align-items: end;
 		position: relative;
+	}
+
+	.rsvp-by-wrapper {
+		grid-column: 1;
+		grid-row: 2;
 	}
 	
 	.date-input-wrapper {

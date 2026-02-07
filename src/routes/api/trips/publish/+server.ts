@@ -33,6 +33,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	const name = typeof d.name === 'string' ? d.name.trim() : '';
 	const checkInDateStr = typeof d.checkInDate === 'string' ? d.checkInDate : '';
 	const checkOutDateStr = typeof d.checkOutDate === 'string' ? d.checkOutDate : '';
+	const rsvpByDateStr = typeof d.rsvpByDate === 'string' ? d.rsvpByDate.trim() : '';
 	const totalTripCostStr = typeof d.totalTripCost === 'string' ? d.totalTripCost : String(d.totalTripCost ?? '');
 	const rooms = Array.isArray(d.rooms) ? d.rooms : [];
 	const description = typeof d.description === 'string' ? d.description : null;
@@ -63,6 +64,12 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	if (checkOutDate <= checkInDate) {
 		return json({ error: 'Check-out date must be after check-in date' }, 400);
 	}
+	const rsvpByDate = rsvpByDateStr
+		? (() => {
+				const d = new Date(rsvpByDateStr);
+				return Number.isNaN(d.getTime()) ? null : d;
+			})()
+		: null;
 	if (rooms.length === 0) {
 		return json({ error: 'At least one room is required' }, 400);
 	}
@@ -95,6 +102,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				listingCoverPhoto: coverPhoto || null,
 				checkInDate,
 				checkOutDate,
+				rsvpByDate,
 				totalCost,
 				pricingModel,
 				inviteCode,

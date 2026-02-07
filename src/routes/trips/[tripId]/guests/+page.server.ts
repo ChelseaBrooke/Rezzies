@@ -6,18 +6,35 @@ import { prisma } from '$lib/server/prisma.js';
 import { notifyExistingUserOfInvite } from '$lib/server/invite-service.js';
 import { z } from 'zod';
 
+const PENDING_INVITE_STATUSES = ['sent', 'opened'];
+
 export const load: PageServerLoad = async ({ parent }) => {
 	const parentData = await parent();
 	const tripId = parentData.trip?.id;
-	const invites = tripId
-		? await prisma.invite.findMany({
-				where: { tripId },
-				orderBy: { createdAt: 'desc' }
-			})
-		: [];
+	const members = parentData.trip?.members ?? [];
+
+	const memberEmails = new Set(
+		members.map((m) => m.user?.email?.trim()?.toLowerCase()).filter(Boolean)
+	);
+	const memberUserIds = new Set(members.map((m) => m.user?.id).filter(Boolean));
+
+	const allInvites =
+		tripId &&
+		(await prisma.invite.findMany({
+			where: { tripId, status: { in: PENDING_INVITE_STATUSES } },
+			orderBy: { createdAt: 'desc' }
+		}));
+
+	const invites = (allInvites ?? []).filter((inv) => {
+		const email = inv.recipientEmail?.trim()?.toLowerCase();
+		if (email && memberEmails.has(email)) return false;
+		if (inv.recipientUserId && memberUserIds.has(inv.recipientUserId)) return false;
+		return true;
+	});
+
 	return {
 		trip: parentData.trip,
-		members: parentData.trip?.members ?? [],
+		members,
 		invites
 	};
 };
@@ -44,10 +61,33 @@ export const actions: Actions = {
 			return { createInviteError: message };
 		}
 
+		const emailTrimmed = email.trim().toLowerCase();
 		const existingUser = await prisma.user.findFirst({
 			where: { email: { equals: email.trim(), mode: 'insensitive' } },
 			select: { id: true }
 		});
+
+		if (existingUser) {
+			const alreadyMember = await prisma.tripMember.findUnique({
+				where: {
+					tripId_userId: { tripId, userId: existingUser.id }
+				}
+			});
+			if (alreadyMember) {
+				return { createInviteError: 'This person is already a guest.' };
+			}
+		} else {
+			const existingPendingByEmail = await prisma.invite.findFirst({
+				where: {
+					tripId,
+					recipientEmail: { equals: emailTrimmed, mode: 'insensitive' },
+					status: { in: PENDING_INVITE_STATUSES }
+				}
+			});
+			if (existingPendingByEmail) {
+				return { createInviteError: 'A pending invite has already been sent to this email.' };
+			}
+		}
 
 		const token = crypto.randomUUID();
 		const invite = await prisma.invite.create({

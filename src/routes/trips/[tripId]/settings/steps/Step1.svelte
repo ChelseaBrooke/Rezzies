@@ -8,6 +8,7 @@
 			location: string;
 			checkInDate: string;
 			checkOutDate: string;
+			rsvpByDate: string;
 			listingUrl: string;
 			listingTitle: string;
 			listingCoverPhoto: string;
@@ -80,6 +81,16 @@
 		{#if numberOfNights > 0}
 			<p class="helper-text">{numberOfNights} night{numberOfNights !== 1 ? 's' : ''}</p>
 		{/if}
+	</div>
+	
+	<div class="form-section">
+		<label for="rsvpByDate" class="form-label">RSVP-by Date (optional)</label>
+		<input
+			type="date"
+			id="rsvpByDate"
+			class="form-input"
+			bind:value={formData.rsvpByDate}
+		/>
 	</div>
 	
 	<div class="form-section">

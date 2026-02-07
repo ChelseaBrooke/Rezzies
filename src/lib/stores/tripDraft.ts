@@ -137,6 +137,7 @@ export interface TripDraft {
 	propertyAddress: string;
 	checkInDate: string;
 	checkOutDate: string;
+	rsvpByDate: string; // Optional YYYY-MM-DD
 	flexibleDates: boolean;
 	coverPhoto: string;
 	galleryPhotos: string[];
@@ -224,6 +225,7 @@ const defaultDraft: TripDraft = {
 	propertyAddress: '',
 	checkInDate: '',
 	checkOutDate: '',
+	rsvpByDate: '',
 	flexibleDates: false,
 	coverPhoto: '',
 	galleryPhotos: [],
@@ -280,6 +282,7 @@ export interface TripForDraft {
 	listingCoverPhoto?: string | null;
 	checkInDate: Date | string;
 	checkOutDate: Date | string;
+	rsvpByDate?: Date | string | null;
 	totalCost?: number | null;
 	pricingModel?: string | null;
 	location?: string | null;
@@ -342,6 +345,7 @@ export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
 		propertyAddress: trip.location ?? '',
 		checkInDate: toYmd(trip.checkInDate),
 		checkOutDate: toYmd(trip.checkOutDate),
+		rsvpByDate: trip.rsvpByDate ? toYmd(trip.rsvpByDate) : '',
 		flexibleDates: trip.allowPartialStays ?? false,
 		totalTripCost: trip.totalCost != null ? String(trip.totalCost) : '',
 		expectedGuestCount: trip.expectedPeopleCount ?? 0,
