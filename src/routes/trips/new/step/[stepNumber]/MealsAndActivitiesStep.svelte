@@ -19,10 +19,11 @@
 
 <style>
 	.meals-and-activities-step {
-		display: flex;
-		flex-direction: column;
-		gap: 2.5rem;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 2rem;
 		width: 100%;
+		align-items: start;
 	}
 	.section-divider-heading {
 		font-size: 1.25rem;
@@ -34,6 +35,11 @@
 	}
 	.meals-section,
 	.activities-section {
-		width: 100%;
+		min-width: 0;
+	}
+	@media (max-width: 900px) {
+		.meals-and-activities-step {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>

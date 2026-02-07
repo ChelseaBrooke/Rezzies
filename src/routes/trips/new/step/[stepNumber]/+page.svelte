@@ -204,9 +204,9 @@
 	
 	.footer-right {
 		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 0.5rem;
+		flex-direction: row;
+		align-items: center;
+		gap: 0.75rem;
 	}
 	
 	.validation-error {
@@ -273,24 +273,23 @@
 	
 	@media (max-width: 768px) {
 		.card-footer {
-			flex-direction: column;
-			gap: 1rem;
+			flex-wrap: wrap;
+			gap: 0.75rem;
 		}
 		
 		.footer-right {
 			width: 100%;
-			flex-direction: row;
 			justify-content: flex-end;
 		}
 		
 		.btn-back {
-			width: 100%;
+			order: 1;
 		}
 		
 		.btn-save-draft,
 		.btn-next,
 		.btn-publish {
-			flex: 1;
+			flex: none;
 		}
 	}
 </style>
