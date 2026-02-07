@@ -28,6 +28,9 @@
 					<NotificationTray />
 				</div>
 				<AvatarMenu user={data.user} class="header-avatar" />
+			{:else}
+				<a href="/login" class="header-btn">Log in</a>
+				<a href="/signup" class="header-btn header-btn-primary">Sign up</a>
 			{/if}
 		</div>
 	</header>
@@ -155,6 +158,14 @@
 
 	.header-btn:hover {
 		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.header-btn-primary {
+		background: var(--copper, #BF4E30);
+		color: white;
+	}
+	.header-btn-primary:hover {
+		background: var(--primaryHover, #A03D24);
 	}
 
 	.header-bell-wrap {

@@ -12,7 +12,7 @@
 	<title>Divvi - Fair Room & Cost Splitting for Group Vacations</title>
 </svelte:head>
 
-{#if $page.url.pathname !== '/' && !$page.url.pathname.startsWith('/trips/new/step') && !$page.url.pathname.match(/^\/trips\/[^\/]+/)}
+{#if $page.url.pathname !== '/' && $page.url.pathname !== '/login' && $page.url.pathname !== '/signup' && !$page.url.pathname.startsWith('/trips/new/step') && !$page.url.pathname.match(/^\/trips\/[^\/]+/)}
 	<Navigation user={data?.user} />
 {/if}
 
