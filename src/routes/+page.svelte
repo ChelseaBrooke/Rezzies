@@ -1,22 +1,11 @@
 <script lang="ts">
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
+	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	function initials(name: string | null | undefined, email?: string): string {
-		if (name?.trim()) {
-			const parts = name.trim().split(/\s+/);
-			return parts.length >= 2
-				? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-				: name.slice(0, 2).toUpperCase();
-		}
-		if (email) {
-			return email.slice(0, 2).toUpperCase();
-		}
-		return '?';
-	}
 </script>
 
 <div class="home-page">
@@ -38,13 +27,7 @@
 				<div class="header-bell-wrap">
 					<NotificationTray />
 				</div>
-				<a href="/profile" class="avatar-btn" aria-label="My profile" title="My profile">
-					{#if data.user.avatarUrl}
-						<img src={data.user.avatarUrl} alt="" class="avatar-img" />
-					{:else}
-						<span class="avatar-inner">{initials(data.user.name, data.user.email)}</span>
-					{/if}
-				</a>
+				<AvatarMenu user={data.user} class="header-avatar" />
 			{/if}
 		</div>
 	</header>
@@ -181,39 +164,8 @@
 		color: white;
 	}
 
-	.avatar-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		background: transparent;
-		border: none;
-		cursor: pointer;
-		padding: 0;
-		text-decoration: none;
-		color: inherit;
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		overflow: hidden;
-		flex-shrink: 0;
-		border: 2px solid rgba(255, 255, 255, 0.3);
-	}
-	.avatar-btn .avatar-img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-	}
-	.avatar-btn .avatar-inner {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 100%;
-		height: 100%;
-		font-size: 0.875rem;
-		font-weight: 600;
-		background: linear-gradient(135deg, var(--slate) 0%, var(--navy) 100%);
-		color: white;
+	.header-avatar :global(.avatar-trigger) {
+		border-color: rgba(255, 255, 255, 0.3);
 	}
 
 	/* Main Content: centered blurry box, shifted down 40% */

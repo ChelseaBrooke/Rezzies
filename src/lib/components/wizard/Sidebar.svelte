@@ -150,12 +150,6 @@
 						</div>
 					{/if}
 				</button>
-				<button class="utility-item" onclick={() => goto('/logout')} type="button" title={collapsed ? 'Logout' : ''}>
-					<span class="utility-icon">🚪</span>
-					{#if !collapsed}
-						<span class="utility-label">Logout</span>
-					{/if}
-				</button>
 			</div>
 			
 			<!-- User Profile Card -->

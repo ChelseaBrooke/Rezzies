@@ -3,8 +3,9 @@
 	import { goto } from '$app/navigation';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
+	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 
-	let { user } = $props<{ user?: { email: string } | null }>();
+	let { user } = $props<{ user?: { id?: string; name?: string | null; email?: string; avatarUrl?: string | null } | null }>();
 </script>
 
 <nav class="navbar">
@@ -24,10 +25,7 @@
 				<span class="nav-bell-wrap">
 					<NotificationTray />
 				</span>
-				<a href="/profile" class="nav-link" class:active={$page.url.pathname === '/profile'}>Profile</a>
-				<form method="POST" action="/logout" style="display: inline;">
-					<button type="submit" class="btn btn-secondary">Log Out</button>
-				</form>
+				<AvatarMenu user={user} />
 			{:else}
 				<a href="/login" class="nav-link">Log In</a>
 				<a href="/signup" class="btn btn-primary">Sign Up</a>

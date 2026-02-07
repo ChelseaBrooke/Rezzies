@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import divviLogo from '$lib/assets/images/divvi logo.png';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
+	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 
 	interface Props {
 		tripId: string;
@@ -29,17 +30,6 @@
 	});
 
 	const currentPath = $derived($page.url.pathname);
-
-	function initials(name: string | null | undefined, email?: string): string {
-		if (name?.trim()) {
-			const parts = name.trim().split(/\s+/);
-			return parts.length >= 2
-				? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-				: name.slice(0, 2).toUpperCase();
-		}
-		if (email) return email.slice(0, 2).toUpperCase();
-		return '?';
-	}
 
 	function isActive(href: string): boolean {
 		if (href === `/trips/${tripId}`) return currentPath === href;
@@ -101,13 +91,7 @@
 		</div>
 		<div class="rail-bottom">
 			{#if user}
-				<a href="/profile" class="user-avatar" aria-label="My profile" title="My profile">
-					{#if user.avatarUrl}
-						<img src={user.avatarUrl} alt="" class="avatar-img" />
-					{:else}
-						<span class="avatar-inner">{initials(user.name, user.email)}</span>
-					{/if}
-				</a>
+				<AvatarMenu user={user} class="user-avatar-wrap" />
 			{/if}
 			<a href="/trips/{tripId}/settings" class="rail-util" aria-label="Settings" title="Settings">
 				<svg class="rail-icon-svg" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -249,39 +233,24 @@
 		flex-shrink: 0;
 	}
 
-	.user-avatar {
+	.user-avatar-wrap {
+		display: inline-flex;
+	}
+	.user-avatar-wrap :global(.avatar-trigger) {
 		width: 44px;
 		height: 44px;
 		border-radius: 12px;
 		background: var(--surface2);
-		color: var(--text);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		text-decoration: none;
-		font-size: 0.8125rem;
-		font-weight: 600;
 		border: 1px solid var(--border-soft);
-		transition: all var(--transition-fast);
-		flex-shrink: 0;
 	}
-
-	.user-avatar:hover {
+	.user-avatar-wrap :global(.avatar-trigger:hover) {
 		background: rgba(17, 24, 39, 0.06);
-		color: var(--text);
 	}
-
-	.avatar-inner {
-		display: block;
-		line-height: 1;
+	.user-avatar-wrap :global(.avatar-trigger .avatar-inner) {
+		border-radius: 10px;
 	}
-
-	.user-avatar .avatar-img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		border-radius: inherit;
-		display: block;
+	.user-avatar-wrap :global(.avatar-trigger .avatar-img) {
+		border-radius: 10px;
 	}
 
 	.rail-util {
@@ -360,10 +329,13 @@
 		}
 
 		.rail-nav-item,
-		.user-avatar,
+		.user-avatar-wrap :global(.avatar-trigger),
 		.rail-util {
 			width: 40px;
 			height: 40px;
+		}
+		.user-avatar-wrap :global(.avatar-trigger) {
+			border-radius: 10px;
 		}
 
 		.rail-nav {

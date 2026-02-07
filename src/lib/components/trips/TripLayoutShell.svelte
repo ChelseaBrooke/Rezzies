@@ -77,16 +77,6 @@
 		return currentPath.startsWith(href);
 	}
 
-	function initials(name: string | null | undefined, email?: string): string {
-		if (name?.trim()) {
-			const parts = name.trim().split(/\s+/);
-			return parts.length >= 2
-				? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-				: name.slice(0, 2).toUpperCase();
-		}
-		if (email) return email.slice(0, 2).toUpperCase();
-		return '?';
-	}
 </script>
 
 	<div class="shell" class:dashboard-mode={isDashboardRoute}>
@@ -130,13 +120,9 @@
 								<span class="trip-notification-bell">
 									<NotificationTray />
 								</span>
-								<a href="/profile" class="trip-top-avatar" aria-label="Go to my profile" title="My profile">
-									{#if user?.avatarUrl}
-										<img src={user.avatarUrl} alt="" class="trip-top-avatar-img" />
-									{:else}
-										<span class="trip-top-avatar-inner">{user ? initials(user.name, user.email) : '?'}</span>
-									{/if}
-								</a>
+								{#if user}
+									<AvatarMenu user={user} class="trip-top-avatar-wrap" />
+								{/if}
 							</div>
 						</header>
 						<div class="main-inner">
@@ -181,13 +167,9 @@
 			<span class="mobile-notification-bell">
 				<NotificationTray />
 			</span>
-			<a href="/profile" class="mobile-top-avatar" aria-label="My profile" title="My profile">
-				{#if user?.avatarUrl}
-					<img src={user.avatarUrl} alt="" class="trip-top-avatar-img" />
-				{:else}
-					<span class="trip-top-avatar-inner">{user ? initials(user.name, user.email) : '?'}</span>
-				{/if}
-			</a>
+			{#if user}
+				<AvatarMenu user={user} class="mobile-top-avatar-wrap" />
+			{/if}
 		</header>
 
 		<div class="content">
@@ -305,35 +287,21 @@
 		color: var(--primary);
 	}
 
-	.trip-top-avatar {
+	.trip-top-avatar-wrap {
 		display: inline-flex;
-		align-items: center;
-		justify-content: center;
+	}
+	.trip-top-avatar-wrap :global(.avatar-trigger) {
 		width: 2.5rem;
 		height: 2.5rem;
 		border-radius: 50%;
 		background: var(--surface2);
-		color: var(--text);
-		font-size: 0.8125rem;
-		font-weight: 600;
-		text-decoration: none;
 		border: 1px solid var(--border);
-		transition: background var(--transition-fast), color var(--transition-fast);
 	}
-	.trip-top-avatar:hover {
+	.trip-top-avatar-wrap :global(.avatar-trigger:hover) {
 		background: var(--focusRing);
-		color: var(--primary);
 	}
-	.trip-top-avatar-inner {
-		display: block;
-		line-height: 1;
-	}
-	.trip-top-avatar-img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		border-radius: inherit;
-		display: block;
+	.trip-top-avatar-wrap :global(.avatar-trigger .avatar-inner) {
+		color: var(--text);
 	}
 
 	.main-inner {
@@ -508,23 +476,21 @@
 			color: var(--primary);
 		}
 
-		.mobile-top-avatar {
+		.mobile-top-avatar-wrap {
 			display: inline-flex;
-			align-items: center;
-			justify-content: center;
+		}
+		.mobile-top-avatar-wrap :global(.avatar-trigger) {
 			width: 2.5rem;
 			height: 2.5rem;
 			border-radius: 50%;
 			background: var(--surface2);
-			color: var(--text);
-			font-size: 0.8125rem;
-			font-weight: 600;
-			text-decoration: none;
 			border: 1px solid var(--border);
 		}
-		.mobile-top-avatar:hover {
+		.mobile-top-avatar-wrap :global(.avatar-trigger:hover) {
 			background: var(--focusRing);
-			color: var(--primary);
+		}
+		.mobile-top-avatar-wrap :global(.avatar-trigger .avatar-inner) {
+			color: var(--text);
 		}
 
 		.bottom-nav {
