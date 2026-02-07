@@ -1,227 +1,185 @@
-<div class="services-page">
-	<!-- Hero Section -->
-	<section class="services-hero">
-		<div class="container">
-			<h1>Our Services</h1>
-			<p class="hero-subtitle">Everything you need to plan and manage group vacations</p>
-			<p class="hero-tagline">When price depends on headcount, but headcount depends on price, you can depend on Divvi.</p>
-		</div>
-	</section>
+<script lang="ts">
+	import MarketingShell from '$lib/components/MarketingShell.svelte';
+	import type { PageData } from './$types';
 
-	<!-- Services Grid -->
-	<section class="services-content">
-		<div class="container">
+	let { data }: { data: PageData } = $props();
+</script>
+
+<MarketingShell user={data?.user}>
+	<div class="marketing-container">
+		<section class="marketing-card services-hero-card">
+			<h1 class="marketing-page-title">Our Services</h1>
+			<p class="marketing-page-subtitle">Everything you need to plan and manage group trips</p>
+			<p class="hero-tagline">When price depends on headcount, but headcount depends on price, you can depend on divvi.</p>
+		</section>
+
+		<section class="marketing-card">
+			<h2 class="section-heading">What we offer</h2>
 			<div class="services-grid">
-				<div class="service-card card">
+				<div class="service-item">
 					<div class="service-icon">🏠</div>
 					<h3>Trip Management</h3>
-					<p>Create and manage group vacation trips with ease. Import property details from VRBO or Airbnb, set pricing models, and track reservations all in one place.</p>
+					<p>Create and manage group trips with ease. Import property details from VRBO or Airbnb, set pricing models, and track reservations all in one place.</p>
 				</div>
-
-				<div class="service-card card">
+				<div class="service-item">
 					<div class="service-icon">💰</div>
 					<h3>Fair Cost Splitting</h3>
 					<p>Choose from multiple pricing models: per room, per person, per bed, or per person per night. Our system automatically calculates what each guest owes.</p>
 				</div>
-
-				<div class="service-card card">
+				<div class="service-item">
 					<div class="service-icon">📅</div>
 					<h3>Flexible Stays</h3>
 					<p>Support for partial stays allows guests to join for part of the trip. The system automatically prorates costs based on stay duration.</p>
 				</div>
-
-				<div class="service-card card">
+				<div class="service-item">
 					<div class="service-icon">🔗</div>
 					<h3>Easy Sharing</h3>
-					<p>Generate unique invite codes for each trip. Guests simply enter the code to access their room selection page - no account required.</p>
+					<p>Generate unique invite codes for each trip. Guests simply enter the code to access their room selection page—no account required.</p>
 				</div>
-
-				<div class="service-card card">
+				<div class="service-item">
 					<div class="service-icon">📊</div>
 					<h3>Dashboard & Reports</h3>
 					<p>Hosts get a comprehensive dashboard to view all reservations, track payments, and export detailed ledgers for accounting.</p>
 				</div>
-
-				<div class="service-card card">
+				<div class="service-item">
 					<div class="service-icon">✨</div>
 					<h3>Automatic Import</h3>
-					<p>Paste your VRBO or Airbnb listing URL to automatically import property details, photos, pricing, and availability - no manual data entry needed.</p>
+					<p>Paste your VRBO or Airbnb listing URL to automatically import property details, photos, pricing, and availability—no manual data entry needed.</p>
 				</div>
 			</div>
-		</div>
-	</section>
+		</section>
 
-	<!-- Pricing Models Section -->
-	<section class="pricing-models">
-		<div class="container">
-			<h2 class="section-title">Pricing Models</h2>
+		<section class="marketing-card">
+			<h2 class="section-heading">Pricing models</h2>
 			<div class="models-grid">
-				<div class="model-card card">
+				<div class="model-item">
 					<h4>Per Room</h4>
 					<p>Equal or weighted split per room. Perfect when rooms are similar in size and quality.</p>
 				</div>
-				<div class="model-card card">
+				<div class="model-item">
 					<h4>Per Person</h4>
 					<p>Simple equal split among all guests. Great for groups where everyone stays the full duration.</p>
 				</div>
-				<div class="model-card card">
+				<div class="model-item">
 					<h4>Per Bed</h4>
 					<p>Weighted by bed type (king, queen, twin). Larger beds cost more, ensuring fairness.</p>
 				</div>
-				<div class="model-card card">
+				<div class="model-item">
 					<h4>Per Person Per Night</h4>
 					<p>Most flexible option. Accounts for room quality, bed type, and stay duration. Recommended for most trips.</p>
 				</div>
 			</div>
-		</div>
-	</section>
+		</section>
 
-	<!-- CTA Section -->
-	<section class="cta">
-		<div class="container">
-			<div class="cta-content">
-				<h2>Ready to Get Started?</h2>
-				<p>Start planning your next group vacation today.</p>
-				<a href="/trips/new" class="btn btn-primary btn-large">Host a Trip</a>
-			</div>
-		</div>
-	</section>
-</div>
+		<section class="marketing-card cta-card">
+			<h2 class="section-heading">Ready to get started?</h2>
+			<p class="cta-text">Start planning your next group trip today.</p>
+			<a href="/trips/new" class="cta-btn">Host a Trip</a>
+		</section>
+	</div>
+</MarketingShell>
 
 <style>
-	.services-page {
-		width: 100%;
-	}
-
-	.services-hero {
-		background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
-		background-image: url('https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1920&q=80');
-		background-size: cover;
-		background-position: center;
-		position: relative;
-		padding: var(--spacing-2xl) 0;
-		text-align: center;
-		color: white;
-	}
-
-	.services-hero::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(37, 99, 235, 0.85);
-	}
-
-	.services-hero .container {
-		position: relative;
-		z-index: 1;
-	}
-
-	.services-hero h1 {
-		color: white;
-		margin-bottom: var(--spacing-md);
-	}
-
-	.hero-subtitle {
-		font-size: 1.25rem;
-		opacity: 0.95;
-	}
-
 	.hero-tagline {
-		margin-top: var(--spacing-lg);
-		font-size: 1.125rem;
+		margin-top: 1rem;
+		font-size: 1.0625rem;
 		font-style: italic;
-		opacity: 0.95;
+		color: rgba(255, 255, 255, 0.85);
 		max-width: 32rem;
-		margin-left: auto;
-		margin-right: auto;
 		line-height: 1.6;
 	}
 
-	.services-content {
-		padding: var(--spacing-2xl) 0;
-		background: white;
+	.section-heading {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.5rem;
+		font-weight: 600;
+		color: #fffbf7;
+		margin: 0 0 1.5rem 0;
+		text-align: center;
 	}
 
 	.services-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: var(--spacing-lg);
+		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+		gap: 1.5rem;
 	}
 
-	.service-card {
+	.service-item {
 		text-align: center;
-		padding: var(--spacing-xl);
+		padding: 0.5rem 0;
 	}
 
 	.service-icon {
-		font-size: 3.5rem;
-		margin-bottom: var(--spacing-md);
+		font-size: 2.5rem;
+		margin-bottom: 0.75rem;
 	}
 
-	.service-card h3 {
-		margin-bottom: var(--spacing-sm);
-		color: var(--color-text);
+	.service-item h3 {
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: #fffbf7;
+		margin: 0 0 0.5rem 0;
 	}
 
-	.service-card p {
-		color: var(--color-text-light);
-		line-height: 1.7;
-	}
-
-	.pricing-models {
-		padding: var(--spacing-2xl) 0;
-		background: var(--color-bg-light);
-	}
-
-	.section-title {
-		text-align: center;
-		margin-bottom: var(--spacing-xl);
+	.service-item p {
+		font-size: 0.9375rem;
+		color: rgba(255, 255, 255, 0.85);
+		line-height: 1.6;
+		margin: 0;
 	}
 
 	.models-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-		gap: var(--spacing-lg);
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 1.25rem;
 	}
 
-	.model-card {
-		padding: var(--spacing-lg);
+	.model-item {
 		text-align: center;
+		padding: 1rem;
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid rgba(255, 255, 255, 0.08);
 	}
 
-	.model-card h4 {
-		margin-bottom: var(--spacing-sm);
-		color: var(--color-primary);
+	.model-item h4 {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--copper, #bf4e30);
+		margin: 0 0 0.35rem 0;
 	}
 
-	.model-card p {
-		color: var(--color-text-light);
-		line-height: 1.7;
+	.model-item p {
+		font-size: 0.875rem;
+		color: rgba(255, 255, 255, 0.8);
+		line-height: 1.5;
 		margin: 0;
 	}
 
-	.cta {
-		padding: var(--spacing-2xl) 0;
-		background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
-		color: white;
-	}
-
-	.cta-content {
+	.cta-card {
 		text-align: center;
 	}
 
-	.cta-content h2 {
-		color: white;
-		margin-bottom: var(--spacing-md);
+	.cta-text {
+		font-size: 1.125rem;
+		margin-bottom: 1.5rem;
+		color: rgba(255, 255, 255, 0.9);
 	}
 
-	.cta-content p {
-		font-size: 1.125rem;
-		margin-bottom: var(--spacing-xl);
-		opacity: 0.95;
+	.cta-btn {
+		display: inline-block;
+		padding: 0.875rem 2rem;
+		font-size: 1rem;
+		font-weight: 600;
+		color: white;
+		background: var(--copper, #bf4e30);
+		border-radius: 8px;
+		text-decoration: none;
+		transition: background 0.2s;
+	}
+
+	.cta-btn:hover {
+		background: var(--primaryHover, #a03d24);
 	}
 
 	@media (max-width: 768px) {

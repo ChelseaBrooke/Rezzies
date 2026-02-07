@@ -2,24 +2,32 @@
 	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
+	import MarketingShell from '$lib/components/MarketingShell.svelte';
 
 	let { data }: { data: PageData } = $props();
-
 </script>
 
-<div class="trips-page">
-	<div class="container">
-		<div class="page-header">
-			<h1>My Trips</h1>
-			<a href="/trips/new" class="btn btn-primary">Host a Trip</a>
+<MarketingShell user={data?.user}>
+	<div class="marketing-container trips-container">
+		<div class="marketing-card trips-header-card">
+			<div class="page-header">
+				<h1 class="marketing-page-title">My Trips</h1>
+				<a href="/trips/new" class="header-cta">Host a Trip</a>
+			</div>
 		</div>
 
 		{#if data.ownedTrips.length > 0}
-			<section class="trips-section">
-				<h2>Trips You Host</h2>
+			<section class="marketing-card">
+				<h2 class="section-heading">Trips you host</h2>
 				<div class="trips-grid">
 					{#each data.ownedTrips as trip}
-						<div class="trip-card" onclick={() => goto(`/trips/${trip.id}`)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && goto(`/trips/${trip.id}`)}>
+						<div
+							class="trip-card"
+							onclick={() => goto(`/trips/${trip.id}`)}
+							role="button"
+							tabindex="0"
+							onkeydown={(e) => e.key === 'Enter' && goto(`/trips/${trip.id}`)}
+						>
 							<div class="trip-card-image-wrap">
 								{#if trip.listingCoverPhoto}
 									<img src={trip.listingCoverPhoto} alt={trip.name} class="trip-image" />
@@ -52,16 +60,14 @@
 							<div class="trip-content">
 								<h3>{trip.name}</h3>
 								<p class="trip-dates">
-									{trip.checkInDate.toLocaleDateString()} - {trip.checkOutDate.toLocaleDateString()}
+									{trip.checkInDate.toLocaleDateString()} – {trip.checkOutDate.toLocaleDateString()}
 								</p>
 								{#if trip.location}
 									<p class="trip-location">📍 {trip.location}</p>
 								{/if}
-								<div class="trip-status">
-									<span class="badge {trip.isPublished ? 'published' : 'draft'}">
-										{trip.isPublished ? 'Published' : 'Draft'}
-									</span>
-								</div>
+								<span class="badge {trip.isPublished ? 'published' : 'draft'}">
+									{trip.isPublished ? 'Published' : 'Draft'}
+								</span>
 							</div>
 						</div>
 					{/each}
@@ -70,20 +76,22 @@
 		{/if}
 
 		{#if data.invitedTrips.length > 0}
-			<section class="trips-section">
-				<h2>Trips You're Invited To</h2>
+			<section class="marketing-card">
+				<h2 class="section-heading">Trips you're invited to</h2>
 				<div class="trips-grid">
 					{#each data.invitedTrips as trip}
-						<div class="trip-card" onclick={() => goto(`/trips/${trip.id}`)}>
-							{#if trip.listingCoverPhoto}
-								<img src={trip.listingCoverPhoto} alt={trip.name} class="trip-image" />
-							{:else}
-								<div class="trip-image-placeholder">🏖️</div>
-							{/if}
+						<div class="trip-card" onclick={() => goto(`/trips/${trip.id}`)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && goto(`/trips/${trip.id}`)}>
+							<div class="trip-card-image-wrap">
+								{#if trip.listingCoverPhoto}
+									<img src={trip.listingCoverPhoto} alt={trip.name} class="trip-image" />
+								{:else}
+									<div class="trip-image-placeholder">🏖️</div>
+								{/if}
+							</div>
 							<div class="trip-content">
 								<h3>{trip.name}</h3>
 								<p class="trip-dates">
-									{trip.checkInDate.toLocaleDateString()} - {trip.checkOutDate.toLocaleDateString()}
+									{trip.checkInDate.toLocaleDateString()} – {trip.checkOutDate.toLocaleDateString()}
 								</p>
 								{#if trip.location}
 									<p class="trip-location">📍 {trip.location}</p>
@@ -96,77 +104,85 @@
 		{/if}
 
 		{#if data.ownedTrips.length === 0 && data.invitedTrips.length === 0}
-			<div class="empty-state">
-				<h2>No trips yet</h2>
-				<p>Start by hosting your first trip!</p>
-				<a href="/trips/new" class="btn btn-primary">Host a Trip</a>
+			<div class="marketing-card empty-state">
+				<h2 class="section-heading">No trips yet</h2>
+				<p class="empty-text">Start by hosting your first trip!</p>
+				<a href="/trips/new" class="cta-btn">Host a Trip</a>
 			</div>
 		{/if}
 	</div>
-</div>
+</MarketingShell>
 
 <style>
-	.trips-page {
-		min-height: calc(100vh - 80px);
-		padding: var(--spacing-xl) var(--spacing-md);
+	.trips-header-card {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 1rem;
 	}
-
-	.container {
-		max-width: 1200px;
-		margin: 0 auto;
-	}
-
 	.page-header {
 		display: flex;
-		justify-content: space-between;
 		align-items: center;
-		margin-bottom: var(--spacing-xl);
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 1rem;
+		width: 100%;
 	}
-
-	.page-header h1 {
+	.page-header .marketing-page-title {
 		margin: 0;
 	}
-
-	.trips-section {
-		margin-bottom: var(--spacing-xl);
+	.header-cta {
+		padding: 0.625rem 1.25rem;
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: white;
+		background: var(--copper, #bf4e30);
+		border-radius: 8px;
+		text-decoration: none;
+		transition: background 0.2s;
+	}
+	.header-cta:hover {
+		background: var(--primaryHover, #a03d24);
 	}
 
-	.trips-section h2 {
-		margin-bottom: var(--spacing-lg);
+	.section-heading {
+		font-family: 'Fraunces', Georgia, serif;
 		font-size: 1.5rem;
+		font-weight: 600;
+		color: #fffbf7;
+		margin: 0 0 1.25rem 0;
 	}
 
 	.trips-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-		gap: var(--spacing-lg);
+		gap: 1.5rem;
 	}
 
 	.trip-card {
-		background: white;
-		border-radius: var(--radius-md);
+		background: rgba(255, 255, 255, 0.06);
+		border-radius: 12px;
 		overflow: hidden;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		border: 1px solid rgba(255, 255, 255, 0.1);
 		cursor: pointer;
-		transition: transform 0.2s, box-shadow 0.2s;
+		transition: background 0.2s, border-color 0.2s, transform 0.2s;
 	}
-
 	.trip-card:hover {
-		transform: translateY(-4px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		background: rgba(255, 255, 255, 0.1);
+		border-color: rgba(255, 255, 255, 0.18);
+		transform: translateY(-2px);
 	}
 
 	.trip-card-image-wrap {
 		position: relative;
 	}
-
 	.trip-delete-form {
 		position: absolute;
 		top: 0.5rem;
 		right: 0.5rem;
 		z-index: 2;
 	}
-
 	.trip-delete-btn {
 		display: flex;
 		align-items: center;
@@ -175,17 +191,15 @@
 		height: 2rem;
 		padding: 0;
 		border: none;
-		border-radius: var(--radius-sm, 0.375rem);
+		border-radius: 6px;
 		background: rgba(0, 0, 0, 0.5);
 		color: white;
 		cursor: pointer;
 		transition: background 0.2s;
 	}
-
 	.trip-delete-btn:hover {
 		background: rgba(220, 38, 38, 0.9);
 	}
-
 	.trip-delete-btn:focus {
 		outline: 2px solid white;
 		outline-offset: 2px;
@@ -193,73 +207,81 @@
 
 	.trip-image {
 		width: 100%;
-		height: 200px;
+		height: 180px;
 		object-fit: cover;
 	}
-
 	.trip-image-placeholder {
 		width: 100%;
-		height: 200px;
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		height: 180px;
+		background: rgba(0, 27, 46, 0.4);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 4rem;
+		font-size: 3rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 	}
 
 	.trip-content {
-		padding: var(--spacing-md);
+		padding: 1rem 1.25rem;
 	}
-
 	.trip-content h3 {
-		margin: 0 0 var(--spacing-xs) 0;
-		font-size: 1.25rem;
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: #fffbf7;
+		margin: 0 0 0.35rem 0;
 	}
-
 	.trip-dates {
-		color: var(--color-text-light);
-		margin: var(--spacing-xs) 0;
+		font-size: 0.875rem;
+		color: rgba(255, 255, 255, 0.8);
+		margin: 0;
 	}
-
 	.trip-location {
-		color: var(--color-text-light);
-		margin: var(--spacing-xs) 0;
-		font-size: 0.9rem;
+		font-size: 0.875rem;
+		color: rgba(255, 255, 255, 0.75);
+		margin: 0.25rem 0 0 0;
 	}
-
-	.trip-status {
-		margin-top: var(--spacing-sm);
-	}
-
 	.badge {
 		display: inline-block;
-		padding: 0.25rem 0.75rem;
-		border-radius: var(--radius-sm);
-		font-size: 0.875rem;
-		font-weight: 500;
+		margin-top: 0.5rem;
+		padding: 0.2rem 0.6rem;
+		border-radius: 6px;
+		font-size: 0.75rem;
+		font-weight: 600;
 	}
-
 	.badge.published {
-		background: rgba(34, 197, 94, 0.1);
-		color: #16a34a;
+		background: rgba(34, 197, 94, 0.25);
+		color: #86efac;
 	}
-
 	.badge.draft {
-		background: rgba(107, 114, 128, 0.1);
-		color: #6b7280;
+		background: rgba(255, 255, 255, 0.15);
+		color: rgba(255, 255, 255, 0.9);
 	}
 
 	.empty-state {
 		text-align: center;
-		padding: var(--spacing-xl) 0;
+	}
+	.empty-text {
+		margin-bottom: 1.5rem;
+		color: rgba(255, 255, 255, 0.85);
+	}
+	.cta-btn {
+		display: inline-block;
+		padding: 0.875rem 2rem;
+		font-size: 1rem;
+		font-weight: 600;
+		color: white;
+		background: var(--copper, #bf4e30);
+		border-radius: 8px;
+		text-decoration: none;
+		transition: background 0.2s;
+	}
+	.cta-btn:hover {
+		background: var(--primaryHover, #a03d24);
 	}
 
-	.empty-state h2 {
-		margin-bottom: var(--spacing-sm);
-	}
-
-	.empty-state p {
-		color: var(--color-text-light);
-		margin-bottom: var(--spacing-lg);
+	@media (max-width: 768px) {
+		.trips-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>
