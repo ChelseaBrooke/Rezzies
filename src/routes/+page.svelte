@@ -1,9 +1,22 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	function initials(name: string | null | undefined, email?: string): string {
+		if (name?.trim()) {
+			const parts = name.trim().split(/\s+/);
+			return parts.length >= 2
+				? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+				: name.slice(0, 2).toUpperCase();
+		}
+		if (email) {
+			return email.slice(0, 2).toUpperCase();
+		}
+		return '?';
+	}
 </script>
 
 <div class="home-page">
@@ -20,19 +33,19 @@
 		</div>
 		
 		<div class="header-right">
-			<button class="header-btn">
-				<span class="globe-icon">🌐</span>
-				<span>US</span>
-			</button>
-			<a href="/our-services" class="header-btn">About Us</a>
-			<a href="/trips" class="header-btn">My Trips</a>
-			<a href="/notifications" class="header-btn" aria-label="Notifications" title="Notifications">
-				<span class="bell-icon">🔔</span>
-				<span>Notifications</span>
-			</a>
-			<a href={data?.user ? '/profile' : '/login'} class="avatar-btn" aria-label={data?.user ? 'My profile' : 'Log in'}>
-				<div class="avatar-circle"></div>
-			</a>
+			{#if data?.user}
+				<a href="/trips" class="header-btn">My Trips</a>
+				<div class="header-bell-wrap">
+					<NotificationTray />
+				</div>
+				<a href="/profile" class="avatar-btn" aria-label="My profile" title="My profile">
+					{#if data.user.avatarUrl}
+						<img src={data.user.avatarUrl} alt="" class="avatar-img" />
+					{:else}
+						<span class="avatar-inner">{initials(data.user.name, data.user.email)}</span>
+					{/if}
+				</a>
+			{/if}
 		</div>
 	</header>
 
@@ -161,9 +174,11 @@
 		background: rgba(255, 255, 255, 0.1);
 	}
 
-	.globe-icon,
-	.bell-icon {
-		font-size: 1rem;
+	.header-bell-wrap {
+		display: inline-flex;
+	}
+	.header-bell-wrap :global(.tray-trigger) {
+		color: white;
 	}
 
 	.avatar-btn {
@@ -176,14 +191,29 @@
 		padding: 0;
 		text-decoration: none;
 		color: inherit;
-	}
-
-	.avatar-circle {
 		width: 40px;
 		height: 40px;
 		border-radius: 50%;
-		background: linear-gradient(135deg, var(--slate) 0%, var(--navy) 100%);
+		overflow: hidden;
+		flex-shrink: 0;
 		border: 2px solid rgba(255, 255, 255, 0.3);
+	}
+	.avatar-btn .avatar-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	.avatar-btn .avatar-inner {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		font-size: 0.875rem;
+		font-weight: 600;
+		background: linear-gradient(135deg, var(--slate) 0%, var(--navy) 100%);
+		color: white;
 	}
 
 	/* Main Content: centered blurry box, shifted down 40% */

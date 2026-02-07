@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import NotificationTray from '$lib/components/NotificationTray.svelte';
 
 	let { user } = $props<{ user?: { email: string } | null }>();
 </script>
@@ -20,10 +21,9 @@
 		<div class="nav-auth">
 			{#if user}
 				<a href="/trips" class="nav-link">My Trips</a>
-				<a href="/notifications" class="nav-link nav-bell" class:active={$page.url.pathname === '/notifications'} aria-label="Notifications" title="Notifications">
-					<svg class="bell-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-					<span>Notifications</span>
-				</a>
+				<span class="nav-bell-wrap">
+					<NotificationTray />
+				</span>
 				<a href="/profile" class="nav-link" class:active={$page.url.pathname === '/profile'}>Profile</a>
 				<form method="POST" action="/logout" style="display: inline;">
 					<button type="submit" class="btn btn-secondary">Log Out</button>
@@ -96,13 +96,9 @@
 		gap: var(--spacing-md);
 	}
 
-	.nav-bell {
+	.nav-bell-wrap {
 		display: inline-flex;
 		align-items: center;
-		gap: var(--spacing-xs);
-	}
-	.nav-bell .bell-icon {
-		flex-shrink: 0;
 	}
 	
 	@media (max-width: 768px) {

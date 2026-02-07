@@ -4,6 +4,7 @@
 	import AppFrame from '$lib/components/layout/AppFrame.svelte';
 	import TripSidebar from './TripSidebar.svelte';
 	import TripSwitcher from './TripSwitcher.svelte';
+	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import type { TripForSidebar } from '$lib/trips/types.js';
 
 	let {
@@ -126,9 +127,9 @@
 								{/if}
 							</div>
 							<div class="trip-top-bar" aria-label="Trip actions">
-								<a href="/trips/{tripId}/notifications" class="trip-notification-bell" aria-label="Notifications" title="Notifications">
-									<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-								</a>
+								<span class="trip-notification-bell">
+									<NotificationTray />
+								</span>
 								<a href="/profile" class="trip-top-avatar" aria-label="Go to my profile" title="My profile">
 									{#if user?.avatarUrl}
 										<img src={user.avatarUrl} alt="" class="trip-top-avatar-img" />
@@ -177,9 +178,9 @@
 				<span>☰</span>
 			</button>
 			<span class="mobile-title">{trip?.name ?? 'Trip'}</span>
-			<a href="/trips/{tripId}/notifications" class="mobile-notification-bell" aria-label="Notifications" title="Notifications">
-				<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-			</a>
+			<span class="mobile-notification-bell">
+				<NotificationTray />
+			</span>
 			<a href="/profile" class="mobile-top-avatar" aria-label="My profile" title="My profile">
 				{#if user?.avatarUrl}
 					<img src={user.avatarUrl} alt="" class="trip-top-avatar-img" />
@@ -291,13 +292,15 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+	}
+	.trip-notification-bell :global(.tray-trigger) {
 		width: 2.5rem;
 		height: 2.5rem;
 		border-radius: var(--radius-md);
 		color: var(--text);
 		transition: background var(--transition-fast), color var(--transition-fast);
 	}
-	.trip-notification-bell:hover {
+	.trip-notification-bell :global(.tray-trigger:hover) {
 		background: var(--surface2);
 		color: var(--primary);
 	}
@@ -493,12 +496,14 @@
 			display: inline-flex;
 			align-items: center;
 			justify-content: center;
+		}
+		.mobile-notification-bell :global(.tray-trigger) {
 			width: 2.5rem;
 			height: 2.5rem;
 			border-radius: var(--radius-md);
 			color: var(--text);
 		}
-		.mobile-notification-bell:hover {
+		.mobile-notification-bell :global(.tray-trigger:hover) {
 			background: var(--surface2);
 			color: var(--primary);
 		}

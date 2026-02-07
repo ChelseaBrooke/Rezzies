@@ -1,6 +1,7 @@
 <script lang="ts">
 	import TripQuickActions from '$lib/components/trips/TripQuickActions.svelte';
 	import TripCalendarWidget from '$lib/components/trips/TripCalendarWidget.svelte';
+	import NotificationTray from '$lib/components/NotificationTray.svelte';
 
 	/** Move node to document.body */
 	function portal(node: HTMLElement) {
@@ -165,12 +166,9 @@
 				{mealSlots}
 			/>
 		</div>
-		<a href="/trips/{trip.id}/notifications" class="hero-bell" aria-label="Notifications" title="Notifications">
-			<svg class="hero-bell-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-				<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-			</svg>
-		</a>
+		<span class="hero-bell">
+			<NotificationTray />
+		</span>
 	</div>
 </div>
 
@@ -253,24 +251,18 @@
 
 	.hero-bell {
 		flex-shrink: 0;
+		display: inline-flex;
+	}
+	.hero-bell :global(.tray-trigger) {
 		width: 44px;
 		height: 44px;
 		border-radius: 8px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		background: transparent;
 		color: #111827;
-		text-decoration: none;
 		transition: opacity var(--transition-fast);
 	}
-
-	.hero-bell:hover {
+	.hero-bell :global(.tray-trigger:hover) {
 		opacity: 0.75;
-	}
-
-	.hero-bell .hero-bell-icon {
-		display: block;
 	}
 
 	.hero-calendar-wrap {

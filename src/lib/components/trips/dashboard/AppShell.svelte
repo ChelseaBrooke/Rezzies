@@ -3,6 +3,7 @@
 	import { setContext } from 'svelte';
 	import { page } from '$app/stores';
 	import divviLogo from '$lib/assets/images/divvi logo.png';
+	import NotificationTray from '$lib/components/NotificationTray.svelte';
 
 	interface Props {
 		tripId: string;
@@ -118,12 +119,9 @@
 	</aside>
 	<main class="main-content">
 		{#if currentPath !== `/trips/${tripId}`}
-			<a href="/trips/{tripId}/notifications" class="top-bell" aria-label="Notifications" title="Notifications">
-				<svg class="bell-icon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-					<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-				</svg>
-			</a>
+			<span class="top-bell">
+				<NotificationTray />
+			</span>
 		{/if}
 		{#if children != null && typeof children === 'function'}
 			<div class="main-content-inner">
@@ -320,27 +318,19 @@
 		position: absolute;
 		top: 0.5rem;
 		right: 2rem;
+		display: inline-flex;
+		z-index: 5;
+	}
+	.top-bell :global(.tray-trigger) {
 		width: 44px;
 		height: 44px;
 		border-radius: 8px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		background: #d1d5db;
 		color: #374151;
-		text-decoration: none;
-		transition: all var(--transition-fast);
-		z-index: 5;
 	}
-
-	.top-bell:hover {
+	.top-bell :global(.tray-trigger:hover) {
 		background: rgba(0, 0, 0, 0.06);
 		color: #111827;
-	}
-
-	.top-bell .bell-icon {
-		display: block;
-		flex-shrink: 0;
 	}
 
 	.main-content-inner {

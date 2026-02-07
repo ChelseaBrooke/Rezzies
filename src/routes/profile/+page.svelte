@@ -189,7 +189,7 @@
 		{ label: 'Upcoming trips', href: '/trips?filter=upcoming', value: stats.upcomingTrips, icon: 'calendar' },
 		{ label: 'Pending invites', href: '/invites', value: stats.pendingInvites, icon: 'mail' },
 		{ label: 'Pending RSVPs', href: '/trips', value: stats.pendingRsvps, icon: 'check-circle' },
-		{ label: 'Unread notifications', href: '/notifications', value: stats.unreadNotifications, icon: 'bell' }
+		{ label: 'Unread notifications', href: '/', value: stats.unreadNotifications, icon: 'bell' }
 	];
 
 	const hasPhotosFeature = $state(false);
