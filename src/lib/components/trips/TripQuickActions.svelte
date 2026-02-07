@@ -106,8 +106,9 @@
 	) {
 		if (!triggerEl) return;
 		const rect = triggerEl.getBoundingClientRect();
+		/* No gap so cursor never hits dead zone between trigger and menu */
 		setStyle({
-			top: `${rect.bottom + 2}px`,
+			top: `${rect.bottom}px`,
 			left: `${rect.left}px`
 		});
 	}
@@ -213,7 +214,7 @@
 </script>
 
 <div class="quick-actions">
-	<!-- Share: hover or click → Invite, Email link, or Copy link -->
+	<!-- Share: single button is the only hit target; one child span so no internal boundaries -->
 	<div class="dropdown-wrap">
 		<button
 			type="button"
@@ -226,8 +227,11 @@
 			aria-expanded={shareOpen}
 			aria-haspopup="menu"
 		>
-			<span class="action-icon" aria-hidden="true">
-				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+			<span class="action-content" aria-hidden="true">
+				<span class="action-icon">
+					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+				</span>
+				<span class="action-label">Share</span>
 			</span>
 		</button>
 		{#if shareOpen}
@@ -262,7 +266,7 @@
 		{/if}
 	</div>
 
-	<!-- Edit: hover or click → Edit or Delete (host only) -->
+	<!-- Edit: single button, one content span -->
 	{#if isHost}
 		<div class="dropdown-wrap">
 			<button
@@ -275,8 +279,11 @@
 				onclick={onEditClick}
 				aria-expanded={editOpen}
 			>
-				<span class="action-icon" aria-hidden="true">
-					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+				<span class="action-content" aria-hidden="true">
+					<span class="action-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+					</span>
+					<span class="action-label">Edit trip</span>
 				</span>
 			</button>
 			{#if editOpen}
@@ -295,7 +302,7 @@
 		</div>
 	{/if}
 
-	<!-- Info: hover or click → trip info overlay -->
+	<!-- Info: single button, one content span -->
 	{#if tripInfoContent}
 		<div class="dropdown-wrap">
 			<button
@@ -308,8 +315,11 @@
 				onclick={onInfoClick}
 				aria-expanded={infoOpen}
 			>
-				<span class="action-icon" aria-hidden="true">
-					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+				<span class="action-content" aria-hidden="true">
+					<span class="action-icon">
+						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+					</span>
+					<span class="action-label">Info</span>
 				</span>
 			</button>
 			{#if infoOpen}
@@ -335,21 +345,36 @@
 	.quick-actions {
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
+		gap: 0.5rem;
+		cursor: pointer;
+	}
+	.quick-actions * {
+		cursor: pointer;
 	}
 
 	.action-btn {
-		width: 2rem;
-		height: 2rem;
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		min-height: 2.25rem;
+		padding: 0.375rem 0.75rem;
 		border: none;
 		background: transparent;
-		border-radius: var(--radius-sm, 0.5rem);
+		border-radius: var(--radius-md, 0.5rem);
 		cursor: pointer;
 		color: var(--muted);
 		transition: all 0.2s;
+		position: relative;
+		white-space: nowrap;
+	}
+
+	/* Single content child with pointer-events: none = button is the only hit target (no flicker) */
+	.action-content {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.35rem;
+		pointer-events: none;
 	}
 
 	.action-btn:hover {
@@ -369,8 +394,15 @@
 		height: 1.125rem;
 	}
 
+	.action-label {
+		font-size: 0.8125rem;
+		font-weight: 500;
+	}
+
 	.dropdown-wrap {
 		position: relative;
+		display: inline-flex;
+		cursor: pointer;
 	}
 
 	.dropdown-backdrop {
@@ -386,9 +418,9 @@
 		z-index: 10000;
 		pointer-events: none;
 	}
+	/* Backdrop must not capture pointer or it covers the trigger and causes hover flicker */
 	.share-menu-portal .dropdown-backdrop-modal {
-		pointer-events: auto;
-		cursor: default;
+		pointer-events: none;
 	}
 	.share-menu-portal .dropdown-menu-portaled {
 		pointer-events: auto;

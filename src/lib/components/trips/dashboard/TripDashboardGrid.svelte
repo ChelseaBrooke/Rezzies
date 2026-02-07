@@ -194,35 +194,6 @@
 			</div>
 		</div>
 	</div>
-
-	<!-- Quick actions (Poll, Share, Upload, etc.) - bottom center of main photo -->
-	<div class="quick-actions-hero-wrapper">
-		<div class="quick-actions-grid quick-actions-hero-pills">
-			<a href="/trips/{tripId}/polls" class="action-pill" title="Create poll">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
-				</svg>
-				<span>Poll</span>
-			</a>
-			<a href="/trips/{tripId}/files" class="action-pill" title="Upload">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-					<polyline points="17 8 12 3 7 8"/>
-					<line x1="12" y1="3" x2="12" y2="15"/>
-				</svg>
-				<span>Upload</span>
-			</a>
-			<a href="/trips/{tripId}/itinerary" class="action-pill" title="Suggestion">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<circle cx="12" cy="12" r="10"/>
-					<line x1="12" y1="16" x2="12" y2="12"/>
-					<line x1="12" y1="8" x2="12.01" y2="8"/>
-				</svg>
-				<span>Suggestion</span>
-			</a>
-		</div>
-	</div>
-
 </div>
 
 <style>
@@ -756,90 +727,5 @@
 	.pending-badge {
 		font-size: 0.75rem;
 		color: var(--muted);
-	}
-
-	/* Quick actions (pills) - bottom center of main photo */
-	.quick-actions-hero-wrapper {
-		position: absolute;
-		left: 50%;
-		transform: translateX(-50%);
-		top: -7rem;
-		z-index: 2;
-		width: 100%;
-		max-width: 420px;
-		pointer-events: none;
-	}
-
-	.quick-actions-hero-wrapper .action-pill {
-		pointer-events: auto;
-		background: rgba(255, 255, 255, 0.12);
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		color: white;
-	}
-	.quick-actions-hero-wrapper button.action-pill {
-		cursor: pointer;
-		font: inherit;
-		text-decoration: none;
-	}
-
-	.quick-actions-hero-wrapper .action-pill:hover {
-		background: rgba(255, 255, 255, 0.25);
-		color: white;
-		border-color: rgba(255, 255, 255, 0.35);
-	}
-
-	.quick-actions-hero-wrapper .action-pill svg {
-		color: inherit;
-	}
-
-	.quick-actions-grid {
-		display: flex;
-		flex-wrap: nowrap;
-		gap: 0.5rem;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.action-pill {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.4rem;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		padding: 0.625rem 0.875rem;
-		background: var(--surface);
-		border: 1px solid var(--border-soft);
-		border-radius: var(--radius-md);
-		color: var(--text);
-		text-decoration: none;
-		transition: all var(--transition-fast);
-		flex-shrink: 0;
-	}
-
-	.action-pill:hover {
-		background: var(--text);
-		color: white;
-		border-color: var(--text);
-	}
-
-	.action-pill svg {
-		flex-shrink: 0;
-	}
-
-	@media (max-width: 1024px) {
-		.quick-actions-hero-wrapper {
-			position: relative;
-			top: 0;
-			left: auto;
-			transform: none;
-			max-width: 100%;
-			margin-bottom: 2rem;
-		}
-
-		.quick-actions-grid {
-			flex-wrap: wrap;
-			justify-content: center;
-		}
 	}
 </style>

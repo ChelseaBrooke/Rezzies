@@ -3,41 +3,6 @@
 	import TripCalendarWidget from '$lib/components/trips/TripCalendarWidget.svelte';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
 
-	/** Move node to document.body */
-	function portal(node: HTMLElement) {
-		document.body.appendChild(node);
-		return {
-			destroy() {
-				if (node.parentNode) node.parentNode.removeChild(node);
-			}
-		};
-	}
-
-	/** Position this node (portaled to body) so its bottom-right matches the sentinel; update on scroll/resize */
-	function positionFromSentinel(node: HTMLElement, sentinel: HTMLElement) {
-		function update() {
-			const rect = sentinel.getBoundingClientRect();
-			node.style.position = 'fixed';
-			node.style.right = `${window.innerWidth - rect.right}px`;
-			node.style.bottom = `${window.innerHeight - rect.bottom}px`;
-			node.style.zIndex = '10000';
-		}
-		update();
-		const ro = new ResizeObserver(update);
-		ro.observe(sentinel);
-		window.addEventListener('scroll', update, true);
-		window.addEventListener('resize', update);
-		return {
-			destroy() {
-				ro.disconnect();
-				window.removeEventListener('scroll', update, true);
-				window.removeEventListener('resize', update);
-			}
-		};
-	}
-
-	let heroActionsSentinel: HTMLDivElement | null = $state(null);
-
 	interface Props {
 		trip: {
 			id: string;
@@ -131,29 +96,21 @@
 						{/if}
 					{/if}
 				</div>
+				<!-- Share / Edit trip / Info (same hover state as former bottom-right icons) -->
+				<div class="hero-center-actions">
+					<TripQuickActions
+						tripId={trip.id}
+						{inviteCode}
+						onInvite={quickActions.onInvite}
+						showToast={quickActions.showToast}
+						{tripInfoContent}
+						{isHost}
+					/>
+				</div>
 			</div>
 			</div>
-			<!-- Sentinel for positioning portaled actions; grid layers on top so we portal buttons to body -->
-			<div class="hero-actions hero-actions-sentinel" bind:this={heroActionsSentinel} aria-hidden="true"></div>
 		</div>
 	</div>
-	{#if heroActionsSentinel && typeof document !== 'undefined'}
-		<div
-			class="hero-actions-portal"
-			use:portal
-			use:positionFromSentinel={heroActionsSentinel}
-			role="presentation"
-		>
-			<TripQuickActions
-				tripId={trip.id}
-				{inviteCode}
-				onInvite={quickActions.onInvite}
-				showToast={quickActions.showToast}
-				{tripInfoContent}
-				{isHost}
-			/>
-		</div>
-	{/if}
 	<!-- Calendar and bell layered over hero -->
 	<div class="hero-calendar-layer">
 		<div class="hero-calendar-wrap">
@@ -432,18 +389,17 @@
 		opacity: 0.9;
 	}
 
-	.hero-actions,
-	.hero-actions-sentinel {
-		position: absolute;
-		right: 1.5rem;
-		bottom: 1.5rem;
+	/* Share / Edit / Info in center of hero (same hover as former bottom-right icons) */
+	.hero-center-actions {
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: 0.5rem;
-		z-index: 10;
+		margin-top: 0.75rem;
+		cursor: pointer;
 	}
 
-	.hero-actions :global(.quick-actions) {
+	.hero-center-actions :global(.quick-actions) {
 		background: rgba(255, 255, 255, 0.15);
 		backdrop-filter: blur(10px);
 		border-radius: var(--radius-xl);
@@ -452,31 +408,17 @@
 		border: 1px solid rgba(255, 255, 255, 0.2);
 	}
 
-	.hero-actions :global(.action-btn) {
-		width: 2rem;
-		height: 2rem;
+	.hero-center-actions :global(.action-btn) {
 		color: white;
 		background: rgba(255, 255, 255, 0.2);
 		border-radius: var(--radius-md);
 		border: none;
+		transition: opacity var(--transition-fast);
 	}
 
-	/* Portaled copy of hero-actions (same look) */
-	.hero-actions-portal :global(.quick-actions) {
-		background: rgba(255, 255, 255, 0.15);
-		backdrop-filter: blur(10px);
-		border-radius: var(--radius-xl);
-		padding: 0.5rem;
-		gap: 0.35rem;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-	}
-	.hero-actions-portal :global(.action-btn) {
-		width: 2rem;
-		height: 2rem;
+	.hero-center-actions :global(.action-btn:hover) {
+		background: rgba(255, 255, 255, 0.35);
 		color: white;
-		background: rgba(255, 255, 255, 0.2);
-		border-radius: var(--radius-md);
-		border: none;
 	}
 
 	@media (max-width: 1024px) {
@@ -515,11 +457,6 @@
 		.hero-subline {
 			font-size: 0.875rem;
 			gap: 1rem;
-		}
-
-		.hero-actions {
-			right: 1rem;
-			bottom: 1rem;
 		}
 
 		.hero-content {
