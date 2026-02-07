@@ -65,10 +65,10 @@
 		{ href: `/trips/${tripId}`, label: 'Dashboard', icon: '📊' },
 		{ href: `/trips/${tripId}/guests`, label: 'Guests', icon: '👥' },
 		{ href: `/trips/${tripId}/rooms`, label: 'Rooms', icon: '🛏️' },
+		{ href: `/trips/${tripId}/activities`, label: 'Activities', icon: '🎯' },
 		{ href: `/trips/${tripId}/payments`, label: 'Payments', icon: '💳' },
 		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary', icon: '📋' },
-		{ href: `/trips/${tripId}/polls`, label: 'Polls', icon: '🗳️' },
-		{ href: `/trips/${tripId}/activities`, label: 'Activities', icon: '🎯' }
+		{ href: `/trips/${tripId}/polls`, label: 'Polls', icon: '🗳️' }
 	];
 
 	function isActive(href: string) {
