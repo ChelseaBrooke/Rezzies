@@ -24,6 +24,8 @@
 		guestPreviewList: Array<{ user?: { name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
 		pendingRsvpCount: number;
 		recentActivityItems: Array<{ text: string }>;
+		/** Full list for "View activity log" modal (date desc) */
+		allActivityItems?: Array<{ text: string; at: string }>;
 		userRsvp?: { status?: string; arrivalDatetime?: string | null } | null;
 		userProfile?: { dietaryRestrictions?: string | null; allergies?: string | null } | null;
 		myAssignment?: { room?: { name: string | null } | null } | null;
@@ -60,6 +62,7 @@
 		guestPreviewList,
 		pendingRsvpCount,
 		recentActivityItems,
+		allActivityItems = [],
 		userRsvp,
 		userProfile,
 		myAssignment,
@@ -98,6 +101,37 @@
 
 	const hasMissingDietary = $derived(!userProfile?.dietaryRestrictions && !userProfile?.allergies);
 	const hasMissingArrival = $derived(!userRsvp?.arrivalDatetime && userRsvp?.status === 'yes');
+
+	let showActivityLogModal = $state(false);
+	function openActivityLog() {
+		showActivityLogModal = true;
+	}
+	function closeActivityLog() {
+		showActivityLogModal = false;
+	}
+	/** Sorted date desc (newest first) for display */
+	const sortedActivityForModal = $derived(
+		[...allActivityItems].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+	);
+	function formatActivityDate(iso: string): string {
+		const d = new Date(iso);
+		return d.toLocaleDateString(undefined, {
+			month: 'short',
+			day: 'numeric',
+			year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
+			hour: 'numeric',
+			minute: '2-digit'
+		});
+	}
+
+	$effect(() => {
+		if (!showActivityLogModal) return;
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') closeActivityLog();
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	});
 </script>
 
 <div class="dashboard-wrapper">
@@ -154,7 +188,7 @@
 		</div>
 
 		<div class="recent-cell">
-			<DashboardCard title="Recent activity" cta={{ label: 'View activity log', href: `/trips/${tripId}/itinerary` }}>
+			<DashboardCard title="Recent activity" cta={{ label: 'View activity log', onClick: openActivityLog }}>
 				{#if recentActivityItems.length > 0}
 					<ul class="activity-list">
 						{#each recentActivityItems as item}
@@ -166,6 +200,32 @@
 				{/if}
 			</DashboardCard>
 		</div>
+
+		<!-- Activity log modal -->
+		{#if showActivityLogModal}
+			<div class="activity-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="activity-log-title" onclick={closeActivityLog}>
+				<div class="activity-modal" onclick={(e) => e.stopPropagation()}>
+					<div class="activity-modal-header">
+						<h2 id="activity-log-title" class="activity-modal-title">Activity log</h2>
+						<button type="button" class="activity-modal-close" onclick={closeActivityLog} aria-label="Close">×</button>
+					</div>
+					<div class="activity-modal-body">
+						{#if sortedActivityForModal.length > 0}
+							<ul class="activity-log-list">
+								{#each sortedActivityForModal as item}
+									<li class="activity-log-item">
+										<span class="activity-log-date">{formatActivityDate(item.at)}</span>
+										<span class="activity-log-text">{item.text}</span>
+									</li>
+								{/each}
+							</ul>
+						{:else}
+							<p class="muted">No activity yet</p>
+						{/if}
+					</div>
+				</div>
+			</div>
+		{/if}
 
 		<div class="guests-row">
 			<div class="guests-card-wrapper">
@@ -359,7 +419,7 @@
 		font-size: 0.6875rem;
 	}
 
-	/* Recent activity card: fill cell (320px) */
+	/* Recent activity card: fill cell (320px); more space below title, subtle list */
 	.recent-cell :global(.dashboard-card) {
 		height: 100%;
 		min-height: 320px;
@@ -369,6 +429,10 @@
 	.recent-cell :global(.dashboard-card .card-body) {
 		flex: 1;
 		min-height: 0;
+		padding-top: 0.875rem;
+	}
+	.recent-cell :global(.card-cta .cta-link) {
+		font-size: 0.7rem;
 	}
 
 	/* Reminders tall: fills row and overlaps hero (400px visible + 10rem overlap) */
@@ -664,16 +728,111 @@
 	.activity-list {
 		list-style: none;
 		margin: 0;
-		padding: 0;
-		font-size: 0.8125rem;
-		color: var(--text);
+		padding: 0 0 0 0.5rem;
+		font-size: 0.75rem;
+		color: var(--muted);
+		line-height: 1.45;
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.375rem;
+		font-weight: 400;
+		border-left: 2px solid var(--border-soft);
 	}
 
 	.activity-item {
-		padding: 0.2rem 0;
+		padding: 0.125rem 0;
+	}
+
+	/* Activity log modal */
+	.activity-modal-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 1000;
+		background: rgba(0, 0, 0, 0.4);
+		backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1.5rem;
+	}
+
+	.activity-modal {
+		background: var(--surfaceSolid);
+		border-radius: var(--radius-2xl);
+		box-shadow: var(--shadow-lg);
+		border: 1px solid var(--border-soft);
+		max-width: 480px;
+		width: 100%;
+		max-height: 80vh;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.activity-modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 1rem 1.25rem;
+		border-bottom: 1px solid var(--border-soft);
+		flex-shrink: 0;
+	}
+
+	.activity-modal-title {
+		margin: 0;
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+
+	.activity-modal-close {
+		background: none;
+		border: none;
+		font-size: 1.5rem;
+		line-height: 1;
+		color: var(--muted);
+		cursor: pointer;
+		padding: 0.25rem;
+		border-radius: var(--radius-md);
+		transition: color var(--transition-fast), background var(--transition-fast);
+	}
+
+	.activity-modal-close:hover {
+		color: var(--text);
+		background: var(--surface2);
+	}
+
+	.activity-modal-body {
+		padding: 1rem 1.25rem;
+		overflow-y: auto;
+		min-height: 0;
+	}
+
+	.activity-log-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.activity-log-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		padding: 0.625rem 0;
+		border-bottom: 1px solid var(--border-soft);
+		font-size: 0.875rem;
+	}
+
+	.activity-log-item:last-child {
+		border-bottom: none;
+	}
+
+	.activity-log-date {
+		font-size: 0.75rem;
+		color: var(--muted);
+	}
+
+	.activity-log-text {
+		color: var(--text);
 	}
 
 	.muted {

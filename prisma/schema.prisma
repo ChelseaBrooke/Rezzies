@@ -57,6 +57,7 @@ model Trip {
   invoices             Invoice[]
   notifications        Notification[]
   chatMessages         ChatMessage[]
+  tripActivities       TripActivity[]
 
   @@index([inviteCode])
   @@index([isPublished])
@@ -516,5 +517,19 @@ model ChatMessage {
 
   @@index([tripId])
   @@index([createdAt])
+  @@index([tripId, createdAt])
+}
+
+// Activity log entries (poll created, photo added, etc.) – append-only
+model TripActivity {
+  id        String   @id @default(uuid())
+  tripId    String
+  type      String   // e.g. "poll_created", "photo_added", "guest_invited"
+  summary   String   // Human-readable one-line for activity log
+  createdAt DateTime @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
   @@index([tripId, createdAt])
 }

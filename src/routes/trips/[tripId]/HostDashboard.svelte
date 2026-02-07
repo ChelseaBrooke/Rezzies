@@ -4,6 +4,7 @@
 	import type { PageData } from './$types';
 	import TripHero from '$lib/components/trips/dashboard/TripHero.svelte';
 	import TripDashboardGrid from '$lib/components/trips/dashboard/TripDashboardGrid.svelte';
+	import { buildTripActivityLog } from '$lib/trip-activity-log.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -49,24 +50,12 @@
 		userInvoices.filter((i) => i.status === 'due').reduce((s, i) => s + i.totalAmount, 0)
 	);
 
-	type ActivityItem = { type: 'room' | 'rsvp'; text: string; at: Date };
+	const allActivityEntries = $derived(buildTripActivityLog(trip));
+	const allActivityItems = $derived(
+		allActivityEntries.map((item) => ({ text: item.text, at: item.at.toISOString() }))
+	);
 	const recentActivityItems = $derived(
-		(() => {
-			const items: ActivityItem[] = [];
-			roomAssignments.forEach((a) => {
-				items.push({
-					type: 'room',
-					text: `${a.user?.name ?? 'Someone'} claimed ${a.room?.name ?? 'room'}`,
-					at: new Date(a.updatedAt)
-				});
-			});
-			rsvps.forEach((r) => {
-				if (r.status === 'yes')
-					items.push({ type: 'rsvp', text: `${r.user?.name ?? 'Someone'} accepted`, at: new Date(r.updatedAt) });
-			});
-			items.sort((a, b) => b.at.getTime() - a.at.getTime());
-			return items.slice(0, 5);
-		})()
+		allActivityEntries.slice(0, 8).map((item) => ({ text: item.text }))
 	);
 
 	const nextUpcomingItem = $derived(
@@ -194,6 +183,7 @@
 			{guestPreviewList}
 			{pendingRsvpCount}
 			{recentActivityItems}
+			{allActivityItems}
 			{userRsvp}
 			{userProfile}
 			{myAssignment}

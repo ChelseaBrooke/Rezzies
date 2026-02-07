@@ -223,18 +223,13 @@
 	}
 
 	.hero-calendar-wrap {
-		/* Lighter, more transparent frosted glass; subtle tint so text stays readable */
-		background: linear-gradient(
-			to bottom,
-			rgba(255, 255, 255, 0.18) 0%,
-			rgba(255, 255, 255, 0.12) 40%,
-			rgba(255, 255, 255, 0.06) 100%
-		);
-		backdrop-filter: blur(14px);
-		-webkit-backdrop-filter: blur(14px);
-		border-radius: var(--radius-lg);
-		border: 1px solid rgba(203, 213, 225, 0.45);
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+		/* Match homepage hero block / header: dark navy glass */
+		background: rgba(0, 27, 46, 0.12);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		border-radius: 12px;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 		padding: 0.75rem 0.5rem;
 		width: 300px;
 		min-width: 300px;
@@ -288,15 +283,13 @@
 	}
 
 	.hero-calendar-wrap :global(.month-header) {
-		color: #1e293b;
-		text-shadow: 0 0 1px rgba(255, 255, 255, 0.8);
+		color: #000;
 	}
 
 	.hero-calendar-wrap :global(.month-title) {
 		font-size: 1.0625rem;
 		font-weight: 700;
-		color: #1e293b;
-		text-shadow: 0 0 1px rgba(255, 255, 255, 0.8);
+		color: #000;
 	}
 
 	.hero-calendar-wrap :global(.day-headers) {
@@ -305,28 +298,96 @@
 
 	.hero-calendar-wrap :global(.day-header) {
 		font-size: 0.7rem;
-		color: rgba(30, 41, 59, 0.85);
+		color: rgba(255, 255, 255, 0.8);
 	}
 
 	.hero-calendar-wrap :global(.day-cell) {
 		font-size: 0.75rem;
-		color: #334155;
+		color: rgba(255, 255, 255, 0.6);
 	}
 
 	.hero-calendar-wrap :global(.day-cell.trip-day) {
-		background: rgba(30, 41, 59, 0.14);
-		color: #1e293b;
+		background: rgba(255, 255, 255, 0.15);
+		color: #FFFBF7;
+	}
+
+	.hero-calendar-wrap :global(.day-cell.trip-day:hover) {
+		background: rgba(255, 255, 255, 0.25);
+	}
+
+	.hero-calendar-wrap :global(.day-cell.trip-day.selected) {
+		background: var(--copper, #BF4E30);
+		color: white;
+	}
+
+	.hero-calendar-wrap :global(.day-cell.trip-day.selected:hover) {
+		background: var(--primaryHover, #A03D24);
+		color: white;
 	}
 
 	.hero-calendar-wrap :global(.month-chevron-btn) {
-		color: #475569;
+		color: #000;
 	}
 
-	/* Match hint text to the trip-day box fill (white/off-white) */
+	.hero-calendar-wrap :global(.month-chevron-btn:hover:not(:disabled)) {
+		background: rgba(0, 0, 0, 0.08);
+		color: #000;
+	}
+
 	.hero-calendar-wrap :global(.day-detail-hint) {
-		color: #f1f5f9;
+		color: rgba(255, 255, 255, 0.85);
 		font-size: 0.7rem;
 		opacity: 0.95;
+	}
+
+	/* Day detail view (back, title, sections) when inside glassy calendar */
+	.hero-calendar-wrap :global(.day-detail-back) {
+		color: rgba(255, 255, 255, 0.95);
+	}
+
+	.hero-calendar-wrap :global(.day-detail-title) {
+		color: #FFFBF7;
+	}
+
+	.hero-calendar-wrap :global(.day-detail-empty),
+	.hero-calendar-wrap :global(.day-detail-label) {
+		color: rgba(255, 255, 255, 0.75);
+	}
+
+	.hero-calendar-wrap :global(.day-detail-item) {
+		color: rgba(255, 251, 247, 0.95);
+		border-bottom-color: rgba(255, 255, 255, 0.2);
+	}
+
+	.hero-calendar-wrap :global(.day-detail-ctas) {
+		border-top-color: rgba(255, 255, 255, 0.2);
+	}
+
+	.hero-calendar-wrap :global(.day-detail-cta) {
+		background: rgba(255, 255, 255, 0.2);
+		border: 1px solid rgba(255, 255, 255, 0.3);
+		color: white;
+	}
+
+	.hero-calendar-wrap :global(.day-detail-cta:hover) {
+		background: rgba(255, 255, 255, 0.3);
+	}
+
+	.hero-calendar-wrap :global(.calendar-empty-msg) {
+		color: rgba(255, 255, 255, 0.85);
+	}
+
+	.hero-calendar-wrap :global(.calendar-empty-msg a) {
+		color: #FFFBF7;
+		text-decoration: underline;
+	}
+
+	.hero-calendar-wrap :global(.day-detail-item .item-title) {
+		color: #FFFBF7;
+	}
+
+	.hero-calendar-wrap :global(.day-detail-item .item-meta) {
+		color: rgba(255, 255, 255, 0.8);
 	}
 
 	.hero-content {

@@ -9,8 +9,8 @@
 		span?: 1 | 2;
 		/** Variant styling */
 		variant?: 'default' | 'sticky' | 'glass';
-		/** Optional CTA at bottom of card */
-		cta?: { label: string; href: string };
+		/** Optional CTA at bottom of card (href = link, onClick = button for e.g. modal) */
+		cta?: { label: string; href?: string; onClick?: () => void };
 		/** Optional content before title (e.g. icon) */
 		headerLeft?: Snippet;
 		/** Optional header right content */
@@ -50,7 +50,11 @@
 	</div>
 	{#if cta}
 		<div class="card-cta">
-			<a href={cta.href} class="cta-link">{cta.label}</a>
+			{#if cta.onClick}
+				<button type="button" class="cta-link cta-button" onclick={cta.onClick}>{cta.label}</button>
+			{:else if cta.href}
+				<a href={cta.href} class="cta-link">{cta.label}</a>
+			{/if}
 		</div>
 	{/if}
 </article>
@@ -156,6 +160,14 @@
 	.cta-link:hover {
 		color: var(--primaryHover);
 		text-decoration: underline;
+	}
+
+	.cta-button {
+		background: none;
+		border: none;
+		cursor: pointer;
+		font: inherit;
+		padding: 0;
 	}
 
 	@media (max-width: 1024px) {
