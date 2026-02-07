@@ -1,95 +1,192 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import kingBedIconUrl from '$lib/assets/images/beds/king.svg.svg?url';
+	import queenBedIconUrl from '$lib/assets/images/beds/queen.svg.svg?url';
+	import twinBedIconUrl from '$lib/assets/images/beds/twin.svg.svg?url';
+	import bunkBedIconUrl from '$lib/assets/images/beds/bunk.svg.svg?url';
+	import sofaBedIconUrl from '$lib/assets/images/beds/sofabed.svg.svg?url';
 
 	let { data }: { data: PageData } = $props();
-	let addRoomOpen = $state(false);
-	let newRoomName = $state('');
 
-	function openAddRoom() {
-		addRoomOpen = true;
+	const rooms = $derived(data.rooms ?? []);
+	const roomAssignments = $derived(data.roomAssignments ?? []);
+	const isHost = data.isHost ?? false;
+	const tripId = data.trip?.id ?? '';
+
+	const BED_ICONS: Record<string, string> = {
+		king: kingBedIconUrl,
+		queen: queenBedIconUrl,
+		twin: twinBedIconUrl,
+		bunk: bunkBedIconUrl,
+		sofa_bed: sofaBedIconUrl,
+		sofa: sofaBedIconUrl,
+		full: queenBedIconUrl,
+		other: queenBedIconUrl
+	};
+
+	function normalizeBedType(bt: string | null): string {
+		if (!bt) return 'other';
+		const t = bt.trim().toLowerCase().replace(/\s+/g, '_');
+		return t || 'other';
 	}
-	function closeAddRoom() {
-		addRoomOpen = false;
-		newRoomName = '';
+
+	function getBedIcon(bedType: string): string {
+		return BED_ICONS[bedType] ?? BED_ICONS.other ?? queenBedIconUrl;
 	}
-	function submitAddRoom() {
-		// Stub: store in local state or call API
-		closeAddRoom();
+
+	/** For each room, build list of { bed, assignedUser } by matching assignments to beds by bedType */
+	const roomSlots = $derived.by(() => {
+		return rooms.map((room) => {
+			const assignments = roomAssignments.filter((a) => a.roomId === room.id);
+			const byBedType = new Map<string, { user: { id: string; name: string | null; avatarUrl: string | null } }[]>();
+			for (const a of assignments) {
+				const type = normalizeBedType(a.bedType);
+				const list = byBedType.get(type) ?? [];
+				list.push({ user: a.user });
+				byBedType.set(type, list);
+			}
+			const slots: { bed: { id: string; bedType: string }; user: { id: string; name: string | null; avatarUrl: string | null } | null }[] = [];
+			for (const bed of room.beds ?? []) {
+				const type = normalizeBedType(bed.bedType);
+				const queue = byBedType.get(type) ?? [];
+				const assigned = queue.shift()?.user ?? null;
+				if (queue.length > 0) byBedType.set(type, queue);
+				else byBedType.delete(type);
+				slots.push({ bed, user: assigned });
+			}
+			return { roomData: room, slots };
+		});
+	});
+
+	function initials(name: string | null): string {
+		if (!name?.trim()) return '?';
+		const parts = name.trim().split(/\s+/);
+		return parts.length >= 2
+			? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+			: name.slice(0, 2).toUpperCase();
 	}
 </script>
 
 <div class="page">
 	<div class="page-header">
-		<h1>Rooms & Beds</h1>
-		<p class="subtitle">Manage rooms and bed assignments</p>
-		<button type="button" class="btn-primary" onclick={openAddRoom}>Add room</button>
+		<h1 class="page-title">Rooms & Beds</h1>
+		{#if isHost}
+			<a href="/trips/{tripId}/rooms/edit" class="manage-link">Manage rooms & beds</a>
+		{/if}
 	</div>
 
-	<div class="card">
-		<div class="card-body">
-			{#if data.rooms?.length > 0}
-				<ul class="room-list">
-					{#each data.rooms as room}
-						<li class="room-item">
-							<div class="room-name">{room.name}</div>
-							<div class="room-meta">
-								{#if room.beds?.length}
-									<span>{room.beds.length} bed(s): {room.beds.map(b => b.bedType).join(', ')}</span>
-								{:else}
-									<span>No beds</span>
-								{/if}
-								{#if room.maxOccupancy}
-									<span> · Max {room.maxOccupancy} guests</span>
-								{/if}
-							</div>
-						</li>
-					{/each}
-				</ul>
-			{:else}
-				<p class="empty">No rooms yet. Add a room to get started.</p>
+	{#if rooms.length === 0}
+		<div class="empty-state">
+			<p>No rooms set up yet.</p>
+			{#if isHost}
+				<a href="/trips/{tripId}/rooms/edit" class="btn-primary">Add rooms</a>
 			{/if}
 		</div>
-	</div>
+	{:else}
+		<div class="rooms-grid">
+			{#each roomSlots as { roomData, slots } (roomData.id)}
+				<article class="room-box">
+					{#if (roomData.photoUrls?.length ?? 0) > 0}
+						<div class="room-cover">
+							<img src={roomData.photoUrls[0]} alt="" />
+						</div>
+					{/if}
+					<div class="room-box-body">
+						<h2 class="room-box-title">{roomData.name}</h2>
+						{#if roomData.maxOccupancy}
+							<p class="room-box-meta">Max {roomData.maxOccupancy} guests</p>
+						{/if}
+						<div class="beds-row">
+							{#each slots as { bed, user } (bed.id)}
+								<div class="bed-slot">
+									<div class="bed-icon-wrap" title={bed.bedType}>
+										<img src={getBedIcon(bed.bedType)} alt="" class="bed-icon" />
+									</div>
+									<div class="bed-avatar-wrap">
+										{#if user}
+											<div class="avatar" title={user.name ?? 'Assigned'}>
+												{#if user.avatarUrl}
+													<img src={user.avatarUrl} alt="" />
+												{:else}
+													<span class="avatar-initials">{initials(user.name)}</span>
+												{/if}
+											</div>
+										{:else}
+											<span class="bed-empty">—</span>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</article>
+			{/each}
+		</div>
+	{/if}
 </div>
 
-{#if addRoomOpen}
-	<div class="modal-backdrop" onclick={closeAddRoom} role="presentation"></div>
-	<div class="modal" role="dialog">
-		<h2>Add room</h2>
-		<form onsubmit={(e) => { e.preventDefault(); submitAddRoom(); }}>
-			<div class="form-group">
-				<label for="room-name">Room name</label>
-				<input id="room-name" type="text" bind:value={newRoomName} placeholder="e.g. Master Bedroom" />
-			</div>
-			<div class="modal-actions">
-				<button type="button" class="btn-secondary" onclick={closeAddRoom}>Cancel</button>
-				<button type="submit" class="btn-primary">Add</button>
-			</div>
-		</form>
-	</div>
-{/if}
-
 <style>
-	.page { padding: 0; }
-	.page-header { margin-bottom: 1.5rem; }
-	.page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.25rem 0; }
-	.subtitle { font-size: 0.875rem; color: var(--muted); margin: 0 0 1rem 0; }
-	.btn-primary { padding: 0.5rem 1rem; background: var(--primary); color: white; border: none; border-radius: 0.5rem; font-weight: 500; cursor: pointer; }
-	.card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
-	.card-body { padding: 1.5rem; }
-	.room-list { list-style: none; margin: 0; padding: 0; }
-	.room-item { padding: 1rem; border-bottom: 1px solid var(--border); transition: background var(--transition-fast); }
-	.room-item:hover { background: var(--surface2); }
-	.room-item:last-child { border-bottom: none; }
-	.room-name { font-weight: 500; margin-bottom: 0.25rem; }
-	.room-meta { font-size: 0.875rem; color: var(--muted); }
-	.empty { color: var(--muted); margin: 0; }
-	.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 27, 46, 0.3); z-index: 100; }
-	.modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-xl); z-index: 101; min-width: 20rem; }
-	.modal h2 { margin: 0 0 1rem 0; font-size: 1.25rem; }
-	.form-group { margin-bottom: 1rem; }
-	.form-group label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }
-	.form-group input { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.875rem; }
-	.modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem; }
-	.btn-secondary { padding: 0.5rem 1rem; background: transparent; border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer; }
+	.page { padding: 0; max-width: none; }
+	.page-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; }
+	.page-title { font-size: 1.5rem; font-weight: 600; margin: 0; color: var(--text); }
+	.manage-link {
+		font-size: 0.875rem;
+		color: var(--primary);
+		text-decoration: none;
+		font-weight: 500;
+	}
+	.manage-link:hover { text-decoration: underline; }
+
+	.empty-state { text-align: center; padding: 3rem 1.5rem; color: var(--muted); }
+	.empty-state p { margin: 0 0 1rem 0; }
+	.btn-primary { display: inline-block; padding: 0.5rem 1rem; background: var(--primary); color: white; border-radius: var(--radius-md); font-weight: 500; text-decoration: none; font-size: 0.9375rem; }
+	.btn-primary:hover { filter: brightness(1.05); }
+
+	.rooms-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 1.25rem;
+	}
+	.room-box {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+	}
+	.room-cover {
+		aspect-ratio: 16/10;
+		background: var(--surface2);
+		overflow: hidden;
+	}
+	.room-cover img { width: 100%; height: 100%; object-fit: cover; }
+	.room-box-body { padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+	.room-box-title { font-size: 1.125rem; font-weight: 600; margin: 0; color: var(--text); }
+	.room-box-meta { font-size: 0.8125rem; color: var(--muted); margin: 0; }
+	.beds-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.25rem; }
+	.bed-slot {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 64px;
+	}
+	.bed-icon-wrap { width: 48px; height: 32px; display: flex; align-items: center; justify-content: center; }
+	.bed-icon { max-width: 100%; max-height: 100%; object-fit: contain; }
+	.bed-avatar-wrap { min-height: 2rem; display: flex; align-items: center; justify-content: center; }
+	.avatar {
+		width: 2rem;
+		height: 2rem;
+		border-radius: 50%;
+		overflow: hidden;
+		background: var(--surface2);
+		border: 2px solid var(--border);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.avatar img { width: 100%; height: 100%; object-fit: cover; }
+	.avatar-initials { font-size: 0.6875rem; font-weight: 600; color: var(--text); }
+	.bed-empty { font-size: 0.875rem; color: var(--muted); }
 </style>
