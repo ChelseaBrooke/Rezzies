@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { onMount, onDestroy } from 'svelte';
 
 	interface Notification {
@@ -66,6 +67,7 @@
 	}
 
 	onMount(() => {
+		if (!browser) return;
 		document.addEventListener('click', handleClickOutside);
 		document.addEventListener('keydown', handleKeydown);
 		// Load unread count for badge without opening tray
@@ -77,6 +79,7 @@
 	});
 
 	onDestroy(() => {
+		if (!browser) return;
 		document.removeEventListener('click', handleClickOutside);
 		document.removeEventListener('keydown', handleKeydown);
 	});

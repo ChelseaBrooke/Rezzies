@@ -19,7 +19,9 @@
 
 <AppShell tripId={data.trip.id} user={data.user} onInvite={handleInvite}>
 	{#snippet children()}
-		{@render children()}
+		{#if children != null && typeof children === 'function'}
+			{@render children()}
+		{/if}
 	{/snippet}
 </AppShell>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 	import { onMount, onDestroy } from 'svelte';
 
 	interface User {
@@ -9,9 +10,11 @@
 		avatarUrl?: string | null;
 	}
 
-	let { user, class: className = '' } = $props<{
+	let { user, class: className = '', placement = 'below' } = $props<{
 		user: User;
 		class?: string;
+		/** 'above' = open upward (e.g. when avatar is at bottom of rail) */
+		placement?: 'below' | 'above';
 	}>();
 
 	let open = $state(false);
@@ -84,11 +87,13 @@
 	}
 
 	onMount(() => {
+		if (!browser) return;
 		document.addEventListener('click', handleClickOutside);
 		document.addEventListener('keydown', handleKeydown);
 	});
 
 	onDestroy(() => {
+		if (!browser) return;
 		document.removeEventListener('click', handleClickOutside);
 		document.removeEventListener('keydown', handleKeydown);
 	});
@@ -118,11 +123,13 @@
 	{#if open && !isSettingsPage}
 		<div
 			class="avatar-dropdown"
+			class:avatar-dropdown-above={placement === 'above'}
 			bind:this={menuEl}
 			role="menu"
 			onmouseenter={onMenuEnter}
 			onmouseleave={onMenuLeave}
 		>
+			<a href="/trips" class="avatar-dropdown-item" role="menuitem" onclick={close}>My Trips</a>
 			<a href="/profile" class="avatar-dropdown-item" role="menuitem" onclick={close}>Edit profile</a>
 			<a href="/settings" class="avatar-dropdown-item" role="menuitem" onclick={close}>Account settings</a>
 			<form method="POST" action="/logout" class="avatar-dropdown-form">
@@ -203,6 +210,14 @@
 		z-index: 1000;
 		overflow: hidden;
 		padding: 0.25rem 0;
+	}
+	.avatar-dropdown-above {
+		top: auto;
+		bottom: 100%;
+		left: 0;
+		right: auto;
+		margin-top: 0;
+		margin-bottom: 0.35rem;
 	}
 
 	.avatar-dropdown-item {

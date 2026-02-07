@@ -1,26 +1,40 @@
 <script lang="ts">
 	import TopBar from './TopBar.svelte';
 	import Stepper from './Stepper.svelte';
-	
-	let { currentStep, children, onBack, backHref, previewLabel }: { currentStep: number; children: any; onBack?: () => void; backHref?: string; previewLabel?: string } = $props();
-	
-	const steps = [
+
+	interface Step {
+		number: number;
+		label: string;
+		optional?: boolean;
+	}
+
+	const DEFAULT_STEPS: Step[] = [
 		{ number: 1, label: 'Basics & Rooms' },
 		{ number: 2, label: 'Pricing' },
 		{ number: 3, label: 'Meals & Activities', optional: true },
 		{ number: 4, label: 'Invite People' },
 		{ number: 5, label: 'Review & Publish' }
 	];
-	
-	const stepTitles = [
-		'Basics & Rooms',
-		'Pricing',
-		'Meals & Activities',
-		'Invite People',
-		'Review & Publish'
-	];
-	
-	const currentTitle = stepTitles[currentStep] || '';
+
+	let {
+		currentStep,
+		children,
+		onBack,
+		backHref,
+		previewLabel,
+		steps: stepsProp
+	}: {
+		currentStep: number;
+		children: any;
+		onBack?: () => void;
+		backHref?: string;
+		previewLabel?: string;
+		steps?: Step[];
+	} = $props();
+
+	const steps = $derived(stepsProp ?? DEFAULT_STEPS);
+	const stepTitles = $derived(steps.map((s) => s.label));
+	const currentTitle = $derived(stepTitles[currentStep] || '');
 </script>
 
 <div class="create-trip-shell" class:contained={!!previewLabel}>

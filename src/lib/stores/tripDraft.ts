@@ -279,6 +279,7 @@ export interface TripForDraft {
 	name: string;
 	description?: string | null;
 	listingUrl?: string | null;
+	listingCoverPhoto?: string | null;
 	checkInDate: Date | string;
 	checkOutDate: Date | string;
 	totalCost?: number | null;
@@ -337,6 +338,8 @@ export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
 		name: trip.name ?? '',
 		description: trip.description ?? '',
 		listingUrl: trip.listingUrl ?? '',
+		coverPhoto: trip.listingCoverPhoto ?? '',
+		galleryPhotos: trip.listingCoverPhoto ? [trip.listingCoverPhoto] : [],
 		destinationCity: trip.location ?? '',
 		propertyAddress: trip.location ?? '',
 		checkInDate: toYmd(trip.checkInDate),
