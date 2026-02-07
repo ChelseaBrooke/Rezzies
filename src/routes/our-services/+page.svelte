@@ -4,6 +4,7 @@
 		<div class="container">
 			<h1>Our Services</h1>
 			<p class="hero-subtitle">Everything you need to plan and manage group vacations</p>
+			<p class="hero-tagline">When price depends on headcount, but headcount depends on price, you can depend on Divvi.</p>
 		</div>
 	</section>
 
@@ -126,6 +127,17 @@
 	.hero-subtitle {
 		font-size: 1.25rem;
 		opacity: 0.95;
+	}
+
+	.hero-tagline {
+		margin-top: var(--spacing-lg);
+		font-size: 1.125rem;
+		font-style: italic;
+		opacity: 0.95;
+		max-width: 32rem;
+		margin-left: auto;
+		margin-right: auto;
+		line-height: 1.6;
 	}
 
 	.services-content {

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import FileUploadTile from '$lib/components/wizard/FileUploadTile.svelte';
 	import RoomBedPicker from '$lib/components/wizard/RoomBedPicker.svelte';
-	import PriceBreakdown from '$lib/components/wizard/PriceBreakdown.svelte';
 	import AddressAutocomplete from '$lib/components/wizard/AddressAutocomplete.svelte';
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 	import { tripDraft } from '$lib/stores/tripDraft.js';
@@ -136,7 +135,7 @@
 			
 			<div class="form-section form-row">
 				<div class="form-group">
-					<label for="expectedGuestCount" class="form-label">Expected Guest Count</label>
+					<label for="expectedGuestCount" class="form-label">Expected guest count (for trip)</label>
 					<input
 						type="number"
 						id="expectedGuestCount"
@@ -144,11 +143,11 @@
 						bind:value={draft.expectedGuestCount}
 						oninput={autosave}
 						min="1"
-						placeholder="0"
+						placeholder="e.g. 6"
 					/>
 				</div>
 				<div class="form-group">
-					<label for="maxOccupancy" class="form-label">Max Occupancy</label>
+					<label for="maxOccupancy" class="form-label">Max occupancy (for trip)</label>
 					<input
 						type="number"
 						id="maxOccupancy"
@@ -156,7 +155,7 @@
 						bind:value={draft.maxOccupancy}
 						oninput={autosave}
 						min="1"
-						placeholder="0"
+						placeholder="e.g. 10"
 					/>
 				</div>
 			</div>
@@ -192,38 +191,6 @@
 					<RoomBedPicker bind:draft {autosave} />
 				</div>
 			</div>
-		</div>
-	</div>
-	
-	<!-- Pricing Section with Buttons -->
-	<div class="pricing-with-buttons">
-		<div class="section-box pricing-section">
-			<div class="pricing-header-row">
-				<h3 class="section-header">Pricing</h3>
-				<div class="pricing-model-selector">
-					<label for="pricingModel" class="form-label">Price Model</label>
-					<select id="pricingModel" class="form-select" bind:value={draft.pricingModel} onchange={autosave}>
-						<option value="per-person">Per Person</option>
-						<option value="per-room">Per Room</option>
-						<option value="per-bed">Per Bed</option>
-					</select>
-				</div>
-			</div>
-			
-			<PriceBreakdown {draft} />
-		</div>
-		<div class="pricing-buttons">
-			<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
-				Save Draft
-			</button>
-			<button
-				type="button"
-				class="btn-next"
-				onclick={handleNextStep}
-				disabled={!canProceed}
-			>
-				Next
-			</button>
 		</div>
 	</div>
 </div>

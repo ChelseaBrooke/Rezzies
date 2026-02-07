@@ -3,6 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { notifyExistingUserOfInvite } from '$lib/server/invite-service.js';
 import { z } from 'zod';
 
 export const load: PageServerLoad = async ({ parent }) => {
@@ -43,8 +44,13 @@ export const actions: Actions = {
 			return { createInviteError: message };
 		}
 
+		const existingUser = await prisma.user.findFirst({
+			where: { email: { equals: email.trim(), mode: 'insensitive' } },
+			select: { id: true }
+		});
+
 		const token = crypto.randomUUID();
-		await prisma.invite.create({
+		const invite = await prisma.invite.create({
 			data: {
 				tripId,
 				token,
@@ -52,9 +58,25 @@ export const actions: Actions = {
 				channel: 'email',
 				recipientEmail: email,
 				recipientPhone: null,
+				recipientUserId: existingUser?.id ?? null,
 				expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 			}
 		});
+
+		if (existingUser) {
+			const trip = await prisma.trip.findUnique({
+				where: { id: tripId },
+				select: { name: true }
+			});
+			if (trip) {
+				await notifyExistingUserOfInvite({
+					inviteId: invite.id,
+					tripId,
+					tripName: trip.name,
+					recipientUserId: existingUser.id
+				});
+			}
+		}
 
 		return { createInviteSuccess: true };
 	}

@@ -3,8 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { tripDraft } from '$lib/stores/tripDraft.js';
 	import Step1 from './Step1.svelte';
-	import Step2 from './Step2.svelte';
-	import ActivitiesStep from './ActivitiesStep.svelte';
+	import PricingStep from './PricingStep.svelte';
+	import MealsAndActivitiesStep from './MealsAndActivitiesStep.svelte';
 	import Step3 from './Step3.svelte';
 	import Step4 from './Step4.svelte';
 	
@@ -143,27 +143,26 @@
 	{/if}
 	<Step1 bind:draft {autosave} {prevStep} {handleNextStep} {canProceed} />
 {:else if stepNumber() === 2}
-	<Step2 bind:draft {autosave} />
+	<PricingStep bind:draft {autosave} />
 {:else if stepNumber() === 3}
-	<ActivitiesStep bind:draft {autosave} />
+	<MealsAndActivitiesStep bind:draft {autosave} />
 {:else if stepNumber() === 4}
 	<Step3 bind:draft {autosave} />
 {:else if stepNumber() === 5}
 	<Step4 bind:draft />
 {/if}
 
-<!-- Footer Actions (for steps 2+) -->
-{#if stepNumber() > 1}
-	{#if validationError}
-		<div class="validation-error">{validationError}</div>
-	{/if}
-	{#if stepNumber() === 5 && publishError}
-		<div class="validation-error">{publishError}</div>
-	{/if}
-	<div class="card-footer">
-		<button type="button" class="btn-back" onclick={prevStep}>
-			Back
-		</button>
+<!-- Footer Actions -->
+{#if validationError}
+	<div class="validation-error">{validationError}</div>
+{/if}
+{#if stepNumber() === 5 && publishError}
+	<div class="validation-error">{publishError}</div>
+{/if}
+<div class="card-footer">
+	<button type="button" class="btn-back" onclick={prevStep} disabled={stepNumber() === 1}>
+		Back
+	</button>
 		<div class="footer-right">
 			{#if stepNumber() < 5}
 				<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
@@ -191,8 +190,7 @@
 				</button>
 			{/if}
 		</div>
-	</div>
-{/if}
+</div>
 
 <style>
 	.card-footer {
@@ -237,8 +235,13 @@
 		color: var(--muted);
 	}
 	
-	.btn-back:hover {
+	.btn-back:hover:not(:disabled) {
 		color: var(--text);
+	}
+
+	.btn-back:disabled {
+		opacity: 0.5;
+		cursor: default;
 	}
 	
 	.btn-save-draft {

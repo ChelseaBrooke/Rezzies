@@ -20,16 +20,28 @@
 		{:else}
 			<div class="notifications-list">
 				{#each data.notifications as notification}
-					<div class="notification-card {notification.read ? 'read' : 'unread'}">
-						<div class="notification-content">
-							<h3>{notification.title}</h3>
-							<p>{notification.message}</p>
-							<time>{new Date(notification.createdAt).toLocaleString()}</time>
+					{#if notification.relatedTripId}
+						<form method="POST" action="?/markReadAndGo" class="notification-card {notification.read ? 'read' : 'unread'} notification-clickable">
+							<input type="hidden" name="notificationId" value={notification.id} />
+							<input type="hidden" name="tripId" value={notification.relatedTripId} />
+							<button type="submit" class="notification-button">
+								<div class="notification-content">
+									<h3>{notification.title}</h3>
+									<p>{notification.message}</p>
+									<time>{new Date(notification.createdAt).toLocaleString()}</time>
+								</div>
+								<span class="notification-arrow" aria-hidden="true">→</span>
+							</button>
+						</form>
+					{:else}
+						<div class="notification-card {notification.read ? 'read' : 'unread'}">
+							<div class="notification-content">
+								<h3>{notification.title}</h3>
+								<p>{notification.message}</p>
+								<time>{new Date(notification.createdAt).toLocaleString()}</time>
+							</div>
 						</div>
-						{#if notification.relatedTripId}
-							<a href="/trips/{notification.relatedTripId}" class="btn btn-sm btn-secondary">View Trip</a>
-						{/if}
-					</div>
+					{/if}
 				{/each}
 			</div>
 		{/if}
@@ -78,13 +90,42 @@
 
 	.notification-card {
 		background: white;
-		padding: var(--spacing-lg);
+		padding: 0;
 		border-radius: var(--radius-md);
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 		display: flex;
 		justify-content: space-between;
+		align-items: stretch;
+		gap: 0;
+	}
+
+	.notification-clickable {
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+	.notification-clickable:hover {
+		background: rgba(102, 126, 234, 0.08);
+	}
+
+	.notification-button {
+		flex: 1;
+		display: flex;
+		justify-content: space-between;
 		align-items: center;
 		gap: var(--spacing-md);
+		padding: var(--spacing-lg);
+		text-align: left;
+		background: none;
+		border: none;
+		cursor: pointer;
+		font: inherit;
+		color: inherit;
+	}
+
+	.notification-arrow {
+		color: var(--color-primary);
+		font-size: 1.25rem;
+		flex-shrink: 0;
 	}
 
 	.notification-card.unread {

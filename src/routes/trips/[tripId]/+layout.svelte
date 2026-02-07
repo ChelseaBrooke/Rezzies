@@ -10,6 +10,13 @@
 	}
 </script>
 
+{#if data.membership?.inviteStatus === 'invited' && data.pendingInviteToken}
+	<div class="invite-banner" role="alert">
+		<p>You've been invited to this trip. Accept to join and RSVP.</p>
+		<a href="/invite/{data.pendingInviteToken}" class="invite-banner-btn">Accept invite</a>
+	</div>
+{/if}
+
 <AppShell tripId={data.trip.id} user={data.user} onInvite={handleInvite}>
 	{#snippet children()}
 		{@render children()}
@@ -19,3 +26,32 @@
 {#if data.canChat && data.user}
 	<TripChat tripId={data.trip.id} userId={data.user.id} />
 {/if}
+
+<style>
+	.invite-banner {
+		background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+		border-left: 4px solid var(--color-primary);
+		padding: var(--spacing-md) var(--spacing-lg);
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--spacing-md);
+		flex-wrap: wrap;
+	}
+	.invite-banner p {
+		margin: 0;
+		color: var(--color-text);
+	}
+	.invite-banner-btn {
+		background: var(--color-primary);
+		color: white;
+		padding: var(--spacing-xs) var(--spacing-md);
+		border-radius: var(--radius-sm);
+		font-weight: 500;
+		text-decoration: none;
+		white-space: nowrap;
+	}
+	.invite-banner-btn:hover {
+		opacity: 0.95;
+	}
+</style>

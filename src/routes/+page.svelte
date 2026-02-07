@@ -27,10 +27,10 @@
 			</button>
 			<a href="/our-services" class="header-btn">About Us</a>
 			<a href="/trips" class="header-btn">My Trips</a>
-			<button class="header-btn">
+			<a href="/notifications" class="header-btn" aria-label="Notifications" title="Notifications">
 				<span class="bell-icon">🔔</span>
 				<span>Notifications</span>
-			</button>
+			</a>
 			<a href={data?.user ? '/profile' : '/login'} class="avatar-btn" aria-label={data?.user ? 'My profile' : 'Log in'}>
 				<div class="avatar-circle"></div>
 			</a>

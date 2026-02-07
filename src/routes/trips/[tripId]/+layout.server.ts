@@ -55,6 +55,20 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 
 	const allTrips = tripsResult.allTrips.map((m) => m.trip);
 
+	// When user is invited but hasn't accepted, get the invite token for the "Accept invite" link
+	let pendingInviteToken: string | null = null;
+	if (membership?.inviteStatus === 'invited') {
+		const pendingInvite = await prisma.invite.findFirst({
+			where: {
+				tripId,
+				recipientUserId: user.id,
+				status: 'sent'
+			},
+			select: { token: true }
+		});
+		pendingInviteToken = pendingInvite?.token ?? null;
+	}
+
 	return {
 		user,
 		trip,
@@ -62,6 +76,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		membership,
 		isHost: membership?.role === 'host',
 		userRsvp,
-		canChat: userRsvp?.status === 'yes' || membership?.role === 'host'
+		canChat: userRsvp?.status === 'yes' || membership?.role === 'host',
+		pendingInviteToken
 	};
 };

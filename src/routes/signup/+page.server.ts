@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { createUser } from '$lib/server/user-auth.js';
 import { createSession } from '$lib/server/session.js';
+import { linkPendingInvitesForUser } from '$lib/server/invite-service.js';
 import { z } from 'zod';
 
 const signupSchema = z.object({
@@ -69,7 +70,10 @@ export const actions: Actions = {
 
 		try {
 			const user = await createUser(email, password, name || undefined);
-			
+
+			// If they were invited before signing up, link those invites and create notifications
+			await linkPendingInvitesForUser(user.id, email);
+
 			// Create session
 			await createSession(cookies, user.id);
 

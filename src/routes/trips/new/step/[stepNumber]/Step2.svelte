@@ -324,7 +324,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;
-		max-width: 720px;
+		width: 100%;
+		max-width: 100%;
 	}
 	.section-1-body,
 	.section-2-body,

@@ -26,6 +26,7 @@
 	.section-header {
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: 0.75rem;
 		margin-bottom: 1.5rem;
 	}
@@ -54,6 +55,9 @@
 	}
 	
 	.section-body {
-		/* Content goes here */
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
 	}
 </style>

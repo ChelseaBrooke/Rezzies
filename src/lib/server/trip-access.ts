@@ -23,7 +23,8 @@ export async function isTripHost(tripId: string, userId: string): Promise<boolea
 
 export async function isTripMember(tripId: string, userId: string): Promise<boolean> {
 	const membership = await getUserTripMembership(tripId, userId);
-	return membership?.inviteStatus === 'accepted';
+	// Allow access for both invited (pending) and accepted so they can view the guest portal
+	return membership?.inviteStatus === 'accepted' || membership?.inviteStatus === 'invited';
 }
 
 export async function getUserTrips(userId: string) {
@@ -56,11 +57,11 @@ export async function getUserTrips(userId: string) {
 			}
 		}
 
-		// Get trips where user is a member
+		// Get trips where user is a member (accepted or invited so they can see and open the guest portal)
 		const memberships = await prisma.tripMember.findMany({
 			where: {
 				userId,
-				inviteStatus: 'accepted'
+				inviteStatus: { in: ['accepted', 'invited'] }
 			},
 			include: {
 				trip: {
