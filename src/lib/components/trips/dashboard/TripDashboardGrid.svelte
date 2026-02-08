@@ -2,6 +2,8 @@
 	import DashboardCard from './DashboardCard.svelte';
 	import TripGoals from '$lib/components/trips/TripGoals.svelte';
 	import Checklist from './Checklist.svelte';
+	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 
 	interface ChecklistStats {
 		rsvp_pending?: number;
@@ -19,9 +21,9 @@
 		isHost: boolean;
 		tripId: string;
 		currentUserId: string;
-		members: Array<{ user?: { name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
+		members: Array<{ user?: { id: string; name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
 		rsvps: Array<{ status: string; user?: { name: string | null } | null; arrivalDatetime?: string | null }>;
-		guestPreviewList: Array<{ user?: { name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
+		guestPreviewList: Array<{ user?: { id: string; name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
 		pendingRsvpCount: number;
 		recentActivityItems: Array<{ text: string }>;
 		/** Full list for "View activity log" modal (date desc) */
@@ -237,13 +239,25 @@
 					<div class="guests-preview">
 						<div class="avatar-row">
 							{#each guestPreviewList as member}
-								<span class="avatar" title={member.user?.name ?? member.user?.email ?? ''}>
-									{#if member.user?.avatarUrl}
-										<img src={member.user.avatarUrl} alt="" class="avatar-img" />
-									{:else}
-										{initials(member.user?.name, member.user?.email)}
-									{/if}
-								</span>
+								{#if member.user?.id}
+									<ProfileTooltip userId={member.user.id}>
+										<button type="button" class="avatar avatar-btn" title={member.user?.name ?? member.user?.email ?? ''} onclick={() => openProfileCard(member.user!.id)}>
+											{#if member.user?.avatarUrl}
+												<img src={member.user.avatarUrl} alt="" class="avatar-img" />
+											{:else}
+												{initials(member.user?.name, member.user?.email)}
+											{/if}
+										</button>
+									</ProfileTooltip>
+								{:else}
+									<span class="avatar" title={member.user?.name ?? member.user?.email ?? ''}>
+										{#if member.user?.avatarUrl}
+											<img src={member.user.avatarUrl} alt="" class="avatar-img" />
+										{:else}
+											{initials(member.user?.name, member.user?.email)}
+										{/if}
+									</span>
+								{/if}
 							{/each}
 						</div>
 						<div class="guests-meta">
@@ -868,6 +882,13 @@
 		justify-content: center;
 		flex-shrink: 0;
 		overflow: hidden;
+	}
+	.avatar-btn {
+		padding: 0;
+		border: none;
+		cursor: pointer;
+		background: linear-gradient(135deg, var(--slate) 0%, var(--primary) 100%);
+		font: inherit;
 	}
 
 	.avatar :global(.avatar-img) {

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import kingBedIconUrl from '$lib/assets/images/beds/king.svg.svg?url';
 	import queenBedIconUrl from '$lib/assets/images/beds/queen.svg.svg?url';
 	import twinBedIconUrl from '$lib/assets/images/beds/twin.svg.svg?url';
@@ -104,13 +106,15 @@
 									</div>
 									<div class="bed-avatar-wrap">
 										{#if user}
-											<div class="avatar" title={user.name ?? 'Assigned'}>
-												{#if user.avatarUrl}
-													<img src={user.avatarUrl} alt="" />
-												{:else}
-													<span class="avatar-initials">{initials(user.name)}</span>
-												{/if}
-											</div>
+											<ProfileTooltip userId={user.id}>
+												<button type="button" class="avatar avatar-btn" title={user.name ?? 'Assigned'} onclick={() => openProfileCard(user.id)}>
+													{#if user.avatarUrl}
+														<img src={user.avatarUrl} alt="" />
+													{:else}
+														<span class="avatar-initials">{initials(user.name)}</span>
+													{/if}
+												</button>
+											</ProfileTooltip>
 										{:else}
 											<span class="bed-empty">—</span>
 										{/if}
@@ -186,6 +190,12 @@
 		align-items: center;
 		justify-content: center;
 	}
+	.avatar-btn {
+		padding: 0;
+		cursor: pointer;
+		font: inherit;
+	}
+	.avatar-btn:hover { opacity: 0.9; }
 	.avatar img { width: 100%; height: 100%; object-fit: cover; }
 	.avatar-initials { font-size: 0.6875rem; font-weight: 600; color: var(--text); }
 	.bed-empty { font-size: 0.875rem; color: var(--muted); }

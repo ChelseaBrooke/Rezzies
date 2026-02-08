@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import type { PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: any } = $props();
@@ -247,7 +248,7 @@
 						<hr class="section-divider" />
 						<div class="button-row">
 							<button type="button" class="btn btn-secondary">Export data</button>
-							<a href="/profile" class="btn btn-destructive">Go to profile to delete account</a>
+							<button type="button" class="btn btn-destructive" onclick={() => data.user?.id && openProfileCard(data.user.id)}>Open profile</button>
 						</div>
 					</div>
 				</section>

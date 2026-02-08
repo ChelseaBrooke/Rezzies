@@ -2,6 +2,8 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import Navigation from '$lib/components/Navigation.svelte';
+	import ProfileCard from '$lib/components/profile/ProfileCard.svelte';
+	import EditProfileModal from '$lib/components/profile/EditProfileModal.svelte';
 	import { page } from '$app/stores';
 
 	let { children, data } = $props();
@@ -12,9 +14,12 @@
 	<title>Divvi - Fair Room & Cost Splitting for Group Vacations</title>
 </svelte:head>
 
-{#if $page.url.pathname !== '/' && $page.url.pathname !== '/login' && $page.url.pathname !== '/signup' && $page.url.pathname !== '/our-services' && $page.url.pathname !== '/find-vacation' && $page.url.pathname !== '/trips' && $page.url.pathname !== '/profile' && !$page.url.pathname.startsWith('/trips/new/step') && !$page.url.pathname.match(/^\/trips\/[^\/]+/)}
+{#if $page.url.pathname !== '/' && $page.url.pathname !== '/login' && $page.url.pathname !== '/signup' && $page.url.pathname !== '/our-services' && $page.url.pathname !== '/find-vacation' && $page.url.pathname !== '/trips' && !$page.url.pathname.startsWith('/trips/new/step') && !$page.url.pathname.match(/^\/trips\/[^\/]+/)}
 	<Navigation user={data?.user} />
 {/if}
+
+<ProfileCard />
+<EditProfileModal />
 
 <main
 	class:no-padding={$page.url.pathname.startsWith('/trips/new/step')}

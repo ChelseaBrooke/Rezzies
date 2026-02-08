@@ -4,6 +4,8 @@
 	import type { PageData } from './$types';
 	import type { GuestRow } from './+page.server';
 	import pokeIcon from '$lib/assets/images/poke.png';
+	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -312,17 +314,33 @@
 						{#each filteredAndSorted as row}
 							<tr class="row-type-{row.type}">
 								<td>
-									<div class="guest-cell">
-										{#if row.avatarUrl}
-											<img src={row.avatarUrl} alt="" class="avatar-img" />
-										{:else}
-											<span class="avatar">{initials(row.name, row.email)}</span>
-										{/if}
-										<div>
-											<span class="guest-name">{row.name}</span>
-											<span class="guest-email">{row.email}</span>
+									{#if row.userId}
+										<ProfileTooltip userId={row.userId}>
+											<button type="button" class="guest-cell guest-cell-btn" onclick={() => openProfileCard(row.userId!)}>
+												{#if row.avatarUrl}
+													<img src={row.avatarUrl} alt="" class="avatar-img" />
+												{:else}
+													<span class="avatar">{initials(row.name, row.email)}</span>
+												{/if}
+												<div>
+													<span class="guest-name">{row.name}</span>
+													<span class="guest-email">{row.email}</span>
+												</div>
+											</button>
+										</ProfileTooltip>
+									{:else}
+										<div class="guest-cell">
+											{#if row.avatarUrl}
+												<img src={row.avatarUrl} alt="" class="avatar-img" />
+											{:else}
+												<span class="avatar">{initials(row.name, row.email)}</span>
+											{/if}
+											<div>
+												<span class="guest-name">{row.name}</span>
+												<span class="guest-email">{row.email}</span>
+											</div>
 										</div>
-									</div>
+									{/if}
 								</td>
 								<td>
 									<span class="status-pill status-{row.rsvpStatus ?? 'pending'}">
@@ -539,6 +557,8 @@
 	.th-actions, .td-actions { width: 1%; white-space: nowrap; }
 
 	.guest-cell { display: flex; align-items: center; gap: 0.75rem; }
+	.guest-cell-btn { width: 100%; text-align: left; background: none; border: none; font: inherit; cursor: pointer; padding: 0; }
+	.guest-cell-btn:hover { opacity: 0.9; }
 	.avatar { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--surface2); display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; color: var(--text); flex-shrink: 0; }
 	.avatar-img { width: 2.25rem; height: 2.25rem; border-radius: 50%; object-fit: cover; }
 	.guest-name { display: block; font-weight: 500; }

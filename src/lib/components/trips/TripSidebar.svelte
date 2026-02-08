@@ -2,6 +2,8 @@
 	import { getTripBadges } from '$lib/trips/selectors.js';
 	import TripNavItem from './TripNavItem.svelte';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import type { TripForSidebar } from '$lib/trips/types.js';
 
 	let {
@@ -55,16 +57,18 @@
 	<!-- Footer: avatar above settings -->
 	<div class="footer">
 		{#if user}
-			<a href="/profile" class="user-row" aria-label="My profile" title="My profile">
-				<span class="user-avatar">
-					{#if user.avatarUrl}
-						<img src={user.avatarUrl} alt="" class="user-avatar-img" />
-					{:else}
-						{initials(user.name, user.email)}
-					{/if}
-				</span>
-				<span class="user-name">{user.name || user.email || 'Profile'}</span>
-			</a>
+			<ProfileTooltip userId={user.id}>
+				<button type="button" class="user-row" aria-label="My profile" title="My profile" onclick={() => openProfileCard(user.id)}>
+					<span class="user-avatar">
+						{#if user.avatarUrl}
+							<img src={user.avatarUrl} alt="" class="user-avatar-img" />
+						{:else}
+							{initials(user.name, user.email)}
+						{/if}
+					</span>
+					<span class="user-name">{user.name || user.email || 'Profile'}</span>
+				</button>
+			</ProfileTooltip>
 		{/if}
 		<TripNavItem href="/trips/{trip.id}/settings" iconName="settings" label="Trip Settings" />
 	</div>
@@ -174,6 +178,17 @@
 		gap: 0.5rem;
 		padding: 0.5rem 0;
 		margin-top: 0.5rem;
+		width: 100%;
+		text-align: left;
+		background: none;
+		border: none;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+		text-decoration: none;
+	}
+	.user-row:hover {
+		opacity: 0.9;
 	}
 
 	.user-avatar {
