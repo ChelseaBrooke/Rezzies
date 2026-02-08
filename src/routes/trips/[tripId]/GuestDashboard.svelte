@@ -122,6 +122,9 @@
 		guest_meals_contributed: guestMealsContributed,
 		guest_activities_contributed: guestActivitiesContributed
 	});
+
+	// Show big RSVP button for guests who are invited (not yet accepted)
+	const showRsvpButton = $derived(data.membership?.inviteStatus === 'invited');
 </script>
 
 {#if trip}
@@ -141,6 +144,7 @@
 			}}
 			{tripInfoContent}
 			isHost={false}
+			rsvpUrl={showRsvpButton ? `/trips/${trip.id}/rsvp` : null}
 			inviteCode={trip.inviteCode}
 			checkInDate={trip.checkInDate ?? ''}
 			checkOutDate={trip.checkOutDate ?? ''}

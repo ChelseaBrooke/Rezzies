@@ -19,6 +19,8 @@
 		};
 		tripInfoContent: string;
 		isHost: boolean;
+		/** When set, show a big RSVP button (top-left) for guests who haven't responded yet */
+		rsvpUrl?: string | null;
 		inviteCode?: string;
 		checkInDate?: string;
 		checkOutDate?: string;
@@ -34,6 +36,7 @@
 		quickActions,
 		tripInfoContent,
 		isHost,
+		rsvpUrl = null,
 		inviteCode,
 		checkInDate = '',
 		checkOutDate = '',
@@ -50,6 +53,9 @@
 				<img src={trip.listingCoverPhoto} alt="" class="hero-image" />
 			{:else}
 				<div class="hero-placeholder"></div>
+			{/if}
+			{#if rsvpUrl}
+				<a href={rsvpUrl} class="hero-rsvp-button">RSVP</a>
 			{/if}
 			<div class="hero-overlay">
 				<div class="hero-content">
@@ -178,6 +184,32 @@
 		width: 100%;
 		height: 100%;
 		background: linear-gradient(135deg, var(--slate) 0%, var(--muted) 100%);
+	}
+
+	.hero-rsvp-button {
+		position: absolute;
+		top: 1.25rem;
+		left: 1.25rem;
+		z-index: 2;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.875rem 1.75rem;
+		font-size: 1.125rem;
+		font-weight: 700;
+		letter-spacing: 0.02em;
+		color: white;
+		background: var(--copper, #bf4e30);
+		border: none;
+		border-radius: var(--radius-lg, 12px);
+		text-decoration: none;
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
+	}
+	.hero-rsvp-button:hover {
+		transform: scale(1.03);
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+		color: white;
 	}
 
 	.hero-overlay {
