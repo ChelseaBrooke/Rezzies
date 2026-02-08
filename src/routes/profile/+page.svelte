@@ -1,126 +1,51 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
+	import MarketingShell from '$lib/components/MarketingShell.svelte';
+	import { TRAVEL_STYLE_OPTIONS } from '$lib/travel-style.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	// Mock profile (structured for later backend)
-	type UserProfile = {
-		handle: string;
-		pronouns: string;
-		avatarUrl: string | null;
-		emailVerified: boolean;
-		phoneVerified: boolean;
-		emergencyContactName: string;
-		emergencyContactPhone: string;
-		shareEmergencyWithHosts: boolean;
-		dietaryTags: string[];
-		allergiesTags: string[];
-		accessibilityNotes: string;
-		roomingPreference: 'solo' | 'share_ok' | 'depends';
-		bedPreference: string[];
-		quietHoursStart: string;
-		quietHoursEnd: string;
-		vibe: 'early_bird' | 'flexible' | 'night_owl';
-		needsRide: boolean;
-		canDrive: boolean;
-		hasCarSeats: boolean;
-		defaultRsvp: 'ask' | 'likely';
-		defaultCostSplit: 'per_person' | 'per_room' | 'per_bed';
-		notifyItinerary: boolean;
-		notifyMealPolls: boolean;
-		notifyPayments: boolean;
-		notifyMentions: boolean;
-		notifyHostAnnouncements: boolean;
-		loginMethods: { type: string; connected: boolean }[];
-		socialLinks: { platform: string; url: string }[];
-		whoCanInvite: 'everyone' | 'friends' | 'link_only';
-		passwordLastChanged: string | null;
-		mfaEnabled: boolean;
-		sessions: { device: string; location: string; lastActive: string }[];
-		profileVisibility: 'public' | 'trip_only' | 'private';
-		hideEmail: boolean;
-		hidePhone: boolean;
-		hideStats: boolean;
-		memberSince: string;
-		roles: ('host' | 'cohost' | 'guest')[];
-	};
-	const MOCK_PROFILE: UserProfile = {
-		handle: 'chelsea',
-		pronouns: 'she/her',
-		avatarUrl: null,
-		emailVerified: true,
-		phoneVerified: false,
-		emergencyContactName: 'Jamie Smith',
-		emergencyContactPhone: '+1 555 123 4567',
-		shareEmergencyWithHosts: true,
-		dietaryTags: ['Vegetarian', 'No dairy'],
-		allergiesTags: ['Tree nuts'],
-		accessibilityNotes: 'Prefer ground floor when possible.',
-		roomingPreference: 'share_ok',
-		bedPreference: ['Queen', 'Twin'],
-		quietHoursStart: '22:00',
-		quietHoursEnd: '07:00',
-		vibe: 'flexible',
-		needsRide: false,
-		canDrive: true,
-		hasCarSeats: false,
-		defaultRsvp: 'ask',
-		defaultCostSplit: 'per_person',
-		notifyItinerary: true,
-		notifyMealPolls: true,
-		notifyPayments: true,
-		notifyMentions: true,
-		notifyHostAnnouncements: true,
-		loginMethods: [
-			{ type: 'Google', connected: true },
-			{ type: 'Email', connected: true },
-			{ type: 'Apple', connected: false }
-		],
-		socialLinks: [{ platform: 'Instagram', url: 'https://instagram.com/chelsea' }],
-		whoCanInvite: 'everyone',
-		passwordLastChanged: '2024-06-15',
-		mfaEnabled: false,
-		sessions: [
-			{ device: 'Chrome on Windows', location: 'Seattle, WA', lastActive: 'Just now' },
-			{ device: 'Safari on iPhone', location: 'Seattle, WA', lastActive: '2 hours ago' }
-		],
-		profileVisibility: 'public',
-		hideEmail: false,
-		hidePhone: true,
-		hideStats: false,
-		memberSince: data.user?.createdAt ? new Date(data.user.createdAt).toISOString().slice(0, 10) : '2023-03-01',
-		roles: ['host', 'guest']
-	};
-
-	let profile = $state<UserProfile>({
-		...MOCK_PROFILE,
-		avatarUrl: data.user?.avatarUrl ?? MOCK_PROFILE.avatarUrl
+	// Profile display state (own profile only for now)
+	let profile = $state({
+		avatarUrl: data.user?.avatarUrl ?? null,
+		travelStyle: data.user?.travelStyle ?? null,
+		homeCity: data.user?.homeCity ?? null,
+		timezone: data.user?.timezone ?? null
 	});
-	let activeTab = $state<'preferences' | 'saved' | 'history' | 'security'>('preferences');
-	let savedSubTab = $state<'trips' | 'templates'>('trips');
+
+	/** 10 soft chat bubble colors (slightly less muted, not harsh) */
+	const CHAT_BUBBLE_COLORS = [
+		'#7a9a78', /* sage */
+		'#6a8ea8', /* soft blue */
+		'#5a9a8a', /* teal */
+		'#9a8268', /* warm taupe */
+		'#8870a0', /* dusty lavender */
+		'#b07860', /* soft terracotta */
+		'#9a8a58', /* muted gold */
+		'#6080a0', /* slate blue */
+		'#a88878', /* dusty peach */
+		'#5a9a78'  /* soft mint */
+	] as const;
+
 	let toast = $state<{ message: string } | null>(null);
 	let editModalOpen = $state(false);
 	let deleteModalOpen = $state(false);
-	let reportModalOpen = $state(false);
+	let avatarUploading = $state(false);
+	let travelStyleEditOpen = $state(false);
+	let travelStyleFormEl = $state<HTMLFormElement | null>(null);
+	let travelStyleDraft = $state('');
 	let editForm = $state({
 		displayName: data.user?.name ?? '',
 		avatarUrl: data.user?.avatarUrl ?? '',
-		chatBubbleColor: data.user?.chatBubbleColor ?? '#3b82f6',
-		handle: MOCK_PROFILE.handle,
-		pronouns: MOCK_PROFILE.pronouns,
-		dietaryTags: MOCK_PROFILE.dietaryTags.join(', '),
-		allergiesTags: MOCK_PROFILE.allergiesTags.join(', '),
-		accessibilityNotes: MOCK_PROFILE.accessibilityNotes
+		chatBubbleColor: data.user?.chatBubbleColor ?? CHAT_BUBBLE_COLORS[0],
+		travelStyle: profile.travelStyle ?? '',
+		homeCity: profile.homeCity ?? '',
+		timezone: profile.timezone ?? ''
 	});
 
 	const displayName = $derived(data.user?.name || 'Traveler');
-	const memberSinceFormatted = $derived(
-		profile.memberSince
-			? new Date(profile.memberSince).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-			: '—'
-	);
 	const stats = $derived(data.stats ?? {
 		tripsHosted: 0,
 		tripsJoined: 0,
@@ -154,25 +79,44 @@
 		editForm = {
 			displayName: data.user?.name ?? '',
 			avatarUrl: data.user?.avatarUrl ?? profile.avatarUrl ?? '',
-			chatBubbleColor: data.user?.chatBubbleColor ?? '#3b82f6',
-			handle: profile.handle,
-			pronouns: profile.pronouns,
-			dietaryTags: profile.dietaryTags.join(', '),
-			allergiesTags: profile.allergiesTags.join(', '),
-			accessibilityNotes: profile.accessibilityNotes
+			chatBubbleColor: data.user?.chatBubbleColor ?? CHAT_BUBBLE_COLORS[0],
+			travelStyle: profile.travelStyle ?? '',
+			homeCity: profile.homeCity ?? '',
+			timezone: profile.timezone ?? ''
 		};
 		editModalOpen = true;
+	}
+
+	async function onAvatarFileChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		avatarUploading = true;
+		try {
+			const fd = new FormData();
+			fd.set('file', file);
+			const res = await fetch('/api/upload-image', { method: 'POST', body: fd });
+			const json = await res.json();
+			if (!res.ok || json.error) {
+				showToast(json.error ?? 'Upload failed');
+				return;
+			}
+			const origin = typeof window !== 'undefined' ? window.location.origin : '';
+			editForm.avatarUrl = json.url ? `${origin}${json.url}` : editForm.avatarUrl;
+			showToast('Photo uploaded. Save profile to keep it.');
+		} finally {
+			avatarUploading = false;
+			input.value = '';
+		}
 	}
 
 	function saveEdit() {
 		profile = {
 			...profile,
 			avatarUrl: editForm.avatarUrl?.trim() || null,
-			handle: editForm.handle,
-			pronouns: editForm.pronouns,
-			dietaryTags: editForm.dietaryTags ? editForm.dietaryTags.split(',').map((s) => s.trim()).filter(Boolean) : [],
-			allergiesTags: editForm.allergiesTags ? editForm.allergiesTags.split(',').map((s) => s.trim()).filter(Boolean) : [],
-			accessibilityNotes: editForm.accessibilityNotes
+			travelStyle: editForm.travelStyle?.trim() || null,
+			homeCity: editForm.homeCity?.trim() || null,
+			timezone: editForm.timezone?.trim() || null
 		};
 		editModalOpen = false;
 		showToast('Profile updated!');
@@ -183,461 +127,122 @@
 		goto('/logout');
 	}
 
-	const statLinks: { label: string; href: string; value: number; icon: string }[] = [
-		{ label: 'Trips hosted', href: '/trips?filter=hosted', value: stats.tripsHosted, icon: 'home' },
-		{ label: 'Trips joined', href: '/trips?filter=joined', value: stats.tripsJoined, icon: 'users' },
-		{ label: 'Upcoming trips', href: '/trips?filter=upcoming', value: stats.upcomingTrips, icon: 'calendar' },
-		{ label: 'Pending invites', href: '/invites', value: stats.pendingInvites, icon: 'mail' },
-		{ label: 'Pending RSVPs', href: '/trips', value: stats.pendingRsvps, icon: 'check-circle' },
-		{ label: 'Unread notifications', href: '/', value: stats.unreadNotifications, icon: 'bell' }
-	];
-
-	const hasPhotosFeature = $state(false);
+	const isOwnProfile = $derived(true);
 </script>
 
 <svelte:head>
 	<title>Profile – Divvi</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-	<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+	<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 </svelte:head>
 
-<div class="profile-page">
-	<div class="profile-container">
-		<!-- Left column: identity + quick actions -->
-		<aside class="profile-left">
-			<!-- Profile header card -->
-			<section class="card card-header" aria-labelledby="profile-identity">
-				<div class="card-header-tint"></div>
-				<div class="card-body">
-					<div class="avatar-wrap">
-						{#if profile.avatarUrl}
-							<img src={profile.avatarUrl} alt="" class="avatar-img" />
-						{:else}
-							<span class="avatar-initials">{initials(data.user?.name)}</span>
-						{/if}
-					</div>
-					<h1 id="profile-identity" class="profile-name">{displayName}</h1>
-					{#if profile.handle}
-						<p class="profile-handle">@{profile.handle}</p>
+<MarketingShell user={data?.user}>
+	<div class="profile-page">
+		<div class="profile-card" role="article" aria-labelledby="profile-name">
+			<!-- Cover strip -->
+			<div class="profile-cover"></div>
+
+			<div class="profile-card-body">
+				<!-- Avatar -->
+				<div class="profile-avatar-wrap">
+					{#if profile.avatarUrl}
+						<img src={profile.avatarUrl} alt="" class="profile-avatar-img" />
+					{:else}
+						<span class="profile-avatar-initials">{initials(data.user?.name)}</span>
 					{/if}
-					{#if profile.pronouns}
-						<p class="profile-pronouns">{profile.pronouns}</p>
-					{/if}
-					<p class="profile-meta">Member since {memberSinceFormatted}</p>
-					<div class="badges-row">
-						{#each profile.roles as role}
-							<span class="pill pill-role">{role === 'cohost' ? 'Co-host' : role}</span>
-						{/each}
-						{#if profile.emailVerified}
-							<span class="pill pill-verified">Verified email</span>
-						{/if}
-						{#if profile.phoneVerified}
-							<span class="pill pill-verified">Verified phone</span>
-						{/if}
-					</div>
-					<div class="cta-row">
-						<button type="button" class="btn btn-primary" onclick={openEditModal}>
-							<span class="icon" aria-hidden="true">✏️</span>
-							Edit profile
-						</button>
-						<button type="button" class="btn btn-secondary" onclick={copyShareLink}>
-							<span class="icon" aria-hidden="true">🔗</span>
-							Share profile
-						</button>
-					</div>
-					<div class="cta-row secondary">
-						<a href="#security-privacy" class="link-soft">Privacy & security →</a>
-					</div>
 				</div>
-			</section>
 
-			<!-- Quick stats card -->
-			<section class="card card-stats" aria-labelledby="quick-stats-title">
-				<h2 id="quick-stats-title" class="card-title">
-					<span class="icon-sm" aria-hidden="true">📊</span>
-					Quick stats
-				</h2>
-				<div class="stats-grid">
-					{#each statLinks as stat}
-						<a href={stat.href} class="stat-tile">
-							<span class="stat-icon" aria-hidden="true">{stat.icon === 'home' ? '🏠' : stat.icon === 'users' ? '👥' : stat.icon === 'calendar' ? '📅' : stat.icon === 'mail' ? '✉️' : stat.icon === 'check-circle' ? '✓' : '🔔'}</span>
-							<span class="stat-label">{stat.label}</span>
-							<span class="stat-value">{stat.value}</span>
-						</a>
-					{/each}
-				</div>
-			</section>
-		</aside>
+				<!-- Display name -->
+				<h1 id="profile-name" class="profile-display-name">{displayName}</h1>
 
-		<!-- Right column: tabs + sections -->
-		<div class="profile-right">
-			<div class="tabs-row" role="tablist">
-				<button
-					type="button"
-					role="tab"
-					class="tab"
-					class:active={activeTab === 'preferences'}
-					onclick={() => (activeTab = 'preferences')}
-				>
-					Preferences
-				</button>
-				<button type="button" role="tab" class="tab" class:active={activeTab === 'saved'} onclick={() => (activeTab = 'saved')}>
-					Saved
-				</button>
-				<button type="button" role="tab" class="tab" class:active={activeTab === 'history'} onclick={() => (activeTab = 'history')}>
-					History
-				</button>
-				<button type="button" role="tab" class="tab" class:active={activeTab === 'security'} onclick={() => (activeTab = 'security')}>
-					Security
-				</button>
-			</div>
-
-			{#if activeTab === 'preferences'}
-				<!-- Basics -->
-				<section class="card section-card" aria-labelledby="basics-title">
-					<h2 id="basics-title" class="card-title card-title-tint">
-						<span class="icon-sm">👤</span>
-						Basics
-					</h2>
-					<div class="card-body">
-						<div class="field-row">
-							<span class="field-label">Email</span>
-							<span class="field-value">{data.user?.email ?? '—'}</span>
-							{#if profile.emailVerified}
-								<span class="pill pill-verified">Verified</span>
-							{/if}
-							<button type="button" class="btn-ghost btn-sm" onclick={openEditModal}>Edit</button>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Phone</span>
-							<span class="field-value">{data.user?.phone ?? 'Not set'}</span>
-							{#if profile.phoneVerified}
-								<span class="pill pill-verified">Verified</span>
-							{/if}
-						</div>
-						<div class="field-row">
-							<span class="field-label">Emergency contact</span>
-							<span class="field-value">{profile.emergencyContactName} · {profile.emergencyContactPhone}</span>
-						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Share emergency with trip hosts</span>
+				<!-- Trip archetype (travel style) with edit pencil when own -->
+				<div class="profile-archetype-row">
+					{#if travelStyleEditOpen}
+						<form
+							class="profile-archetype-form"
+							method="POST"
+							action="?/updateTravelStyle"
+							bind:this={travelStyleFormEl}
+							use:enhance={() => {
+								return ({ result }) => {
+									if (result.type === 'success' && result.data?.updateTravelStyleSuccess) {
+										profile = { ...profile, travelStyle: travelStyleDraft?.trim() || null };
+										travelStyleEditOpen = false;
+										showToast('Travel style updated');
+									}
+								};
+							}}
+						>
+							<select
+								name="travelStyle"
+								class="profile-archetype-select"
+								value={travelStyleDraft}
+								onchange={(e) => { travelStyleDraft = (e.currentTarget as HTMLSelectElement).value; travelStyleFormEl?.requestSubmit(); }}
+							>
+								<option value="">—</option>
+								{#each TRAVEL_STYLE_OPTIONS as opt}
+									<option value={opt}>{opt}</option>
+								{/each}
+							</select>
+						</form>
+					{:else}
+						<span class="profile-archetype-pill">{profile.travelStyle || 'No travel style set'}</span>
+						{#if isOwnProfile}
 							<button
 								type="button"
-								class="toggle"
-								class:on={profile.shareEmergencyWithHosts}
-								onclick={() => (profile = { ...profile, shareEmergencyWithHosts: !profile.shareEmergencyWithHosts })}
-								aria-pressed={profile.shareEmergencyWithHosts}
+								class="profile-edit-pencil"
+								aria-label="Edit travel style"
+								onclick={() => { travelStyleDraft = profile.travelStyle ?? ''; travelStyleEditOpen = true; }}
 							>
-								<span class="toggle-thumb"></span>
+								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
 							</button>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Dietary</span>
-							<div class="tags">
-								{#each profile.dietaryTags as tag}
-									<span class="pill pill-tag">{tag}</span>
-								{/each}
-								{#if profile.dietaryTags.length === 0}
-									<span class="muted">None set</span>
-								{/if}
-							</div>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Allergies</span>
-							<div class="tags">
-								{#each profile.allergiesTags as tag}
-									<span class="pill pill-tag">{tag}</span>
-								{/each}
-								{#if profile.allergiesTags.length === 0}
-									<span class="muted">None set</span>
-								{/if}
-							</div>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Accessibility notes</span>
-							<span class="field-value">{profile.accessibilityNotes || '—'}</span>
-						</div>
-					</div>
-				</section>
-
-				<!-- Travel preferences -->
-				<section class="card section-card" aria-labelledby="prefs-title">
-					<h2 id="prefs-title" class="card-title card-title-tint">
-						<span class="icon-sm">✈️</span>
-						Preferences
-					</h2>
-					<div class="card-body">
-						<div class="field-row">
-							<span class="field-label">Rooming</span>
-							<div class="radio-group">
-								{#each ['solo', 'share_ok', 'depends'] as opt}
-									<label class="radio-label">
-										<input type="radio" name="rooming" value={opt} checked={profile.roomingPreference === opt} onchange={() => (profile = { ...profile, roomingPreference: opt as UserProfile['roomingPreference'] })} />
-										{opt === 'solo' ? 'Solo' : opt === 'share_ok' ? 'Share OK' : 'Depends'}
-									</label>
-								{/each}
-							</div>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Bed preference</span>
-							<div class="pills-select">
-								{#each ['King', 'Queen', 'Twin', 'Sofa bed OK'] as bed}
-									<button
-										type="button"
-										class="pill pill-select"
-										class:active={profile.bedPreference.includes(bed)}
-										onclick={() => {
-											const next = profile.bedPreference.includes(bed)
-												? profile.bedPreference.filter((b) => b !== bed)
-												: [...profile.bedPreference, bed];
-											profile = { ...profile, bedPreference: next };
-										}}
-									>
-										{bed}
-									</button>
-								{/each}
-							</div>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Quiet hours</span>
-							<span class="field-value">{profile.quietHoursStart} – {profile.quietHoursEnd}</span>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Vibe</span>
-							<div class="segmented">
-								<button type="button" class="seg" class:active={profile.vibe === 'early_bird'} onclick={() => (profile = { ...profile, vibe: 'early_bird' })}>Early bird</button>
-								<button type="button" class="seg" class:active={profile.vibe === 'flexible'} onclick={() => (profile = { ...profile, vibe: 'flexible' })}>Flexible</button>
-								<button type="button" class="seg" class:active={profile.vibe === 'night_owl'} onclick={() => (profile = { ...profile, vibe: 'night_owl' })}>Night owl</button>
-							</div>
-						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Needs a ride</span>
-							<button type="button" class="toggle" class:on={profile.needsRide} onclick={() => (profile = { ...profile, needsRide: !profile.needsRide })} aria-pressed={profile.needsRide}><span class="toggle-thumb"></span></button>
-						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Can drive</span>
-							<button type="button" class="toggle" class:on={profile.canDrive} onclick={() => (profile = { ...profile, canDrive: !profile.canDrive })} aria-pressed={profile.canDrive}><span class="toggle-thumb"></span></button>
-						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Has car seats</span>
-							<button type="button" class="toggle" class:on={profile.hasCarSeats} onclick={() => (profile = { ...profile, hasCarSeats: !profile.hasCarSeats })} aria-pressed={profile.hasCarSeats}><span class="toggle-thumb"></span></button>
-						</div>
-					</div>
-				</section>
-
-				<!-- Defaults -->
-				<section class="card section-card" aria-labelledby="defaults-title">
-					<h2 id="defaults-title" class="card-title card-title-tint">
-						<span class="icon-sm">⚙️</span>
-						Defaults
-					</h2>
-					<div class="card-body">
-						<div class="field-row">
-							<span class="field-label">Default RSVP</span>
-							<div class="segmented">
-								<button type="button" class="seg" class:active={profile.defaultRsvp === 'ask'} onclick={() => (profile = { ...profile, defaultRsvp: 'ask' })}>Ask me every time</button>
-								<button type="button" class="seg" class:active={profile.defaultRsvp === 'likely'} onclick={() => (profile = { ...profile, defaultRsvp: 'likely' })}>Auto-set to Likely</button>
-							</div>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Cost split preference</span>
-							<div class="segmented">
-								<button type="button" class="seg" class:active={profile.defaultCostSplit === 'per_person'} onclick={() => (profile = { ...profile, defaultCostSplit: 'per_person' })}>Per person</button>
-								<button type="button" class="seg" class:active={profile.defaultCostSplit === 'per_room'} onclick={() => (profile = { ...profile, defaultCostSplit: 'per_room' })}>Per room</button>
-								<button type="button" class="seg" class:active={profile.defaultCostSplit === 'per_bed'} onclick={() => (profile = { ...profile, defaultCostSplit: 'per_bed' })}>Per bed</button>
-							</div>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Notifications</span>
-							<div class="check-list">
-								<label class="check-label"><input type="checkbox" bind:checked={profile.notifyItinerary} /> Itinerary changes</label>
-								<label class="check-label"><input type="checkbox" bind:checked={profile.notifyMealPolls} /> Meal polls</label>
-								<label class="check-label"><input type="checkbox" bind:checked={profile.notifyPayments} /> Payment reminders</label>
-								<label class="check-label"><input type="checkbox" bind:checked={profile.notifyMentions} /> @mentions</label>
-								<label class="check-label"><input type="checkbox" bind:checked={profile.notifyHostAnnouncements} /> Host announcements</label>
-							</div>
-						</div>
-					</div>
-				</section>
-
-				<!-- Connections -->
-				<section class="card section-card" aria-labelledby="connections-title">
-					<h2 id="connections-title" class="card-title card-title-tint">
-						<span class="icon-sm">🔗</span>
-						Connections
-					</h2>
-					<div class="card-body">
-						<div class="field-row">
-							<span class="field-label">Login methods</span>
-							<div class="pills-row">
-								{#each profile.loginMethods as method}
-									<span class="pill" class:connected={method.connected}>{method.type} {method.connected ? '✓' : ''}</span>
-								{/each}
-							</div>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Social links</span>
-							{#each profile.socialLinks as link}
-								<span class="field-value"><a href={link.url} target="_blank" rel="noopener noreferrer">{link.platform}</a></span>
-							{/each}
-							{#if profile.socialLinks.length === 0}
-								<span class="muted">None added</span>
-							{/if}
-						</div>
-						<div class="field-row">
-							<span class="field-label">Who can invite me</span>
-							<select
-								class="select"
-								value={profile.whoCanInvite}
-								onchange={(e) => (profile = { ...profile, whoCanInvite: (e.currentTarget.value as UserProfile['whoCanInvite']) })}
-							>
-								<option value="everyone">Everyone</option>
-								<option value="friends">Friends of friends</option>
-								<option value="link_only">Only people with link</option>
-							</select>
-						</div>
-						<div class="button-row">
-							<a href="/settings/blocked" class="btn btn-ghost">Block list</a>
-							<button type="button" class="btn btn-ghost" onclick={() => (reportModalOpen = true)}>Report issue</button>
-						</div>
-					</div>
-				</section>
-			{/if}
-
-			{#if activeTab === 'saved'}
-				<section class="card section-card" aria-labelledby="saved-title">
-					<h2 id="saved-title" class="card-title card-title-tint">
-						<span class="icon-sm">⭐</span>
-						Saved
-					</h2>
-					<div class="sub-tabs">
-						<button type="button" class="sub-tab" class:active={savedSubTab === 'trips'} onclick={() => (savedSubTab = 'trips')}>Saved trips</button>
-						<button type="button" class="sub-tab" class:active={savedSubTab === 'templates'} onclick={() => (savedSubTab = 'templates')}>Templates</button>
-					</div>
-					<div class="card-body">
-						{#if savedSubTab === 'trips'}
-							<div class="empty-state">
-								<span class="empty-icon" aria-hidden="true">📌</span>
-								<p>No saved trips yet.</p>
-								<p class="muted">When you save a trip, it’ll show up here.</p>
-								<a href="/trips" class="btn btn-secondary">Browse trips</a>
-							</div>
-						{:else}
-							<div class="empty-state">
-								<span class="empty-icon" aria-hidden="true">📋</span>
-								<p>No templates yet.</p>
-								<p class="muted">Room choice and dietary presets will appear here.</p>
-							</div>
 						{/if}
-					</div>
-				</section>
-			{/if}
+					{/if}
+				</div>
 
-			{#if activeTab === 'history'}
-				<section class="card section-card" aria-labelledby="history-title">
-					<h2 id="history-title" class="card-title card-title-tint">
-						<span class="icon-sm">📅</span>
-						Trip history
-					</h2>
-					<div class="card-body">
-						<div class="timeline">
-							<div class="timeline-year">2024</div>
-							<div class="timeline-item">
-								<div class="timeline-content">
-									<strong>Lake weekend</strong>
-									<span class="muted">Jun 14 – 16 · Tahoe</span>
-									<span class="pill pill-role">Guest</span>
-									<button type="button" class="btn-ghost btn-sm">View recap</button>
-								</div>
-							</div>
-							<div class="timeline-year">2023</div>
-							<div class="timeline-item">
-								<div class="timeline-content">
-									<strong>Beach house</strong>
-									<span class="muted">Aug 1 – 7 · Oregon Coast</span>
-									<span class="pill pill-role">Host</span>
-									<button type="button" class="btn-ghost btn-sm">View recap</button>
-								</div>
-							</div>
-						</div>
-						{#if hasPhotosFeature}
-							<div class="field-row">
-								<span class="field-label">Photo highlights you’re tagged in</span>
-								<span class="muted">Coming soon</span>
-							</div>
-						{:else}
-							<div class="empty-state small">
-								<span class="empty-icon">📷</span>
-								<p class="muted">Photo highlights (coming soon)</p>
-							</div>
-						{/if}
-					</div>
-				</section>
-			{/if}
+				<!-- Home city / time zone (optional) -->
+				{#if profile.homeCity || profile.timezone}
+					<p class="profile-location">
+						{#if profile.homeCity}{profile.homeCity}{/if}
+						{#if profile.homeCity && profile.timezone} · {/if}
+						{#if profile.timezone}{profile.timezone}{/if}
+					</p>
+				{/if}
 
-			{#if activeTab === 'security'}
-				<section id="security-privacy" class="card section-card" aria-labelledby="security-title">
-					<h2 id="security-title" class="card-title card-title-tint">
-						<span class="icon-sm">🔒</span>
-						Security & privacy
-					</h2>
-					<div class="card-body">
-						<div class="field-row">
-							<span class="field-label">Password</span>
-							<span class="field-value">Last changed {profile.passwordLastChanged ?? 'never'}</span>
-							<a href="/settings" class="btn btn-ghost btn-sm">Change password</a>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Two-factor auth</span>
-							<span class="field-value">{profile.mfaEnabled ? 'On' : 'Off'}</span>
-							<button type="button" class="btn btn-ghost btn-sm">{profile.mfaEnabled ? 'Manage MFA' : 'Set up MFA'}</button>
-						</div>
-						<div class="field-row">
-							<span class="field-label">Active sessions</span>
-							<ul class="sessions-list">
-								{#each profile.sessions as session}
-									<li class="session-item">
-										<span>{session.device}</span>
-										<span class="muted">{session.location} · {session.lastActive}</span>
-										<button type="button" class="btn-ghost btn-sm">Sign out</button>
-									</li>
-								{/each}
-							</ul>
-							<button type="button" class="btn btn-ghost" onclick={() => showToast('Signed out of other sessions')}>Sign out all others</button>
-						</div>
-						<hr class="card-divider" />
-						<div class="field-row">
-							<span class="field-label">Profile visibility</span>
-							<select class="select" value={profile.profileVisibility} onchange={(e) => (profile = { ...profile, profileVisibility: e.currentTarget.value as UserProfile['profileVisibility'] })}>
-								<option value="public">Public</option>
-								<option value="trip_only">Trip-only</option>
-								<option value="private">Private</option>
-							</select>
-						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Hide email</span>
-							<button type="button" class="toggle" class:on={profile.hideEmail} onclick={() => (profile = { ...profile, hideEmail: !profile.hideEmail })} aria-pressed={profile.hideEmail}><span class="toggle-thumb"></span></button>
-						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Hide phone</span>
-							<button type="button" class="toggle" class:on={profile.hidePhone} onclick={() => (profile = { ...profile, hidePhone: !profile.hidePhone })} aria-pressed={profile.hidePhone}><span class="toggle-thumb"></span></button>
-						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Hide stats</span>
-							<button type="button" class="toggle" class:on={profile.hideStats} onclick={() => (profile = { ...profile, hideStats: !profile.hideStats })} aria-pressed={profile.hideStats}><span class="toggle-thumb"></span></button>
-						</div>
-						<hr class="card-divider" />
-						<div class="button-row">
-							<button type="button" class="btn btn-secondary">Export data</button>
-							<button type="button" class="btn btn-destructive" onclick={() => (deleteModalOpen = true)}>Delete account</button>
-						</div>
+				<!-- Actions: own = Edit + Account settings; other = Add Friend, Report, Block -->
+				<div class="profile-actions">
+					{#if isOwnProfile}
+						<button type="button" class="btn btn-primary" onclick={openEditModal}>Edit profile</button>
+						<a href="/settings" class="btn btn-secondary">Account settings</a>
+					{:else}
+						<button type="button" class="btn btn-primary">Add Friend</button>
+						<button type="button" class="btn btn-ghost">Report</button>
+						<a href="/settings?tab=blocked" class="btn btn-ghost">Block</a>
+					{/if}
+				</div>
+
+				<!-- Host/guest history: stats only -->
+				<div class="profile-stats">
+					<div class="profile-stat">
+						<span class="profile-stat-value">{stats.tripsHosted}</span>
+						<span class="profile-stat-label">Trips hosted</span>
 					</div>
-				</section>
-			{/if}
+					<div class="profile-stat">
+						<span class="profile-stat-value">{stats.tripsJoined}</span>
+						<span class="profile-stat-label">Trips joined</span>
+					</div>
+					{#if !isOwnProfile}
+						<div class="profile-stat">
+							<span class="profile-stat-value">0</span>
+							<span class="profile-stat-label">Trips together</span>
+						</div>
+					{/if}
+				</div>
+			</div>
 		</div>
 	</div>
-</div>
+</MarketingShell>
 
 <!-- Edit profile modal -->
 {#if editModalOpen}
@@ -647,7 +252,13 @@
 			<form method="POST" action="?/updateProfile" use:enhance={() => {
 				return ({ result }) => {
 					if (result.type === 'success' && result.data?.updateProfileSuccess) {
-						profile = { ...profile, avatarUrl: editForm.avatarUrl?.trim() || null };
+						profile = {
+							...profile,
+							avatarUrl: editForm.avatarUrl?.trim() || null,
+							travelStyle: editForm.travelStyle?.trim() || null,
+							homeCity: editForm.homeCity?.trim() || null,
+							timezone: editForm.timezone?.trim() || null
+						};
 						editModalOpen = false;
 						showToast('Profile updated!');
 					}
@@ -661,38 +272,52 @@
 					<input id="edit-name" type="text" name="name" bind:value={editForm.displayName} />
 				</div>
 				<div class="form-group">
-					<label for="edit-avatar">Avatar image URL</label>
-					<input id="edit-avatar" type="url" name="avatarUrl" bind:value={editForm.avatarUrl} placeholder="https://…" />
-					<small class="field-hint">Paste a link to a profile image (e.g. from imgur.com or your photo host).</small>
+					<label for="edit-avatar">Avatar image</label>
+					<input id="edit-avatar" type="url" name="avatarUrl" bind:value={editForm.avatarUrl} placeholder="https://… or upload below" />
+					<div class="avatar-upload-row">
+						<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="avatar-file-input" onchange={onAvatarFileChange} />
+						<button type="button" class="btn btn-secondary avatar-upload-btn" onclick={() => (document.querySelector('.avatar-file-input') as HTMLInputElement)?.click()} disabled={avatarUploading}>
+							{avatarUploading ? 'Uploading…' : 'Upload from computer'}
+						</button>
+					</div>
+					<small class="field-hint">Paste a link or upload a photo (JPEG, PNG, WebP, GIF; max 10MB).</small>
 				</div>
 				<div class="form-group">
-					<label for="edit-chat-color">Chat bubble color</label>
+					<label>Chat bubble color</label>
 					<div class="color-picker-row">
-						<input id="edit-chat-color" type="color" name="chatBubbleColor" bind:value={editForm.chatBubbleColor} class="color-input" />
-						<span class="color-hex">{editForm.chatBubbleColor}</span>
+						<input type="hidden" name="chatBubbleColor" value={editForm.chatBubbleColor} />
+						{#each CHAT_BUBBLE_COLORS as color}
+							<button
+								type="button"
+								class="color-swatch"
+								class:selected={editForm.chatBubbleColor.toLowerCase() === color}
+								style="background-color: {color}"
+								title={color}
+								aria-label="Select color {color}"
+								onclick={() => (editForm.chatBubbleColor = color)}
+							></button>
+						{/each}
 					</div>
 					<small class="field-hint">Used as your message color in trip group chats.</small>
 				</div>
 				<div class="form-group">
-					<label for="edit-handle">Handle</label>
-					<input id="edit-handle" type="text" bind:value={editForm.handle} placeholder="@username" />
+					<label for="edit-travel-style">Travel style</label>
+					<select id="edit-travel-style" name="travelStyle" bind:value={editForm.travelStyle}>
+						<option value="">—</option>
+						{#each TRAVEL_STYLE_OPTIONS as opt}
+							<option value={opt}>{opt}</option>
+						{/each}
+					</select>
 				</div>
 				<div class="form-group">
-					<label for="edit-pronouns">Pronouns</label>
-					<input id="edit-pronouns" type="text" bind:value={editForm.pronouns} placeholder="she/her" />
+					<label for="edit-home-city">Home city (optional)</label>
+					<input id="edit-home-city" type="text" name="homeCity" bind:value={editForm.homeCity} placeholder="e.g. Seattle, WA" />
 				</div>
 				<div class="form-group">
-					<label for="edit-dietary">Dietary (comma-separated)</label>
-					<input id="edit-dietary" type="text" bind:value={editForm.dietaryTags} />
+					<label for="edit-timezone">Time zone (optional)</label>
+					<input id="edit-timezone" type="text" name="timezone" bind:value={editForm.timezone} placeholder="e.g. America/Los_Angeles" />
 				</div>
-				<div class="form-group">
-					<label for="edit-allergies">Allergies (comma-separated)</label>
-					<input id="edit-allergies" type="text" bind:value={editForm.allergiesTags} />
-				</div>
-				<div class="form-group">
-					<label for="edit-accessibility">Accessibility notes</label>
-					<textarea id="edit-accessibility" bind:value={editForm.accessibilityNotes} rows="2"></textarea>
-				</div>
+				<p class="modal-hint">Dietary, allergies, and accessibility are in <a href="/settings">Account settings → Basics</a>.</p>
 				<div class="modal-actions">
 					<button type="button" class="btn btn-ghost" onclick={() => (editModalOpen = false)}>Cancel</button>
 					<button type="submit" class="btn btn-primary">Save</button>
@@ -716,80 +341,245 @@
 	</div>
 {/if}
 
-<!-- Report issue modal -->
-{#if reportModalOpen}
-	<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
-		<div class="modal">
-			<h2 id="report-modal-title" class="modal-title">Report an issue</h2>
-			<p class="modal-text">Describe what went wrong and we’ll look into it.</p>
-			<form onsubmit={(e) => { e.preventDefault(); reportModalOpen = false; showToast('Report submitted. Thanks!'); }}>
-				<div class="form-group">
-					<textarea rows="3" placeholder="Details…"></textarea>
-				</div>
-				<div class="modal-actions">
-					<button type="button" class="btn btn-ghost" onclick={() => (reportModalOpen = false)}>Cancel</button>
-					<button type="submit" class="btn btn-primary">Submit</button>
-				</div>
-			</form>
-		</div>
-	</div>
-{/if}
-
 {#if toast}
 	<div class="toast" role="status">{toast.message}</div>
 {/if}
 
 <style>
-	/* Sleek profile theme: neutral grays, soft blue accent, Plus Jakarta Sans */
+	/* Minimal public profile card – Divvi */
 	.profile-page {
 		font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-		background: #f8fafc;
 		min-height: calc(100vh - 80px);
 		width: 100%;
 		max-width: 100vw;
-		overflow-x: hidden;
 		box-sizing: border-box;
-		padding: clamp(0.75rem, 2vw, 1.5rem) clamp(0.5rem, 4vw, 1.5rem);
+		padding: 2rem 1.5rem;
+		display: flex;
+		align-items: flex-start;
+		justify-content: center;
 	}
-	@media (min-width: 768px) {
-		.profile-page {
-			padding: clamp(1rem, 3vw, 2rem) clamp(1rem, 5vw, 2.5rem);
-		}
-	}
-
-	.profile-container {
+	.profile-card {
 		width: 100%;
-		max-width: 100%;
-		margin: 0 auto;
-		display: grid;
-		gap: clamp(1rem, 2vw, 1.5rem);
-		box-sizing: border-box;
+		max-width: 420px;
+		background: var(--surfaceSolid, #fff);
+		border-radius: 16px;
+		box-shadow: 0 1px 3px rgba(0, 27, 46, 0.08);
+		border: 1px solid var(--border, #e2e8f0);
+		overflow: hidden;
 	}
-	@media (min-width: 900px) {
-		.profile-container {
-			grid-template-columns: minmax(260px, 320px) 1fr;
-			align-items: start;
-		}
+	.profile-cover {
+		height: 72px;
+		background: linear-gradient(135deg, var(--navy, #001b2e) 0%, var(--slate, #294c60) 100%);
 	}
-
-	.profile-left {
+	.profile-card-body {
+		text-align: center;
+		padding: 0 1.5rem 1.5rem;
+		position: relative;
+	}
+	.profile-avatar-wrap {
+		width: 96px;
+		height: 96px;
+		margin: -48px auto 1rem;
+		border-radius: 50%;
+		background: var(--bg, #f8fafc);
+		border: 3px solid var(--surfaceSolid, #fff);
+		box-shadow: 0 2px 12px rgba(0, 27, 46, 0.1);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+	}
+	.profile-avatar-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.profile-avatar-initials {
+		font-size: 2rem;
+		font-weight: 600;
+		color: var(--copper, #bf4e30);
+		letter-spacing: -0.02em;
+	}
+	.profile-display-name {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: var(--navy, #001b2e);
+		margin: 0 0 0.5rem 0;
+		letter-spacing: -0.02em;
+		line-height: 1.2;
+	}
+	.profile-archetype-row {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.35rem;
+		margin-bottom: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.profile-archetype-pill {
+		display: inline-block;
+		font-size: 0.8125rem;
+		background: rgba(191, 78, 48, 0.1);
+		color: var(--copper, #bf4e30);
+		padding: 0.25rem 0.625rem;
+		border-radius: 999px;
+		font-weight: 500;
+	}
+	.profile-edit-pencil {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.25rem;
+		border: none;
+		background: transparent;
+		color: var(--muted, #94a3b8);
+		cursor: pointer;
+		border-radius: 6px;
+		transition: color 0.2s, background 0.2s;
+	}
+	.profile-edit-pencil:hover {
+		color: var(--copper, #bf4e30);
+		background: rgba(191, 78, 48, 0.08);
+	}
+	.profile-archetype-form {
+		display: inline-block;
+	}
+	.profile-archetype-select {
+		font-size: 0.8125rem;
+		padding: 0.35rem 0.625rem;
+		border-radius: 999px;
+		border: 1px solid var(--border, #e2e8f0);
+		background: var(--bg, #f8fafc);
+		color: var(--text, #0f172a);
+		min-width: 12rem;
+	}
+	.profile-location {
+		font-size: 0.875rem;
+		color: var(--muted, #64748b);
+		margin: 0 0 1rem 0;
+	}
+	.profile-actions {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		margin-bottom: 1.25rem;
+	}
+	.profile-actions .btn {
+		font-size: 0.875rem;
+		padding: 0.5rem 1rem;
+		text-decoration: none;
+		border-radius: 8px;
+		font-weight: 500;
+		cursor: pointer;
+		border: none;
+	}
+	.profile-actions .btn-primary {
+		background: var(--copper);
+		color: white;
+	}
+	.profile-actions .btn-primary:hover {
+		background: var(--primaryHover);
+	}
+	.profile-actions .btn-secondary {
+		background: var(--surfaceSolid);
+		color: var(--text);
+		border: 1px solid var(--border);
+	}
+	.profile-actions .btn-secondary:hover {
+		background: var(--border-soft);
+		border-color: var(--border-strong);
+	}
+	.profile-actions .btn-ghost {
+		background: transparent;
+		color: var(--muted);
+	}
+	.profile-actions .btn-ghost:hover {
+		background: var(--border-soft);
+		color: var(--text);
+	}
+	.profile-stats {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 2rem;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--border, #e2e8f0);
+	}
+	.profile-stat {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		align-items: center;
+		gap: 0.15rem;
+	}
+	.profile-stat-value {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: var(--navy, #001b2e);
+	}
+	.profile-stat-label {
+		font-size: 0.75rem;
+		color: var(--muted, #64748b);
+		font-weight: 500;
+	}
+
+	/* Legacy / modal (below) */
+	.profile-center {
 		min-width: 0;
 	}
-	@media (min-width: 900px) {
-		.profile-left {
-			position: sticky;
-			top: 6rem;
-		}
+	.profile-hero-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 1rem;
+	}
+	.profile-display-name {
+		font-size: clamp(1.5rem, 4vw, 2rem);
+		font-weight: 700;
+		color: var(--navy);
+		margin: 0 0 0.5rem 0;
+		letter-spacing: -0.03em;
+		line-height: 1.2;
+	}
+	.profile-hero-left .badges-row {
+		justify-content: flex-start;
+		margin-bottom: 0;
+	}
+	.btn-add {
+		background: var(--copper);
+		color: white;
+		border: none;
+		padding: 0.5rem 1.25rem;
+		font-size: 0.875rem;
+		font-weight: 600;
+		border-radius: var(--radius-lg);
+		white-space: nowrap;
+	}
+	.btn-add:hover {
+		background: var(--primaryHover);
+	}
+	.profile-about-block {
+		background: var(--bg);
+		border-radius: var(--radius-lg);
+		padding: 1rem 1.25rem;
+		margin-bottom: 1.25rem;
+		border: 1px solid var(--border);
+	}
+	.profile-about-text {
+		font-size: 0.9375rem;
+		line-height: 1.5;
+		color: var(--text);
+		margin: 0;
 	}
 
 	.card {
-		background: #ffffff;
-		border-radius: 12px;
-		box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-		border: 1px solid #e2e8f0;
+		background: var(--surfaceSolid);
+		border-radius: var(--radius-xl);
+		box-shadow: 0 2px 8px rgba(0, 27, 46, 0.06);
+		border: 1px solid var(--border);
 		overflow: hidden;
 		min-width: 0;
 	}
@@ -799,7 +589,7 @@
 	.card-title {
 		font-size: 0.9375rem;
 		font-weight: 600;
-		color: #0f172a;
+		color: var(--navy);
 		margin: 0 0 0.75rem 0;
 		display: flex;
 		align-items: center;
@@ -807,74 +597,20 @@
 		letter-spacing: -0.01em;
 	}
 	.card-title-tint {
-		background: #f8fafc;
+		background: var(--bg);
 		padding: clamp(0.5rem, 2vw, 0.75rem) clamp(0.75rem, 3vw, 1.25rem);
 		margin: -1px -1px 0 -1px;
-		border-radius: 12px 12px 0 0;
-		border-bottom: 1px solid #e2e8f0;
+		border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+		border-bottom: 1px solid var(--border);
 	}
 	.icon-sm {
 		font-size: 1.125rem;
 		opacity: 0.85;
 	}
-	.card-header-tint {
-		height: 3px;
-		background: linear-gradient(90deg, #3b82f6 0%, #94a3b8 100%);
-		opacity: 0.35;
-	}
-	.card-header .card-body {
-		text-align: center;
-	}
-	.avatar-wrap {
-		width: 80px;
-		height: 80px;
-		border-radius: 50%;
-		background: #f1f5f9;
-		margin: 0 auto 0.75rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		overflow: hidden;
-	}
-	.avatar-img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.avatar-initials {
-		font-size: 1.75rem;
-		font-weight: 600;
-		color: #2563eb;
-		letter-spacing: -0.02em;
-	}
-	.profile-name {
-		font-size: 1.25rem;
-		font-weight: 600;
-		color: #0f172a;
-		margin: 0 0 0.25rem 0;
-		letter-spacing: -0.02em;
-	}
-	.profile-handle {
-		font-size: 0.875rem;
-		color: #64748b;
-		margin: 0 0 0.125rem 0;
-	}
-	.profile-pronouns {
-		font-size: 0.8125rem;
-		color: #64748b;
-		margin: 0 0 0.5rem 0;
-	}
-	.profile-meta {
-		font-size: 0.75rem;
-		color: #94a3b8;
-		margin: 0 0 0.75rem 0;
-	}
 	.badges-row {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.35rem;
-		justify-content: center;
-		margin-bottom: 1rem;
 	}
 	.pill {
 		display: inline-flex;
@@ -882,22 +618,22 @@
 		padding: 0.25rem 0.5rem;
 		font-size: 0.6875rem;
 		font-weight: 600;
-		border-radius: 6px;
-		background: #f1f5f9;
-		color: #475569;
+		border-radius: var(--radius-md);
+		background: var(--bg);
+		color: var(--muted);
 		letter-spacing: 0.02em;
 	}
 	.pill-role {
-		background: #eff6ff;
-		color: #2563eb;
+		background: rgba(191, 78, 48, 0.15);
+		color: var(--copper);
 	}
 	.pill-verified {
-		background: #ecfdf5;
-		color: #059669;
+		background: rgba(41, 76, 96, 0.12);
+		color: var(--slate);
 	}
 	.pill-tag {
-		background: #f1f5f9;
-		color: #334155;
+		background: rgba(191, 78, 48, 0.12);
+		color: var(--copper);
 	}
 	.pill-select {
 		border: none;
@@ -905,134 +641,73 @@
 		font-family: inherit;
 	}
 	.pill-select.active {
-		background: #2563eb;
+		background: var(--copper);
 		color: white;
 	}
 	.pill.connected {
-		background: #ecfdf5;
-		color: #059669;
-	}
-	.cta-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		justify-content: center;
-		margin-bottom: 0.5rem;
-	}
-	.cta-row.secondary {
-		margin-bottom: 0;
-	}
-	.cta-row .btn {
-		font-size: 0.875rem;
-		padding: 0.5rem 1rem;
-		font-weight: 500;
-	}
-	.cta-row .icon {
-		margin-right: 0.25rem;
-	}
-	.profile-page .cta-row .btn-primary {
-		background: #2563eb;
-		color: white;
-		border: none;
-	}
-	.profile-page .cta-row .btn-primary:hover {
-		background: #1d4ed8;
-	}
-	.profile-page .cta-row .btn-secondary {
-		background: #ffffff;
-		color: #475569;
-		border: 1px solid #e2e8f0;
-	}
-	.profile-page .cta-row .btn-secondary:hover {
-		background: #f8fafc;
-		border-color: #cbd5e1;
-	}
-	.link-soft {
-		font-size: 0.8125rem;
-		color: #64748b;
-		text-decoration: none;
-	}
-	.link-soft:hover {
-		color: #2563eb;
-	}
-	.card-stats .card-title {
-		margin-bottom: 0.75rem;
-		padding: 0 0.25rem;
-	}
-	.stats-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 0.5rem;
-	}
-	.stat-tile {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		padding: clamp(0.5rem, 2vw, 0.75rem);
-		background: #ffffff;
-		border-radius: 8px;
-		border: 1px solid #e2e8f0;
-		text-decoration: none;
-		color: #0f172a;
-		transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-		min-width: 0;
-	}
-	.stat-tile:hover {
-		background: #f8fafc;
-		border-color: #cbd5e1;
-		box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-	}
-	.stat-icon {
-		font-size: 1.25rem;
-	}
-	.stat-label {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		color: #64748b;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-	}
-	.stat-value {
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: #0f172a;
+		background: rgba(41, 76, 96, 0.12);
+		color: var(--slate);
 	}
 
 	.profile-right {
 		min-width: 0;
 	}
-	.tabs-row {
-		display: flex;
-		gap: 0.25rem;
-		margin-bottom: 1rem;
-		flex-wrap: wrap;
-		border-bottom: 1px solid #e2e8f0;
-		padding-bottom: 0.5rem;
+	@media (min-width: 900px) {
+		.profile-right {
+			position: sticky;
+			top: 6rem;
+		}
 	}
-	.tab {
-		padding: clamp(0.4rem, 1.5vw, 0.5rem) clamp(0.75rem, 2vw, 1rem);
-		font-size: clamp(0.8125rem, 2vw, 0.875rem);
-		font-weight: 500;
+	.card-stats .card-title {
+		margin-bottom: 0.5rem;
+		padding: 0 0.25rem;
+		color: var(--navy);
+	}
+	.stats-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+	}
+	.stat-tile {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.625rem 0;
 		background: transparent;
 		border: none;
-		border-radius: 6px;
-		cursor: pointer;
-		color: #64748b;
-		transition: color 0.15s ease, background 0.15s ease;
-		min-height: 44px;
-		touch-action: manipulation;
+		border-radius: 0;
+		border-bottom: 1px solid var(--border);
+		text-decoration: none;
+		color: var(--text);
+		transition: background 0.15s ease;
+		min-width: 0;
 	}
-	.tab:hover {
-		color: #0f172a;
-		background: #f1f5f9;
+	.stat-tile:last-child {
+		border-bottom: none;
 	}
-	.tab.active {
-		background: #eff6ff;
-		color: #2563eb;
-		border: none;
-		box-shadow: none;
+	.stat-tile:hover {
+		background: var(--border-soft);
 	}
-
+	.stat-tile .stat-icon {
+		font-size: 1.125rem;
+		opacity: 0.85;
+		flex-shrink: 0;
+	}
+	.stat-tile .stat-label {
+		flex: 1;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--muted);
+		text-transform: none;
+		letter-spacing: 0;
+	}
+	.stat-tile .stat-value {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--navy);
+		flex-shrink: 0;
+	}
 	.section-card {
 		margin-bottom: 1rem;
 	}
@@ -1052,7 +727,7 @@
 	.field-label {
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: #64748b;
+		color: var(--muted);
 		min-width: 0;
 		flex: 1 1 100%;
 	}
@@ -1064,7 +739,7 @@
 	}
 	.field-value {
 		font-size: 0.875rem;
-		color: #0f172a;
+		color: var(--text);
 		flex: 1;
 		min-width: 0;
 		overflow-wrap: break-word;
@@ -1079,8 +754,8 @@
 		height: 24px;
 		min-height: 24px;
 		border-radius: 9999px;
-		background: #e2e8f0;
-		border: 1px solid #cbd5e1;
+		background: var(--border);
+		border: 1px solid var(--border-strong);
 		cursor: pointer;
 		padding: 2px;
 		flex-shrink: 0;
@@ -1088,8 +763,8 @@
 		touch-action: manipulation;
 	}
 	.toggle.on {
-		background: #2563eb;
-		border-color: #2563eb;
+		background: var(--copper);
+		border-color: var(--copper);
 	}
 	.toggle-thumb {
 		display: block;
@@ -1125,29 +800,29 @@
 		padding: 0.35rem 0.75rem;
 		font-size: 0.8125rem;
 		font-weight: 500;
-		background: #f1f5f9;
+		background: var(--bg);
 		border: 1px solid transparent;
-		border-radius: 6px;
+		border-radius: var(--radius-md);
 		cursor: pointer;
-		color: #64748b;
+		color: var(--muted);
 		transition: all 0.15s ease;
 	}
 	.seg:hover {
-		color: #0f172a;
-		background: #e2e8f0;
+		color: var(--text);
+		background: var(--border-soft);
 	}
 	.seg.active {
-		background: #2563eb;
+		background: var(--copper);
 		color: white;
-		border-color: #2563eb;
+		border-color: var(--copper);
 	}
 	.select {
 		padding: 0.35rem 0.75rem;
 		font-size: 0.875rem;
-		border: 1px solid #e2e8f0;
-		border-radius: 6px;
-		background: #ffffff;
-		color: #0f172a;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: var(--surfaceSolid);
+		color: var(--text);
 		min-width: 0;
 		max-width: 100%;
 		width: 100%;
@@ -1182,7 +857,7 @@
 	.card-divider {
 		border: none;
 		height: 1px;
-		background: #e2e8f0;
+		background: var(--border);
 		margin: 1rem 0;
 	}
 	.sessions-list {
@@ -1197,7 +872,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.5rem 0;
-		border-bottom: 1px solid #e2e8f0;
+		border-bottom: 1px solid var(--border);
 		font-size: 0.875rem;
 	}
 	.session-item:last-child {
@@ -1211,16 +886,16 @@
 	.sub-tab {
 		padding: 0.35rem 0.75rem;
 		font-size: 0.8125rem;
-		background: #f1f5f9;
+		background: var(--bg);
 		border: none;
-		border-radius: 6px;
+		border-radius: var(--radius-md);
 		cursor: pointer;
-		color: #64748b;
+		color: var(--muted);
 	}
 	.sub-tab.active {
-		background: #eff6ff;
-		color: #2563eb;
-		border: 1px solid #bfdbfe;
+		background: transparent;
+		color: var(--copper);
+		border: 1px solid var(--copper);
 	}
 	.empty-state {
 		text-align: center;
@@ -1247,7 +922,7 @@
 	.timeline-year {
 		font-size: 0.75rem;
 		font-weight: 600;
-		color: #64748b;
+		color: var(--muted);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		margin: 0.75rem 0 0.25rem 0;
@@ -1270,13 +945,13 @@
 	}
 	.muted {
 		font-size: 0.875rem;
-		color: #64748b;
+		color: var(--muted);
 	}
 
 	.modal-backdrop {
 		position: fixed;
 		inset: 0;
-		background: rgba(15, 23, 42, 0.45);
+		background: rgba(0, 27, 46, 0.45);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1286,10 +961,10 @@
 		box-sizing: border-box;
 	}
 	.modal {
-		background: #ffffff;
-		border-radius: 12px;
-		box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
-		border: 1px solid #e2e8f0;
+		background: var(--surfaceSolid);
+		border-radius: var(--radius-xl);
+		box-shadow: 0 20px 25px -5px rgba(0, 27, 46, 0.1), 0 8px 10px -6px rgba(0, 27, 46, 0.08);
+		border: 1px solid var(--border);
 		max-width: min(440px, calc(100vw - 2rem));
 		width: 100%;
 		padding: clamp(1rem, 4vw, 1.5rem);
@@ -1302,13 +977,13 @@
 	.modal-title {
 		font-size: 1.25rem;
 		font-weight: 600;
-		color: #0f172a;
+		color: var(--navy);
 		margin: 0 0 1rem 0;
 		letter-spacing: -0.02em;
 	}
 	.modal-text {
 		font-size: 0.875rem;
-		color: #64748b;
+		color: var(--muted);
 		margin: 0 0 1rem 0;
 	}
 	.form-group {
@@ -1318,7 +993,7 @@
 		display: block;
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: #64748b;
+		color: var(--muted);
 		margin-bottom: 0.25rem;
 	}
 	.form-group input,
@@ -1326,42 +1001,77 @@
 		width: 100%;
 		padding: 0.5rem 0.75rem;
 		font-size: 0.875rem;
-		border: 1px solid #e2e8f0;
-		border-radius: 6px;
-		background: #ffffff;
-		color: #0f172a;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		background: var(--surfaceSolid);
+		color: var(--text);
 	}
 	.field-hint {
 		display: block;
 		margin-top: 0.25rem;
 		font-size: 0.75rem;
-		color: var(--muted, #64748b);
+		color: var(--muted);
+	}
+	.avatar-upload-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
+	}
+	.avatar-file-input {
+		position: absolute;
+		width: 0.1px;
+		height: 0.1px;
+		opacity: 0;
+		overflow: hidden;
+		z-index: -1;
+	}
+	.avatar-upload-btn {
+		flex-shrink: 0;
 	}
 	.color-picker-row {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 	}
-	.color-input {
-		width: 2.5rem;
-		height: 2.5rem;
-		padding: 2px;
-		border: 1px solid var(--color-border, #e2e8f0);
-		border-radius: 6px;
+	.color-swatch {
+		width: 1.75rem;
+		height: 1.75rem;
+		border: 2px solid transparent;
+		border-radius: 50%;
 		cursor: pointer;
-		background: #fff;
+		padding: 0;
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
+	}
+	.color-swatch:hover {
+		transform: scale(1.1);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	}
+	.color-swatch.selected {
+		border-color: var(--text);
+		box-shadow: 0 0 0 1px var(--bg);
 	}
 	.color-hex {
 		font-size: 0.875rem;
 		font-family: ui-monospace, monospace;
-		color: var(--muted, #64748b);
+		color: var(--muted);
 	}
 
 	.form-group input:focus,
 	.form-group textarea:focus {
 		outline: none;
-		border-color: #2563eb;
-		box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+		border-color: var(--copper);
+		box-shadow: 0 0 0 2px var(--focusRing);
+	}
+	.modal-hint {
+		font-size: 0.875rem;
+		color: var(--muted);
+		margin: 0 0 1rem 0;
+	}
+	.modal-hint a {
+		color: var(--copper);
+		text-decoration: underline;
 	}
 	.modal-actions {
 		display: flex;
@@ -1371,45 +1081,45 @@
 	}
 
 	.profile-page .btn-primary {
-		background: #2563eb;
+		background: var(--copper);
 		color: white;
 		border: none;
 	}
 	.profile-page .btn-primary:hover {
-		background: #1d4ed8;
+		background: var(--primaryHover);
 	}
 	.profile-page .btn-ghost {
 		background: transparent;
-		color: #64748b;
+		color: var(--muted);
 		border: none;
 	}
 	.profile-page .btn-ghost:hover {
-		background: #f1f5f9;
-		color: #0f172a;
+		background: var(--border-soft);
+		color: var(--text);
 	}
 	.profile-page .btn-secondary {
-		background: #ffffff;
-		color: #475569;
-		border: 1px solid #e2e8f0;
+		background: var(--surfaceSolid);
+		color: var(--text);
+		border: 1px solid var(--border);
 	}
 	.profile-page .btn-secondary:hover {
-		background: #f8fafc;
-		border-color: #cbd5e1;
+		background: var(--border-soft);
+		border-color: var(--border-strong);
 	}
 	.profile-page .btn-destructive {
-		background: #dc2626;
+		background: var(--danger);
 		color: white;
 		border: none;
 	}
 	.profile-page .btn-destructive:hover {
-		background: #b91c1c;
+		background: var(--dangerHover);
 	}
 	.toast {
 		position: fixed;
 		bottom: 2rem;
 		left: 50%;
 		transform: translateX(-50%);
-		background: #0f172a;
+		background: var(--navy);
 		color: white;
 		padding: 0.5rem 1rem;
 		border-radius: 8px;

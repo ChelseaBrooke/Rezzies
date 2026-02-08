@@ -4,14 +4,14 @@ import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
 import { hashPassword, verifyPassword } from '$lib/server/auth.js';
 
-export const load: PageServerLoad = async ({ cookies }) => {
+export const load: PageServerLoad = async ({ cookies, url }) => {
 	const user = await getSessionUser(cookies);
-	
+
 	if (!user) {
 		throw redirect(303, '/login?redirect=/settings');
 	}
 
-	// Get full user data including notification preferences
+	// Get full user data including notification preferences and basics
 	const userData = await prisma.user.findUnique({
 		where: { id: user.id },
 		select: {
@@ -19,14 +19,25 @@ export const load: PageServerLoad = async ({ cookies }) => {
 			email: true,
 			name: true,
 			phone: true,
+			emergencyContactName: true,
+			emergencyContactPhone: true,
+			shareEmergencyWithHosts: true,
+			dietaryTags: true,
+			allergiesTags: true,
+			accessibilityNotes: true,
 			emailTripInvites: true,
 			emailTripUpdates: true,
 			inAppNotifications: true
 		}
 	});
 
+	const tab = url.searchParams.get('tab');
+	const openTab = tab === 'blocked' ? 'blocked' : null;
+
 	return {
-		user: userData
+		user: userData,
+		blocked: [] as string[],
+		openTab
 	};
 };
 
@@ -36,14 +47,26 @@ export const actions: Actions = {
 		if (!user) throw redirect(303, '/login');
 
 		const formData = await request.formData();
-		const name = formData.get('name') as string | null;
-		const phone = formData.get('phone') as string | null;
+		const name = (formData.get('name') as string)?.trim() || null;
+		const phone = (formData.get('phone') as string)?.trim() || null;
+		const emergencyContactName = (formData.get('emergencyContactName') as string)?.trim() || null;
+		const emergencyContactPhone = (formData.get('emergencyContactPhone') as string)?.trim() || null;
+		const shareEmergencyWithHosts = formData.get('shareEmergencyWithHosts') === 'true';
+		const dietaryTags = (formData.get('dietaryTags') as string)?.trim() || null;
+		const allergiesTags = (formData.get('allergiesTags') as string)?.trim() || null;
+		const accessibilityNotes = (formData.get('accessibilityNotes') as string)?.trim() || null;
 
 		await prisma.user.update({
 			where: { id: user.id },
 			data: {
-				name: name || null,
-				phone: phone || null
+				name,
+				phone,
+				emergencyContactName,
+				emergencyContactPhone,
+				shareEmergencyWithHosts,
+				dietaryTags,
+				allergiesTags,
+				accessibilityNotes
 			}
 		});
 

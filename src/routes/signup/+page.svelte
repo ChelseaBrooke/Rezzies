@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import { TRAVEL_STYLE_OPTIONS } from '$lib/travel-style.js';
 	import type { ActionData } from './$types';
 
 	let { form } = $props();
@@ -56,6 +57,15 @@
 						required
 						placeholder="Confirm your password"
 					/>
+				</div>
+				<div class="auth-field">
+					<label for="travelStyle">Travel style</label>
+					<select id="travelStyle" name="travelStyle" class="auth-select">
+						<option value="">Pick one (optional)</option>
+						{#each TRAVEL_STYLE_OPTIONS as opt}
+							<option value={opt}>{opt}</option>
+						{/each}
+					</select>
 				</div>
 				<button type="submit" class="auth-submit">Sign up</button>
 			</form>
@@ -229,6 +239,23 @@
 		outline: none;
 		border-color: rgba(255, 255, 255, 0.5);
 		background: rgba(255, 255, 255, 0.15);
+	}
+	.auth-select {
+		padding: 0.75rem 1rem;
+		font-size: 1rem;
+		border-radius: 8px;
+		border: 1px solid rgba(255, 255, 255, 0.25);
+		background: rgba(255, 255, 255, 0.12);
+		color: white;
+		cursor: pointer;
+	}
+	.auth-select:focus {
+		outline: none;
+		border-color: rgba(255, 255, 255, 0.5);
+	}
+	.auth-select option {
+		background: #001b2e;
+		color: white;
 	}
 	.auth-hint {
 		font-size: 0.8125rem;

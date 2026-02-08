@@ -113,7 +113,9 @@
 	</div>
 	<!-- Calendar and bell layered over hero -->
 	<div class="hero-calendar-layer">
-		<div class="hero-calendar-wrap">
+		<div class="hero-calendar-outer">
+			<div class="hero-calendar-back" aria-hidden="true"></div>
+			<div class="hero-calendar-wrap">
 			<TripCalendarWidget
 				tripId={trip.id}
 				placement="sidebar"
@@ -122,6 +124,7 @@
 				{activities}
 				{mealSlots}
 			/>
+			</div>
 		</div>
 		<span class="hero-bell">
 			<NotificationTray />
@@ -222,22 +225,37 @@
 		opacity: 0.75;
 	}
 
-	.hero-calendar-wrap {
-		/* Match homepage hero block / header: dark navy glass */
-		background: rgba(0, 27, 46, 0.12);
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
-		border-radius: 12px;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-		padding: 0.75rem 0.5rem;
+	.hero-calendar-outer {
+		position: relative;
 		width: 300px;
 		min-width: 300px;
+		min-height: 300px;
+	}
+
+	.hero-calendar-back {
+		/* Same color as page background with a slight shadow */
+		position: absolute;
+		inset: 0;
+		border-radius: 12px;
+		border: none;
+		background: var(--bg);
+		z-index: 0;
+		box-shadow: 8px -4px 20px rgba(0, 27, 46, 0.04);
+	}
+
+	.hero-calendar-wrap {
+		position: relative;
+		z-index: 1;
+		border-radius: 12px;
+		border: none;
+		padding: 0.75rem 0.5rem;
+		width: 100%;
 		min-height: 300px;
 		font-size: 0.8125rem;
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+		background: transparent;
 	}
 
 	.hero-calendar-wrap :global(.calendar-sidebar) {
@@ -246,9 +264,10 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		background: transparent;
-		box-shadow: none;
-		border: none;
+		background: var(--bg) !important;
+		box-shadow: none !important;
+		border: none !important;
+		outline: none;
 		padding: 0;
 		min-width: 0;
 		justify-content: space-between;
@@ -283,13 +302,13 @@
 	}
 
 	.hero-calendar-wrap :global(.month-header) {
-		color: #000;
+		color: var(--text);
 	}
 
 	.hero-calendar-wrap :global(.month-title) {
 		font-size: 1.0625rem;
 		font-weight: 700;
-		color: #000;
+		color: var(--text);
 	}
 
 	.hero-calendar-wrap :global(.day-headers) {
@@ -298,96 +317,99 @@
 
 	.hero-calendar-wrap :global(.day-header) {
 		font-size: 0.7rem;
-		color: rgba(255, 255, 255, 0.8);
+		color: var(--copper);
 	}
 
-	.hero-calendar-wrap :global(.day-cell) {
+	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell) {
 		font-size: 0.75rem;
-		color: rgba(255, 255, 255, 0.6);
+		color: var(--muted);
+		background: transparent;
 	}
 
-	.hero-calendar-wrap :global(.day-cell.trip-day) {
-		background: rgba(255, 255, 255, 0.15);
-		color: #FFFBF7;
+	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell.trip-day) {
+		background: rgba(191, 78, 48, 0.25);
+		color: var(--copper);
 	}
 
-	.hero-calendar-wrap :global(.day-cell.trip-day:hover) {
-		background: rgba(255, 255, 255, 0.25);
+	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell.trip-day:hover) {
+		background: rgba(191, 78, 48, 0.4);
+		color: var(--copper);
 	}
 
-	.hero-calendar-wrap :global(.day-cell.trip-day.selected) {
+	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell.trip-day.selected) {
 		background: var(--copper, #BF4E30);
 		color: white;
 	}
 
-	.hero-calendar-wrap :global(.day-cell.trip-day.selected:hover) {
+	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell.trip-day.selected:hover) {
 		background: var(--primaryHover, #A03D24);
 		color: white;
 	}
 
 	.hero-calendar-wrap :global(.month-chevron-btn) {
-		color: #000;
+		color: var(--text);
 	}
 
 	.hero-calendar-wrap :global(.month-chevron-btn:hover:not(:disabled)) {
-		background: rgba(0, 0, 0, 0.08);
-		color: #000;
+		background: var(--border-soft);
+		color: var(--text);
 	}
 
 	.hero-calendar-wrap :global(.day-detail-hint) {
-		color: rgba(255, 255, 255, 0.85);
+		color: var(--muted);
 		font-size: 0.7rem;
 		opacity: 0.95;
 	}
 
-	/* Day detail view (back, title, sections) when inside glassy calendar */
+	/* Day detail view (back, title, sections) on solid background */
 	.hero-calendar-wrap :global(.day-detail-back) {
-		color: rgba(255, 255, 255, 0.95);
+		color: var(--primary);
 	}
 
 	.hero-calendar-wrap :global(.day-detail-title) {
-		color: #FFFBF7;
+		color: var(--text);
 	}
 
 	.hero-calendar-wrap :global(.day-detail-empty),
 	.hero-calendar-wrap :global(.day-detail-label) {
-		color: rgba(255, 255, 255, 0.75);
+		color: var(--muted);
 	}
 
 	.hero-calendar-wrap :global(.day-detail-item) {
-		color: rgba(255, 251, 247, 0.95);
-		border-bottom-color: rgba(255, 255, 255, 0.2);
+		color: var(--text);
+		border-bottom-color: var(--border);
 	}
 
 	.hero-calendar-wrap :global(.day-detail-ctas) {
-		border-top-color: rgba(255, 255, 255, 0.2);
+		border-top-color: var(--border);
 	}
 
 	.hero-calendar-wrap :global(.day-detail-cta) {
-		background: rgba(255, 255, 255, 0.2);
-		border: 1px solid rgba(255, 255, 255, 0.3);
+		background: var(--primary);
+		border: 1px solid var(--primary);
 		color: white;
 	}
 
 	.hero-calendar-wrap :global(.day-detail-cta:hover) {
-		background: rgba(255, 255, 255, 0.3);
+		background: var(--primaryHover);
+		border-color: var(--primaryHover);
 	}
 
 	.hero-calendar-wrap :global(.calendar-empty-msg) {
-		color: rgba(255, 255, 255, 0.85);
+		color: var(--muted);
 	}
 
 	.hero-calendar-wrap :global(.calendar-empty-msg a) {
-		color: #FFFBF7;
+		color: var(--primary);
 		text-decoration: underline;
 	}
 
 	.hero-calendar-wrap :global(.day-detail-item .item-title) {
-		color: #FFFBF7;
+		color: var(--text);
 	}
 
 	.hero-calendar-wrap :global(.day-detail-item .item-meta) {
-		color: rgba(255, 255, 255, 0.8);
+		color: var(--muted);
 	}
 
 	.hero-content {

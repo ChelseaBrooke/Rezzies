@@ -2,7 +2,11 @@ import bcrypt from 'bcryptjs';
 import { prisma } from './prisma.js';
 import { hashPassword, verifyPassword } from './auth.js';
 
-export async function createUser(email: string, password: string, name?: string): Promise<{ id: string; email: string; name: string | null }> {
+export async function createUser(
+	email: string,
+	password: string,
+	opts?: { name?: string; travelStyle?: string | null }
+): Promise<{ id: string; email: string; name: string | null }> {
 	const existingUser = await prisma.user.findUnique({
 		where: { email }
 	});
@@ -12,12 +16,15 @@ export async function createUser(email: string, password: string, name?: string)
 	}
 
 	const passwordHash = await hashPassword(password);
-	
+	const name = opts?.name ?? null;
+	const travelStyle = opts?.travelStyle && opts.travelStyle.trim() !== '' ? opts.travelStyle.trim() : null;
+
 	const user = await prisma.user.create({
 		data: {
 			email,
 			passwordHash,
-			name: name || null
+			name,
+			travelStyle
 		},
 		select: {
 			id: true,

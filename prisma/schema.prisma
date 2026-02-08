@@ -190,6 +190,16 @@ model User {
   phone        String?
   avatarUrl       String?  // Profile image URL (e.g. from image host or Gravatar)
   chatBubbleColor String?  // Hex color for chat bubble in group chats (e.g. #3b82f6)
+  travelStyle     String?  // e.g. "Up at 6am", "Just here for the vibes"
+  homeCity        String?  // optional for public profile
+  timezone        String?  // e.g. "America/Los_Angeles"
+  // Basics (moved to account settings)
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  shareEmergencyWithHosts Boolean @default(false)
+  dietaryTags            String?  // comma-separated
+  allergiesTags          String?  // comma-separated
+  accessibilityNotes     String?
   // Notification preferences
   emailTripInvites     Boolean @default(true)  // Email when invited to a trip
   emailTripUpdates     Boolean @default(true)  // Email for trip updates, new activity

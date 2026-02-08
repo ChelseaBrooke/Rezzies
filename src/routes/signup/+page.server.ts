@@ -3,12 +3,14 @@ import type { Actions, PageServerLoad } from './$types';
 import { createUser } from '$lib/server/user-auth.js';
 import { createSession } from '$lib/server/session.js';
 import { linkPendingInvitesForUser } from '$lib/server/invite-service.js';
+import { TRAVEL_STYLE_OPTIONS, isValidTravelStyle } from '$lib/travel-style.js';
 import { z } from 'zod';
 
 const signupSchema = z.object({
 	email: z.string().email('Invalid email address'),
 	password: z.string().min(8, 'Password must be at least 8 characters'),
-	name: z.string().optional()
+	name: z.string().optional(),
+	travelStyle: z.union([z.enum(TRAVEL_STYLE_OPTIONS), z.literal('')]).optional()
 }).refine((data) => data.password.length >= 8, {
 	message: 'Password must be at least 8 characters',
 	path: ['password']
@@ -30,6 +32,7 @@ export const actions: Actions = {
 		const password = formData.get('password');
 		const confirmPassword = formData.get('confirmPassword');
 		const name = formData.get('name');
+		const travelStyleRaw = (formData.get('travelStyle') as string)?.trim() || '';
 
 		// Validate required fields are present
 		if (!email || typeof email !== 'string') {
@@ -57,10 +60,12 @@ export const actions: Actions = {
 			});
 		}
 
-		const validationResult = signupSchema.safeParse({ 
-			email, 
-			password, 
-			name: name && typeof name === 'string' ? name : undefined 
+		const travelStyle = travelStyleRaw === '' ? undefined : (isValidTravelStyle(travelStyleRaw) ? travelStyleRaw : undefined);
+		const validationResult = signupSchema.safeParse({
+			email,
+			password,
+			name: name && typeof name === 'string' ? name : undefined,
+			travelStyle: travelStyle ?? ''
 		});
 		if (!validationResult.success) {
 			return fail(400, {
@@ -69,7 +74,10 @@ export const actions: Actions = {
 		}
 
 		try {
-			const user = await createUser(email, password, name || undefined);
+			const user = await createUser(email, password, {
+				name: validationResult.data.name || undefined,
+				travelStyle: validationResult.data.travelStyle || null
+			});
 
 			// If they were invited before signing up, link those invites and create notifications
 			await linkPendingInvitesForUser(user.id, email);
