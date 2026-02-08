@@ -207,6 +207,7 @@
 			}))
 		);
 		
+		const totalSlots = beds.reduce((s, b) => s + (b.count || 1), 0);
 		draft.rooms = [
 			...draft.rooms,
 			{
@@ -214,7 +215,7 @@
 				name: '',
 				roomType: newRoomType,
 				customRoomDescription: newRoomType === 'other' ? newRoomCustomDesc : '',
-				type: 'private',
+				type: totalSlots === 1 ? 'private' : 'shared',
 				maxOccupants: 2,
 				notes: '',
 				photos: [],
@@ -270,7 +271,10 @@
 				notes: ''
 			}))
 		);
-		
+		// Single-slot room = private (costs more), multi-slot = shared
+		const totalSlots = room.beds.reduce((s, b) => s + (b.count || 1), 0);
+		room.type = totalSlots === 1 ? 'private' : 'shared';
+
 		autosave();
 		editingRoomId = null;
 		newRoomBedTypesArray = [];

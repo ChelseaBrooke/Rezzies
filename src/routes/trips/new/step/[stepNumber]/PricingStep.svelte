@@ -1,15 +1,32 @@
 <script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 
+	// Universal bed weights (see PRICING_MATH.md); privacy from room type or inferred from slot count
 	const BED_WEIGHTS: Record<string, number> = {
-		king: 1.0,
-		queen: 0.75,
-		full: 0.7,
-		twin: 0.5,
-		bunk: 0.5,
-		sofa: 0.4,
-		other: 0.6
+		twin: 1.0,
+		single: 1.0,
+		bunk: 0.9,
+		full: 1.1,
+		double: 1.1,
+		queen: 1.2,
+		king: 1.3,
+		sofa: 0.85,
+		sofa_bed: 0.85,
+		air_mattress: 0.75,
+		other: 1.0
 	};
+	function bedWeight(type: string): number {
+		return BED_WEIGHTS[type.toLowerCase().replace(/\s+/g, '_')] ?? BED_WEIGHTS.other;
+	}
+	function roomSlotCount(room: { beds?: Array<{ count?: number }> }): number {
+		if (!room.beds?.length) return 0;
+		return room.beds.reduce((s, b) => s + (b.count || 1), 0);
+	}
+	// For per-bed: always infer from slot count so "lone bed in own room" costs more (1.25), multi-bed room = shared (1.0)
+	function privacyFactor(room: { type?: string; beds?: Array<{ count?: number }> }): number {
+		const slots = roomSlotCount(room);
+		return slots === 1 ? 1.25 : 1.0;
+	}
 
 	type PricingModelOption = 'per-person' | 'per-room' | 'per-bed';
 
@@ -42,31 +59,100 @@
 		const map = new Map<string, number>();
 		rooms.forEach((room) => {
 			room.beds.forEach((bed) => {
-				const t = bed.bedType.toLowerCase();
+				const t = bed.bedType.toLowerCase().replace(/\s+/g, '_');
 				map.set(t, (map.get(t) ?? 0) + bed.count);
 			});
 		});
 		return Array.from(map.entries()).map(([type, count]) => ({ type, count }));
 	});
-	const totalWeightedValue = $derived.by(() => {
-		let v = 0;
-		bedsByType.forEach(({ type, count }) => {
-			v += count * (BED_WEIGHTS[type] ?? BED_WEIGHTS.other);
-		});
-		return v;
-	});
 	const perRoomCost = $derived(totalRooms > 0 ? total / totalRooms : 0);
 	const perPersonAtMin = $derived(expected > 0 ? total / expected : 0);
 	const perPersonAtMax = $derived(max > 0 ? total / max : 0);
-	const pricePerWeightUnit = $derived(totalWeightedValue > 0 ? total / totalWeightedValue : 0);
-	const perBedTypeBreakdown = $derived.by(() => {
-		if (totalWeightedValue <= 0) return [];
-		return bedsByType.map(({ type, count }) => {
-			const weight = BED_WEIGHTS[type] ?? BED_WEIGHTS.other;
-			const pricePerBed = pricePerWeightUnit * weight;
-			const pricePerBedPerNight = nights > 0 ? pricePerBed / nights : 0;
-			return { type, count, pricePerBed, pricePerBedPerNight };
+
+	// Per-bed: price = (total ÷ max(effective guest count, yes-RSVPs)) × (bed weight × privacy ÷ average combined weight)
+	const perBedSlotCount = $derived(
+		rooms.reduce((s, room) => s + room.beds.reduce((b, bed) => b + (bed.count || 1), 0), 0)
+	);
+	const perBedSumCombinedWeight = $derived.by(() => {
+		let sum = 0;
+		rooms.forEach((room) => {
+			const p = privacyFactor(room);
+			room.beds.forEach((bed) => {
+				sum += (bed.count || 1) * bedWeight(bed.bedType) * p;
+			});
 		});
+		return sum;
+	});
+	const perBedAvgCombinedWeight = $derived(perBedSlotCount > 0 ? perBedSumCombinedWeight / perBedSlotCount : 1);
+	// Base = total ÷ number of beds so the per-bed breakdown sums to the trip total
+	const basePerBedSlots = $derived(perBedSlotCount > 0 ? total / perBedSlotCount : 0);
+	const basePerPersonExpected = $derived(expected > 0 ? total / expected : 0);
+	const basePerPersonMax = $derived(max > 0 ? total / max : 0);
+
+	// Per-room: denominator = sum of (room privacy × people in room). We don't have assignments in preview, so approximate: assume guests fill rooms (by maxOccupancy). Then denominator = sum over rooms of (privacy × min(people in room, capacity)).
+	const roomDenomExpected = $derived.by(() => {
+		let remaining = expected;
+		let sum = 0;
+		for (const room of rooms) {
+			const cap = Math.max(1, room.maxOccupants ?? 1);
+			const people = Math.min(cap, remaining);
+			if (people <= 0) break;
+			sum += privacyFactor(room) * people;
+			remaining -= people;
+		}
+		return Math.max(sum, expected);
+	});
+	const roomDenomMax = $derived.by(() => {
+		let remaining = max;
+		let sum = 0;
+		for (const room of rooms) {
+			const cap = Math.max(1, room.maxOccupants ?? 1);
+			const people = Math.min(cap, remaining);
+			if (people <= 0) break;
+			sum += privacyFactor(room) * people;
+			remaining -= people;
+		}
+		return Math.max(sum, max);
+	});
+	const perRoomPricePerPersonExpected = $derived(roomDenomExpected > 0 ? total / roomDenomExpected : 0);
+	const perRoomPricePerPersonMax = $derived(roomDenomMax > 0 ? total / roomDenomMax : 0);
+
+	// One row per bed slot: price = (total ÷ slot count) × (bed weight × privacy ÷ avg combined weight) so breakdown sums to trip total
+	const perBedSlotBreakdown = $derived.by(() => {
+		if (perBedSlotCount <= 0) return [];
+		const avgCombined = perBedAvgCombinedWeight || 1;
+		const list: {
+			roomName: string;
+			bedType: string;
+			label: string;
+			pricePerBed: number;
+			pricePerBedPerNight: number;
+			pricePerBedMax: number;
+			pricePerBedPerNightMax: number;
+		}[] = [];
+		rooms.forEach((room) => {
+			const roomName = room.name || 'Room';
+			const p = privacyFactor(room);
+			room.beds.forEach((bed) => {
+				const w = bedWeight(bed.bedType);
+				const unitExpected = (basePerBedSlots * (w * p)) / avgCombined;
+				const unitMax = (basePerPersonMax * (w * p)) / avgCombined;
+				const count = Math.max(1, bed.count || 1);
+				const typeLabel = bed.bedType.charAt(0).toUpperCase() + bed.bedType.slice(1).replace(/_/g, ' ');
+				for (let i = 0; i < count; i++) {
+					list.push({
+						roomName,
+						bedType: bed.bedType,
+						label: count > 1 ? `${roomName} — ${typeLabel} ${i + 1}` : `${roomName} — ${typeLabel}`,
+						pricePerBed: unitExpected,
+						pricePerBedPerNight: nights > 0 ? unitExpected / nights : 0,
+						pricePerBedMax: unitMax,
+						pricePerBedPerNightMax: nights > 0 ? unitMax / nights : 0
+					});
+				}
+			});
+		});
+		return list;
 	});
 
 	const perPersonAtMinPerNight = $derived(nights > 0 ? perPersonAtMin / nights : 0);
@@ -171,9 +257,9 @@
 						<td class="col-model">Per Room</td>
 						<td class="col-scenario">
 							{#if totalRooms > 0}
-								<span>${perRoomCost.toFixed(2)} per room</span>
+								<span>${perRoomPricePerPersonExpected.toFixed(2)} per person</span>
 								{#if nights > 0}
-									<p class="per-night"><strong>Per night:</strong> ${perRoomCostPerNight.toFixed(2)}</p>
+									<p class="per-night"><strong>Per night:</strong> ${(perRoomPricePerPersonExpected / nights).toFixed(2)}</p>
 								{/if}
 							{:else}
 								—
@@ -181,9 +267,9 @@
 						</td>
 						<td class="col-scenario">
 							{#if totalRooms > 0}
-								<span>${perRoomCost.toFixed(2)} per room</span>
+								<span>${perRoomPricePerPersonMax.toFixed(2)} per person</span>
 								{#if nights > 0}
-									<p class="per-night"><strong>Per night:</strong> ${perRoomCostPerNight.toFixed(2)}</p>
+									<p class="per-night"><strong>Per night:</strong> ${(perRoomPricePerPersonMax / nights).toFixed(2)}</p>
 								{/if}
 							{:else}
 								—
@@ -205,13 +291,14 @@
 						</td>
 						<td class="col-model">Per Bed</td>
 						<td class="col-scenario">
-							{#if perBedTypeBreakdown.length > 0}
-								<ul class="bed-breakdown">
-									{#each perBedTypeBreakdown as { type, count, pricePerBed, pricePerBedPerNight }}
+							{#if perBedSlotBreakdown.length > 0}
+								<ul class="bed-breakdown bed-by-room">
+									{#each perBedSlotBreakdown as item, i (item.roomName + '-' + item.bedType + '-' + i)}
 										<li>
-											{type.charAt(0).toUpperCase()}{type.slice(1)} ${pricePerBed.toFixed(2)}/bed ({count}x)
+											<span class="bed-slot-label">{item.label}</span>
+											<span class="bed-slot-price">${item.pricePerBed.toFixed(2)}</span>
 											{#if nights > 0}
-												<p class="per-night"><strong>Per night:</strong> ${pricePerBedPerNight.toFixed(2)}</p>
+												<p class="per-night"><strong>Per night:</strong> ${item.pricePerBedPerNight.toFixed(2)}</p>
 											{/if}
 										</li>
 									{/each}
@@ -221,13 +308,14 @@
 							{/if}
 						</td>
 						<td class="col-scenario">
-							{#if perBedTypeBreakdown.length > 0}
-								<ul class="bed-breakdown">
-									{#each perBedTypeBreakdown as { type, count, pricePerBed, pricePerBedPerNight }}
+							{#if perBedSlotBreakdown.length > 0}
+								<ul class="bed-breakdown bed-by-room">
+									{#each perBedSlotBreakdown as item, i (item.roomName + '-' + item.bedType + '-' + i)}
 										<li>
-											{type.charAt(0).toUpperCase()}{type.slice(1)} ${pricePerBed.toFixed(2)}/bed ({count}x)
+											<span class="bed-slot-label">{item.label}</span>
+											<span class="bed-slot-price">${item.pricePerBedMax.toFixed(2)}</span>
 											{#if nights > 0}
-												<p class="per-night"><strong>Per night:</strong> ${pricePerBedPerNight.toFixed(2)}</p>
+												<p class="per-night"><strong>Per night:</strong> ${item.pricePerBedPerNightMax.toFixed(2)}</p>
 											{/if}
 										</li>
 									{/each}
@@ -241,7 +329,11 @@
 			</table>
 		</div>
 		{#if draft.pricingModel === 'per-bed'}
-			<p class="per-bed-note">In per-bed pricing, everyone pays based on the bed they choose. Larger beds cost a bit more than smaller beds, and beds in private rooms cost a bit more than beds in shared rooms. The total trip cost is split proportionally across everyone attending, and prices can go down as more people RSVP until the deadline.</p>
+			<p class="per-bed-note">In per-bed pricing, everyone pays based on the bed they choose. Larger beds and beds in private rooms cost a bit more (bed-type weight × room privacy). The breakdown below shows the price per bed so that <strong>when all beds are filled, the total collected equals the trip cost.</strong></p>
+			<p class="formula-note"><strong>Formula:</strong> Base = total trip cost ÷ number of sleeping spots. Each bed’s price = base × (bed weight × privacy ÷ average combined weight). Sum of all bed prices = trip cost.</p>
+		{/if}
+		{#if draft.pricingModel === 'per-room'}
+			<p class="formula-note"><strong>Formula:</strong> Price per person = Total cost × (room privacy) ÷ denominator. Denominator = sum of (room privacy × people in that room) for occupied rooms, with a floor of guest count. More guests → larger denominator → lower price per person.</p>
 		{/if}
 	</div>
 </div>
@@ -326,6 +418,13 @@
 		line-height: 1.5;
 		max-width: 56ch;
 	}
+	.formula-note {
+		margin: 0.5rem 0 0;
+		font-size: 0.8125rem;
+		color: var(--muted);
+		line-height: 1.45;
+		max-width: 56ch;
+	}
 	.comparison-table-wrapper {
 		overflow-x: auto;
 	}
@@ -397,6 +496,20 @@
 	}
 	.bed-breakdown .per-night {
 		margin: 0.15rem 0 0 0;
+	}
+	.bed-by-room li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.35rem;
+	}
+	.bed-slot-label {
+		flex: 1;
+		min-width: 0;
+	}
+	.bed-slot-price {
+		font-weight: 600;
+		color: var(--text);
 	}
 	.radio-label {
 		display: inline-flex;

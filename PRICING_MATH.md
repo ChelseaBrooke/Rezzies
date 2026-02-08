@@ -21,11 +21,10 @@ Used in per-bed pricing. Weights are relative; larger beds cost more than smalle
 
 Used in both per-room and per-bed pricing. Stored per room.
 
-| Room type            | Privacy factor |
-|----------------------|----------------|
-| Shared room          | 1.0            |
-| Private room         | 1.25           |
-| Private room + ensuite | 1.4         |
+| Room type     | Privacy factor |
+|---------------|----------------|
+| Shared room   | 1.0            |
+| Private room  | 1.25           |
 
 ---
 
@@ -84,34 +83,19 @@ Each person in Room B: 5000 × 1.0 / 5.5 ≈ $909.09.
 
 ### 4. PER_BED (with privacy)
 
-Everyone pays based on the bed they choose. Larger beds cost more; beds in private rooms cost more.
+Everyone pays based on the bed they choose. Larger beds cost more; beds in private rooms cost more (bed-type weight × room privacy factor).
 
 **Formula:**
 ```
-Price per person =
-  Total trip cost
-  × (bed weight × privacy factor)
-  ÷ (sum of (bed weight × privacy factor) for everyone who RSVP’d yes,
-     or the minimum expected guests equivalent — whichever is higher)
+Price per person = (Total trip cost ÷ effective guest count OR yes-RSVPs, whichever is higher) × (bed-type weight × privacy factor ÷ average combined weight)
 ```
 
-That is the whole calculation: one term per person (bed weight × room privacy factor), sum in the denominator, then scale so the total equals the trip cost.
+- **Denominator** = max(effective guest count, yes-RSVPs). Use the higher of expected guest count and the number of people who have RSVP’d (plus this booking when calculating a reservation).
+- **Average combined weight** = sum of (bed-type weight × room privacy factor for each sleeping spot) ÷ number of sleeping spots.
 
-**Example:** Total cost $5,000. One guest: King (1.3) in private room (1.25). Another: Twin (1.0) in shared room (1.0).  
-Denominator = (1.3 × 1.25) + (1.0 × 1.0) = 1.625 + 1.0 = 2.625.  
-Guest 1: 5000 × 1.625 / 2.625 ≈ $3,095.24.  
-Guest 2: 5000 × 1.0 / 2.625 ≈ $1,904.76.
-
----
-
-## Minimum expected guests equivalent
-
-For both per-room and per-bed, the denominator is never lower than a “minimum expected guests equivalent” so that:
-
-- Early bookers don’t overpay when few people have RSVP’d.
-- The total still reconciles to the trip cost as more people are added.
-
-Implementation typically uses the trip’s expected guest count (or total bed capacity) to compute a floor on the denominator (e.g. assuming average weight × average privacy per slot).
+**Example:** Total cost $3,000, denominator 3. Slots: King in private (1.3×1.25), Twin shared (1.0×1.0), Twin shared (1.0×1.0).  
+Sum combined = 1.625 + 1 + 1 = 3.625. Average combined weight = 3.625 / 3. Base = 3000 / 3 = $1,000.  
+King: 1000 × (1.3 × 1.25 / (3.625/3)) ≈ $1,344.83. Each Twin: 1000 × (1.0 × 1.0 / (3.625/3)) ≈ $827.59.
 
 ---
 
@@ -131,5 +115,5 @@ priceForStay = fullStayPrice × stayFactor
 
 - All prices are stored in cents (integers) in the database where applicable.
 - Display prices are rounded to 2 decimal places.
-- Room privacy factor is stored on the Room model (default 1.0 = shared). Private = 1.25, private + ensuite = 1.4.
-- Bed weights are configurable per trip (JSON) but default to the universal table above.
+- Room privacy factor is stored on the Room model (default 1.0 = shared). Private = 1.25.
+- Bed weights are configurable per trip (JSON) but default to the universal table above.max RSVP

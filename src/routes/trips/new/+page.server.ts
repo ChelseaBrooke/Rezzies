@@ -135,13 +135,28 @@ export const actions: Actions = {
 
 				// Create rooms and beds
 				for (const roomData of data.rooms) {
+					// Privacy: use draft type if set, else infer — single-slot room = private (1.25), multi-slot = shared (1.0)
+					const roomSlots = (roomData.beds || []).reduce(
+						(sum: number, b: { quantity?: number; count?: number }) => sum + (b.quantity ?? b.count ?? 1),
+						0
+					);
+					const privacyFactor =
+						roomData.type === 'private'
+							? 1.25
+							: roomData.type === 'shared'
+								? 1.0
+								: roomSlots === 1
+									? 1.25
+									: 1.0;
+
 					const room = await tx.room.create({
 						data: {
 							tripId: newTrip.id,
 							name: roomData.name,
 							maxOccupancy: roomData.maxOccupants || 2,
 							photoUrls: roomData.photos || [],
-							baseRateModifier: 1.0
+							baseRateModifier: 1.0,
+							privacyFactor
 						}
 					});
 

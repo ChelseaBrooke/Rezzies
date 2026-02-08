@@ -295,6 +295,7 @@ export interface TripForDraft {
 		description?: string | null;
 		photoUrls?: string[];
 		maxOccupancy?: number | null;
+		privacyFactor?: number | null;
 		beds?: Array<{
 			id: string;
 			bedType: string;
@@ -322,7 +323,7 @@ export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
 		name: room.name ?? `Room ${idx + 1}`,
 		roomType: 'bedroom',
 		customRoomDescription: room.description ?? '',
-		type: 'private',
+		type: room.privacyFactor != null && room.privacyFactor >= 1.25 ? 'private' : 'shared',
 		maxOccupants: room.maxOccupancy ?? 2,
 		notes: '',
 		photos: room.photoUrls ?? [],

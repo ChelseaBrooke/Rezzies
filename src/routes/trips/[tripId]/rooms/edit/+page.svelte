@@ -21,8 +21,7 @@
 
 	const privacyOptions = [
 		{ value: 1.0, label: 'Shared room' },
-		{ value: 1.25, label: 'Private room' },
-		{ value: 1.4, label: 'Private room + ensuite' }
+		{ value: 1.25, label: 'Private room' }
 	];
 
 	let roomPhotoUploading = $state(false);

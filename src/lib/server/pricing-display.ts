@@ -99,14 +99,25 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 		const bedPricing: BedPricingDisplay[] = [];
 
 		if (pricingModel === 'PER_BED') {
-			// Price per person = totalCost × (bed weight × privacy factor) ÷ totalValueAllSlots (preview)
+			// Price per person = (total ÷ max(effective guest count, yes-RSVPs)) × (bed weight × privacy ÷ average combined weight)
 			const bedWeights = parseBedWeights(trip.bedWeights);
-			const privacyFactor = room.privacyFactor ?? 1.0;
-			const totalValue = computedPricing.totalValueAllSlots || 1;
+			let totalSlots = 0;
+			let sumCombinedWeight = 0;
+			for (const r of trip.rooms) {
+				const p = r.privacyFactor ?? 1.0;
+				for (const b of r.beds) {
+					const slots = b.capacitySlots || b.capacity || 1;
+					totalSlots += slots;
+					sumCombinedWeight += slots * getBedWeight(bedWeights, b.bedType) * p;
+				}
+			}
+			const avgCombinedWeight = totalSlots > 0 ? sumCombinedWeight / totalSlots : 1;
+			const effectiveGuests = Math.max(1, trip.expectedPeopleCount ?? trip.maxGuests ?? totalSlots);
+			const base = trip.totalCost / effectiveGuests;
+			const roomPrivacy = room.privacyFactor ?? 1.0;
 			for (const bed of room.beds) {
 				const w = getBedWeight(bedWeights, bed.bedType);
-				const slots = bed.capacitySlots || bed.capacity || 1;
-				const bedPriceFullStay = (trip.totalCost * w * privacyFactor * slots) / totalValue;
+				const bedPriceFullStay = (base * (w * roomPrivacy)) / avgCombinedWeight;
 				const bedPricePerNight = bedPriceFullStay / totalNights;
 
 				bedPricing.push({
