@@ -2,7 +2,7 @@
  * Calculate and format pricing display for rooms/beds based on pricing model
  */
 
-import { computeRoomPricing, type PricingMode } from './pricing-canonical.js';
+import { computeRoomPricing, getBedWeight, parseBedWeights, type PricingMode } from './pricing-canonical.js';
 import { prisma } from './prisma.js';
 
 export interface RoomPricingDisplay {
@@ -99,16 +99,14 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 		const bedPricing: BedPricingDisplay[] = [];
 
 		if (pricingModel === 'PER_BED') {
-			// Show price per bed
+			// Price per person = totalCost × (bed weight × privacy factor) ÷ totalValueAllSlots (preview)
+			const bedWeights = parseBedWeights(trip.bedWeights);
+			const privacyFactor = room.privacyFactor ?? 1.0;
+			const totalValue = computedPricing.totalValueAllSlots || 1;
 			for (const bed of room.beds) {
-				// Calculate bed price based on bed weight and slots
-				const bedWeights = JSON.parse(trip.bedWeights || '{}');
-				const bedWeight = bedWeights[bed.bedType.toLowerCase()] || 0.6;
+				const w = getBedWeight(bedWeights, bed.bedType);
 				const slots = bed.capacitySlots || bed.capacity || 1;
-				
-				// Use proportional pricing based on bed weight
-				const bedWeightRatio = (bedWeight * slots) / roomPricingData.bedWeightSum;
-				const bedPriceFullStay = roomPricingData.roomPriceFullStay * bedWeightRatio;
+				const bedPriceFullStay = (trip.totalCost * w * privacyFactor * slots) / totalValue;
 				const bedPricePerNight = bedPriceFullStay / totalNights;
 
 				bedPricing.push({

@@ -1,131 +1,123 @@
 # Pricing Calculation Documentation
 
-This document explains how pricing is calculated for rooms and beds based on the selected pricing model.
+This document explains how pricing is calculated for rooms and beds based on the selected pricing model. Privacy is a factor in both per-room and per-bed pricing.
 
-## Pricing Models
+## Bed-type weights (universal)
 
-### 1. PER_PERSON (Equal Split)
+Used in per-bed pricing. Weights are relative; larger beds cost more than smaller beds.
 
-**Calculation:**
-- Total trip cost divided by total capacity (sum of all room max occupancies)
-- Each person pays the same amount regardless of which room they stay in
+| Bed type      | Bed weight |
+|---------------|------------|
+| Twin / Single | 1.0        |
+| Bunk (per person) | 0.9   |
+| Full / Double | 1.1        |
+| Queen         | 1.2        |
+| King          | 1.3        |
+| Sofa bed      | 0.85       |
+| Air mattress  | 0.75       |
+| Other         | 1.0        |
+
+## Privacy factors
+
+Used in both per-room and per-bed pricing. Stored per room.
+
+| Room type            | Privacy factor |
+|----------------------|----------------|
+| Shared room          | 1.0            |
+| Private room         | 1.25           |
+| Private room + ensuite | 1.4         |
+
+---
+
+## Pricing models
+
+### 1. PER_PERSON (Equal split)
+
+**Calculation:** Total trip cost divided by total capacity. Each person pays the same amount.
 
 **Formula:**
 ```
 perPersonPrice = totalCost / totalCapacity
-totalPrice = perPersonPrice * numberOfGuests
+totalPrice = perPersonPrice × numberOfGuests
 ```
 
-**Example:**
-- Total cost: $5,000
-- Total capacity: 10 people
-- Per person: $500
-- If 3 people book: $1,500 total
+**Example:** Total cost $5,000, total capacity 10 → $500 per person.
 
 ---
 
 ### 2. PER_PERSON_PER_NIGHT
 
-**Calculation:**
-- Total trip cost divided by total nights and total capacity
-- Each person pays per night they stay
+**Calculation:** Total trip cost divided by total nights and total capacity. Each person pays per night.
 
 **Formula:**
 ```
 perPersonPerNightPrice = totalCost / totalNights / totalCapacity
-nightlyRate = perPersonPerNightPrice * numberOfGuests
-totalPrice = nightlyRate * nightsStayed
+nightlyRate = perPersonPerNightPrice × numberOfGuests
+totalPrice = nightlyRate × nightsStayed
 ```
 
-**Example:**
-- Total cost: $5,000
-- Total nights: 5
-- Total capacity: 10 people
-- Per person per night: $100
-- If 3 people stay for 3 nights: $900 total ($100 × 3 × 3)
+**Example:** $5,000, 5 nights, capacity 10 → $100 per person per night.
 
 ---
 
-### 3. PER_ROOM (Equal Split)
+### 3. PER_ROOM (with privacy)
 
-**Calculation:**
-- Uses canonical pricing model with bed weights and sharing discounts
-- Total trip cost divided by number of rooms
-- Each room pays the same amount
+In this model, bed type does not matter—only the room and its privacy factor. Each person in a room pays the same share of the room’s weighted portion.
 
-**Formula (Canonical):**
+**Formula:**
 ```
-roomPriceFullStay = totalCost / numberOfRooms
-roomPricePerNight = roomPriceFullStay / totalNights
+Price per person =
+  Total trip cost
+  × (room privacy factor)
+  ÷ (sum of (room privacy factor × number of people in that room) for all occupied rooms,
+     or the minimum expected guests equivalent — whichever is higher)
 ```
 
-**Example:**
-- Total cost: $5,000
-- Number of rooms: 5
-- Per room: $1,000 for full stay
-- Per room per night (5 nights): $200/night
+**Denominator:** For each occupied room, add `(room privacy factor × number of people in that room)`. Sum over all occupied rooms. Use that sum, or a minimum based on expected guest count, whichever is higher.
+
+**Example:** Total cost $5,000. Room A: private (1.25), 2 people. Room B: shared (1.0), 3 people.  
+Denominator = (1.25 × 2) + (1.0 × 3) = 2.5 + 3 = 5.5.  
+Each person in Room A: 5000 × 1.25 / 5.5 ≈ $1,136.36.  
+Each person in Room B: 5000 × 1.0 / 5.5 ≈ $909.09.
 
 ---
 
-### 4. PER_BED (Weighted by Bed Type)
+### 4. PER_BED (with privacy)
 
-**Calculation:**
-- Uses canonical pricing model with bed weights
-- Beds are weighted: King (1.00), Queen (0.75), Full (0.70), Twin (0.50), Bunk (0.50), Sofa (0.40)
-- Sharing discount applied: rooms with more beds cost less per bed
-- Privacy premium: private rooms (single bed) cost more
+Everyone pays based on the bed they choose. Larger beds cost more; beds in private rooms cost more.
 
-**Formula (Canonical):**
+**Formula:**
 ```
-1. Calculate bed weight sum per room:
-   bedWeightSum = Σ (bedWeight[bedType] × capacitySlots)
-
-2. Calculate per-slot value with sharing discount:
-   roomValueDiscounted = bedWeightSum / (occMax ^ sharingExponentAlpha)
-   slotValueBase = roomValueDiscounted / occMax
-
-3. Apply privacy premium (if enabled):
-   privacyMultiplier = 1 + (privacyPremiumP × privacyNorm)
-   slotValue = slotValueBase × privacyMultiplier
-
-4. Scale to dollars:
-   totalValueAllSlots = Σ (slotValue × occMax)
-   dollarsPerValueUnit = totalCost / totalValueAllSlots
-   slotPriceFullStay = dollarsPerValueUnit × slotValue
-   bedPriceFullStay = slotPriceFullStay × bedCapacitySlots
-   bedPricePerNight = bedPriceFullStay / totalNights
+Price per person =
+  Total trip cost
+  × (bed weight × privacy factor)
+  ÷ (sum of (bed weight × privacy factor) for everyone who RSVP’d yes,
+     or the minimum expected guests equivalent — whichever is higher)
 ```
 
-**Example:**
-- Total cost: $5,000
-- Bedroom 1: 1 King Bed (weight 1.00, 2 slots)
-- Bedroom 2: 1 Queen Bed (weight 0.75, 2 slots)
-- Bedroom 3: 1 Twin Bed (weight 0.50, 1 slot)
+That is the whole calculation: one term per person (bed weight × room privacy factor), sum in the denominator, then scale so the total equals the trip cost.
 
-**Calculation:**
-1. Bed weight sums:
-   - Room 1: 1.00 × 2 = 2.00
-   - Room 2: 0.75 × 2 = 1.50
-   - Room 3: 0.50 × 1 = 0.50
-   - Total: 4.00
-
-2. With sharing discount (alpha = 0.60):
-   - Room 1: 2.00 / (2^0.60) = 1.32 → 1.32 / 2 = 0.66 per slot
-   - Room 2: 1.50 / (2^0.60) = 0.99 → 0.99 / 2 = 0.50 per slot
-   - Room 3: 0.50 / (1^0.60) = 0.50 → 0.50 / 1 = 0.50 per slot
-
-3. Scale to $5,000:
-   - Total value: (0.66 × 2) + (0.50 × 2) + (0.50 × 1) = 2.82
-   - Dollars per unit: $5,000 / 2.82 = $1,773.05
-   - King bed: $1,773.05 × 0.66 × 2 = $2,340.43
-   - Queen bed: $1,773.05 × 0.50 × 2 = $1,773.05
-   - Twin bed: $1,773.05 × 0.50 × 1 = $886.52
+**Example:** Total cost $5,000. One guest: King (1.3) in private room (1.25). Another: Twin (1.0) in shared room (1.0).  
+Denominator = (1.3 × 1.25) + (1.0 × 1.0) = 1.625 + 1.0 = 2.625.  
+Guest 1: 5000 × 1.625 / 2.625 ≈ $3,095.24.  
+Guest 2: 5000 × 1.0 / 2.625 ≈ $1,904.76.
 
 ---
 
-## Partial Stays
+## Minimum expected guests equivalent
 
-If `allowPartialStays` is enabled, guests can book for fewer nights than the full trip duration.
+For both per-room and per-bed, the denominator is never lower than a “minimum expected guests equivalent” so that:
+
+- Early bookers don’t overpay when few people have RSVP’d.
+- The total still reconciles to the trip cost as more people are added.
+
+Implementation typically uses the trip’s expected guest count (or total bed capacity) to compute a floor on the denominator (e.g. assuming average weight × average privacy per slot).
+
+---
+
+## Partial stays
+
+If `allowPartialStays` is enabled, guests can book for fewer nights than the full trip.
 
 **Formula:**
 ```
@@ -133,60 +125,11 @@ stayFactor = nightsStayed / totalNights
 priceForStay = fullStayPrice × stayFactor
 ```
 
-**Example:**
-- Full stay price: $1,000 (5 nights)
-- Guest stays: 3 nights
-- Stay factor: 3 / 5 = 0.6
-- Price: $1,000 × 0.6 = $600
-
----
-
-## Bed Weights (Default)
-
-| Bed Type | Weight | Capacity |
-|----------|--------|----------|
-| King     | 1.00   | 2 people |
-| Queen    | 0.75   | 2 people |
-| Full     | 0.70   | 2 people |
-| Twin     | 0.50   | 1 person |
-| Bunk     | 0.50   | 1 person per slot |
-| Sofa     | 0.40   | 1-2 people |
-| Other    | 0.60   | Varies |
-
----
-
-## Sharing Discount
-
-The sharing discount makes rooms with more beds cheaper per bed. Controlled by `sharingExponentAlpha` (default: 0.60).
-
-- **Lower alpha (0.3)**: Less discount, beds cost more similar
-- **Higher alpha (0.9)**: More discount, shared rooms much cheaper
-
-**Formula:**
-```
-roomValueDiscounted = bedWeightSum / (occMax ^ sharingExponentAlpha)
-```
-
----
-
-## Privacy Premium
-
-Optional premium for private rooms (single bed). Controlled by `privacyPremiumP` (default: 0.00, range: 0-0.25).
-
-**Formula:**
-```
-privacyNorm = 1 - ((occMax - 1) / (occMaxMax - 1))
-privacyMultiplier = 1 + (privacyPremiumP × privacyNorm)
-```
-
-- **privacyPremiumP = 0.00**: No premium (default)
-- **privacyPremiumP = 0.25**: Private rooms cost 25% more
-
 ---
 
 ## Notes
 
-- All prices are stored in cents (integers) in the database
-- Display prices are rounded to 2 decimal places
-- The canonical pricing model ensures all pricing modes reconcile to the exact total trip cost
-- Prices are calculated when rooms are created and can be locked at reservation time
+- All prices are stored in cents (integers) in the database where applicable.
+- Display prices are rounded to 2 decimal places.
+- Room privacy factor is stored on the Room model (default 1.0 = shared). Private = 1.25, private + ensuite = 1.4.
+- Bed weights are configurable per trip (JSON) but default to the universal table above.

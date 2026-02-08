@@ -15,7 +15,14 @@
 		{ value: 'bunk', label: 'Bunk' },
 		{ value: 'sofa_bed', label: 'Sofa Bed' },
 		{ value: 'full', label: 'Full' },
+		{ value: 'air_mattress', label: 'Air mattress' },
 		{ value: 'other', label: 'Other' }
+	];
+
+	const privacyOptions = [
+		{ value: 1.0, label: 'Shared room' },
+		{ value: 1.25, label: 'Private room' },
+		{ value: 1.4, label: 'Private room + ensuite' }
 	];
 
 	let roomPhotoUploading = $state(false);
@@ -38,7 +45,7 @@
 		if (res.ok) await invalidateAll();
 	}
 
-	async function updateRoom(roomId: number, updates: { name?: string; maxOccupancy?: number | null; photoUrls?: string[] }) {
+	async function updateRoom(roomId: number, updates: { name?: string; maxOccupancy?: number | null; photoUrls?: string[]; privacyFactor?: number }) {
 		const res = await fetch(`/api/trips/${tripId}/rooms/${roomId}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
@@ -140,6 +147,19 @@
 							if (v && v !== room.name) updateRoom(room.id, { name: v });
 						}}
 					/>
+					<select
+						class="privacy-select"
+						title="Room type (affects per-bed / per-room pricing)"
+						value={String(room.privacyFactor ?? 1)}
+						onchange={(e) => {
+							const v = parseFloat((e.currentTarget as HTMLSelectElement).value);
+							if (!Number.isNaN(v) && v !== (room.privacyFactor ?? 1)) updateRoom(room.id, { privacyFactor: v });
+						}}
+					>
+						{#each privacyOptions as opt}
+							<option value={opt.value}>{opt.label}</option>
+						{/each}
+					</select>
 					<input
 						type="number"
 						value={room.maxOccupancy ?? ''}
@@ -226,6 +246,7 @@
 	.room-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
 	.room-name-input { flex: 1; min-width: 0; padding: 0.35rem 0; border: none; border-bottom: 1px solid var(--border); font-size: 1rem; font-weight: 600; background: transparent; color: var(--text); }
 	.room-name-input:focus { outline: none; border-bottom-color: var(--primary); }
+	.privacy-select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.8125rem; background: var(--surface2); color: var(--text); min-width: 8rem; }
 	.max-occupants-input { width: 3rem; padding: 0.35rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.8125rem; text-align: center; background: var(--surface2); color: var(--text); }
 	.remove-room-btn { width: 1.75rem; height: 1.75rem; border-radius: 50%; background: var(--surface2); color: var(--muted); border: none; cursor: pointer; font-size: 1.1rem; line-height: 1; }
 	.remove-room-btn:hover { background: var(--error, #b91c1c); color: white; }

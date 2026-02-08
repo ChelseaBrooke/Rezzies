@@ -41,13 +41,18 @@ export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 				? d.maxOccupancy
 				: undefined;
 	const photoUrls = Array.isArray(d.photoUrls) ? (d.photoUrls as string[]).filter((u) => typeof u === 'string') : undefined;
+	const privacyFactor =
+		d.privacyFactor !== undefined && typeof d.privacyFactor === 'number' && d.privacyFactor >= 1 && d.privacyFactor <= 2
+			? d.privacyFactor
+			: undefined;
 
 	const room = await prisma.room.update({
 		where: { id: roomId },
 		data: {
 			...(name !== undefined && { name }),
 			...(maxOccupancy !== undefined && { maxOccupancy }),
-			...(photoUrls !== undefined && { photoUrls })
+			...(photoUrls !== undefined && { photoUrls }),
+			...(privacyFactor !== undefined && { privacyFactor })
 		},
 		include: { beds: true }
 	});

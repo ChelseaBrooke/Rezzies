@@ -73,6 +73,7 @@ model Room {
   baseRateModifier Float    @default(1.0)
   photoUrls        String[] // Array of photo URLs
   maxOccupancy     Int? // Max people per room
+  privacyFactor    Float    @default(1.0) // 1.0 shared, 1.25 private, 1.4 private+ensuite
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

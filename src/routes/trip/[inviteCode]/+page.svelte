@@ -229,6 +229,9 @@
 			{#if selectedRoom && data.trip.pricingModel !== 'PER_ROOM'}
 				<section class="form-section">
 					<h2>Select Bed</h2>
+					{#if data.trip.pricingModel === 'per_bed' || data.trip.pricingModel === 'PER_BED'}
+						<p class="per-bed-note">In per-bed pricing, everyone pays based on the bed they choose. Larger beds cost a bit more than smaller beds, and beds in private rooms cost a bit more than beds in shared rooms. The total trip cost is split proportionally across everyone attending, and prices can go down as more people RSVP until the deadline.</p>
+					{/if}
 					<div class="bed-list">
 						{#each selectedRoom.beds as bed}
 							<button
@@ -329,6 +332,14 @@
 		border-radius: 8px;
 		margin-bottom: 1.5rem;
 		border: 1px solid #fcc;
+	}
+
+	.per-bed-note {
+		font-size: 0.875rem;
+		color: #555;
+		line-height: 1.5;
+		margin: 0 0 1rem 0;
+		max-width: 56ch;
 	}
 
 	.form-section {

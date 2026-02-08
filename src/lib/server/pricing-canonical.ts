@@ -1,18 +1,19 @@
 // Canonical Pricing Model for Divvi
-// Implements sleep-slot based pricing with bed weights, sharing discounts, and privacy premiums
+// Per-bed and per-room pricing use bed-type weights and room privacy factors.
+// See PRICING_MATH.md for formulas.
 
 import { prisma } from './prisma.js';
 
 export type PricingMode = 'PER_ROOM' | 'PER_PERSON' | 'PER_BED' | 'PER_PERSON_PER_NIGHT';
 
 export interface BedWeights {
-	[key: string]: number; // e.g., { "king": 1.00, "queen": 0.75, "twin": 0.50 }
+	[key: string]: number; // e.g., { "king": 1.3, "queen": 1.2, "twin": 1.0 }
 }
 
 export interface PricingSettings {
 	bedWeights: BedWeights;
-	sharingExponentAlpha: number; // 0.3-0.9, default 0.60
-	privacyPremiumP: number; // 0-0.25, default 0.00
+	sharingExponentAlpha: number; // legacy
+	privacyPremiumP: number; // legacy; privacy now via Room.privacyFactor
 }
 
 export interface RoomPricing {
@@ -45,15 +46,19 @@ export interface ReservationPriceParams {
 	checkOutDate: Date;
 }
 
-// Default bed weights
+// Default bed weights (universal). Per-bed pricing: larger beds cost more.
 export const DEFAULT_BED_WEIGHTS: BedWeights = {
-	king: 1.00,
-	queen: 0.75,
-	full: 0.70,
-	twin: 0.50,
-	bunk: 0.50, // Per slot in bunk
-	sofa: 0.40,
-	other: 0.60
+	twin: 1.0,
+	single: 1.0,
+	bunk: 0.9,
+	full: 1.1,
+	double: 1.1,
+	queen: 1.2,
+	king: 1.3,
+	sofa: 0.85,
+	sofa_bed: 0.85,
+	air_mattress: 0.75,
+	other: 1.0
 };
 
 /**
@@ -66,23 +71,41 @@ export function calculateNights(startDate: Date, endDate: Date): number {
 }
 
 /**
+ * Normalize bed type for weight lookup: lowercase, spaces -> underscore
+ */
+function normalizeBedType(bedType: string | null): string {
+	if (!bedType || !bedType.trim()) return 'other';
+	return bedType.trim().toLowerCase().replace(/\s+/g, '_');
+}
+
+export function getBedWeight(weights: BedWeights, bedType: string | null): number {
+	const key = normalizeBedType(bedType);
+	return weights[key] ?? weights.other ?? DEFAULT_BED_WEIGHTS.other;
+}
+
+/**
  * Parse bed weights from JSON string or use defaults
  */
-function parseBedWeights(weightsJson: string | null): BedWeights {
+export function parseBedWeights(weightsJson: string | null): BedWeights {
 	if (!weightsJson) {
 		return DEFAULT_BED_WEIGHTS;
 	}
 	try {
 		const parsed = JSON.parse(weightsJson);
-		return { ...DEFAULT_BED_WEIGHTS, ...parsed };
+		// Normalize keys to lowercase with underscores
+		const normalized: BedWeights = {};
+		for (const [k, v] of Object.entries(parsed)) {
+			if (typeof v === 'number') normalized[normalizeBedType(k)] = v;
+		}
+		return { ...DEFAULT_BED_WEIGHTS, ...normalized };
 	} catch {
 		return DEFAULT_BED_WEIGHTS;
 	}
 }
 
 /**
- * Compute canonical pricing for all rooms in a trip
- * This is the core function that reconciles all pricing to tripTotal
+ * Compute canonical pricing for all rooms in a trip.
+ * Uses bed-type weights and room privacy factors. See PRICING_MATH.md.
  */
 export async function computeRoomPricing(
 	tripId: string
@@ -108,62 +131,34 @@ export async function computeRoomPricing(
 
 	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
 	const bedWeights = parseBedWeights(trip.bedWeights);
-	const sharingAlpha = trip.sharingExponentAlpha || 0.60;
-	const privacyP = trip.privacyPremiumP || 0.00;
 
-	// Step 1: Calculate bed weight sum and occMax for each room
-	const roomData = trip.rooms.map(room => {
+	// Per-slot value = bedWeight * room privacyFactor; scale so sum = totalCost
+	const roomData = trip.rooms.map((room) => {
 		let bedWeightSum = 0;
 		let occMax = 0;
+		const privacyFactor = room.privacyFactor ?? 1.0;
 
 		for (const bed of room.beds) {
-			const bedWeight = bedWeights[bed.bedType.toLowerCase()] || bedWeights.other;
+			const w = getBedWeight(bedWeights, bed.bedType);
 			const slots = bed.capacitySlots || bed.capacity || 1;
-			bedWeightSum += bedWeight * slots;
+			bedWeightSum += w * slots;
 			occMax += slots;
 		}
+
+		// slotValue = (weighted sum / occMax) * privacyFactor for a single "average" slot in this room
+		const slotValue = occMax > 0 ? (bedWeightSum / occMax) * privacyFactor : privacyFactor;
 
 		return {
 			roomId: room.id,
 			occMax,
-			bedWeightSum
+			bedWeightSum,
+			privacyFactor,
+			slotValue
 		};
 	});
 
-	// Find max occupancy for privacy normalization
-	const occMaxMax = Math.max(...roomData.map(r => r.occMax), 1);
-
-	// Step 2: Calculate per-slot value base (with sharing discount)
-	const roomPricing: RoomPricing[] = roomData.map(room => {
-		// Apply sharing discount
-		const roomValueDiscounted = room.bedWeightSum / Math.pow(room.occMax, sharingAlpha);
-		const slotValueBase = roomValueDiscounted / room.occMax;
-
-		// Apply privacy premium
-		let privacyMultiplier = 1.0;
-		if (occMaxMax > 1 && privacyP > 0) {
-			const privacyNorm = 1 - ((room.occMax - 1) / (occMaxMax - 1));
-			privacyMultiplier = 1 + (privacyP * privacyNorm);
-		}
-
-		const slotValue = slotValueBase * privacyMultiplier;
-
-		return {
-			roomId: room.roomId,
-			occMax: room.occMax,
-			bedWeightSum: room.bedWeightSum,
-			slotValueBase,
-			slotValue,
-			slotPriceFullStay: 0, // Will be calculated after scaling
-			roomPriceFullStay: 0,
-			slotPricePerNight: 0,
-			roomPricePerNight: 0
-		};
-	});
-
-	// Step 3: Calculate total value and scaling factor
-	const totalValueAllSlots = roomPricing.reduce(
-		(sum, r) => sum + (r.slotValue * r.occMax),
+	const totalValueAllSlots = roomData.reduce(
+		(sum, r) => sum + r.slotValue * r.occMax,
 		0
 	);
 
@@ -172,18 +167,24 @@ export async function computeRoomPricing(
 	}
 
 	const dollarsPerValueUnit = trip.totalCost / totalValueAllSlots;
+	const totalSlots = roomData.reduce((sum, r) => sum + r.occMax, 0);
 
-	// Step 4: Scale to dollars
-	const totalSlots = roomPricing.reduce((sum, r) => sum + r.occMax, 0);
+	const roomPricing: RoomPricing[] = roomData.map((room) => {
+		const slotPriceFullStay = dollarsPerValueUnit * room.slotValue;
+		const roomPriceFullStay = slotPriceFullStay * room.occMax;
+		return {
+			roomId: room.roomId,
+			occMax: room.occMax,
+			bedWeightSum: room.bedWeightSum,
+			slotValueBase: room.slotValue,
+			slotValue: room.slotValue,
+			slotPriceFullStay,
+			roomPriceFullStay,
+			slotPricePerNight: slotPriceFullStay / totalNights,
+			roomPricePerNight: roomPriceFullStay / totalNights
+		};
+	});
 
-	for (const room of roomPricing) {
-		room.slotPriceFullStay = dollarsPerValueUnit * room.slotValue;
-		room.roomPriceFullStay = room.slotPriceFullStay * room.occMax;
-		room.slotPricePerNight = room.slotPriceFullStay / totalNights;
-		room.roomPricePerNight = room.roomPricePerNight / totalNights;
-	}
-
-	// Sanity check: sum should equal tripTotal (within rounding)
 	const sumCheck = roomPricing.reduce((sum, r) => sum + r.roomPriceFullStay, 0);
 	const diff = Math.abs(sumCheck - trip.totalCost);
 	if (diff > 0.01) {
@@ -201,7 +202,8 @@ export async function computeRoomPricing(
 }
 
 /**
- * Calculate price for a reservation using canonical model
+ * Calculate price for a reservation using privacy-aware per-bed or per-room formula.
+ * See PRICING_MATH.md.
  */
 export async function calculateReservationPrice(
 	params: ReservationPriceParams
@@ -212,48 +214,157 @@ export async function calculateReservationPrice(
 	totalPrice: number;
 	perNightRate: number;
 }> {
-	const { tripId, roomId, numberOfSlots, checkInDate, checkOutDate } = params;
+	const { tripId, roomId, bedId, numberOfSlots, checkInDate, checkOutDate } = params;
 
 	const trip = await prisma.trip.findUnique({
-		where: { id: tripId }
+		where: { id: tripId },
+		include: {
+			rooms: {
+				include: { beds: true }
+			},
+			roomAssignments: {
+				include: { room: true }
+			}
+		}
 	});
 
 	if (!trip) {
 		throw new Error('Trip not found');
 	}
 
-	// Check partial stays
 	const stayNights = calculateNights(checkInDate, checkOutDate);
 	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
-	const stayFactor = stayNights / totalNights;
+	const stayFactor = totalNights > 0 ? stayNights / totalNights : 1;
 
 	if (!trip.allowPartialStays && stayFactor < 1.0) {
 		throw new Error('Partial stays are not allowed for this trip');
 	}
 
-	// Validate dates are within trip range
 	if (checkInDate < trip.checkInDate || checkOutDate > trip.checkOutDate) {
 		throw new Error('Reservation dates must be within trip dates');
 	}
 
-	// Get computed pricing
-	const pricing = await computeRoomPricing(tripId);
-	const roomPricing = pricing.roomPricing.find(r => r.roomId === roomId);
+	const room = trip.rooms.find((r) => r.id === roomId);
+	if (!room) {
+		throw new Error('Room not found');
+	}
 
+	const expectedPeople = trip.expectedPeopleCount ?? trip.maxGuests ?? 1;
+	const bedWeights = parseBedWeights(trip.bedWeights);
+	const privacyFactor = room.privacyFactor ?? 1.0;
+
+	const pricingModel = (trip.pricingModel || 'per_person').toLowerCase();
+
+	if (pricingModel === 'per_bed') {
+		// Price per person = totalCost × (bed weight × privacy factor) ÷ denominator
+		const bed = bedId ? room.beds.find((b) => b.id === bedId) : room.beds[0];
+		if (!bed) {
+			throw new Error('Bed not found');
+		}
+		const bedWeight = getBedWeight(bedWeights, bed.bedType);
+		const numerator = bedWeight * privacyFactor;
+
+		let denominator = 0;
+		for (const a of trip.roomAssignments) {
+			const w = getBedWeight(bedWeights, a.bedType);
+			const p = a.room?.privacyFactor ?? 1.0;
+			denominator += (a.partySize || 1) * w * p;
+		}
+		denominator += numerator; // include current booking
+		denominator = Math.max(denominator, expectedPeople);
+
+		const pricePerPersonFullStay = (trip.totalCost * numerator) / denominator;
+		const totalPrice = pricePerPersonFullStay * stayFactor;
+		const perNightRate = totalNights > 0 ? totalPrice / stayNights : totalPrice;
+
+		return {
+			nights: stayNights,
+			stayFactor,
+			slotPriceForStay: totalPrice,
+			totalPrice: Math.round(totalPrice * 100) / 100,
+			perNightRate: Math.round(perNightRate * 100) / 100
+		};
+	}
+
+	if (pricingModel === 'per_room') {
+		// Price per person = totalCost × (room privacy factor) ÷ denominator
+		// denominator = sum of (room privacy factor × people in that room) for all occupied rooms
+		const peoplePerRoom: Record<number, number> = {};
+		for (const r of trip.rooms) {
+			peoplePerRoom[r.id] = 0;
+		}
+		for (const a of trip.roomAssignments) {
+			peoplePerRoom[a.roomId] = (peoplePerRoom[a.roomId] ?? 0) + (a.partySize || 1);
+		}
+		peoplePerRoom[roomId] = (peoplePerRoom[roomId] ?? 0) + 1; // current booking
+
+		let denominator = 0;
+		for (const [rid, people] of Object.entries(peoplePerRoom)) {
+			if (people <= 0) continue;
+			const r = trip.rooms.find((x) => x.id === Number(rid));
+			const p = r?.privacyFactor ?? 1.0;
+			denominator += p * people;
+		}
+		denominator = Math.max(denominator, expectedPeople);
+
+		const pricePerPersonFullStay = (trip.totalCost * privacyFactor) / denominator;
+		const totalPrice = pricePerPersonFullStay * stayFactor;
+		const perNightRate = totalNights > 0 ? totalPrice / stayNights : totalPrice;
+
+		return {
+			nights: stayNights,
+			stayFactor,
+			slotPriceForStay: totalPrice,
+			totalPrice: Math.round(totalPrice * 100) / 100,
+			perNightRate: Math.round(perNightRate * 100) / 100
+		};
+	}
+
+	// PER_PERSON: equal split by capacity
+	if (pricingModel === 'per_person') {
+		const totalCapacity = trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 0), 0) || 1;
+		const pricePerPersonFullStay = trip.totalCost / totalCapacity;
+		const totalPrice = pricePerPersonFullStay * numberOfSlots * stayFactor;
+		const perNightRate = stayNights > 0 ? totalPrice / stayNights : totalPrice;
+		return {
+			nights: stayNights,
+			stayFactor,
+			slotPriceForStay: totalPrice,
+			totalPrice: Math.round(totalPrice * 100) / 100,
+			perNightRate: Math.round(perNightRate * 100) / 100
+		};
+	}
+
+	// PER_PERSON_PER_NIGHT: equal split by capacity and nights
+	if (pricingModel === 'per_person_per_night') {
+		const totalCapacity = trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 0), 0) || 1;
+		const pricePerPersonPerNight = trip.totalCost / totalNights / totalCapacity;
+		const totalPrice = pricePerPersonPerNight * numberOfSlots * stayNights;
+		const perNightRate = pricePerPersonPerNight * numberOfSlots;
+		return {
+			nights: stayNights,
+			stayFactor,
+			slotPriceForStay: totalPrice,
+			totalPrice: Math.round(totalPrice * 100) / 100,
+			perNightRate: Math.round(perNightRate * 100) / 100
+		};
+	}
+
+	// Fallback: use computed room pricing (e.g. legacy or unknown model)
+	const pricing = await computeRoomPricing(tripId);
+	const roomPricing = pricing.roomPricing.find((r) => r.roomId === roomId);
 	if (!roomPricing) {
 		throw new Error('Room not found in pricing');
 	}
-
-	// Calculate price
 	const slotPriceForStay = roomPricing.slotPriceFullStay * stayFactor;
 	const totalPrice = slotPriceForStay * numberOfSlots;
-	const perNightRate = roomPricing.slotPricePerNight * numberOfSlots;
+	const perNightRate = totalNights > 0 ? roomPricing.slotPricePerNight * numberOfSlots : totalPrice / stayNights;
 
 	return {
 		nights: stayNights,
 		stayFactor,
 		slotPriceForStay,
-		totalPrice: Math.round(totalPrice * 100) / 100, // Round to cents
+		totalPrice: Math.round(totalPrice * 100) / 100,
 		perNightRate: Math.round(perNightRate * 100) / 100
 	};
 }
@@ -292,35 +403,53 @@ export async function getPricingPreview(
 		}
 
 		case 'PER_ROOM': {
-			const perRoom = Math.round((trip.totalCost / pricing.roomPricing.length) * 100) / 100;
+			// Preview: assume 1 person per room; denominator = sum(privacy factor)
+			const privacySum = trip.rooms.reduce((s, r) => s + (r.privacyFactor ?? 1), 0) || 1;
+			const roomBreakdownWithPrivacy: RoomPricing[] = pricing.roomPricing.map((r) => {
+				const room = trip.rooms!.find((x) => x.id === r.roomId);
+				const p = room?.privacyFactor ?? 1.0;
+				const roomPriceFullStay = (trip.totalCost * p) / privacySum;
+				return {
+					...r,
+					roomPriceFullStay,
+					slotPriceFullStay: roomPriceFullStay / (r.occMax || 1),
+					roomPricePerNight: roomPriceFullStay / pricing.totalNights,
+					slotPricePerNight: roomPriceFullStay / (r.occMax || 1) / pricing.totalNights
+				};
+			});
+			const perRoom =
+				trip.rooms.length > 0
+					? (trip.totalCost * (trip.rooms[0].privacyFactor ?? 1)) / privacySum
+					: trip.totalCost / pricing.roomPricing.length;
 			return {
 				mode,
-				perRoomFullStay: perRoom,
-				roomBreakdown: pricing.roomPricing
+				perRoomFullStay: Math.round(perRoom * 100) / 100,
+				roomBreakdown: roomBreakdownWithPrivacy
 			};
 		}
 
 		case 'PER_BED': {
-			// Group by bed type and calculate average
+			// Preview: price per bed = totalCost * (bedWeight * privacy) / totalValue (from computeRoomPricing)
 			const bedPrices: { [key: string]: number[] } = {};
+			const weights = parseBedWeights(trip.bedWeights);
 			for (const room of trip.rooms || []) {
+				const p = room.privacyFactor ?? 1.0;
 				for (const bed of room.beds) {
-					const roomP = pricing.roomPricing.find(r => r.roomId === room.id);
-					if (roomP) {
-						const bedPrice = roomP.slotPriceFullStay * (bed.capacitySlots || bed.capacity || 1);
-						if (!bedPrices[bed.bedType]) {
-							bedPrices[bed.bedType] = [];
-						}
-						bedPrices[bed.bedType].push(bedPrice);
-					}
+					const w = getBedWeight(weights, bed.bedType);
+					const slots = bed.capacitySlots || bed.capacity || 1;
+					const roomP = pricing.roomPricing.find((r) => r.roomId === room.id);
+					const bedPrice = roomP
+						? (trip.totalCost * w * p * slots) / pricing.totalValueAllSlots
+						: (trip.totalCost * w * p * slots) / pricing.totalValueAllSlots;
+					const key = normalizeBedType(bed.bedType);
+					if (!bedPrices[key]) bedPrices[key] = [];
+					bedPrices[key].push(bedPrice);
 				}
 			}
-
 			const perBed = Object.entries(bedPrices).map(([bedType, prices]) => ({
 				bedType,
 				price: Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100
 			}));
-
 			return {
 				mode,
 				perBedFullStay: perBed

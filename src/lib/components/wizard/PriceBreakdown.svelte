@@ -151,6 +151,7 @@
 						<span class="item-value">${bedType.totalCost.toFixed(2)}</span>
 					</div>
 				{/each}
+				<p class="per-bed-note">In per-bed pricing, everyone pays based on the bed they choose. Larger beds cost a bit more than smaller beds, and beds in private rooms cost a bit more than beds in shared rooms. The total trip cost is split proportionally across everyone attending, and prices can go down as more people RSVP until the deadline.</p>
 			</div>
 		{:else if draft.pricingModel === 'per-person' && draft.expectedGuestCount > 0}
 			<div class="breakdown-section">
@@ -269,5 +270,13 @@
 	.breakdown-item.note {
 		font-style: italic;
 		color: var(--muted);
+	}
+
+	.per-bed-note {
+		font-size: 0.75rem;
+		color: var(--muted);
+		line-height: 1.45;
+		margin: 0.5rem 0 0 0.75rem;
+		max-width: 52ch;
 	}
 </style>

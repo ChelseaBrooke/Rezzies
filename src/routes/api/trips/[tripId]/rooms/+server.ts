@@ -24,6 +24,10 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	const maxOccupancy =
 		typeof d.maxOccupancy === 'number' && d.maxOccupancy > 0 ? d.maxOccupancy : null;
 	const photoUrls = Array.isArray(d.photoUrls) ? (d.photoUrls as string[]).filter((u) => typeof u === 'string') : [];
+	const privacyFactor =
+		typeof d.privacyFactor === 'number' && d.privacyFactor >= 1 && d.privacyFactor <= 2
+			? d.privacyFactor
+			: 1.0;
 
 	const room = await prisma.room.create({
 		data: {
@@ -31,6 +35,7 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 			name,
 			maxOccupancy,
 			photoUrls,
+			privacyFactor,
 			beds: undefined
 		},
 		include: { beds: true }

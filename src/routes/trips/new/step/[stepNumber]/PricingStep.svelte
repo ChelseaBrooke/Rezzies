@@ -240,6 +240,9 @@
 				</tbody>
 			</table>
 		</div>
+		{#if draft.pricingModel === 'per-bed'}
+			<p class="per-bed-note">In per-bed pricing, everyone pays based on the bed they choose. Larger beds cost a bit more than smaller beds, and beds in private rooms cost a bit more than beds in shared rooms. The total trip cost is split proportionally across everyone attending, and prices can go down as more people RSVP until the deadline.</p>
+		{/if}
 	</div>
 </div>
 
@@ -315,6 +318,13 @@
 		margin: 0 0.5em;
 		color: var(--muted);
 		font-weight: normal;
+	}
+	.per-bed-note {
+		margin: 1rem 0 0;
+		font-size: 0.875rem;
+		color: var(--muted);
+		line-height: 1.5;
+		max-width: 56ch;
 	}
 	.comparison-table-wrapper {
 		overflow-x: auto;

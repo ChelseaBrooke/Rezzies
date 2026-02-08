@@ -315,6 +315,9 @@
 							<option value="PER_BED">Per Bed (Weighted by Bed Type)</option>
 						</select>
 					</div>
+					{#if formData.pricingModel === 'PER_BED'}
+						<p class="per-bed-note">In per-bed pricing, everyone pays based on the bed they choose. Larger beds cost a bit more than smaller beds, and beds in private rooms cost a bit more than beds in shared rooms. The total trip cost is split proportionally across everyone attending, and prices can go down as more people RSVP until the deadline.</p>
+					{/if}
 
 					{#if pricingBreakdown}
 						<div class="pricing-preview card">
@@ -618,7 +621,14 @@
 		display: block;
 		margin-top: var(--spacing-xs);
 		color: var(--color-text-light);
+	}
+
+	.per-bed-note {
 		font-size: 0.875rem;
+		color: var(--color-text-light);
+		line-height: 1.5;
+		margin: 0.75rem 0 0;
+		max-width: 56ch;
 	}
 
 	.pricing-preview {
