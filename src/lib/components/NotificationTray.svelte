@@ -168,10 +168,10 @@
 		border-radius: 6px;
 	}
 	.tray-trigger:hover {
-		background: rgba(255, 255, 255, 0.1);
+		background: transparent;
 	}
 	:global(.navbar) .tray-trigger:hover {
-		background: var(--surface2);
+		background: transparent;
 	}
 
 	.bell-icon {

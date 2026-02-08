@@ -87,36 +87,47 @@
 	{:else}
 		<div class="rooms-grid">
 			{#each roomSlots as { roomData, slots } (roomData.id)}
-				<article class="room-box">
-					{#if (roomData.photoUrls?.length ?? 0) > 0}
-						<div class="room-cover">
-							<img src={roomData.photoUrls[0]} alt="" />
-						</div>
-					{/if}
-					<div class="room-box-body">
-						<h2 class="room-box-title">{roomData.name}</h2>
-						{#if roomData.maxOccupancy}
-							<p class="room-box-meta">Max {roomData.maxOccupancy} guests</p>
+				<article class="room-card">
+					<!-- Room photo(s) -->
+					<div class="room-card-photos">
+						{#if (roomData.photoUrls?.length ?? 0) > 0}
+							<img src={roomData.photoUrls[0]} alt="" class="room-card-hero" />
+							{#if (roomData.photoUrls?.length ?? 0) > 1}
+								<div class="room-card-thumbnails">
+									{#each roomData.photoUrls.slice(1, 4) as url}
+										<img src={url} alt="" />
+									{/each}
+								</div>
+							{/if}
+						{:else}
+							<div class="room-card-placeholder"></div>
 						{/if}
-						<div class="beds-row">
+					</div>
+					<div class="room-card-body">
+						<h2 class="room-card-title">{roomData.name}</h2>
+						{#if roomData.maxOccupancy}
+							<p class="room-card-meta">Max {roomData.maxOccupancy} guests</p>
+						{/if}
+						<!-- Beds: icon with avatar layered on top (person in bed) -->
+						<div class="room-card-beds">
 							{#each slots as { bed, user } (bed.id)}
-								<div class="bed-slot">
-									<div class="bed-icon-wrap" title={bed.bedType}>
-										<img src={getBedIcon(bed.bedType)} alt="" class="bed-icon" />
+								<div class="bed-in-slot" title={bed.bedType}>
+									<div class="bed-in-slot-icon-wrap">
+										<img src={getBedIcon(bed.bedType)} alt="" class="bed-in-slot-icon" />
 									</div>
-									<div class="bed-avatar-wrap">
+									<div class="bed-in-slot-avatar-wrap">
 										{#if user}
 											<ProfileTooltip userId={user.id}>
-												<button type="button" class="avatar avatar-btn" title={user.name ?? 'Assigned'} onclick={() => openProfileCard(user.id)}>
+												<button type="button" class="bed-avatar bed-avatar-btn" title={user.name ?? 'Assigned'} onclick={() => openProfileCard(user.id)}>
 													{#if user.avatarUrl}
 														<img src={user.avatarUrl} alt="" />
 													{:else}
-														<span class="avatar-initials">{initials(user.name)}</span>
+														<span class="bed-avatar-initials">{initials(user.name)}</span>
 													{/if}
 												</button>
 											</ProfileTooltip>
 										{:else}
-											<span class="bed-empty">—</span>
+											<span class="bed-in-slot-empty">Empty</span>
 										{/if}
 									</div>
 								</div>
@@ -148,55 +159,171 @@
 
 	.rooms-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		gap: 1.25rem;
+		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+		gap: 1.5rem;
 	}
-	.room-box {
+
+	.room-card {
 		background: var(--surface);
 		border: 1px solid var(--border);
-		border-radius: var(--radius-lg);
+		border-radius: var(--radius-xl);
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 	}
-	.room-cover {
-		aspect-ratio: 16/10;
+
+	.room-card-photos {
+		position: relative;
+		aspect-ratio: 4/3;
 		background: var(--surface2);
 		overflow: hidden;
 	}
-	.room-cover img { width: 100%; height: 100%; object-fit: cover; }
-	.room-box-body { padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
-	.room-box-title { font-size: 1.125rem; font-weight: 600; margin: 0; color: var(--text); }
-	.room-box-meta { font-size: 0.8125rem; color: var(--muted); margin: 0; }
-	.beds-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.25rem; }
-	.bed-slot {
+
+	.room-card-hero {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.room-card-placeholder {
+		width: 100%;
+		height: 100%;
+		background: linear-gradient(135deg, var(--surface2) 0%, var(--border-soft) 100%);
+	}
+
+	.room-card-thumbnails {
+		position: absolute;
+		bottom: 0.5rem;
+		left: 0.5rem;
+		right: 0.5rem;
+		display: flex;
+		gap: 0.35rem;
+		justify-content: center;
+	}
+
+	.room-card-thumbnails img {
+		width: 2.5rem;
+		height: 2.5rem;
+		object-fit: cover;
+		border-radius: 6px;
+		border: 2px solid rgba(255, 255, 255, 0.9);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+	}
+
+	.room-card-body {
+		padding: 1.25rem;
 		display: flex;
 		flex-direction: column;
-		align-items: center;
 		gap: 0.5rem;
-		min-width: 64px;
 	}
-	.bed-icon-wrap { width: 48px; height: 32px; display: flex; align-items: center; justify-content: center; }
-	.bed-icon { max-width: 100%; max-height: 100%; object-fit: contain; }
-	.bed-avatar-wrap { min-height: 2rem; display: flex; align-items: center; justify-content: center; }
-	.avatar {
-		width: 2rem;
-		height: 2rem;
-		border-radius: 50%;
-		overflow: hidden;
-		background: var(--surface2);
-		border: 2px solid var(--border);
+
+	.room-card-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		margin: 0;
+		color: var(--text);
+		letter-spacing: -0.02em;
+	}
+
+	.room-card-meta {
+		font-size: 0.8125rem;
+		color: var(--muted);
+		margin: 0;
+	}
+
+	/* Beds: each bed is a “person in bed” visual – bed icon with avatar layered on top */
+	.room-card-beds {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1rem;
+		margin-top: 0.75rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.bed-in-slot {
+		position: relative;
+		width: 90px;
+		height: 68px;
+		flex-shrink: 0;
+	}
+
+	.bed-in-slot-icon-wrap {
+		position: absolute;
+		bottom: 0;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 84px;
+		height: 52px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
-	.avatar-btn {
+
+	.bed-in-slot-icon {
+		width: 100%;
+		max-height: 100%;
+		object-fit: contain;
+		opacity: 0.92;
+	}
+
+	.bed-in-slot-avatar-wrap {
+		position: absolute;
+		top: 0;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 2;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		/* Sit avatar on the “pillow” area – centered and slightly above the bed base */
+	}
+
+	.bed-avatar {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		overflow: hidden;
+		background: var(--surface2);
+		border: 2px solid var(--surface);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+	}
+
+	.bed-avatar-btn {
 		padding: 0;
 		cursor: pointer;
 		font: inherit;
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
 	}
-	.avatar-btn:hover { opacity: 0.9; }
-	.avatar img { width: 100%; height: 100%; object-fit: cover; }
-	.avatar-initials { font-size: 0.6875rem; font-weight: 600; color: var(--text); }
-	.bed-empty { font-size: 0.875rem; color: var(--muted); }
+
+	.bed-avatar-btn:hover {
+		transform: scale(1.08);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+	}
+
+	.bed-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.bed-avatar-initials {
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: var(--copper, #bf4e30);
+	}
+
+	.bed-in-slot-empty {
+		font-size: 0.6875rem;
+		font-weight: 500;
+		color: var(--muted);
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
 </style>

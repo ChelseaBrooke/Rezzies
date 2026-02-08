@@ -108,7 +108,12 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 			}
 		});
 
-		// Replace rooms: delete existing (cascade deletes beds), then create from draft
+		// Replace rooms: remove dependent records that reference rooms (no FK cascade), then delete rooms
+		const existingRoomIds = await prisma.room.findMany({ where: { tripId }, select: { id: true } }).then((r) => r.map((x) => x.id));
+		if (existingRoomIds.length > 0) {
+			await prisma.reservation.deleteMany({ where: { tripId } });
+			await prisma.guestSubmission.deleteMany({ where: { roomId: { in: existingRoomIds } } });
+		}
 		await prisma.room.deleteMany({ where: { tripId } });
 
 		for (const room of rooms) {

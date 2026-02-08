@@ -279,11 +279,12 @@
 		width: 2.5rem;
 		height: 2.5rem;
 		border-radius: var(--radius-md);
+		background: transparent;
 		color: var(--text);
-		transition: background var(--transition-fast), color var(--transition-fast);
+		transition: color var(--transition-fast);
 	}
 	.trip-notification-bell :global(.tray-trigger:hover) {
-		background: var(--surface2);
+		background: transparent;
 		color: var(--primary);
 	}
 
@@ -469,10 +470,11 @@
 			width: 2.5rem;
 			height: 2.5rem;
 			border-radius: var(--radius-md);
+			background: transparent;
 			color: var(--text);
 		}
 		.mobile-notification-bell :global(.tray-trigger:hover) {
-			background: var(--surface2);
+			background: transparent;
 			color: var(--primary);
 		}
 

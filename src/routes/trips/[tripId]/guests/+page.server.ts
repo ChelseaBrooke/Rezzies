@@ -1,7 +1,7 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
-import { isTripHost } from '$lib/server/trip-access.js';
+import { isTripHost, isTripHostOrCoHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 import { notifyExistingUserOfInvite } from '$lib/server/invite-service.js';
 import { z } from 'zod';
@@ -37,7 +37,14 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const trip = parentData.trip;
 	const members = parentData.trip?.members ?? [];
 	const rsvps = parentData.trip?.rsvps ?? [];
-	const roomAssignments = parentData.trip?.roomAssignments ?? [];
+	// Fetch room assignments directly so we always get latest from DB (avoids layout merge/serialization issues)
+	const roomAssignments =
+		tripId ?
+			await prisma.roomAssignment.findMany({
+				where: { tripId },
+				include: { room: { select: { id: true, name: true } } }
+			})
+		:	[];
 	const isHost = parentData.isHost ?? false;
 
 	const memberEmails = new Set(
@@ -167,12 +174,18 @@ export const load: PageServerLoad = async ({ parent }) => {
 	}
 
 	const totalInvited = guestRows.length;
+	const withRoom = guestRows.filter((r) => r.roomId != null);
+	if (withRoom.length > 0) {
+		console.log('[guests load] rows with room:', withRoom.length, withRoom.map((r) => ({ userId: r.userId, roomId: r.roomId, roomName: r.roomName })));
+	}
 	const rooms =
 		trip?.rooms?.map((r) => ({
 			id: r.id,
 			name: r.name,
 			beds: (r.beds ?? []).map((b) => ({ id: b.id, bedType: b.bedType }))
 		})) ?? [];
+
+	const canManageGuests = isHost || parentData.membership?.role === 'co-host';
 
 	return {
 		trip: trip
@@ -194,7 +207,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 		},
 		rooms,
 		invites,
-		isHost
+		isHost,
+		canManageGuests
 	};
 };
 
@@ -328,5 +342,126 @@ export const actions: Actions = {
 		const _unrespondedUserIds = members.map((m) => m.userId).filter((uid) => !respondedUserIds.has(uid));
 		// TODO: send nudge notification to each unresponded user
 		return { nudgeAllPendingSuccess: true };
+	},
+
+	updateGuestRsvp: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) throw error(403, 'Only the host or co-host can update guest RSVP');
+
+		const formData = await request.formData();
+		const userId = (formData.get('userId') as string)?.trim();
+		const rsvpStatusRaw = (formData.get('rsvpStatus') as string)?.trim() || '';
+		const partySizeRaw = formData.get('partySize');
+		const partySize = Math.min(20, Math.max(1, parseInt(String(partySizeRaw), 10) || 1));
+
+		if (!userId) return fail(400, { updateGuestRsvpError: 'Missing user' });
+
+		const isMember = await prisma.tripMember.findUnique({
+			where: { tripId_userId: { tripId, userId } }
+		});
+		if (!isMember) return fail(400, { updateGuestRsvpError: 'User is not a guest on this trip' });
+
+		if (rsvpStatusRaw === '' || rsvpStatusRaw === 'no-response') {
+			await prisma.rSVP.deleteMany({ where: { tripId, userId } });
+		} else if (rsvpStatusRaw === 'yes' || rsvpStatusRaw === 'no' || rsvpStatusRaw === 'maybe') {
+			await prisma.rSVP.upsert({
+				where: { tripId_userId: { tripId, userId } },
+				create: {
+					tripId,
+					userId,
+					status: rsvpStatusRaw,
+					adultsCount: partySize,
+					kidsCount: 0
+				},
+				update: {
+					status: rsvpStatusRaw,
+					adultsCount: partySize,
+					kidsCount: 0
+				}
+			});
+		}
+
+		const assignment = await prisma.roomAssignment.findFirst({
+			where: { tripId, userId }
+		});
+		if (assignment) {
+			await prisma.roomAssignment.update({
+				where: { id: assignment.id },
+				data: { partySize }
+			});
+		}
+
+		return { updateGuestRsvpSuccess: true };
+	},
+
+	/** Assign a guest to a room. Only runs when roomId is a valid number; never deletes. */
+	assignRoom: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) throw error(403, 'Only the host or co-host can assign rooms');
+
+		const formData = await request.formData();
+		const userId = (formData.get('userId') as string)?.trim();
+		const roomIdRaw = formData.get('roomId');
+		const roomId =
+			typeof roomIdRaw === 'string' && roomIdRaw.trim() !== ''
+				? parseInt(roomIdRaw.trim(), 10)
+				: null;
+		const partySizeRaw = formData.get('partySize');
+		const partySize = Math.min(20, Math.max(1, parseInt(String(partySizeRaw), 10) || 1));
+		if (!userId || roomId == null || Number.isNaN(roomId)) return { assignRoomSuccess: true };
+
+		const isMember = await prisma.tripMember.findUnique({
+			where: { tripId_userId: { tripId, userId } }
+		});
+		if (!isMember) return { assignRoomSuccess: true };
+
+		const room = await prisma.room.findFirst({
+			where: { id: roomId, tripId }
+		});
+		if (!room) return { assignRoomSuccess: true };
+
+		const existing = await prisma.roomAssignment.findFirst({
+			where: { tripId, userId }
+		});
+		const bedType = existing?.bedType ?? null;
+
+		if (existing) {
+			await prisma.roomAssignment.update({
+				where: { id: existing.id },
+				data: { roomId, bedType, partySize }
+			});
+		} else {
+			await prisma.roomAssignment.create({
+				data: { tripId, userId, roomId, bedType, partySize }
+			});
+		}
+		return { assignRoomSuccess: true };
+	},
+
+	/** Clear a guest's room. Only runs when confirmClear is '1'. */
+	clearRoom: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) throw error(403, 'Only the host or co-host can clear room assignments');
+
+		const formData = await request.formData();
+		const userId = (formData.get('userId') as string)?.trim();
+		if (formData.get('confirmClear') !== '1' || !userId) return { clearRoomSuccess: true };
+
+		const existing = await prisma.roomAssignment.findFirst({
+			where: { tripId, userId }
+		});
+		if (existing) {
+			await prisma.roomAssignment.delete({ where: { id: existing.id } });
+		}
+		return { clearRoomSuccess: true };
 	}
 };

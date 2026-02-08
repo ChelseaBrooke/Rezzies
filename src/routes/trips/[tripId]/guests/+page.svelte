@@ -21,10 +21,21 @@
 	let sortBy = $state<'name' | 'rsvp' | 'party-size'>('name');
 	let sortDir = $state<'asc' | 'desc'>('asc');
 	let removeTarget = $state<GuestRow | null>(null);
-	let editingAssignment = $state<GuestRow | null>(null);
-	let editingRoomIdStr = $state<string>(''); // '' = Unassigned
 	let copyToast = $state(false);
 	let nudgeToast = $state(false);
+	let roomSaveError = $state<string | null>(null);
+	/** Per-user room id for dropdown display. Seeded once from server; only we update it on user action. */
+	let displayRoomIdByUserId = $state<Record<string, number | null>>({});
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		const rows = data.guestRows ?? [];
+		if (rows.length === 0 || Object.keys(displayRoomIdByUserId).length > 0) return;
+		const next: Record<string, number | null> = {};
+		for (const r of rows) {
+			if (r.userId != null) next[r.userId] = r.roomId ?? null;
+		}
+		displayRoomIdByUserId = next;
+	});
 
 	const inviteLink = $derived(
 		typeof window !== 'undefined' && data.trip?.inviteCode
@@ -79,6 +90,32 @@
 			return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
 		}
 		return email ? email.slice(0, 2).toUpperCase() : '?';
+	}
+
+	/** Room label for display when roomName can be empty in DB */
+	function roomLabel(row: GuestRow): string {
+		if (row.roomName?.trim()) return row.roomName.trim();
+		if (row.roomId == null) return '';
+		const rooms = data.rooms ?? [];
+		const idx = rooms.findIndex((r) => r.id === row.roomId);
+		if (idx >= 0) return rooms[idx].name?.trim() || `Room ${idx + 1}`;
+		return `Room ${row.roomId}`;
+	}
+
+	/** Display value for room dropdown: local state if set, else server row.roomId. */
+	function roomDisplayValue(row: GuestRow): number | null {
+		if (row.userId == null) return row.roomId ?? null;
+		if (displayRoomIdByUserId[row.userId] !== undefined) return displayRoomIdByUserId[row.userId];
+		return row.roomId ?? null;
+	}
+
+	/** Value for the room select: must match an option (room id in data.rooms) or '' for "Choose Room". */
+	function roomSelectValue(row: GuestRow): string {
+		const rooms = data.rooms ?? [];
+		const displayVal = roomDisplayValue(row);
+		if (displayVal == null) return '';
+		const exists = rooms.some((r) => r.id === displayVal);
+		return exists ? String(displayVal) : '';
 	}
 
 	const rsvpVisual = $derived.by(() => {
@@ -158,22 +195,20 @@
 		URL.revokeObjectURL(a.href);
 	}
 
-	async function saveRoomAssignment(row: GuestRow, roomId: number | null, bedType: string | null, partySize: number) {
-		if (!row.userId || !data.trip?.id) return;
-		const res = await fetch(`/api/trips/${data.trip.id}/room-assignment`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ userId: row.userId, roomId, bedType, partySize })
-		});
+	/** Room assign/clear use form POST only (assignRoom/clearRoom actions) — no fetch, so nothing can send a stray clear. */
+
+	/** POST to form action so RSVP/party size persist (avoids form action URL issues) */
+	async function updateGuestRsvp(userId: string, rsvpStatus: string, partySize: number) {
+		if (!data.trip?.id) return;
+		const formData = new FormData();
+		formData.set('userId', userId);
+		formData.set('rsvpStatus', rsvpStatus);
+		formData.set('partySize', String(partySize));
+		const url = `/trips/${data.trip.id}/guests?/updateGuestRsvp`;
+		const res = await fetch(url, { method: 'POST', body: formData });
 		if (res.ok) {
-			editingAssignment = null;
 			await invalidateAll();
 		}
-	}
-
-	function startEditingAssignment(row: GuestRow) {
-		editingAssignment = row;
-		editingRoomIdStr = row.roomId != null ? String(row.roomId) : '';
 	}
 </script>
 
@@ -272,6 +307,12 @@
 	</div>
 
 	<div class="card">
+		{#if roomSaveError}
+			<div class="room-save-error" role="alert">
+				{roomSaveError}
+				<button type="button" class="btn-dismiss" onclick={() => (roomSaveError = null)} aria-label="Dismiss">×</button>
+			</div>
+		{/if}
 		{#if data.isHost && (data.summary?.unrespondedCount ?? 0) > 0}
 			<div class="card-header-row">
 				<form method="POST" action="?/nudgeAllPending" class="card-header-nudge-form" use:enhance={async ({ result }) => {
@@ -343,18 +384,51 @@
 									{/if}
 								</td>
 								<td>
-									<span class="status-pill status-{row.rsvpStatus ?? 'pending'}">
-										{row.rsvpStatus === 'yes' ? 'Going' : row.rsvpStatus === 'no' ? 'Not going' : row.rsvpStatus === 'maybe' ? 'Maybe' : 'No response'}
-									</span>
-									{#if row.rsvpUpdatedAt}
-										<span class="updated-hint">{formatRsvpUpdated(row.rsvpUpdatedAt)}</span>
+									{#if data.canManageGuests && row.type === 'member' && row.userId}
+										<select
+											class="rsvp-select status-pill status-{row.rsvpStatus ?? 'pending'}"
+											value={row.rsvpStatus || 'no-response'}
+											onchange={async (e) => {
+												const v = (e.currentTarget as HTMLSelectElement).value;
+												await updateGuestRsvp(row.userId!, v, row.partySize || 1);
+											}}
+										>
+											<option value="yes">Going</option>
+											<option value="no">Not going</option>
+											<option value="maybe">Maybe</option>
+											<option value="no-response">No response</option>
+										</select>
+										{#if row.rsvpUpdatedAt}
+											<span class="updated-hint">{formatRsvpUpdated(row.rsvpUpdatedAt)}</span>
+										{/if}
+									{:else}
+										<span class="status-pill status-{row.rsvpStatus ?? 'pending'}">
+											{row.rsvpStatus === 'yes' ? 'Going' : row.rsvpStatus === 'no' ? 'Not going' : row.rsvpStatus === 'maybe' ? 'Maybe' : 'No response'}
+										</span>
+										{#if row.rsvpUpdatedAt}
+											<span class="updated-hint">{formatRsvpUpdated(row.rsvpUpdatedAt)}</span>
+										{/if}
 									{/if}
 								</td>
 								<td>
-									{#if row.partySize > 0}
-										{row.partySize} {row.partySize > 1 ? '(+' + (row.partySize - 1) + ')' : ''}
+									{#if data.canManageGuests && row.type === 'member' && row.userId}
+										<input
+											type="number"
+											min="1"
+											max="20"
+											value={row.partySize || 1}
+											class="party-size-input"
+											onchange={async (e) => {
+												const n = Math.min(20, Math.max(1, parseInt((e.currentTarget as HTMLInputElement).value, 10) || 1));
+												await updateGuestRsvp(row.userId!, row.rsvpStatus || 'no-response', n);
+											}}
+										/>
 									{:else}
-										—
+										{#if row.partySize > 0}
+											{row.partySize} {row.partySize > 1 ? '(+' + (row.partySize - 1) + ')' : ''}
+										{:else}
+											—
+										{/if}
 									{/if}
 								</td>
 								<td>
@@ -365,35 +439,48 @@
 									{/if}
 								</td>
 								<td>
-									{#if editingAssignment?.userId === row.userId}
-										<div class="inline-edit">
+									{#if row.type === 'member' && data.canManageGuests}
+										<form method="POST" action="?/assignRoom" class="room-cell-form" use:enhance={() => invalidateAll()}>
+											<input type="hidden" name="userId" value={row.userId ?? ''} />
+											<input type="hidden" name="partySize" value={row.partySize || 1} />
 											<select
 												class="edit-select"
-												bind:value={editingRoomIdStr}
+												name="roomId"
+												value={roomSelectValue(row)}
 												onchange={(e) => {
 													const v = (e.currentTarget as HTMLSelectElement).value;
 													const rid = v ? parseInt(v, 10) : null;
-													saveRoomAssignment(row, rid, row.bedType, row.partySize || 1);
+													if (row.userId == null) return;
+													if (rid != null && !Number.isNaN(rid)) {
+														displayRoomIdByUserId = { ...displayRoomIdByUserId, [row.userId]: rid };
+														e.currentTarget.form?.requestSubmit();
+													} else {
+														displayRoomIdByUserId = { ...displayRoomIdByUserId, [row.userId]: row.roomId ?? null };
+													}
 												}}
 											>
-												<option value="">Unassigned</option>
-												{#each data.rooms ?? [] as room}
-													<option value={room.id}>{room.name}</option>
+												<option value="">Choose Room</option>
+												{#each (data.rooms ?? []) as room, i}
+													<option value={String(room.id)}>{room.name?.trim() || `Room ${i + 1}`}</option>
 												{/each}
 											</select>
-											<button type="button" class="btn-link" onclick={() => (editingAssignment = null)}>Cancel</button>
-										</div>
-									{:else if row.type === 'member' && data.isHost}
-										{#if row.roomName}
-											<span>{row.roomName}{row.bedType ? ` (${row.bedType})` : ''}</span>
-											<button type="button" class="btn-link edit-link" onclick={() => startEditingAssignment(row)}>Edit</button>
-										{:else}
-											<span class="muted">Unassigned</span>
-											<button type="button" class="btn-link edit-link" onclick={() => startEditingAssignment(row)}>Assign</button>
+										</form>
+										{#if roomDisplayValue(row) != null}
+											<form method="POST" action="?/clearRoom" class="clear-room-form" use:enhance={() => {
+												if (row.userId != null) displayRoomIdByUserId = { ...displayRoomIdByUserId, [row.userId]: null };
+												return invalidateAll();
+											}}>
+												<input type="hidden" name="userId" value={row.userId ?? ''} />
+												<input type="hidden" name="confirmClear" value="1" />
+												<button type="submit" class="btn-link clear-room">Clear</button>
+											</form>
+										{/if}
+										{#if roomLabel(row) && row.bedType}
+											<span class="bed-type-hint">({row.bedType})</span>
 										{/if}
 									{:else}
-										{#if row.roomName}
-											{row.roomName}{row.bedType ? ` (${row.bedType})` : ''}
+										{#if row.roomId != null || row.roomName}
+											{roomLabel(row) || row.roomName}{row.bedType ? ` (${row.bedType})` : ''}
 										{:else}
 											<span class="muted">Unassigned</span>
 										{/if}
@@ -499,6 +586,28 @@
 
 <style>
 	.page { padding: 0; }
+	.room-save-error {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		margin-bottom: 0.75rem;
+		background: #fef2f2;
+		border: 1px solid #fecaca;
+		border-radius: var(--radius-md);
+		color: #b91c1c;
+		font-size: 0.875rem;
+	}
+	.room-save-error .btn-dismiss {
+		background: none;
+		border: none;
+		color: inherit;
+		font-size: 1.25rem;
+		line-height: 1;
+		cursor: pointer;
+		padding: 0 0.25rem;
+	}
 	.page-header { margin-bottom: 1rem; }
 	.header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
 	.page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 0.25rem 0; }
@@ -572,7 +681,11 @@
 	.updated-hint { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 0.125rem; }
 
 	.inline-edit { display: flex; align-items: center; gap: 0.5rem; }
-	.edit-select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8125rem; }
+	.edit-select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8125rem; color: black; }
+	.bed-type-hint { margin-left: 0.25rem; font-size: 0.8125rem; color: var(--muted); }
+	.rsvp-form, .party-size-form { display: inline-flex; align-items: center; }
+	.rsvp-select { padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8125rem; cursor: pointer; }
+	.party-size-input { width: 3rem; padding: 0.25rem 0.35rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8125rem; }
 	.edit-link { margin-left: 0.5rem; font-size: 0.8125rem; }
 	.btn-link { background: none; border: none; color: var(--primary); cursor: pointer; font-size: inherit; padding: 0; text-decoration: underline; }
 	.btn-link:hover { color: var(--primaryHover); }
@@ -584,6 +697,8 @@
 	.btn-icon.btn-remove { border: 1px solid rgba(185, 28, 28, 0.4); color: #b91c1c; }
 	.btn-icon.btn-remove:hover { background: rgba(185, 28, 28, 0.08); }
 	.inline-form { display: inline; }
+	.room-cell-form, .clear-room-form { display: inline; }
+	.clear-room-form .clear-room { margin-left: 0.25rem; }
 
 	.muted { color: var(--muted); }
 	.empty { color: var(--muted); margin: 0; padding: 1rem 0; }

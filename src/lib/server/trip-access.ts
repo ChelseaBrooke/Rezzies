@@ -21,6 +21,11 @@ export async function isTripHost(tripId: string, userId: string): Promise<boolea
 	return membership?.role === 'host';
 }
 
+export async function isTripHostOrCoHost(tripId: string, userId: string): Promise<boolean> {
+	const membership = await getUserTripMembership(tripId, userId);
+	return membership?.role === 'host' || membership?.role === 'co-host';
+}
+
 export async function isTripMember(tripId: string, userId: string): Promise<boolean> {
 	const membership = await getUserTripMembership(tripId, userId);
 	// Allow access for both invited (pending) and accepted so they can view the guest portal

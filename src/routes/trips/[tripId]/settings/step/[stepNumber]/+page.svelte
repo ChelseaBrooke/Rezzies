@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { invalidateAll } from '$app/navigation';
 	import { tripToDraft } from '$lib/stores/tripDraft.js';
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 	import Step1 from '../../../../new/step/[stepNumber]/Step1.svelte';
@@ -7,6 +8,33 @@
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	/** Build a plain JSON-serializable payload from draft (avoids $state proxy serialization issues) */
+	function draftToPayload(d: TripDraft): Record<string, unknown> {
+		return {
+			name: d.name,
+			description: d.description ?? '',
+			listingUrl: d.listingUrl ?? '',
+			propertyAddress: d.propertyAddress ?? d.destinationCity ?? '',
+			coverPhoto: d.coverPhoto ?? '',
+			galleryPhotos: Array.isArray(d.galleryPhotos) ? d.galleryPhotos : [],
+			checkInDate: d.checkInDate,
+			checkOutDate: d.checkOutDate,
+			rsvpByDate: d.rsvpByDate || undefined,
+			totalTripCost: d.totalTripCost,
+			pricingModel: d.pricingModel ?? 'per-person',
+			expectedGuestCount: d.expectedGuestCount ?? null,
+			maxOccupancy: d.maxOccupancy ?? null,
+			partialStayAllowed: d.partialStayAllowed ?? false,
+			rooms: (d.rooms ?? []).map((r) => ({
+				name: r.name,
+				photos: Array.isArray(r.photos) ? r.photos : [],
+				beds: Array.isArray(r.beds) ? r.beds : [],
+				maxOccupants: r.maxOccupants,
+				notes: r.notes ?? r.customRoomDescription ?? ''
+			}))
+		};
+	}
 
 	// Reactive so content and nav update when navigating between step/1, step/2, etc.
 	const tripId = $derived(data.trip?.id ?? '');
@@ -88,16 +116,18 @@
 		saveError = null;
 		isSaving = true;
 		try {
+			const payload = draftToPayload(draft);
 			const res = await fetch(`/api/trips/${tripId}/update`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(draft)
+				body: JSON.stringify(payload)
 			});
 			const result = await res.json().catch(() => ({}));
 			if (!res.ok) {
 				saveError = result.error || `Save failed (${res.status})`;
 				return;
 			}
+			await invalidateAll();
 			goto(`/trips/${tripId}`);
 		} catch (e) {
 			saveError = e instanceof Error ? e.message : 'Failed to save trip';
@@ -119,7 +149,7 @@
 {#if validationError}
 	<div class="validation-error">{validationError}</div>
 {/if}
-{#if stepNumber === 2 && saveError}
+{#if saveError}
 	<div class="validation-error">{saveError}</div>
 {/if}
 <div class="card-footer">
@@ -127,6 +157,14 @@
 		Back
 	</button>
 	<div class="footer-right">
+		<button
+			type="button"
+			class="btn-publish"
+			onclick={handleSave}
+			disabled={isSaving || !canProceed}
+		>
+			{isSaving ? 'Saving…' : 'Save changes'}
+		</button>
 		{#if stepNumber < 2}
 			<button
 				type="button"
@@ -135,15 +173,6 @@
 				disabled={!canProceed}
 			>
 				Next
-			</button>
-		{:else}
-			<button
-				type="button"
-				class="btn-publish"
-				onclick={handleSave}
-				disabled={isSaving}
-			>
-				{isSaving ? 'Saving…' : 'Save changes'}
 			</button>
 		{/if}
 	</div>

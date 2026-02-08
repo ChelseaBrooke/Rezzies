@@ -99,11 +99,9 @@
 		</div>
 	</aside>
 	<main class="main-content">
-		{#if currentPath !== `/trips/${tripId}`}
-			<span class="top-bell">
-				<NotificationTray />
-			</span>
-		{/if}
+		<span class="top-bell">
+			<NotificationTray />
+		</span>
 		{#if children != null && typeof children === 'function'}
 			<div class="main-content-inner">
 				{@render children()}
@@ -291,11 +289,11 @@
 		width: 44px;
 		height: 44px;
 		border-radius: 8px;
-		background: #d1d5db;
+		background: transparent;
 		color: #374151;
 	}
 	.top-bell :global(.tray-trigger:hover) {
-		background: rgba(0, 0, 0, 0.06);
+		background: transparent;
 		color: #111827;
 	}
 

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import TripQuickActions from '$lib/components/trips/TripQuickActions.svelte';
 	import TripCalendarWidget from '$lib/components/trips/TripCalendarWidget.svelte';
-	import NotificationTray from '$lib/components/NotificationTray.svelte';
 
 	interface Props {
 		trip: {
@@ -132,9 +131,6 @@
 			/>
 			</div>
 		</div>
-		<span class="hero-bell">
-			<NotificationTray />
-		</span>
 	</div>
 </div>
 
@@ -227,7 +223,7 @@
 	.hero-calendar-layer {
 		position: absolute;
 		top: -3rem;
-		right: 1rem;
+		right: 3rem;
 		left: auto;
 		display: flex;
 		flex-direction: row;
@@ -239,22 +235,6 @@
 
 	.hero-calendar-layer > * {
 		pointer-events: auto;
-	}
-
-	.hero-bell {
-		flex-shrink: 0;
-		display: inline-flex;
-	}
-	.hero-bell :global(.tray-trigger) {
-		width: 44px;
-		height: 44px;
-		border-radius: 8px;
-		background: transparent;
-		color: #111827;
-		transition: opacity var(--transition-fast);
-	}
-	.hero-bell :global(.tray-trigger:hover) {
-		opacity: 0.75;
 	}
 
 	.hero-calendar-outer {
