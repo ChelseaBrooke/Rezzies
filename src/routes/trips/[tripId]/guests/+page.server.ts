@@ -4,6 +4,8 @@ import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost, isTripHostOrCoHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 import { notifyExistingUserOfInvite } from '$lib/server/invite-service.js';
+import { createInvoiceForUser } from '$lib/server/invoice-calculator.js';
+import { hashPassword } from '$lib/server/auth.js';
 import { z } from 'zod';
 
 const PENDING_INVITE_STATUSES = ['sent', 'opened'];
@@ -29,6 +31,8 @@ export type GuestRow = {
 	allergies: string | null;
 	/** Total amount due for this guest (from invoices for this trip). Members only. */
 	toPayTotal: number | null;
+	/** Bed IDs currently assigned (for multi-select beds UI). */
+	assignedBedIds: string[];
 };
 
 export const load: PageServerLoad = async ({ parent }) => {
@@ -42,7 +46,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		tripId ?
 			await prisma.roomAssignment.findMany({
 				where: { tripId },
-				include: { room: { select: { id: true, name: true } } }
+				include: { room: { include: { beds: { select: { id: true, bedType: true } } } } }
 			})
 		:	[];
 	const isHost = parentData.isHost ?? false;
@@ -76,6 +80,12 @@ export const load: PageServerLoad = async ({ parent }) => {
 		(guestProfiles ?? []).map((p) => [p.userId, { dietaryRestrictions: p.dietaryRestrictions, allergies: p.allergies }])
 	);
 
+	// Refresh invoice (To Pay) for every guest with a room so it reflects price model + room + days
+	if (tripId) {
+		for (const a of roomAssignments) {
+			await createInvoiceForUser(tripId, a.userId).catch(() => {});
+		}
+	}
 	const invoices =
 		tripId &&
 		(await prisma.invoice.findMany({
@@ -92,7 +102,12 @@ export const load: PageServerLoad = async ({ parent }) => {
 	}
 
 	const rsvpByUserId = new Map(rsvps.map((r) => [r.userId, r]));
-	const assignmentByUserId = new Map(roomAssignments.map((a) => [a.userId, a]));
+	const assignmentsByUserId = new Map<string, typeof roomAssignments>();
+	for (const a of roomAssignments) {
+		const list = assignmentsByUserId.get(a.userId) ?? [];
+		list.push(a);
+		assignmentsByUserId.set(a.userId, list);
+	}
 
 	let goingCount = 0;
 	let goingPartySize = 0;
@@ -104,12 +119,14 @@ export const load: PageServerLoad = async ({ parent }) => {
 	for (const member of members) {
 		const uid = member.user?.id;
 		const rsvp = uid ? rsvpByUserId.get(uid) : null;
-		const assignment = uid ? assignmentByUserId.get(uid) : null;
+		const assignments = uid ? (assignmentsByUserId.get(uid) ?? []) : [];
+		const firstAssignment = assignments[0] ?? null;
 		const profile = uid ? profileByUserId.get(uid) : null;
 		const status = rsvp?.status ?? null;
+		const totalPartySize = assignments.reduce((s, a) => s + (a.partySize || 1), 0);
 		if (status === 'yes') {
 			goingCount++;
-			goingPartySize += assignment?.partySize ?? rsvp?.adultsCount ?? 1;
+			goingPartySize += totalPartySize || (rsvp?.adultsCount ?? 1);
 		} else if (status === 'no') notGoingCount++;
 		else unrespondedCount++;
 
@@ -117,6 +134,15 @@ export const load: PageServerLoad = async ({ parent }) => {
 			!!(profile?.dietaryRestrictions?.trim() || profile?.allergies?.trim());
 
 		const toPayTotal = uid ? (toPayByUserId.get(uid) ?? null) : null;
+		const assignedBedIds: string[] = [];
+		for (const a of assignments) {
+			if (a.bedId) {
+				assignedBedIds.push(a.bedId);
+			} else if (a.room?.beds?.length) {
+				const bed = a.bedType ? a.room.beds.find((b) => b.bedType === a.bedType) : a.room.beds[0];
+				if (bed?.id) assignedBedIds.push(bed.id);
+			}
+		}
 		guestRows.push({
 			type: 'member',
 			userId: uid,
@@ -125,25 +151,26 @@ export const load: PageServerLoad = async ({ parent }) => {
 			avatarUrl: member.user?.avatarUrl,
 			rsvpStatus: status,
 			rsvpUpdatedAt: rsvp?.updatedAt ? rsvp.updatedAt.toISOString() : null,
-			partySize: assignment?.partySize ?? (status === 'yes' ? (rsvp?.adultsCount ?? 1) + (rsvp?.kidsCount ?? 0) : 0),
-			roomName: assignment?.room?.name ?? null,
-			bedType: assignment?.bedType ?? null,
-			roomId: assignment?.roomId ?? null,
-			assignmentId: assignment?.id ?? null,
-			arrivalDate: assignment?.startDate
-				? new Date(assignment.startDate).toISOString().slice(0, 10)
+			partySize: totalPartySize || (status === 'yes' ? (rsvp?.adultsCount ?? 1) + (rsvp?.kidsCount ?? 0) : 0),
+			roomName: firstAssignment?.room?.name ?? null,
+			bedType: firstAssignment?.bedType ?? null,
+			roomId: firstAssignment?.roomId ?? null,
+			assignmentId: firstAssignment?.id ?? null,
+			arrivalDate: firstAssignment?.startDate
+				? new Date(firstAssignment.startDate).toISOString().slice(0, 10)
 				: rsvp?.arrivalDatetime
 					? new Date(rsvp.arrivalDatetime).toISOString().slice(0, 10)
 					: null,
-			departureDate: assignment?.endDate
-				? new Date(assignment.endDate).toISOString().slice(0, 10)
+			departureDate: firstAssignment?.endDate
+				? new Date(firstAssignment.endDate).toISOString().slice(0, 10)
 				: rsvp?.departureDatetime
 					? new Date(rsvp.departureDatetime).toISOString().slice(0, 10)
 					: null,
 			hasDietaryFlags: hasDietary,
 			dietaryRestrictions: profile?.dietaryRestrictions ?? null,
 			allergies: profile?.allergies ?? null,
-			toPayTotal: toPayTotal !== null && toPayTotal > 0 ? toPayTotal : null
+			toPayTotal: toPayTotal !== null && toPayTotal > 0 ? toPayTotal : null,
+			assignedBedIds
 		});
 	}
 
@@ -169,7 +196,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 			hasDietaryFlags: false,
 			dietaryRestrictions: null,
 			allergies: null,
-			toPayTotal: null
+			toPayTotal: null,
+			assignedBedIds: []
 		});
 	}
 
@@ -194,7 +222,9 @@ export const load: PageServerLoad = async ({ parent }) => {
 					name: trip.name,
 					rsvpByDate: trip.rsvpByDate ? trip.rsvpByDate.toISOString().slice(0, 10) : null,
 					allowPartialStays: trip.allowPartialStays ?? false,
-					inviteCode: trip.inviteCode
+					inviteCode: trip.inviteCode,
+					checkInDate: trip.checkInDate ? trip.checkInDate.toISOString().slice(0, 10) : null,
+					checkOutDate: trip.checkOutDate ? trip.checkOutDate.toISOString().slice(0, 10) : null
 				}
 			: null,
 		guestRows,
@@ -394,74 +424,143 @@ export const actions: Actions = {
 			});
 		}
 
+		await createInvoiceForUser(tripId, userId).catch(() => {});
 		return { updateGuestRsvpSuccess: true };
 	},
 
-	/** Assign a guest to a room. Only runs when roomId is a valid number; never deletes. */
-	assignRoom: async ({ request, params, cookies }) => {
+	/** Assign beds to a guest (multi-select). Replaces all existing assignments. Cost is calculated from selected beds. */
+	assignBeds: async ({ request, params, cookies }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
 		const canManage = await isTripHostOrCoHost(tripId, user.id);
-		if (!canManage) throw error(403, 'Only the host or co-host can assign rooms');
+		if (!canManage) throw error(403, 'Only the host or co-host can assign beds');
 
 		const formData = await request.formData();
 		const userId = (formData.get('userId') as string)?.trim();
-		const roomIdRaw = formData.get('roomId');
-		const roomId =
-			typeof roomIdRaw === 'string' && roomIdRaw.trim() !== ''
-				? parseInt(roomIdRaw.trim(), 10)
-				: null;
+		const bedIds = formData.getAll('bedIds');
 		const partySizeRaw = formData.get('partySize');
 		const partySize = Math.min(20, Math.max(1, parseInt(String(partySizeRaw), 10) || 1));
-		if (!userId || roomId == null || Number.isNaN(roomId)) return { assignRoomSuccess: true };
+		if (!userId) return { assignBedsSuccess: true };
+
+		const trip = await prisma.trip.findUnique({
+			where: { id: tripId },
+			select: { checkInDate: true, checkOutDate: true, allowPartialStays: true }
+		});
+		if (!trip) return { assignBedsSuccess: true };
 
 		const isMember = await prisma.tripMember.findUnique({
 			where: { tripId_userId: { tripId, userId } }
 		});
-		if (!isMember) return { assignRoomSuccess: true };
+		if (!isMember) return { assignBedsSuccess: true };
 
-		const room = await prisma.room.findFirst({
-			where: { id: roomId, tripId }
-		});
-		if (!room) return { assignRoomSuccess: true };
+		let startDate: Date | null = trip.checkInDate;
+		let endDate: Date | null = trip.checkOutDate;
+		if (trip.allowPartialStays) {
+			const startRaw = (formData.get('startDate') as string)?.trim();
+			const endRaw = (formData.get('endDate') as string)?.trim();
+			if (startRaw) {
+				const d = new Date(startRaw);
+				if (!Number.isNaN(d.getTime())) startDate = d;
+			}
+			if (endRaw) {
+				const d = new Date(endRaw);
+				if (!Number.isNaN(d.getTime())) endDate = d;
+			}
+		}
 
-		const existing = await prisma.roomAssignment.findFirst({
-			where: { tripId, userId }
-		});
-		const bedType = existing?.bedType ?? null;
+		await prisma.roomAssignment.deleteMany({ where: { tripId, userId } });
 
-		if (existing) {
-			await prisma.roomAssignment.update({
-				where: { id: existing.id },
-				data: { roomId, bedType, partySize }
+		const bedIdList = Array.isArray(bedIds) ? bedIds : [bedIds];
+		const validBedIds = bedIdList
+			.filter((id): id is string => typeof id === 'string')
+			.map((id) => id.trim())
+			.filter((id) => id !== '');
+
+		for (const bedId of validBedIds) {
+			const bed = await prisma.bed.findFirst({
+				where: { id: bedId },
+				include: { room: { select: { id: true, tripId: true } } }
 			});
-		} else {
+			if (!bed || bed.room.tripId !== tripId) continue;
 			await prisma.roomAssignment.create({
-				data: { tripId, userId, roomId, bedType, partySize }
+				data: {
+					tripId,
+					userId,
+					roomId: bed.roomId,
+					bedId: bed.id,
+					bedType: bed.bedType,
+					partySize: 1,
+					...(startDate && { startDate }),
+					...(endDate && { endDate })
+				}
 			});
 		}
-		return { assignRoomSuccess: true };
+
+		await createInvoiceForUser(tripId, userId).catch(() => {});
+		return { assignBedsSuccess: true };
 	},
 
-	/** Clear a guest's room. Only runs when confirmClear is '1'. */
-	clearRoom: async ({ request, params, cookies }) => {
+	/** Add a guest manually (no invite link). Creates a placeholder user + TripMember so host can set room, RSVP, cost. */
+	addManualGuest: async ({ request, params, cookies }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
 		const canManage = await isTripHostOrCoHost(tripId, user.id);
-		if (!canManage) throw error(403, 'Only the host or co-host can clear room assignments');
+		if (!canManage) throw error(403, 'Only the host or co-host can add guests manually');
 
 		const formData = await request.formData();
-		const userId = (formData.get('userId') as string)?.trim();
-		if (formData.get('confirmClear') !== '1' || !userId) return { clearRoomSuccess: true };
+		const name = (formData.get('name') as string)?.trim() ?? '';
+		const emailRaw = (formData.get('email') as string)?.trim() ?? '';
 
-		const existing = await prisma.roomAssignment.findFirst({
-			where: { tripId, userId }
-		});
-		if (existing) {
-			await prisma.roomAssignment.delete({ where: { id: existing.id } });
+		if (!name) return fail(400, { addManualGuestError: 'Name is required' });
+
+		let userId: string;
+
+		if (emailRaw) {
+			const existing = await prisma.user.findFirst({
+				where: { email: { equals: emailRaw, mode: 'insensitive' } },
+				select: { id: true }
+			});
+			if (existing) {
+				const alreadyMember = await prisma.tripMember.findUnique({
+					where: { tripId_userId: { tripId, userId: existing.id } }
+				});
+				if (alreadyMember) return fail(400, { addManualGuestError: 'This person is already a guest' });
+				userId = existing.id;
+				await prisma.tripMember.create({
+					data: { tripId, userId: existing.id, role: 'guest', inviteStatus: 'accepted' }
+				});
+			} else {
+				const passwordHash = await hashPassword(crypto.randomUUID());
+				const newUser = await prisma.user.create({
+					data: {
+						email: emailRaw.toLowerCase(),
+						passwordHash,
+						name: name || null
+					}
+				});
+				userId = newUser.id;
+				await prisma.tripMember.create({
+					data: { tripId, userId: newUser.id, role: 'guest', inviteStatus: 'accepted' }
+				});
+			}
+		} else {
+			const placeholderEmail = `manual-${crypto.randomUUID()}@guest.placeholder`;
+			const passwordHash = await hashPassword(crypto.randomUUID());
+			const newUser = await prisma.user.create({
+				data: {
+					email: placeholderEmail,
+					passwordHash,
+					name: name || null
+				}
+			});
+			userId = newUser.id;
+			await prisma.tripMember.create({
+				data: { tripId, userId: newUser.id, role: 'guest', inviteStatus: 'accepted' }
+			});
 		}
-		return { clearRoomSuccess: true };
+
+		return { addManualGuestSuccess: true };
 	}
 };

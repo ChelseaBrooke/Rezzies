@@ -1,8 +1,9 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripMember } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { totalSpotsForBeds, hasEnoughSpots, isPrismaUniqueConflict } from '$lib/server/bed-spot-validation.js';
 import { z } from 'zod';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
@@ -20,18 +21,14 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		throw error(403, 'You must be a member of this trip to RSVP');
 	}
 
-	// Get trip with all necessary data
+	// Get trip with all necessary data: rooms with beds, and all bed claims (to show claimed-by-other)
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
 		include: {
 			rooms: {
 				include: {
-					beds: true,
-					roomAssignments: {
-						where: {
-							userId: user.id
-						}
-					}
+					beds: { where: { isAvailable: true } },
+					roomAssignments: true
 				}
 			},
 			activities: {
@@ -67,15 +64,22 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	// Get user's current selections
 	const currentRsvp = trip.rsvps[0] || null;
 	const currentProfile = trip.guestProfiles[0] || null;
-	const currentRoomAssignment = trip.rooms.flatMap(r => r.roomAssignments)[0] || null;
-	const selectedActivities = trip.activities.filter(a => a.participants.length > 0);
+	const allAssignments = trip.rooms.flatMap((r) => r.roomAssignments);
+	const myAssignmentIds = new Set(
+		allAssignments.filter((a) => a.userId === user.id && a.bedId).map((a) => a.bedId as string)
+	);
+	const claimedBedIdsByOther = new Set(
+		allAssignments.filter((a) => a.userId !== user.id && a.bedId).map((a) => a.bedId as string)
+	);
+	const selectedActivities = trip.activities.filter((a) => a.participants.length > 0);
 
 	return {
 		user,
 		trip,
 		currentRsvp,
 		currentProfile,
-		currentRoomAssignment,
+		myClaimedBedIds: Array.from(myAssignmentIds),
+		claimedBedIdsByOther: Array.from(claimedBedIdsByOther),
 		selectedActivities
 	};
 };
@@ -138,6 +142,13 @@ export const actions: Actions = {
 			update: validation.data
 		});
 
+		// When guest RSVPs "no", release their bed claims so beds become available again
+		if (validation.data.status === 'no') {
+			await prisma.roomAssignment.deleteMany({
+				where: { tripId, userId: user.id }
+			});
+		}
+
 		return { success: true };
 	},
 
@@ -181,7 +192,8 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	selectRoom: async ({ request, params, cookies }) => {
+	/** Guest claims beds. Party size must be covered by total spots of selected beds. One bed = one guest (unique). */
+	claimBeds: async ({ request, params, cookies }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 
@@ -190,34 +202,64 @@ export const actions: Actions = {
 		if (!member) throw error(403, 'You must be a member of this trip');
 
 		const formData = await request.formData();
-		const roomId = Number(formData.get('roomId'));
-		const bedId = formData.get('bedId') as string | null;
-		const startDate = formData.get('startDate') ? new Date(formData.get('startDate') as string) : null;
-		const endDate = formData.get('endDate') ? new Date(formData.get('endDate') as string) : null;
-		const partySize = Number(formData.get('partySize')) || 1;
+		const bedIdsRaw = formData.getAll('bedIds');
+		const bedIds = Array.isArray(bedIdsRaw) ? (bedIdsRaw as string[]).filter((id) => typeof id === 'string' && id.trim() !== '') : [];
 
-		// Remove existing assignment
-		await prisma.roomAssignment.deleteMany({
-			where: {
-				tripId,
-				userId: user.id
-			}
+		const rsvp = await prisma.rSVP.findUnique({
+			where: { tripId_userId: { tripId, userId: user.id } }
 		});
+		const partySize = Math.min(99, Math.max(1, rsvp?.adultsCount ?? 1));
 
-		// Create new assignment
-		await prisma.roomAssignment.create({
-			data: {
-				tripId,
-				roomId,
-				userId: user.id,
-				startDate,
-				endDate,
-				partySize,
-				bedType: bedId ? (await prisma.bed.findUnique({ where: { id: bedId } }))?.bedType || null : null
-			}
+		const trip = await prisma.trip.findUnique({
+			where: { id: tripId },
+			include: { rooms: { include: { beds: true } } }
 		});
+		if (!trip) return fail(404, { claimBedsError: 'Trip not found' });
 
-		return { success: true };
+		const allBeds = trip.rooms.flatMap((r) => r.beds);
+		const bedsById = new Map(allBeds.map((b) => [b.id, b]));
+		const totalSpots = totalSpotsForBeds(bedsById, bedIds);
+		const toCreate = bedIds
+			.map((bedId) => {
+				const bed = bedsById.get(bedId);
+				if (!bed) return null;
+				return { bedId: bed.id, roomId: bed.roomId, bedType: bed.bedType };
+			})
+			.filter((x): x is NonNullable<typeof x> => x !== null);
+
+		if (!hasEnoughSpots(totalSpots, partySize)) {
+			return fail(400, {
+				claimBedsError: `You need at least ${partySize} spot(s) for your party. Selected beds total ${totalSpots} spot(s). Add more beds.`
+			});
+		}
+
+		try {
+			await prisma.$transaction(async (tx) => {
+				await tx.roomAssignment.deleteMany({ where: { tripId, userId: user.id } });
+				for (const { bedId, roomId, bedType } of toCreate) {
+					await tx.roomAssignment.create({
+						data: {
+							tripId,
+							roomId,
+							userId: user.id,
+							bedId,
+							bedType,
+							partySize: 1
+						}
+					});
+				}
+			});
+		} catch (e: unknown) {
+			if (isPrismaUniqueConflict(e)) {
+				return fail(409, { bedClaimConflict: true, claimBedsError: 'That bed was just claimed. Pick another.' });
+			}
+			throw e;
+		}
+
+		const { createInvoiceForUser } = await import('$lib/server/invoice-calculator.js');
+		await createInvoiceForUser(tripId, user.id).catch(() => {});
+
+		return { claimBedsSuccess: true };
 	},
 
 	toggleActivity: async ({ request, params, cookies }) => {

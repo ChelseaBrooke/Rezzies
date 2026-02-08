@@ -4,8 +4,34 @@
 	import type { PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: any } = $props();
-	
+
 	let activeTab = $state('rsvp');
+	const partySize = $derived(data.currentRsvp?.adultsCount ?? 1);
+	const myClaimedSet = $derived(new Set(data.myClaimedBedIds ?? []));
+	const claimedByOtherSet = $derived(new Set(data.claimedBedIdsByOther ?? []));
+
+	let selectedBedIds = $state<string[]>([]);
+	function initSelectedBeds() {
+		selectedBedIds = [...(data.myClaimedBedIds ?? [])];
+	}
+	$effect(() => {
+		if (activeTab === 'room' && data.myClaimedBedIds) {
+			initSelectedBeds();
+		}
+	});
+
+	const rooms = $derived(data.trip?.rooms ?? []);
+	const spotsSelected = $derived.by(() => {
+		let total = 0;
+		for (const room of rooms) {
+			for (const bed of room.beds ?? []) {
+				if (selectedBedIds.includes(bed.id)) total += bed.capacitySlots ?? bed.capacity ?? 1;
+			}
+		}
+		return total;
+	});
+	const canSubmit = $derived(spotsSelected >= partySize);
+	const spotsShortfall = $derived(Math.max(0, partySize - spotsSelected));
 </script>
 
 <div class="rsvp-page">
@@ -84,8 +110,9 @@
 						</div>
 						<div class="form-row">
 							<div class="form-group">
-								<label for="adultsCount">Adults</label>
-								<input type="number" id="adultsCount" name="adultsCount" value={data.currentRsvp?.adultsCount || 1} min="1" required />
+								<label for="adultsCount">How many people are you RSVPing for?</label>
+								<input type="number" id="adultsCount" name="adultsCount" value={data.currentRsvp?.adultsCount || 1} min="1" max="99" required title="Adults (you + plus-ones). Kids don’t count toward sleeping spots." />
+								<small class="form-hint">Adults only — kids don’t count toward bed spots.</small>
 							</div>
 							<div class="form-group">
 								<label for="kidsCount">Kids</label>
@@ -100,36 +127,85 @@
 							<label for="notes">Notes</label>
 							<textarea id="notes" name="notes">{data.currentRsvp?.notes || ''}</textarea>
 						</div>
+						{#if (data.myClaimedBedIds?.length ?? 0) > 0}
+							<p class="helper-text">If you change party size, update your bed claims in the <strong>Room</strong> tab if needed.</p>
+						{/if}
 						<button type="submit" class="btn btn-primary">Save RSVP</button>
 					</form>
 				</section>
 			{:else if activeTab === 'room'}
 				<section class="rsvp-section">
-					<h2>Select Your Room</h2>
+					<h2>Claim your beds</h2>
+					{#if form?.claimBedsError}
+						<div class="error-message" class:conflict={form?.bedClaimConflict}>
+							{form.claimBedsError}
+						</div>
+					{/if}
+					{#if form?.claimBedsSuccess !== undefined && form?.claimBedsSuccess}
+						<div class="success-message">Beds saved. You can adjust later if plans change.</div>
+					{/if}
 					{#if data.trip.rooms.length === 0}
 						<p>No rooms available yet. The host will add rooms soon.</p>
 					{:else}
-						<div class="rooms-grid">
-							{#each data.trip.rooms as room}
-								<div class="room-card {data.currentRoomAssignment?.roomId === room.id ? 'selected' : ''}">
-									<h3>{room.name}</h3>
-									{#if room.description}
-										<p>{room.description}</p>
-									{/if}
-									<div class="beds-list">
-										{#each room.beds as bed}
-											<span class="bed-badge">{bed.bedType} ({bed.capacitySlots} slots)</span>
-										{/each}
-									</div>
-									<form method="POST" action="?/selectRoom" use:enhance>
-										<input type="hidden" name="roomId" value={room.id} />
-										<button type="submit" class="btn btn-sm {data.currentRoomAssignment?.roomId === room.id ? 'btn-secondary' : 'btn-primary'}">
-											{data.currentRoomAssignment?.roomId === room.id ? 'Selected' : 'Select Room'}
-										</button>
-									</form>
-								</div>
-							{/each}
+						<div class="spots-counter">
+							<span>Spots needed: <strong>{partySize}</strong></span>
+							<span>Spots selected: <strong>{spotsSelected}</strong></span>
+							{#if spotsShortfall > 0}
+								<span class="spots-warn">Add {spotsShortfall} more spot(s) to cover your party.</span>
+							{/if}
 						</div>
+						<p class="helper-text">You’re reserving beds, not assigning individuals. You can adjust later if plans change.</p>
+						<form method="POST" action="?/claimBeds" use:enhance={() => ({ result }) => { if (result.type === 'success') initSelectedBeds(); }}>
+							<div class="rooms-grid beds-claim">
+								{#each rooms as room}
+									<div class="room-card beds-room">
+										<h3>{room.name}</h3>
+										{#if room.description}
+											<p>{room.description}</p>
+										{/if}
+										<div class="beds-list beds-checkboxes">
+											{#each (room.beds ?? []) as bed}
+												{@const spots = bed.capacitySlots ?? bed.capacity ?? 1}
+												{@const isClaimedByOther = claimedByOtherSet.has(bed.id)}
+												<label class="bed-option" class:disabled={isClaimedByOther}>
+													<input
+														type="checkbox"
+														name="bedIds"
+														value={bed.id}
+														checked={selectedBedIds.includes(bed.id)}
+														disabled={isClaimedByOther}
+														onchange={(e) => {
+															const checked = (e.currentTarget as HTMLInputElement).checked;
+															if (checked) selectedBedIds = [...selectedBedIds, bed.id];
+															else selectedBedIds = selectedBedIds.filter((id) => id !== bed.id);
+														}}
+													/>
+													<span>{bed.bedType}</span>
+													<span class="bed-spots">({spots} spot{spots !== 1 ? 's' : ''})</span>
+													{#if isClaimedByOther}
+														<span class="claimed-badge">Claimed</span>
+													{/if}
+												</label>
+											{/each}
+										</div>
+									</div>
+								{/each}
+							</div>
+							<div class="beds-form-actions">
+								<button type="submit" class="btn btn-primary" disabled={!canSubmit}>
+									Save beds
+								</button>
+								{#if !canSubmit && spotsSelected > 0}
+									<span class="validation-hint">Select enough beds to cover {partySize} spot(s).</span>
+								{/if}
+							</div>
+						</form>
+						{#if myClaimedSet.size > 0}
+							<p class="summary-hint">Your current claims: {spotsSelected} spot(s) across {selectedBedIds.length} bed(s).</p>
+						{/if}
+						{#if spotsSelected > partySize && partySize > 0}
+							<p class="helper-text">You’re holding extra spots—you can keep them or uncheck beds to release.</p>
+						{/if}
 					{/if}
 				</section>
 			{:else if activeTab === 'activities'}
@@ -298,6 +374,12 @@
 		border-radius: var(--radius-sm);
 		font-size: 1rem;
 	}
+	.form-hint {
+		display: block;
+		margin-top: 0.25rem;
+		font-size: 0.85rem;
+		color: var(--color-text-light);
+	}
 
 	.form-row {
 		display: grid;
@@ -362,6 +444,58 @@
 		margin-bottom: var(--spacing-md);
 		border-left: 3px solid #16a34a;
 	}
+
+	.error-message {
+		background: rgba(239, 68, 68, 0.1);
+		color: #b91c1c;
+		padding: var(--spacing-sm);
+		border-radius: var(--radius-sm);
+		margin-bottom: var(--spacing-md);
+		border-left: 3px solid #b91c1c;
+	}
+	.error-message.conflict { font-weight: 600; }
+
+	.spots-counter {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--spacing-md);
+		margin-bottom: var(--spacing-sm);
+		font-size: 1rem;
+	}
+	.spots-warn { color: var(--color-warning, #b45309); }
+	.helper-text {
+		color: var(--color-text-light);
+		font-size: 0.9rem;
+		margin-bottom: var(--spacing-md);
+	}
+	.beds-claim .room-card { flex-direction: column; align-items: stretch; }
+	.beds-checkboxes { display: flex; flex-direction: column; gap: 0.25rem; }
+	.bed-option {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		cursor: pointer;
+	}
+	.bed-option.disabled { opacity: 0.6; cursor: not-allowed; }
+	.bed-option input { margin: 0; }
+	.bed-spots { font-size: 0.85rem; color: var(--color-text-light); }
+	.claimed-badge {
+		font-size: 0.75rem;
+		background: var(--color-bg-light);
+		padding: 0.15rem 0.4rem;
+		border-radius: var(--radius-sm);
+		margin-left: auto;
+	}
+	.beds-form-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--spacing-md);
+		flex-wrap: wrap;
+		margin-top: var(--spacing-lg);
+	}
+	.validation-hint { color: var(--color-text-light); font-size: 0.9rem; }
+	.summary-hint { margin-top: var(--spacing-sm); font-size: 0.9rem; color: var(--color-text-light); }
 
 	.btn-sm {
 		padding: var(--spacing-xs) var(--spacing-md);

@@ -100,6 +100,7 @@ model Bed {
   room              Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
   reservations      Reservation[]
   legacySubmissions GuestSubmission[] // Legacy support
+  roomAssignments   RoomAssignment[]
 
   @@index([roomId])
   @@index([isAvailable])
@@ -280,12 +281,14 @@ model Invite {
   @@index([token])
 }
 
-// Room Assignments
+// Room Assignments (one row per bed selected for a guest; multiple rows per user for multi-bed)
+// When bedId is set, (tripId, bedId) is unique so one bed can only be claimed by one guest.
 model RoomAssignment {
   id        String    @id @default(uuid())
   tripId    String
   roomId    Int
   userId    String
+  bedId     String?   // Specific bed when host or guest claims; unique per trip
   startDate DateTime?
   endDate   DateTime?
   partySize Int       @default(1)
@@ -297,10 +300,13 @@ model RoomAssignment {
   trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bed  Bed? @relation(fields: [bedId], references: [id], onDelete: SetNull)
 
+  @@unique([tripId, bedId])
   @@index([tripId])
   @@index([roomId])
   @@index([userId])
+  @@index([bedId])
 }
 
 // Meal Plan

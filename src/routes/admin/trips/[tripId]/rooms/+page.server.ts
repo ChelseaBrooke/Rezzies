@@ -126,6 +126,10 @@ export const actions: Actions = {
 		try {
 			const formData = await request.formData();
 			const bedId = formData.get('bedId') as string;
+			if (!bedId) return fail(400, { error: 'Bed ID required' });
+
+			const { releaseBedClaimsAndNotify } = await import('$lib/server/bed-claims.js');
+			await releaseBedClaimsAndNotify(bedId);
 
 			await prisma.bed.delete({
 				where: { id: bedId }

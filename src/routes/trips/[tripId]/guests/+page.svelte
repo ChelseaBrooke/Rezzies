@@ -14,6 +14,10 @@
 	let inviteEmail = $state('');
 	let inviteRole = $state<'guest' | 'co-host'>('guest');
 	let inviteError = $state('');
+	let addManualOpen = $state(false);
+	let addManualName = $state('');
+	let addManualEmail = $state('');
+	let addManualError = $state('');
 	let searchQuery = $state('');
 	let filterRsvp = $state<'all' | 'yes' | 'no' | 'no-response'>('all');
 	let filterAssignment = $state<'all' | 'assigned' | 'unassigned'>('all');
@@ -24,18 +28,67 @@
 	let copyToast = $state(false);
 	let nudgeToast = $state(false);
 	let roomSaveError = $state<string | null>(null);
-	/** Per-user room id for dropdown display. Seeded once from server; only we update it on user action. */
-	let displayRoomIdByUserId = $state<Record<string, number | null>>({});
-	$effect(() => {
-		if (typeof window === 'undefined') return;
-		const rows = data.guestRows ?? [];
-		if (rows.length === 0 || Object.keys(displayRoomIdByUserId).length > 0) return;
-		const next: Record<string, number | null> = {};
-		for (const r of rows) {
-			if (r.userId != null) next[r.userId] = r.roomId ?? null;
+	let openBedsUserId = $state<string | null>(null);
+	let selectedBedIdsForEdit = $state<string[]>([]);
+
+	function openBedsForRow(row: GuestRow) {
+		if (openBedsUserId && openBedsUserId !== (row.userId ?? null)) closeBedsDropdown();
+		openBedsUserId = row.userId ?? null;
+		selectedBedIdsForEdit = [...(row.assignedBedIds ?? [])];
+	}
+	function closeBedsDropdown() {
+		const userId = openBedsUserId;
+		const idsToSubmit = [...selectedBedIdsForEdit];
+		openBedsUserId = null;
+		if (!userId) return;
+		const form = document.querySelector<HTMLFormElement>(`form.beds-form[data-beds-user-id="${userId}"]`);
+		if (!form) return;
+		const container = form.querySelector('[data-bedids-container]');
+		if (container) {
+			container.innerHTML = '';
+			for (const id of idsToSubmit) {
+				const input = document.createElement('input');
+				input.type = 'hidden';
+				input.name = 'bedIds';
+				input.value = id;
+				container.appendChild(input);
+			}
 		}
-		displayRoomIdByUserId = next;
-	});
+		setTimeout(() => form.requestSubmit(), 0);
+	}
+	function toggleBedForEdit(bedId: string) {
+		if (selectedBedIdsForEdit.includes(bedId)) {
+			selectedBedIdsForEdit = selectedBedIdsForEdit.filter((id) => id !== bedId);
+		} else {
+			selectedBedIdsForEdit = [...selectedBedIdsForEdit, bedId];
+		}
+	}
+
+	function clickOutside(
+		node: HTMLElement,
+		opts: { onOutside: () => void; active: boolean } | (() => void)
+	) {
+		const onOutside = typeof opts === 'function' ? opts : opts.onOutside;
+		let active = typeof opts === 'function' ? true : opts.active;
+		function handleClick(e: MouseEvent) {
+			if (active && node && !node.contains(e.target as Node)) onOutside();
+		}
+		function addListener() {
+			setTimeout(() => document.addEventListener('click', handleClick), 0);
+		}
+		if (active) addListener();
+		return {
+			update(newOpts: { onOutside: () => void; active: boolean } | (() => void)) {
+				const newActive = typeof newOpts === 'function' ? true : newOpts.active;
+				if (newActive && !active) addListener();
+				else if (!newActive && active) document.removeEventListener('click', handleClick);
+				active = newActive;
+			},
+			destroy() {
+				document.removeEventListener('click', handleClick);
+			}
+		};
+	}
 
 	const inviteLink = $derived(
 		typeof window !== 'undefined' && data.trip?.inviteCode
@@ -53,6 +106,18 @@
 		inviteEmail = '';
 		inviteRole = 'guest';
 		inviteError = '';
+	}
+	function openAddManual() {
+		addManualOpen = true;
+		addManualName = '';
+		addManualEmail = '';
+		addManualError = '';
+	}
+	function closeAddManual() {
+		addManualOpen = false;
+		addManualName = '';
+		addManualEmail = '';
+		addManualError = '';
 	}
 	function handleInviteSubmit() {
 		return async ({ result }: { result: { type: string; data?: { createInviteError?: string; createInviteSuccess?: boolean } } }) => {
@@ -92,30 +157,26 @@
 		return email ? email.slice(0, 2).toUpperCase() : '?';
 	}
 
-	/** Room label for display when roomName can be empty in DB */
-	function roomLabel(row: GuestRow): string {
-		if (row.roomName?.trim()) return row.roomName.trim();
-		if (row.roomId == null) return '';
+	/** Label for assigned beds: "Room 1: King, Twin; Room 2: Queen" */
+	function bedsLabel(row: GuestRow): string {
+		const bedIds = row.assignedBedIds ?? [];
+		if (bedIds.length === 0) return '';
 		const rooms = data.rooms ?? [];
-		const idx = rooms.findIndex((r) => r.id === row.roomId);
-		if (idx >= 0) return rooms[idx].name?.trim() || `Room ${idx + 1}`;
-		return `Room ${row.roomId}`;
-	}
-
-	/** Display value for room dropdown: local state if set, else server row.roomId. */
-	function roomDisplayValue(row: GuestRow): number | null {
-		if (row.userId == null) return row.roomId ?? null;
-		if (displayRoomIdByUserId[row.userId] !== undefined) return displayRoomIdByUserId[row.userId];
-		return row.roomId ?? null;
-	}
-
-	/** Value for the room select: must match an option (room id in data.rooms) or '' for "Choose Room". */
-	function roomSelectValue(row: GuestRow): string {
-		const rooms = data.rooms ?? [];
-		const displayVal = roomDisplayValue(row);
-		if (displayVal == null) return '';
-		const exists = rooms.some((r) => r.id === displayVal);
-		return exists ? String(displayVal) : '';
+		const byRoom: Record<string, string[]> = {};
+		for (const bedId of bedIds) {
+			for (const room of rooms) {
+				const bed = room.beds?.find((b) => b.id === bedId);
+				if (bed) {
+					const name = room.name?.trim() || `Room ${room.id}`;
+					if (!byRoom[name]) byRoom[name] = [];
+					byRoom[name].push(bed.bedType || 'bed');
+					break;
+				}
+			}
+		}
+		return Object.entries(byRoom)
+			.map(([roomName, types]) => `${roomName}: ${types.join(', ')}`)
+			.join('; ');
 	}
 
 	const rsvpVisual = $derived.by(() => {
@@ -139,8 +200,8 @@
 		if (filterRsvp === 'yes') rows = rows.filter((r) => r.rsvpStatus === 'yes');
 		else if (filterRsvp === 'no') rows = rows.filter((r) => r.rsvpStatus === 'no');
 		else if (filterRsvp === 'no-response') rows = rows.filter((r) => r.rsvpStatus !== 'yes' && r.rsvpStatus !== 'no');
-		if (filterAssignment === 'assigned') rows = rows.filter((r) => r.roomName != null);
-		else if (filterAssignment === 'unassigned') rows = rows.filter((r) => r.type === 'member' && r.roomName == null);
+		if (filterAssignment === 'assigned') rows = rows.filter((r) => (r.assignedBedIds?.length ?? 0) > 0);
+		else if (filterAssignment === 'unassigned') rows = rows.filter((r) => r.type === 'member' && (r.assignedBedIds?.length ?? 0) === 0);
 		if (filterDietary === 'has-flags') rows = rows.filter((r) => r.hasDietaryFlags);
 		if (sortBy === 'name') rows.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
 		else if (sortBy === 'rsvp') {
@@ -258,9 +319,12 @@
 
 	<!-- Toolbar: actions (right, above) then search + filters (search on right) -->
 	<div class="toolbar">
-		{#if data.isHost}
+		{#if data.canManageGuests}
 			<div class="toolbar-actions-row">
 				<button type="button" class="btn-secondary" onclick={copyInviteLink}>Copy link</button>
+				{#if data.isHost}
+					<button type="button" class="btn-secondary" onclick={openAddManual}>Add guest manually</button>
+				{/if}
 				<button type="button" class="btn-primary" onclick={openInvite}>Invite</button>
 				{#if copyToast}
 					<span class="toast">Link copied</span>
@@ -440,49 +504,94 @@
 								</td>
 								<td>
 									{#if row.type === 'member' && data.canManageGuests}
-										<form method="POST" action="?/assignRoom" class="room-cell-form" use:enhance={() => invalidateAll()}>
-											<input type="hidden" name="userId" value={row.userId ?? ''} />
-											<input type="hidden" name="partySize" value={row.partySize || 1} />
-											<select
-												class="edit-select"
-												name="roomId"
-												value={roomSelectValue(row)}
-												onchange={(e) => {
-													const v = (e.currentTarget as HTMLSelectElement).value;
-													const rid = v ? parseInt(v, 10) : null;
-													if (row.userId == null) return;
-													if (rid != null && !Number.isNaN(rid)) {
-														displayRoomIdByUserId = { ...displayRoomIdByUserId, [row.userId]: rid };
-														e.currentTarget.form?.requestSubmit();
-													} else {
-														displayRoomIdByUserId = { ...displayRoomIdByUserId, [row.userId]: row.roomId ?? null };
-													}
+										<div
+											class="beds-cell beds-dropdown-wrap"
+											use:clickOutside={{ onOutside: closeBedsDropdown, active: openBedsUserId === row.userId }}
+											role="presentation"
+										>
+											<form
+												method="POST"
+												action="?/assignBeds"
+												class="beds-form"
+												data-beds-user-id={row.userId ?? ''}
+												use:enhance={async ({ result }) => {
+													if (result.type === 'success') openBedsUserId = null;
+													await invalidateAll();
 												}}
 											>
-												<option value="">Choose Room</option>
-												{#each (data.rooms ?? []) as room, i}
-													<option value={String(room.id)}>{room.name?.trim() || `Room ${i + 1}`}</option>
-												{/each}
-											</select>
-										</form>
-										{#if roomDisplayValue(row) != null}
-											<form method="POST" action="?/clearRoom" class="clear-room-form" use:enhance={() => {
-												if (row.userId != null) displayRoomIdByUserId = { ...displayRoomIdByUserId, [row.userId]: null };
-												return invalidateAll();
-											}}>
 												<input type="hidden" name="userId" value={row.userId ?? ''} />
-												<input type="hidden" name="confirmClear" value="1" />
-												<button type="submit" class="btn-link clear-room">Clear</button>
+												<input type="hidden" name="partySize" value={row.partySize || 1} />
+												{#if data.trip?.allowPartialStays}
+													<input type="hidden" name="startDate" value={row.arrivalDate ?? data.trip?.checkInDate ?? ''} />
+													<input type="hidden" name="endDate" value={row.departureDate ?? data.trip?.checkOutDate ?? ''} />
+												{/if}
+												<div data-bedids-container aria-hidden="true"></div>
+												<button
+													type="button"
+													class="beds-dropdown-trigger edit-select"
+													onclick={(e) => {
+														e.stopPropagation();
+														openBedsForRow(row);
+													}}
+													aria-haspopup="listbox"
+													aria-expanded={openBedsUserId === row.userId}
+												>
+													{#if (row.assignedBedIds?.length ?? 0) > 0}
+														{bedsLabel(row)}
+													{:else}
+														Choose beds…
+													{/if}
+												</button>
+												{#if openBedsUserId === row.userId}
+													<div class="beds-dropdown-panel" role="listbox" onclick={(e) => e.stopPropagation()}>
+														{#each (data.rooms ?? []) as room, ri}
+															<div class="beds-dropdown-room">
+																<div class="beds-dropdown-room-name">{room.name?.trim() || `Room ${ri + 1}`}</div>
+																{#each (room.beds ?? []) as bed}
+																	<label class="beds-dropdown-option">
+																		<input
+																			type="checkbox"
+																			checked={selectedBedIdsForEdit.includes(bed.id)}
+																			onchange={() => toggleBedForEdit(bed.id)}
+																		/>
+																		<span>{bed.bedType}</span>
+																	</label>
+																{/each}
+															</div>
+														{/each}
+														<div class="beds-form-actions">
+															<button type="button" class="btn-secondary btn-small" onclick={() => closeBedsDropdown()}>Done</button>
+															<button
+																type="button"
+																class="btn-link clear-room"
+																onclick={() => {
+																	selectedBedIdsForEdit = [];
+																	closeBedsDropdown();
+																}}
+															>Clear</button>
+														</div>
+													</div>
+												{/if}
+												<!-- bed IDs submitted via data-bedids-container hidden inputs on Save -->
+												<select multiple class="beds-hidden-select" aria-hidden="true" tabindex={-1} style="display:none">
+													{#each (data.rooms ?? []) as room, ri}
+														<optgroup label={room.name?.trim() || `Room ${ri + 1}`}>
+															{#each (room.beds ?? []) as bed}
+																<option value={bed.id}>{bed.bedType}</option>
+															{/each}
+														</optgroup>
+													{/each}
+												</select>
 											</form>
-										{/if}
-										{#if roomLabel(row) && row.bedType}
-											<span class="bed-type-hint">({row.bedType})</span>
-										{/if}
+											<form method="POST" action="?/assignBeds" class="clear-beds-form" use:enhance={() => invalidateAll()} style="display: none;">
+												<input type="hidden" name="userId" value={row.userId ?? ''} />
+											</form>
+										</div>
 									{:else}
-										{#if row.roomId != null || row.roomName}
-											{roomLabel(row) || row.roomName}{row.bedType ? ` (${row.bedType})` : ''}
+										{#if (row.assignedBedIds?.length ?? 0) > 0}
+											{bedsLabel(row)}
 										{:else}
-											<span class="muted">Unassigned</span>
+											<span class="muted">No beds selected</span>
 										{/if}
 									{/if}
 								</td>
@@ -579,6 +688,40 @@
 			<div class="modal-actions">
 				<button type="button" class="btn-secondary" onclick={closeInvite}>Cancel</button>
 				<button type="submit" class="btn-primary">Send invite</button>
+			</div>
+		</form>
+	</div>
+{/if}
+
+<!-- Add guest manually modal -->
+{#if addManualOpen}
+	<div class="modal-backdrop" onclick={closeAddManual} role="presentation"></div>
+	<div class="modal" role="dialog" aria-labelledby="add-manual-title">
+		<h2 id="add-manual-title">Add guest manually</h2>
+		<p class="modal-hint">For someone who doesn't go online much. They'll appear on the guest list so you can assign a room, set RSVP, and account for their cost.</p>
+		<form method="POST" action="?/addManualGuest" use:enhance={async ({ result }) => {
+			if (result.type === 'success' && result.data?.addManualGuestSuccess) {
+				closeAddManual();
+				await invalidateAll();
+			}
+			if (result.type === 'failure' && result.data?.addManualGuestError) {
+				addManualError = result.data.addManualGuestError;
+			}
+		}}>
+			{#if addManualError}
+				<p class="form-error">{addManualError}</p>
+			{/if}
+			<div class="form-group">
+				<label for="add-manual-name">Name *</label>
+				<input id="add-manual-name" type="text" name="name" bind:value={addManualName} placeholder="e.g. Jane Smith" required />
+			</div>
+			<div class="form-group">
+				<label for="add-manual-email">Email (optional)</label>
+				<input id="add-manual-email" type="email" name="email" bind:value={addManualEmail} placeholder="If they have an account, add them by email" />
+			</div>
+			<div class="modal-actions">
+				<button type="button" class="btn-secondary" onclick={closeAddManual}>Cancel</button>
+				<button type="submit" class="btn-primary">Add guest</button>
 			</div>
 		</form>
 	</div>
@@ -699,6 +842,56 @@
 	.inline-form { display: inline; }
 	.room-cell-form, .clear-room-form { display: inline; }
 	.clear-room-form .clear-room { margin-left: 0.25rem; }
+	.beds-cell { display: flex; flex-direction: column; gap: 0.35rem; }
+	.beds-dropdown-wrap { position: relative; }
+	.beds-dropdown-trigger {
+		display: block;
+		width: 100%;
+		min-width: 10rem;
+		text-align: left;
+		padding: 0.35rem 0.5rem;
+		border: 1px solid var(--border-color, #ccc);
+		border-radius: 4px;
+		background: var(--input-bg, #fff);
+		cursor: pointer;
+		font: inherit;
+	}
+	.beds-dropdown-trigger:hover { border-color: var(--border-hover, #888); }
+	.beds-dropdown-panel {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		margin-top: 2px;
+		min-width: 12rem;
+		max-height: 16rem;
+		overflow-y: auto;
+		background: var(--input-bg, #fff);
+		border: 1px solid var(--border-color, #ccc);
+		border-radius: 6px;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+		z-index: 20;
+		padding: 0.5rem;
+	}
+	.beds-dropdown-room { margin-bottom: 0.5rem; }
+	.beds-dropdown-room:last-of-type { margin-bottom: 0.25rem; }
+	.beds-dropdown-room-name {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--muted, #666);
+		margin-bottom: 0.25rem;
+	}
+	.beds-dropdown-option {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.2rem 0;
+		cursor: pointer;
+		font-size: 0.9rem;
+	}
+	.beds-dropdown-option input { margin: 0; }
+	.beds-hidden-select { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+	.beds-form-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+	.btn-small { padding: 0.25rem 0.5rem; font-size: 0.8125rem; }
 
 	.muted { color: var(--muted); }
 	.empty { color: var(--muted); margin: 0; padding: 1rem 0; }
@@ -711,6 +904,7 @@
 	.modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-xl); z-index: 101; min-width: 20rem; }
 	.modal h2 { margin: 0 0 0.75rem 0; font-size: 1.25rem; }
 	.modal p { margin: 0 0 1rem 0; font-size: 0.875rem; }
+	.modal-hint { color: var(--muted); font-size: 0.8125rem; margin: 0 0 1rem 0; }
 	.form-error { color: var(--error, #b91c1c); font-size: 0.875rem; margin: 0 0 1rem 0; }
 	.form-group { margin-bottom: 1rem; }
 	.form-group label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }

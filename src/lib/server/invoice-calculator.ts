@@ -24,11 +24,11 @@ export interface InvoiceBreakdown {
 }
 
 export async function calculateInvoiceForUser(tripId: string, userId: string): Promise<InvoiceBreakdown> {
-	// Get user's selections
-	const [roomAssignment, activityParticipants, extraSelections, trip] = await Promise.all([
-		prisma.roomAssignment.findFirst({
+	// Get user's selections (multiple room assignments = multi-select beds)
+	const [roomAssignments, activityParticipants, extraSelections, trip] = await Promise.all([
+		prisma.roomAssignment.findMany({
 			where: { tripId, userId },
-			include: { room: true }
+			include: { room: { include: { beds: true } } }
 		}),
 		prisma.activityParticipant.findMany({
 			where: {
@@ -61,15 +61,16 @@ export async function calculateInvoiceForUser(tripId: string, userId: string): P
 		total: 0
 	};
 
-	// Calculate room costs
-	if (roomAssignment) {
+	// Calculate room costs (one line per assigned bed)
+	for (const roomAssignment of roomAssignments) {
 		const startDate = roomAssignment.startDate || trip.checkInDate;
 		const endDate = roomAssignment.endDate || trip.checkOutDate;
 		const nights = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-		// Use existing pricing calculation
-		const bed = roomAssignment.room.beds.find(b => b.bedType === roomAssignment.bedType) || roomAssignment.room.beds[0];
-		
+		const bed = roomAssignment.bedId
+			? roomAssignment.room.beds.find((b) => b.id === roomAssignment.bedId)
+			: roomAssignment.room.beds.find((b) => b.bedType === roomAssignment.bedType) || roomAssignment.room.beds[0];
+
 		if (bed) {
 			const priceCalculation = await calculateReservationPrice({
 				tripId,
@@ -89,6 +90,8 @@ export async function calculateInvoiceForUser(tripId: string, userId: string): P
 		}
 	}
 
+	const firstAssignment = roomAssignments[0];
+
 	// Calculate activity costs
 	for (const participant of activityParticipants) {
 		if (participant.status === 'in') {
@@ -107,8 +110,8 @@ export async function calculateInvoiceForUser(tripId: string, userId: string): P
 		
 		// Apply quantity-based pricing
 		if (selection.rule.type === 'per_pet' || selection.rule.type === 'per_night') {
-			const nights = roomAssignment 
-				? Math.ceil(((roomAssignment.endDate || trip.checkOutDate).getTime() - (roomAssignment.startDate || trip.checkInDate).getTime()) / (1000 * 60 * 60 * 24))
+			const nights = firstAssignment
+				? Math.ceil(((firstAssignment.endDate || trip.checkOutDate).getTime() - (firstAssignment.startDate || trip.checkInDate).getTime()) / (1000 * 60 * 60 * 24))
 				: Math.ceil((trip.checkOutDate.getTime() - trip.checkInDate.getTime()) / (1000 * 60 * 60 * 24));
 			
 			if (selection.rule.type === 'per_night') {

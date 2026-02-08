@@ -18,7 +18,8 @@
 
 	const members = $derived(trip?.members ?? []);
 	const rsvps = $derived(trip?.rsvps ?? []);
-	const roomAssignments = $derived(trip?.roomAssignments ?? []);
+	// Prefer page-loaded assignments (fresh after host assigns beds on guests page)
+	const roomAssignments = $derived('roomAssignments' in data && Array.isArray(data.roomAssignments) ? data.roomAssignments : (trip?.roomAssignments ?? []));
 	const rooms = $derived(trip?.rooms ?? []);
 	const activities = $derived(trip?.activities ?? []);
 	const mealSlots = $derived(trip?.mealSlots ?? []);
@@ -32,7 +33,23 @@
 	const totalBedSlots = $derived(
 		rooms.reduce((sum, r) => sum + (r.beds?.reduce((s, b) => s + (b.capacitySlots ?? 1), 0) ?? 0), 0)
 	);
-	const claimedSlots = $derived(roomAssignments.reduce((sum, a) => sum + (a.partySize ?? 1), 0));
+	const bedSpotsByBedId = $derived.by(() => {
+		const map = new Map<string, number>();
+		for (const r of rooms) {
+			for (const b of r.beds ?? []) {
+				map.set(b.id, b.capacitySlots ?? b.capacity ?? 1);
+			}
+		}
+		return map;
+	});
+	const claimedSlots = $derived(
+		roomAssignments.reduce((sum, a) => {
+			if (a.bedId) {
+				return sum + (bedSpotsByBedId.get(a.bedId) ?? a.partySize ?? 1);
+			}
+			return sum + (a.partySize ?? 1);
+		}, 0)
+	);
 	const bedsPct = $derived(totalBedSlots > 0 ? Math.round((claimedSlots / totalBedSlots) * 100) : 0);
 
 	const committedFunds = $derived(
@@ -207,3 +224,4 @@
 			{checklistStats}
 		/>
 {/if}
+

@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { releaseBedClaimsAndNotify } from '$lib/server/bed-claims.js';
 
 export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
@@ -46,6 +47,7 @@ export const DELETE: RequestHandler = async ({ cookies, params }) => {
 	});
 	if (!bed || bed.room.tripId !== tripId) return json({ error: 'Bed not found' }, 404);
 
+	await releaseBedClaimsAndNotify(bedId);
 	await prisma.bed.delete({ where: { id: bedId } });
 	return json({ success: true });
 };
