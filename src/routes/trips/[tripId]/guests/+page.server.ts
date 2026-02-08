@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
-import { isTripHost, isTripHostOrCoHost } from '$lib/server/trip-access.js';
+import { isTripHost, isTripHostOrCoHost, getMemberTripState, type MemberTripState } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 import { notifyExistingUserOfInvite } from '$lib/server/invite-service.js';
 import { createInvoiceForUser } from '$lib/server/invoice-calculator.js';
@@ -33,6 +33,17 @@ export type GuestRow = {
 	toPayTotal: number | null;
 	/** Bed IDs currently assigned (for multi-select beds UI). */
 	assignedBedIds: string[];
+	/** Display state: invited | accepted | rsvp_yes | rsvp_no (only for active members; removed are in removedRows). */
+	memberTripState?: MemberTripState;
+	/** Trip role for this member (host, co-host, guest) so UI can e.g. hide Remove for host. */
+	role?: string;
+}
+
+export type RemovedRow = {
+	userId: string;
+	name: string;
+	email: string;
+	role: string;
 };
 
 export const load: PageServerLoad = async ({ parent }) => {
@@ -114,9 +125,11 @@ export const load: PageServerLoad = async ({ parent }) => {
 	let notGoingCount = 0;
 	let unrespondedCount = 0;
 
+	const activeMembers = members.filter((m) => m.inviteStatus !== 'removed');
+	const removedMembers = members.filter((m) => m.inviteStatus === 'removed');
 	const guestRows: GuestRow[] = [];
 
-	for (const member of members) {
+	for (const member of activeMembers) {
 		const uid = member.user?.id;
 		const rsvp = uid ? rsvpByUserId.get(uid) : null;
 		const assignments = uid ? (assignmentsByUserId.get(uid) ?? []) : [];
@@ -143,9 +156,11 @@ export const load: PageServerLoad = async ({ parent }) => {
 				if (bed?.id) assignedBedIds.push(bed.id);
 			}
 		}
+		const memberTripState = getMemberTripState(member, rsvp ?? null);
 		guestRows.push({
 			type: 'member',
 			userId: uid,
+			role: member.role,
 			name: member.user?.name ?? '—',
 			email: member.user?.email ?? '—',
 			avatarUrl: member.user?.avatarUrl,
@@ -170,9 +185,17 @@ export const load: PageServerLoad = async ({ parent }) => {
 			dietaryRestrictions: profile?.dietaryRestrictions ?? null,
 			allergies: profile?.allergies ?? null,
 			toPayTotal: toPayTotal !== null && toPayTotal > 0 ? toPayTotal : null,
-			assignedBedIds
+			assignedBedIds,
+			memberTripState
 		});
 	}
+
+	const removedRows: RemovedRow[] = removedMembers.map((m) => ({
+		userId: m.user?.id ?? '',
+		name: m.user?.name ?? '—',
+		email: m.user?.email ?? '—',
+		role: m.role
+	}));
 
 	for (const inv of invites) {
 		unrespondedCount++;
@@ -228,6 +251,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 				}
 			: null,
 		guestRows,
+		removedRows,
 		summary: {
 			totalInvited,
 			goingCount,
@@ -328,17 +352,42 @@ export const actions: Actions = {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
-		const host = await isTripHost(tripId, user.id);
-		if (!host) throw error(403, 'Only the trip host can remove guests');
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) throw error(403, 'Only the host or co-host can remove guests');
 
 		const formData = await request.formData();
 		const userId = (formData.get('userId') as string)?.trim();
 		if (!userId) return { removeGuestError: 'Missing user' };
 
-		await prisma.tripMember.deleteMany({
-			where: { tripId, userId }
+		const target = await prisma.tripMember.findUnique({
+			where: { tripId_userId: { tripId, userId } }
+		});
+		if (!target) return { removeGuestError: 'Guest not found' };
+		if (target.role === 'host') return { removeGuestError: 'Cannot remove the trip host' };
+
+		await prisma.tripMember.update({
+			where: { tripId_userId: { tripId, userId } },
+			data: { inviteStatus: 'removed' }
 		});
 		return { removeGuestSuccess: true };
+	},
+
+	restoreGuest: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) throw error(403, 'Only the host or co-host can restore guests');
+
+		const formData = await request.formData();
+		const userId = (formData.get('userId') as string)?.trim();
+		if (!userId) return { restoreGuestError: 'Missing user' };
+
+		await prisma.tripMember.update({
+			where: { tripId_userId: { tripId, userId } },
+			data: { inviteStatus: 'accepted' }
+		});
+		return { restoreGuestSuccess: true };
 	},
 
 	nudgeUnresponded: async ({ request, params, cookies }) => {
@@ -366,7 +415,7 @@ export const actions: Actions = {
 		});
 		const respondedUserIds = new Set(rsvps.filter((r) => r.status === 'yes' || r.status === 'no').map((r) => r.userId));
 		const members = await prisma.tripMember.findMany({
-			where: { tripId },
+			where: { tripId, inviteStatus: { in: ['invited', 'accepted'] } },
 			select: { userId: true }
 		});
 		const _unrespondedUserIds = members.map((m) => m.userId).filter((uid) => !respondedUserIds.has(uid));
@@ -393,6 +442,7 @@ export const actions: Actions = {
 			where: { tripId_userId: { tripId, userId } }
 		});
 		if (!isMember) return fail(400, { updateGuestRsvpError: 'User is not a guest on this trip' });
+		if (isMember.inviteStatus === 'removed') return fail(400, { updateGuestRsvpError: 'Cannot update RSVP for a removed guest' });
 
 		if (rsvpStatusRaw === '' || rsvpStatusRaw === 'no-response') {
 			await prisma.rSVP.deleteMany({ where: { tripId, userId } });
@@ -452,7 +502,7 @@ export const actions: Actions = {
 		const isMember = await prisma.tripMember.findUnique({
 			where: { tripId_userId: { tripId, userId } }
 		});
-		if (!isMember) return { assignBedsSuccess: true };
+		if (!isMember || isMember.inviteStatus === 'removed') return { assignBedsSuccess: true };
 
 		let startDate: Date | null = trip.checkInDate;
 		let endDate: Date | null = trip.checkOutDate;

@@ -240,8 +240,8 @@ export const actions: Actions = {
 				}
 			}
 
-			// Redirect to trip management page
-			throw redirect(303, `/trips/${trip.id}/manage`);
+			// Redirect to trip dashboard
+			throw redirect(303, `/trips/${trip.id}`);
 		} catch (error) {
 			console.error('Error creating trip:', error);
 			if (error && typeof error === 'object' && 'status' in error && error.status === 303) {

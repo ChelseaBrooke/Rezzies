@@ -75,7 +75,7 @@
 			{
 				title: 'Settings',
 				items: [
-					{ label: 'Manage Trip', icon: '⚙️', path: `/trips/${tripId}/manage` }
+					{ label: 'Trip Settings', icon: '⚙️', path: `/trips/${tripId}/settings` }
 				]
 			}
 		];

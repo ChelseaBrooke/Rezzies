@@ -17,7 +17,17 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		throw error(403, 'You do not have access to this trip');
 	}
 
-	const [trip, membership, tripsResult, userRsvp] = await Promise.all([
+	// First visit: if user was "invited" (hadn't visited trip page yet), mark as "accepted"
+	let membership = await getUserTripMembership(tripId, user.id);
+	if (membership?.inviteStatus === 'invited') {
+		await prisma.tripMember.update({
+			where: { tripId_userId: { tripId, userId: user.id } },
+			data: { inviteStatus: 'accepted' }
+		});
+		membership = { ...membership, inviteStatus: 'accepted' };
+	}
+
+	const [trip, , tripsResult, userRsvp] = await Promise.all([
 		prisma.trip.findUnique({
 			where: { id: tripId },
 			include: {
@@ -48,7 +58,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 				tripActivities: { orderBy: { createdAt: 'desc' } }
 			}
 		}),
-		getUserTripMembership(tripId, user.id),
+		Promise.resolve(membership),
 		getUserTrips(user.id),
 		prisma.rSVP.findUnique({
 			where: {

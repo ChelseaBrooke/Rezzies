@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
-	import type { GuestRow } from './+page.server';
+	import type { GuestRow, RemovedRow } from './+page.server';
 	import pokeIcon from '$lib/assets/images/poke.png';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
@@ -147,6 +147,16 @@
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+	}
+
+	function stateLabel(row: GuestRow): string {
+		const s = row.memberTripState;
+		if (!s) return row.type === 'invite' ? 'Pending' : '—';
+		if (s === 'invited') return 'Invited';
+		if (s === 'accepted') return 'Accepted';
+		if (s === 'rsvp_yes') return 'Going';
+		if (s === 'rsvp_no') return 'Not going';
+		return '—';
 	}
 
 	function initials(name: string, email: string): string {
@@ -398,6 +408,7 @@
 							<th class="th-sortable" onclick={() => toggleSort('name')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('name')}>
 								Guest {#if sortBy === 'name'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
 							</th>
+							<th>State</th>
 							<th class="th-sortable" onclick={() => toggleSort('rsvp')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('rsvp')}>
 								RSVP {#if sortBy === 'rsvp'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
 							</th>
@@ -446,6 +457,9 @@
 											</div>
 										</div>
 									{/if}
+								</td>
+								<td>
+									<span class="state-pill state-{row.memberTripState ?? 'invite'}">{stateLabel(row)}</span>
 								</td>
 								<td>
 									{#if data.canManageGuests && row.type === 'member' && row.userId}
@@ -616,7 +630,7 @@
 													</button>
 												</form>
 											{/if}
-											{#if row.type === 'member' && row.userId}
+											{#if row.type === 'member' && row.userId && row.role !== 'host'}
 												<button
 													type="button"
 													class="btn-icon btn-remove"
@@ -644,6 +658,26 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if data.canManageGuests && (data.removedRows?.length ?? 0) > 0}
+		<div class="card removed-section">
+			<h3 class="removed-section-title">Removed from trip</h3>
+			<p class="removed-section-hint">These people were removed by a host. They no longer have access. You can restore them to the guest list.</p>
+			<ul class="removed-list">
+				{#each data.removedRows as removed (removed.userId)}
+					<li class="removed-item">
+						<span class="removed-name">{removed.name}</span>
+						<span class="removed-email">{removed.email}</span>
+						{#if removed.role === 'co-host'}<span class="removed-role">Co-host</span>{/if}
+						<form method="POST" action="?/restoreGuest" class="inline-form" use:enhance={() => invalidateAll()}>
+							<input type="hidden" name="userId" value={removed.userId} />
+							<button type="submit" class="btn-secondary btn-small">Restore</button>
+						</form>
+					</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
 </div>
 
 <!-- Remove confirm -->
@@ -827,6 +861,12 @@
 	.edit-select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8125rem; color: black; }
 	.bed-type-hint { margin-left: 0.25rem; font-size: 0.8125rem; color: var(--muted); }
 	.rsvp-form, .party-size-form { display: inline-flex; align-items: center; }
+	.state-pill { display: inline-block; padding: 0.2rem 0.5rem; border-radius: var(--radius-md); font-size: 0.75rem; font-weight: 500; }
+	.state-pill.state-invited { background: #fef3c7; color: #92400e; }
+	.state-pill.state-accepted { background: #e0e7ff; color: #3730a3; }
+	.state-pill.state-rsvp_yes { background: #dcfce7; color: #166534; }
+	.state-pill.state-rsvp_no { background: #f3f4f6; color: #6b7280; }
+	.state-pill.state-invite { background: #f3f4f6; color: #6b7280; }
 	.rsvp-select { padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8125rem; cursor: pointer; }
 	.party-size-input { width: 3rem; padding: 0.25rem 0.35rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8125rem; }
 	.edit-link { margin-left: 0.5rem; font-size: 0.8125rem; }
@@ -839,6 +879,15 @@
 	.btn-icon-img { display: block; object-fit: contain; }
 	.btn-icon.btn-remove { border: 1px solid rgba(185, 28, 28, 0.4); color: #b91c1c; }
 	.btn-icon.btn-remove:hover { background: rgba(185, 28, 28, 0.08); }
+	.removed-section { margin-top: 1.5rem; }
+	.removed-section-title { font-size: 1.125rem; margin: 0 0 0.25rem 0; color: var(--text); }
+	.removed-section-hint { font-size: 0.875rem; color: var(--muted); margin: 0 0 1rem 0; }
+	.removed-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+	.removed-item { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+	.removed-item:last-child { border-bottom: none; }
+	.removed-name { font-weight: 500; }
+	.removed-email { font-size: 0.875rem; color: var(--muted); }
+	.removed-role { font-size: 0.75rem; padding: 0.1rem 0.4rem; background: var(--surface2); border-radius: var(--radius-sm); }
 	.inline-form { display: inline; }
 	.room-cell-form, .clear-room-form { display: inline; }
 	.clear-room-form .clear-room { margin-left: 0.25rem; }

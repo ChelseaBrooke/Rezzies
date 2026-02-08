@@ -123,8 +123,10 @@
 		guest_activities_contributed: guestActivitiesContributed
 	});
 
-	// Show big RSVP button for guests who are invited (not yet accepted)
-	const showRsvpButton = $derived(data.membership?.inviteStatus === 'invited');
+	// Show big RSVP button when guest hasn't responded yet (Accepted or Invited, no yes/no)
+	const showRsvpButton = $derived(
+		data.userRsvp?.status !== 'yes' && data.userRsvp?.status !== 'no'
+	);
 </script>
 
 {#if trip}

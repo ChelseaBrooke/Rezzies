@@ -266,6 +266,22 @@
 		{/if}
 	</div>
 
+	<!-- My RSVP: for hosts/co-hosts to set their own RSVP, party size, room, etc. -->
+	{#if isHost}
+		<a
+			href="/trips/{tripId}/rsvp"
+			class="action-btn"
+			title="My RSVP"
+		>
+			<span class="action-content" aria-hidden="true">
+				<span class="action-icon">
+					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+				</span>
+				<span class="action-label">My RSVP</span>
+			</span>
+		</a>
+	{/if}
+
 	<!-- Edit: single button, one content span -->
 	{#if isHost}
 		<div class="dropdown-wrap">
@@ -366,6 +382,10 @@
 		transition: all 0.2s;
 		position: relative;
 		white-space: nowrap;
+	}
+
+	a.action-btn {
+		text-decoration: none;
 	}
 
 	/* Single content child with pointer-events: none = button is the only hit target (no flicker) */

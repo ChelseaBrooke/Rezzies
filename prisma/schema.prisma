@@ -246,7 +246,7 @@ model TripMember {
   tripId       String
   userId       String
   role         String   @default("guest") // "host" | "guest"
-  inviteStatus String   @default("invited") // "invited" | "accepted" | "declined"
+  inviteStatus String   @default("invited") // "invited" | "accepted" | "removed" — display state is derived with RSVP: Invited, Accepted, RSVPyes, RSVPno, Removed
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
