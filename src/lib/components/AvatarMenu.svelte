@@ -2,8 +2,7 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { onMount, onDestroy } from 'svelte';
-	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
-	import { openProfileCard, openEditProfileModal } from '$lib/stores/profileOverlay.js';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 
 	interface User {
 		id?: string;
@@ -106,41 +105,21 @@
 	onmouseenter={onTriggerEnter}
 	onmouseleave={onTriggerLeave}
 >
-	{#if user?.id}
-		<ProfileTooltip userId={user.id}>
-			<button
-				type="button"
-				class="avatar-trigger"
-				aria-label="Account menu"
-				aria-expanded={open}
-				aria-haspopup="true"
-				onclick={toggle}
-				bind:this={triggerEl}
-			>
-				{#if user.avatarUrl}
-					<img src={user.avatarUrl} alt="" class="avatar-img" />
-				{:else}
-					<span class="avatar-inner">{initials(user.name, user.email)}</span>
-				{/if}
-			</button>
-		</ProfileTooltip>
-	{:else}
-		<button
-			type="button"
-			class="avatar-trigger"
-			aria-label="Account menu"
-			aria-expanded={open}
-			aria-haspopup="true"
-			onclick={toggle}
-			bind:this={triggerEl}
-		>
-			{#if user?.avatarUrl}
-				<img src={user.avatarUrl} alt="" class="avatar-img" />
-			{:else}
-				<span class="avatar-inner">{initials(user?.name, user?.email)}</span>
-			{/if}
-		</button>
-	{/if}
+	<button
+		type="button"
+		class="avatar-trigger"
+		aria-label="Account menu"
+		aria-expanded={open}
+		aria-haspopup="true"
+		onclick={toggle}
+		bind:this={triggerEl}
+	>
+		{#if user?.avatarUrl}
+			<img src={user.avatarUrl} alt="" class="avatar-img" />
+		{:else}
+			<span class="avatar-inner">{initials(user?.name, user?.email)}</span>
+		{/if}
+	</button>
 
 	{#if open && !isSettingsPage}
 		<div
@@ -153,10 +132,9 @@
 		>
 			<a href="/trips" class="avatar-dropdown-item" role="menuitem" onclick={close}>My Trips</a>
 			{#if user?.id}
-				<button type="button" class="avatar-dropdown-item" role="menuitem" onclick={() => { openProfileCard(user.id!); close(); }}>Profile</button>
-				<button type="button" class="avatar-dropdown-item" role="menuitem" onclick={() => { openEditProfileModal(); close(); }}>Edit profile</button>
+				<button type="button" class="avatar-dropdown-item" role="menuitem" onclick={() => { openProfileCard(user.id!); close(); }}>My Profile</button>
 			{/if}
-			<a href="/settings" class="avatar-dropdown-item" role="menuitem" onclick={close}>Account settings</a>
+			<a href="/settings" class="avatar-dropdown-item" role="menuitem" onclick={close}>Account Settings</a>
 			<form method="POST" action="/logout" class="avatar-dropdown-form">
 				<button type="submit" class="avatar-dropdown-item avatar-dropdown-logout" role="menuitem">
 					Log out
@@ -234,7 +212,9 @@
 		border: 1px solid var(--border);
 		z-index: 1000;
 		overflow: hidden;
-		padding: 0.25rem 0;
+		display: flex;
+		flex-direction: column;
+		padding: 0.5rem 0;
 	}
 	.avatar-dropdown-above {
 		top: auto;
@@ -259,6 +239,7 @@
 		cursor: pointer;
 		font-family: inherit;
 		transition: background 0.15s;
+		flex: 0 0 auto;
 	}
 	.avatar-dropdown-item:hover {
 		background: var(--surface2);
@@ -268,6 +249,10 @@
 		margin: 0;
 		padding: 0;
 		border-top: 1px solid var(--border);
+		flex: 0 0 auto;
+	}
+	.avatar-dropdown-form .avatar-dropdown-item {
+		margin: 0;
 	}
 	.avatar-dropdown-logout {
 		color: var(--muted);

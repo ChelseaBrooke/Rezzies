@@ -41,9 +41,12 @@
 	}
 	
 	function prevStep() {
-		if (stepNumber() > 1) {
-			goto(`/trips/new/step/${stepNumber() - 1}`);
+		if (stepNumber() === 1) {
+			// Always go to My Trips — referrer is unreliable (e.g. Sitemap, redirects)
+			goto('/trips');
+			return;
 		}
+		goto(`/trips/new/step/${stepNumber() - 1}`);
 	}
 	
 	let validationError = $state<string | null>(null);
@@ -160,7 +163,7 @@
 	<div class="validation-error">{publishError}</div>
 {/if}
 <div class="card-footer">
-	<button type="button" class="btn-back" onclick={prevStep} disabled={stepNumber() === 1}>
+	<button type="button" class="btn-back" onclick={prevStep}>
 		Back
 	</button>
 		<div class="footer-right">
