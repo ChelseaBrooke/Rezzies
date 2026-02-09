@@ -25,7 +25,6 @@ model Trip {
   pricingModel      String // "per_room" | "per_bed" | "per_person" | "per_person_per_night"
   inviteCode        String   @unique // Unique code for guests to access
   isPublished       Boolean  @default(false)
-  hostId            String? // AdminUser who created this trip
   timezone          String   @default("UTC")
   location          String?
 
@@ -42,7 +41,6 @@ model Trip {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  host                 AdminUser?            @relation(fields: [hostId], references: [id])
   rooms                Room[]
   reservations         Reservation[]
   members              TripMember[]
@@ -62,7 +60,6 @@ model Trip {
 
   @@index([inviteCode])
   @@index([isPublished])
-  @@index([hostId])
 }
 
 model Room {
@@ -170,19 +167,6 @@ model EmailLog {
   @@index([createdAt])
 }
 
-model AdminUser {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  trips Trip[] // Hosts can create multiple trips
-
-  @@index([email])
-}
-
-// Regular users (separate from AdminUser)
 model User {
   id           String   @id @default(uuid())
   email        String   @unique

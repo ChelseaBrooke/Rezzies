@@ -12,22 +12,31 @@ export const load: PageServerLoad = async ({ cookies }) => {
 	}
 
 	try {
-		const { ownedTrips, invitedTrips, allTrips } = await getUserTrips(user.id);
+		const [tripsResult, pendingInvites] = await Promise.all([
+			getUserTrips(user.id),
+			prisma.invite.findMany({
+				where: { recipientUserId: user.id, status: 'sent' },
+				include: { trip: { select: { name: true, id: true } } }
+			})
+		]);
+
+		const { ownedTrips, invitedTrips, allTrips } = tripsResult;
 
 		return {
 			user,
 			ownedTrips,
 			invitedTrips,
-			allTrips
+			allTrips,
+			pendingInvites
 		};
 	} catch (error) {
 		console.error('Error loading trips:', error);
-		// Return empty arrays if there's an error
 		return {
 			user,
 			ownedTrips: [],
 			invitedTrips: [],
-			allTrips: []
+			allTrips: [],
+			pendingInvites: []
 		};
 	}
 };

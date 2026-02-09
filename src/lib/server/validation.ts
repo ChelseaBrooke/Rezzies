@@ -17,14 +17,6 @@ export const guestSubmissionSchema = z.object({
 
 export type GuestSubmissionInput = z.infer<typeof guestSubmissionSchema>;
 
-// Admin login validation
-export const adminLoginSchema = z.object({
-	email: z.string().email('Invalid email address'),
-	password: z.string().min(1, 'Password is required')
-});
-
-export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
-
 // Trip creation validation
 export const tripCreationSchema = z.object({
 	name: z.string().min(1, 'Trip name is required').max(200),

@@ -1,9 +1,27 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	let invoiceModalOpen = $state($page.url.searchParams.get('invoice') === '1' && !!data.myInvoice);
+
+	function formatDate(iso: string) {
+		return new Date(iso).toLocaleDateString();
+	}
+
+	function triggerCsvDownload(csv: string, filename: string) {
+		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+		const url = window.URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		window.URL.revokeObjectURL(url);
+	}
 
 	const breakdown = $derived(
 		data.myInvoice?.breakdownJson
@@ -66,6 +84,88 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if data.canManageGuests}
+		<div class="card legacy-card">
+			<div class="card-body">
+				<div class="legacy-header">
+					<div>
+						<h3 class="section-title">Legacy bookings</h3>
+						<p class="legacy-hint">Bookings from the public trip link (before the RSVP flow). Read-only.</p>
+					</div>
+					{#if (data.legacyReservations?.length ?? 0) > 0}
+						<form
+							method="POST"
+							action="?/exportLegacyBookings"
+							use:enhance={async ({ result }) => {
+								if (result.type === 'success' && result.data?.exportLegacyCsv) {
+									triggerCsvDownload(result.data.exportLegacyCsv, result.data.exportLegacyFilename ?? 'legacy_bookings.csv');
+									await invalidateAll();
+								}
+							}}
+						>
+							<button type="submit" class="btn btn-secondary btn-small">Export CSV</button>
+						</form>
+					{/if}
+				</div>
+				{#if data.legacyStats && data.legacyStats.totalReservations > 0}
+					<div class="legacy-stats">
+						<span class="legacy-stat">Reservations: <strong>{data.legacyStats.totalReservations}</strong></span>
+						<span class="legacy-stat">Revenue: <strong>${data.legacyStats.totalRevenue.toFixed(2)}</strong></span>
+						<span class="legacy-stat">Nights: <strong>{data.legacyStats.totalNights}</strong></span>
+						<span class="legacy-stat">Avg: <strong>${data.legacyStats.averagePrice.toFixed(2)}</strong></span>
+					</div>
+				{/if}
+				{#if (data.legacyReservations?.length ?? 0) === 0}
+					<p class="empty">No legacy bookings for this trip.</p>
+				{:else}
+					<div class="table-wrap">
+						<table class="legacy-table">
+							<thead>
+								<tr>
+									<th>Name</th>
+									<th>Email</th>
+									<th>Room</th>
+									<th>Bed</th>
+									<th>Check-in</th>
+									<th>Check-out</th>
+									<th>Nights</th>
+									<th>Guests</th>
+									<th>Total</th>
+									<th>Submitted</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each data.legacyReservations ?? [] as r}
+									<tr>
+										<td>{r.name}</td>
+										<td>{r.email}</td>
+										<td>{r.roomName}</td>
+										<td>{r.bedType ? r.bedType.toUpperCase() : '—'}</td>
+										<td>{formatDate(r.checkInDate)}</td>
+										<td>{formatDate(r.checkOutDate)}</td>
+										<td>{r.nights}</td>
+										<td>{r.numberOfGuests}</td>
+										<td>${r.calculatedPrice.toFixed(2)}</td>
+										<td>{formatDate(r.submittedAt)}</td>
+									</tr>
+								{/each}
+							</tbody>
+							{#if data.legacyStats && data.legacyStats.totalReservations > 0}
+								<tfoot>
+									<tr class="total-row">
+										<td colspan="8"><strong>Total</strong></td>
+										<td><strong>${data.legacyStats.totalRevenue.toFixed(2)}</strong></td>
+										<td></td>
+									</tr>
+								</tfoot>
+							{/if}
+						</table>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <!-- Invoice modal -->
@@ -175,6 +275,19 @@
 	.btn-stub { padding: 0.25rem 0.5rem; font-size: 0.8125rem; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; transition: background var(--transition-fast); }
 	.btn-stub:hover { background: var(--surface); }
 	.empty { color: var(--muted); margin: 1rem 0 0 0; }
+
+	.legacy-card { margin-top: 1.5rem; }
+	.legacy-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+	.legacy-hint { font-size: 0.8125rem; color: var(--muted); margin: 0.25rem 0 0 0; }
+	.legacy-stats { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; font-size: 0.875rem; }
+	.legacy-stat { color: var(--muted); }
+	.legacy-stat strong { color: var(--text); }
+	.table-wrap { overflow-x: auto; }
+	.legacy-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+	.legacy-table th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); font-weight: 600; color: var(--muted); }
+	.legacy-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+	.legacy-table tbody tr:hover { background: var(--surface2); }
+	.legacy-table tfoot .total-row { background: var(--surface2); font-weight: 600; }
 
 	/* Modal */
 	.modal-backdrop {

@@ -13,8 +13,22 @@
 			<div class="page-header">
 				<h1 class="marketing-page-title">My Trips</h1>
 				<a href="/trips/new" class="header-cta">Host a Trip</a>
-			</div>
 		</div>
+	</div>
+
+		{#if data.pendingInvites?.length > 0}
+			<section class="marketing-card">
+				<h2 class="section-heading">Pending invites</h2>
+				<p class="section-hint">You’ve been invited to these trips. Open the link to accept.</p>
+				<ul class="pending-invites-list">
+					{#each data.pendingInvites as inv}
+						<li>
+							<a href="/invite/{inv.token}" class="pending-invite-link">{inv.trip.name}</a>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
 
 		{#if data.ownedTrips.length > 0}
 			<section class="marketing-card">
@@ -103,7 +117,7 @@
 			</section>
 		{/if}
 
-		{#if data.ownedTrips.length === 0 && data.invitedTrips.length === 0}
+		{#if data.ownedTrips.length === 0 && data.invitedTrips.length === 0 && (data.pendingInvites?.length ?? 0) === 0}
 			<div class="marketing-card empty-state">
 				<h2 class="section-heading">No trips yet</h2>
 				<p class="empty-text">Start by hosting your first trip!</p>
@@ -152,6 +166,27 @@
 		font-weight: 600;
 		color: #fffbf7;
 		margin: 0 0 1.25rem 0;
+	}
+	.section-hint {
+		font-size: 0.875rem;
+		color: rgba(255, 255, 255, 0.75);
+		margin: -0.5rem 0 1rem 0;
+	}
+	.pending-invites-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+	.pending-invites-list li {
+		margin-bottom: 0.5rem;
+	}
+	.pending-invite-link {
+		color: var(--copper, #e07d5a);
+		font-weight: 500;
+		text-decoration: none;
+	}
+	.pending-invite-link:hover {
+		text-decoration: underline;
 	}
 
 	.trips-grid {
