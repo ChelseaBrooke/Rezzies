@@ -55,7 +55,8 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 						recipient: { select: { id: true, name: true } }
 					}
 				},
-				tripActivities: { orderBy: { createdAt: 'desc' } }
+				tripActivities: { orderBy: { createdAt: 'desc' } },
+				extraCostRules: true
 			}
 		}),
 		Promise.resolve(membership),

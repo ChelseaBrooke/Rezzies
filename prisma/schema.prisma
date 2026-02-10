@@ -28,6 +28,19 @@ model Trip {
   timezone          String   @default("UTC")
   location          String?
 
+  // Trip info / house rules (editable on dashboard)
+  fullAddress       String?  // Full address for maps; auto-populated from creation address
+  locationCity      String?  // City name for hero display
+  checkInTime       String?
+  checkOutTime      String?
+  parkingNotes      String?
+  houseRules        String?
+  whatToBring       String?
+  petsAllowed       Boolean?
+  childrenAllowed   Boolean?
+  tripNotes         String?
+  tripInfoEditedAt  DateTime? // Set when user edits trip info section (for reminder)
+
   // New pricing fields
   expectedPeopleCount Int? // Expected number of people (for PER_PERSON mode)
   maxGuests           Int? // Max guests from property listing

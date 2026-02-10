@@ -1,6 +1,6 @@
+import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ parent }) => {
-	const parentData = await parent();
-	return { trip: parentData.trip };
+export const load: PageServerLoad = async ({ params }) => {
+	throw redirect(303, `/trips/${params.tripId}/itinerary?tab=activities`);
 };

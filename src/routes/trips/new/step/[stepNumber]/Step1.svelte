@@ -2,6 +2,8 @@
 	import FileUploadTile from '$lib/components/wizard/FileUploadTile.svelte';
 	import RoomBedPicker from '$lib/components/wizard/RoomBedPicker.svelte';
 	import AddressAutocomplete from '$lib/components/wizard/AddressAutocomplete.svelte';
+	import DateRangePicker from '$lib/components/wizard/DateRangePicker.svelte';
+	import SingleDatePicker from '$lib/components/wizard/SingleDatePicker.svelte';
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 	import { tripDraft } from '$lib/stores/tripDraft.js';
 	
@@ -31,19 +33,20 @@
 	function handleAddressSelect(address: string, details?: any) {
 		// draft.destinationCity is already updated via bind:value
 		if (details && details.address_components) {
-			// Extract city, state, country from address components
 			const components = details.address_components;
+			let city = '';
 			let state = '';
 			let country = '';
-			
 			components.forEach((component: any) => {
-				if (component.types.includes('administrative_area_level_1')) {
+				if (component.types.includes('locality')) {
+					city = component.long_name;
+				} else if (component.types.includes('administrative_area_level_1')) {
 					state = component.short_name;
 				} else if (component.types.includes('country')) {
 					country = component.long_name;
 				}
 			});
-			
+			draft.locationCity = city;
 			draft.destinationState = state;
 			draft.destinationCountry = country;
 		}
@@ -95,51 +98,42 @@
 			</div>
 			
 			<div class="form-section date-group">
-				<div class="date-input-wrapper">
-					<label for="checkInDate" class="form-label">Check-in Date *</label>
-					<input
-						type="date"
-						id="checkInDate"
-						class="form-input date-input"
-						bind:value={draft.checkInDate}
-						oninput={autosave}
-						required
+				<div class="trip-dates-wrapper">
+					<label class="form-label">Trip Dates *</label>
+					<DateRangePicker
+						checkInDate={draft.checkInDate ?? ''}
+						checkOutDate={draft.checkOutDate ?? ''}
+						onRangeChange={(checkIn, checkOut) => {
+							draft.checkInDate = checkIn;
+							draft.checkOutDate = checkOut;
+							autosave();
+						}}
 					/>
-				</div>
-				<div class="date-input-wrapper">
-					<label for="checkOutDate" class="form-label">Check-out Date *</label>
-					<input
-						type="date"
-						id="checkOutDate"
-						class="form-input date-input"
-						bind:value={draft.checkOutDate}
-						oninput={autosave}
-						required
-					/>
+					<div class="flexible-dates-wrapper">
+						<label class="checkbox-label-small">
+							<input
+								type="checkbox"
+								bind:checked={draft.flexibleDates}
+								onchange={autosave}
+							/>
+							<span class="flexible-dates-text">Flexible dates allowed</span>
+							<div class="tooltip-container">
+								<span class="tooltip-icon">i</span>
+								<span class="tooltip-text">Allow your guests to select dates for a partial stay</span>
+							</div>
+						</label>
+					</div>
 				</div>
 				<div class="date-input-wrapper rsvp-by-wrapper">
 					<label for="rsvpByDate" class="form-label">RSVP-by Date (optional)</label>
-					<input
-						type="date"
-						id="rsvpByDate"
-						class="form-input date-input"
-						bind:value={draft.rsvpByDate}
-						oninput={autosave}
+					<SingleDatePicker
+						value={draft.rsvpByDate ?? ''}
+						onDateChange={(date) => {
+							draft.rsvpByDate = date;
+							autosave();
+						}}
+						placeholder="Select date"
 					/>
-				</div>
-				<div class="flexible-dates-wrapper">
-					<label class="checkbox-label-small">
-						<input
-							type="checkbox"
-							bind:checked={draft.flexibleDates}
-							onchange={autosave}
-						/>
-						<span class="flexible-dates-text">Flexible dates allowed</span>
-						<div class="tooltip-container">
-							<span class="tooltip-icon">i</span>
-							<span class="tooltip-text">Allow your guests to select dates for a partial stay</span>
-						</div>
-					</label>
 				</div>
 			</div>
 			
@@ -357,35 +351,34 @@
 	
 	.date-group {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
-		grid-template-rows: auto auto;
-		gap: 0.75rem;
-		align-items: end;
-		position: relative;
+		grid-template-columns: 1fr auto;
+		gap: 1rem;
+		align-items: start;
+	}
+
+	.trip-dates-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	.trip-dates-wrapper .form-label {
+		margin-bottom: 0;
 	}
 
 	.rsvp-by-wrapper {
-		grid-column: 1;
-		grid-row: 2;
+		min-width: 140px;
 	}
-	
+
 	.date-input-wrapper {
 		display: flex;
 		flex-direction: column;
 		gap: 0.2rem;
 	}
-	
-	.date-input {
-		min-width: 0;
-	}
-	
+
 	.flexible-dates-wrapper {
-		grid-column: 2;
-		grid-row: 2;
 		display: flex;
 		align-items: center;
-		justify-content: flex-end;
-		margin-top: 0.25rem;
 	}
 	
 	.checkbox-label-small {
@@ -774,6 +767,10 @@
 		
 		.date-group {
 			grid-template-columns: 1fr;
+		}
+
+		.rsvp-by-wrapper {
+			min-width: 0;
 		}
 	}
 </style>

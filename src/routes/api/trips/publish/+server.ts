@@ -39,6 +39,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	const description = typeof d.description === 'string' ? d.description : null;
 	const listingUrl = typeof d.listingUrl === 'string' ? d.listingUrl : null;
 	const propertyAddress = typeof d.propertyAddress === 'string' ? d.propertyAddress : null;
+	const locationCity = typeof d.locationCity === 'string' ? d.locationCity.trim() || null : null;
 	const coverPhoto = typeof d.coverPhoto === 'string' ? d.coverPhoto : null;
 	const pricingModel = mapPricingModel(typeof d.pricingModel === 'string' ? d.pricingModel : 'per-person');
 	const expectedGuestCount = typeof d.expectedGuestCount === 'number' ? d.expectedGuestCount : null;
@@ -111,7 +112,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				maxGuests: maxOccupancy,
 				allowPartialStays: partialStayAllowed,
 				timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-				location: propertyAddress || null
+				location: propertyAddress || null,
+				fullAddress: propertyAddress || null,
+				locationCity: locationCity || null
 			}
 		});
 

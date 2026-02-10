@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DashboardCard from './DashboardCard.svelte';
-	import TripGoals from '$lib/components/trips/TripGoals.svelte';
+	import TripGoalsCombined from './TripGoalsCombined.svelte';
+	import TripInfoCard from './TripInfoCard.svelte';
 	import Checklist from './Checklist.svelte';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
@@ -25,9 +26,6 @@
 		rsvps: Array<{ status: string; user?: { name: string | null } | null; arrivalDatetime?: string | null }>;
 		guestPreviewList: Array<{ user?: { id: string; name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
 		pendingRsvpCount: number;
-		recentActivityItems: Array<{ text: string }>;
-		/** Full list for "View activity log" modal (date desc) */
-		allActivityItems?: Array<{ text: string; at: string }>;
 		userRsvp?: { status?: string; arrivalDatetime?: string | null } | null;
 		userProfile?: { dietaryRestrictions?: string | null; allergies?: string | null } | null;
 		myAssignment?: { room?: { name: string | null } | null } | null;
@@ -53,6 +51,20 @@
 		showToast?: (msg: string) => void;
 		/** Checklist stats for role-based checklists */
 		checklistStats: ChecklistStats;
+		/** Trip info for TripInfoCard */
+		tripDescription?: string | null;
+		extraCostRules?: Array<{ label: string; amount: number; type: string }>;
+		itineraryHref?: string;
+		tripInfo?: {
+			description?: string | null;
+			checkInTime?: string | null;
+			checkOutTime?: string | null;
+			fullAddress?: string | null;
+			parkingNotes?: string | null;
+			houseRules?: string | null;
+			tripInfoEditedAt?: Date | string | null;
+		};
+		tripInfoEdited?: boolean;
 	}
 
 	let {
@@ -63,8 +75,6 @@
 		rsvps,
 		guestPreviewList,
 		pendingRsvpCount,
-		recentActivityItems,
-		allActivityItems = [],
 		userRsvp,
 		userProfile,
 		myAssignment,
@@ -87,7 +97,12 @@
 		nudgePending,
 		inviteCode,
 		showToast,
-		checklistStats
+		checklistStats,
+		tripDescription = null,
+		extraCostRules = [],
+		itineraryHref = '',
+		tripInfo = {},
+		tripInfoEdited = false
 	}: Props = $props();
 
 	function initials(name: string | null | undefined, email?: string | null): string {
@@ -104,36 +119,6 @@
 	const hasMissingDietary = $derived(!userProfile?.dietaryRestrictions && !userProfile?.allergies);
 	const hasMissingArrival = $derived(!userRsvp?.arrivalDatetime && userRsvp?.status === 'yes');
 
-	let showActivityLogModal = $state(false);
-	function openActivityLog() {
-		showActivityLogModal = true;
-	}
-	function closeActivityLog() {
-		showActivityLogModal = false;
-	}
-	/** Sorted date desc (newest first) for display */
-	const sortedActivityForModal = $derived(
-		[...allActivityItems].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
-	);
-	function formatActivityDate(iso: string): string {
-		const d = new Date(iso);
-		return d.toLocaleDateString(undefined, {
-			month: 'short',
-			day: 'numeric',
-			year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
-			hour: 'numeric',
-			minute: '2-digit'
-		});
-	}
-
-	$effect(() => {
-		if (!showActivityLogModal) return;
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') closeActivityLog();
-		};
-		window.addEventListener('keydown', onKey);
-		return () => window.removeEventListener('keydown', onKey);
-	});
 </script>
 
 <div class="dashboard-wrapper">
@@ -167,67 +152,45 @@
 			</div>
 		</div>
 
-		<div class="goals-cell">
+		<div class="goals-cell" id="trip-info">
 			<div class="goals-card-wrap">
 				<DashboardCard>
-					<TripGoals
-						{rsvpCurrent}
-						{rsvpTotal}
-						{rsvpPct}
-						{bedsCurrent}
-						{bedsTotal}
-						{bedsPct}
-						{fundingCurrent}
-						{fundingTotal}
-						{fundingPct}
-						{fundingDisplay}
-						{guestsHref}
-						{roomsHref}
-						{paymentsHref}
+					<TripInfoCard
+						isHost={isHost}
+						tripId={tripId}
+						description={tripInfo?.description ?? tripDescription}
+						checkInTime={tripInfo?.checkInTime}
+						checkOutTime={tripInfo?.checkOutTime}
+						fullAddress={tripInfo?.fullAddress}
+						parkingNotes={tripInfo?.parkingNotes}
+						houseRules={tripInfo?.houseRules}
+						{extraCostRules}
+						itineraryHref={itineraryHref}
+						showToast={showToast}
 					/>
 				</DashboardCard>
 			</div>
 		</div>
 
 		<div class="recent-cell">
-			<DashboardCard title="Recent activity" cta={{ label: 'View activity log', onClick: openActivityLog }}>
-				{#if recentActivityItems.length > 0}
-					<ul class="activity-list">
-						{#each recentActivityItems as item}
-							<li class="activity-item">{item.text}</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="muted">No recent activity</p>
-				{/if}
+			<DashboardCard>
+				<TripGoalsCombined
+					{rsvpCurrent}
+					{rsvpTotal}
+					{rsvpPct}
+					{bedsCurrent}
+					{bedsTotal}
+					{bedsPct}
+					{fundingCurrent}
+					{fundingTotal}
+					{fundingPct}
+					{fundingDisplay}
+					{guestsHref}
+					{roomsHref}
+					{paymentsHref}
+				/>
 			</DashboardCard>
 		</div>
-
-		<!-- Activity log modal -->
-		{#if showActivityLogModal}
-			<div class="activity-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="activity-log-title" onclick={closeActivityLog}>
-				<div class="activity-modal" onclick={(e) => e.stopPropagation()}>
-					<div class="activity-modal-header">
-						<h2 id="activity-log-title" class="activity-modal-title">Activity log</h2>
-						<button type="button" class="activity-modal-close" onclick={closeActivityLog} aria-label="Close">×</button>
-					</div>
-					<div class="activity-modal-body">
-						{#if sortedActivityForModal.length > 0}
-							<ul class="activity-log-list">
-								{#each sortedActivityForModal as item}
-									<li class="activity-log-item">
-										<span class="activity-log-date">{formatActivityDate(item.at)}</span>
-										<span class="activity-log-text">{item.text}</span>
-									</li>
-								{/each}
-							</ul>
-						{:else}
-							<p class="muted">No activity yet</p>
-						{/if}
-					</div>
-				</div>
-			</div>
-		{/if}
 
 		<div class="guests-row">
 			<div class="guests-card-wrapper">
@@ -281,9 +244,9 @@
 
 	/*
 	 * LAYOUT RULES (keep when changing styles):
-	 * - Row 1: Reminders (col 1) | Trip goals (col 3) | Recent activity (col 5). Reminders and goals MUST line up: row height = sticky card height, goals cell stretches to match.
-	 * - Row 2: Guests ONLY under Reminders + Goals (grid-column 1/4). Guests sit directly underneath with a small gap (margin-top). Do not span guests under Recent.
-	 * - Recent activity stays in its own column, row 1–3; it does not affect reminders/goals/guests alignment.
+	 * - Row 1: Reminders (col 1) | Trip info (col 3) | Trip goals (col 5). Reminders and goals MUST line up: row height = sticky card height, middle cell stretches to match.
+	 * - Row 2: Guests ONLY under Reminders + Trip info (grid-column 1/4). Guests sit directly underneath with a small gap (margin-top). Do not span guests under Trip goals.
+	 * - Trip goals stays in its own column, row 1–3; it does not affect reminders/trip info/guests alignment.
 	 */
 	.dashboard-layout {
 		display: grid;
@@ -321,7 +284,7 @@
 		margin-top: -1rem;
 	}
 
-	/* Recent activity: 50% of full span height (320px) */
+	/* Trip goals combined: right column (320px) */
 	.recent-cell {
 		grid-column: 5;
 		grid-row: 1 / 3;
@@ -355,7 +318,7 @@
 		max-height: 88px;
 	}
 
-	/* Trip goals: no background */
+	/* Trip info card: transparent styling to match former goals */
 	.goals-card-wrap {
 		min-width: 0;
 	}
@@ -371,12 +334,7 @@
 		box-shadow: none;
 	}
 
-	.goals-card-wrap :global(.goal-card) {
-		background: transparent;
-		box-shadow: none;
-	}
-
-	/* Trip goals: fill cell height (same as sticky); boxes end where sticky ends */
+	/* Trip info: fill cell height (same as sticky) */
 	.goals-cell :global(.dashboard-card) {
 		height: 100%;
 		min-height: 0;
@@ -391,49 +349,7 @@
 		display: flex;
 		flex-direction: column;
 	}
-	.goals-cell :global(.viz) {
-		flex: 1;
-		min-height: 0;
-		display: flex;
-		flex-direction: column;
-	}
-	.goals-cell :global(.viz-grid) {
-		flex: 1;
-		gap: 1rem;
-		align-items: stretch;
-		min-height: 0;
-	}
-	.goals-cell :global(.viz-card) {
-		padding: 1.8rem 0.75rem;
-		min-height: 0;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-	}
-	.goals-cell :global(.viz-title) {
-		margin-bottom: 1.1rem;
-		flex-shrink: 0;
-	}
-	.goals-cell :global(.card-gauge) {
-		margin-bottom: 0.95rem;
-		width: 87px;
-		height: 64px;
-		flex-shrink: 0;
-	}
-	.goals-cell :global(.card-gauge .gauge-svg) {
-		width: 87px;
-		height: 64px;
-	}
-	.goals-cell :global(.card-metric) {
-		font-size: 1rem;
-	}
-	.goals-cell :global(.card-label),
-	.goals-cell :global(.card-cta),
-	.goals-cell :global(.card-done) {
-		font-size: 0.6875rem;
-	}
-
-	/* Recent activity card: fill cell (320px); more space below title, subtle list */
+	/* Trip goals combined: fill cell (320px) */
 	.recent-cell :global(.dashboard-card) {
 		height: 100%;
 		min-height: 320px;
@@ -443,10 +359,6 @@
 	.recent-cell :global(.dashboard-card .card-body) {
 		flex: 1;
 		min-height: 0;
-		padding-top: 0.875rem;
-	}
-	.recent-cell :global(.card-cta .cta-link) {
-		font-size: 0.7rem;
 	}
 
 	/* Reminders tall: fills row and overlaps hero (400px visible + 10rem overlap) */
@@ -737,116 +649,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
-	}
-
-	.activity-list {
-		list-style: none;
-		margin: 0;
-		padding: 0 0 0 0.5rem;
-		font-size: 0.75rem;
-		color: var(--muted);
-		line-height: 1.45;
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-		font-weight: 400;
-		border-left: 2px solid var(--border-soft);
-	}
-
-	.activity-item {
-		padding: 0.125rem 0;
-	}
-
-	/* Activity log modal */
-	.activity-modal-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 1000;
-		background: rgba(0, 0, 0, 0.4);
-		backdrop-filter: blur(4px);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1.5rem;
-	}
-
-	.activity-modal {
-		background: var(--surfaceSolid);
-		border-radius: var(--radius-2xl);
-		box-shadow: var(--shadow-lg);
-		border: 1px solid var(--border-soft);
-		max-width: 480px;
-		width: 100%;
-		max-height: 80vh;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.activity-modal-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 1rem 1.25rem;
-		border-bottom: 1px solid var(--border-soft);
-		flex-shrink: 0;
-	}
-
-	.activity-modal-title {
-		margin: 0;
-		font-size: 1.125rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-
-	.activity-modal-close {
-		background: none;
-		border: none;
-		font-size: 1.5rem;
-		line-height: 1;
-		color: var(--muted);
-		cursor: pointer;
-		padding: 0.25rem;
-		border-radius: var(--radius-md);
-		transition: color var(--transition-fast), background var(--transition-fast);
-	}
-
-	.activity-modal-close:hover {
-		color: var(--text);
-		background: var(--surface2);
-	}
-
-	.activity-modal-body {
-		padding: 1rem 1.25rem;
-		overflow-y: auto;
-		min-height: 0;
-	}
-
-	.activity-log-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-	}
-
-	.activity-log-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		padding: 0.625rem 0;
-		border-bottom: 1px solid var(--border-soft);
-		font-size: 0.875rem;
-	}
-
-	.activity-log-item:last-child {
-		border-bottom: none;
-	}
-
-	.activity-log-date {
-		font-size: 0.75rem;
-		color: var(--muted);
-	}
-
-	.activity-log-text {
-		color: var(--text);
 	}
 
 	.muted {

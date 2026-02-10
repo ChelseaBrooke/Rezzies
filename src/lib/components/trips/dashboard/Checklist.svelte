@@ -11,6 +11,7 @@
 		current_user_rsvp_status?: string | null;
 		guest_meals_contributed?: number;
 		guest_activities_contributed?: number;
+		trip_info_edited?: boolean;
 	}
 
 	interface Props {
@@ -62,7 +63,16 @@
 			isComplete: activitiesTotal >= 1
 		});
 
-		// 5. Finalize trip details
+		// 5. Add trip info / house rules
+		const tripInfoEdited = computedStats.trip_info_edited ?? false;
+		items.push({
+			key: 'host_add_trip_info',
+			label: 'Add trip info / house rules',
+			href: `/trips/${tripId}#trip-info`,
+			isComplete: tripInfoEdited
+		});
+
+		// 6. Finalize trip details
 		const missingCount = computedStats.missing_trip_details_count ?? 0;
 		const missingSummary = computedStats.missing_trip_details_summary ?? 'complete';
 		items.push({

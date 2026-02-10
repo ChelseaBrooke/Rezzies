@@ -7,6 +7,8 @@
 			id: string;
 			name: string | null;
 			location: string | null;
+			locationCity?: string | null;
+			fullAddress?: string | null;
 			listingCoverPhoto: string | null;
 		};
 		dateRange: string;
@@ -81,14 +83,14 @@
 							<span>{dateRange}</span>
 						</span>
 					{/if}
-					{#if trip.location?.trim()}
+					{#if (trip.locationCity ?? trip.location)?.trim()}
 						{#if mapsUrl}
 							<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Open in Google Maps">
 								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 									<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
 									<circle cx="12" cy="10" r="3"></circle>
 								</svg>
-								<span>{trip.location}</span>
+								<span>{trip.locationCity ?? trip.location}</span>
 							</a>
 						{:else}
 							<span class="hero-meta-text">
@@ -96,7 +98,7 @@
 									<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
 									<circle cx="12" cy="10" r="3"></circle>
 								</svg>
-								<span>{trip.location}</span>
+								<span>{trip.locationCity ?? trip.location}</span>
 							</span>
 						{/if}
 					{/if}

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import AddressAutocomplete from '$lib/components/wizard/AddressAutocomplete.svelte';
+	import DateRangePicker from '$lib/components/wizard/DateRangePicker.svelte';
+	import SingleDatePicker from '$lib/components/wizard/SingleDatePicker.svelte';
 
 	interface Props {
 		formData: {
@@ -60,24 +62,16 @@
 	</div>
 	
 	<div class="form-section">
-		<label class="form-label">Dates</label>
-		<div class="inline-fields">
-			<input
-				type="date"
-				id="checkInDate"
-				class="form-input"
-				bind:value={formData.checkInDate}
-				required
-			/>
-			<span class="field-separator">to</span>
-			<input
-				type="date"
-				id="checkOutDate"
-				class="form-input"
-				bind:value={formData.checkOutDate}
-				required
-			/>
-		</div>
+		<label class="form-label">Trip Dates *</label>
+		<DateRangePicker
+			checkInDate={formData.checkInDate}
+			checkOutDate={formData.checkOutDate}
+			onRangeChange={(checkIn, checkOut) => {
+				formData.checkInDate = checkIn;
+				formData.checkOutDate = checkOut;
+			}}
+			placeholder="Select trip dates"
+		/>
 		{#if numberOfNights > 0}
 			<p class="helper-text">{numberOfNights} night{numberOfNights !== 1 ? 's' : ''}</p>
 		{/if}
@@ -85,11 +79,10 @@
 	
 	<div class="form-section">
 		<label for="rsvpByDate" class="form-label">RSVP-by Date (optional)</label>
-		<input
-			type="date"
-			id="rsvpByDate"
-			class="form-input"
-			bind:value={formData.rsvpByDate}
+		<SingleDatePicker
+			value={formData.rsvpByDate}
+			onDateChange={(date) => { formData.rsvpByDate = date; }}
+			placeholder="Select date"
 		/>
 	</div>
 	
@@ -172,17 +165,6 @@
 	.form-textarea {
 		resize: vertical;
 		min-height: 100px;
-	}
-
-	.inline-fields {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.field-separator {
-		color: var(--muted);
-		font-size: 0.875rem;
 	}
 
 	.helper-text {

@@ -212,8 +212,8 @@
 					{/if}
 				{/if}
 				<div class="day-detail-ctas">
-					<a href={tripId ? `/trips/${tripId}/activities` : '#'} class="day-detail-cta">Add activity</a>
-					<a href={tripId ? `/trips/${tripId}/meals` : '#'} class="day-detail-cta">Add meal</a>
+					<a href={tripId ? `/trips/${tripId}/itinerary?tab=activities` : '#'} class="day-detail-cta">Add activity</a>
+					<a href={tripId ? `/trips/${tripId}/itinerary?tab=meals` : '#'} class="day-detail-cta">Add meal</a>
 				</div>
 			</div>
 		{:else if sidebarMonth}

@@ -6,8 +6,15 @@
 	import pokeIcon from '$lib/assets/images/poke.png';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
+	import ActivityLogModal from '$lib/components/trips/dashboard/ActivityLogModal.svelte';
+	import { buildTripActivityLog } from '$lib/trip-activity-log.js';
 
 	let { data }: { data: PageData } = $props();
+
+	const allActivityItems = $derived(
+		buildTripActivityLog(data.trip ?? null).map((item) => ({ text: item.text, at: item.at.toISOString() }))
+	);
+	let showActivityLog = $state(false);
 
 	let inviteOpen = $state(false);
 	let inviteName = $state('');
@@ -287,6 +294,7 @@
 	<div class="page-header">
 		<div class="header-top">
 			<h1>Guests</h1>
+			<button type="button" class="btn-secondary" onclick={() => (showActivityLog = true)}>Recent activity</button>
 		</div>
 
 		<!-- RSVP visual: stacked bar -->
@@ -760,6 +768,12 @@
 		</form>
 	</div>
 {/if}
+
+<ActivityLogModal
+	open={showActivityLog}
+	items={allActivityItems}
+	onClose={() => (showActivityLog = false)}
+/>
 
 <style>
 	.page { padding: 0; }

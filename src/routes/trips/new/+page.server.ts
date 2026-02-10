@@ -107,7 +107,9 @@ export const actions: Actions = {
 					data: {
 						name: data.name,
 						description: data.description || null,
-						location: data.location || null,
+						location: data.location || data.destination || null,
+						fullAddress: data.fullAddress || data.location || data.destination || null,
+						locationCity: data.locationCity?.trim() || null,
 						listingUrl: data.listingUrl || null,
 						listingTitle: data.listingTitle || null,
 						listingCoverPhoto: data.coverPhoto || null,

@@ -134,6 +134,7 @@ export interface TripDraft {
 	destinationCity: string;
 	destinationState: string;
 	destinationCountry: string;
+	locationCity: string; // City for hero display (extracted from address)
 	propertyAddress: string;
 	checkInDate: string;
 	checkOutDate: string;
@@ -222,6 +223,7 @@ const defaultDraft: TripDraft = {
 	destinationCity: '',
 	destinationState: '',
 	destinationCountry: '',
+	locationCity: '',
 	propertyAddress: '',
 	checkInDate: '',
 	checkOutDate: '',
@@ -343,6 +345,7 @@ export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
 		coverPhoto: trip.listingCoverPhoto ?? '',
 		galleryPhotos: trip.listingCoverPhoto ? [trip.listingCoverPhoto] : [],
 		destinationCity: trip.location ?? '',
+		locationCity: (trip as { locationCity?: string | null }).locationCity ?? '',
 		propertyAddress: trip.location ?? '',
 		checkInDate: toYmd(trip.checkInDate),
 		checkOutDate: toYmd(trip.checkOutDate),

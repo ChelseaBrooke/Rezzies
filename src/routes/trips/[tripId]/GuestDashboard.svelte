@@ -4,7 +4,6 @@
 	import type { PageData } from './$types';
 	import TripHero from '$lib/components/trips/dashboard/TripHero.svelte';
 	import TripDashboardGrid from '$lib/components/trips/dashboard/TripDashboardGrid.svelte';
-	import { buildTripActivityLog } from '$lib/trip-activity-log.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -50,14 +49,6 @@
 		userInvoices.filter((i) => i.status === 'due').reduce((s, i) => s + i.totalAmount, 0)
 	);
 
-	const allActivityEntries = $derived(buildTripActivityLog(trip));
-	const allActivityItems = $derived(
-		allActivityEntries.map((item) => ({ text: item.text, at: item.at.toISOString() }))
-	);
-	const recentActivityItems = $derived(
-		allActivityEntries.slice(0, 8).map((item) => ({ text: item.text }))
-	);
-
 	const nextUpcomingItem = $derived(
 		activities.slice().sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]
 	);
@@ -94,12 +85,11 @@
 		return `https://www.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${startStr}/${endStr}`;
 	});
 
-	/** Google Maps search URL for destination. */
-	const mapsUrl = $derived(
-		trip?.location?.trim()
-			? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trip.location)}`
-			: null
-	);
+	/** Google Maps search URL for destination (full address when available). */
+	const mapsUrl = $derived.by(() => {
+		const addr = (trip?.fullAddress ?? trip?.location)?.trim();
+		return addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}` : null;
+	});
 
 	const tripInfoContent = $derived(
 		'Check-in is 4pm. Keys at the lockbox — code in your confirmation.\n\n' +
@@ -135,6 +125,8 @@
 				id: trip.id,
 				name: trip.name,
 				location: trip.location,
+				locationCity: trip.locationCity,
+				fullAddress: trip.fullAddress,
 				listingCoverPhoto: trip.listingCoverPhoto
 			}}
 			{dateRange}
@@ -163,8 +155,6 @@
 			{rsvps}
 			{guestPreviewList}
 			{pendingRsvpCount}
-			{recentActivityItems}
-			{allActivityItems}
 			{userRsvp}
 			{userProfile}
 			{myAssignment}
@@ -185,5 +175,16 @@
 			roomsHref="/trips/{trip.id}/rooms"
 			paymentsHref="/trips/{trip.id}/payments"
 			{checklistStats}
+			tripDescription={trip?.description ?? null}
+			extraCostRules={trip?.extraCostRules ?? []}
+			itineraryHref={trip ? `/trips/${trip.id}/itinerary` : ''}
+			tripInfo={{
+				description: trip?.description,
+				checkInTime: trip?.checkInTime,
+				checkOutTime: trip?.checkOutTime,
+				fullAddress: trip?.fullAddress ?? trip?.location,
+				parkingNotes: trip?.parkingNotes,
+				houseRules: trip?.houseRules
+			}}
 		/>
 {/if}

@@ -104,7 +104,8 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 				expectedPeopleCount: expectedGuestCount,
 				maxGuests: maxOccupancy,
 				allowPartialStays: partialStayAllowed,
-				location: propertyAddress || null
+				location: propertyAddress || null,
+				fullAddress: propertyAddress || null
 			}
 		});
 
