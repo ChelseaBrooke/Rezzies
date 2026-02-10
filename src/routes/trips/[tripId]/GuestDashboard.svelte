@@ -34,6 +34,10 @@
 	const claimedSlots = $derived(roomAssignments.reduce((sum, a) => sum + (a.partySize ?? 1), 0));
 	const bedsPct = $derived(totalBedSlots > 0 ? Math.round((claimedSlots / totalBedSlots) * 100) : 0);
 
+	const roomsTotal = $derived(rooms.length);
+	const roomsFilled = $derived(new Set(roomAssignments.map((a) => a.roomId)).size);
+	const roomsPct = $derived(roomsTotal > 0 ? Math.round((roomsFilled / roomsTotal) * 100) : 0);
+
 	const committedFunds = $derived(
 		(trip?.invoices ?? []).reduce((s, i) => s + (i.status === 'paid' ? i.totalAmount : 0), 0)
 	);
@@ -167,6 +171,9 @@
 			bedsCurrent={claimedSlots}
 			bedsTotal={totalBedSlots}
 			{bedsPct}
+			roomsFilled={roomsFilled}
+			roomsTotal={roomsTotal}
+			roomsPct={roomsPct}
 			fundingCurrent={Math.round(committedFunds)}
 			fundingTotal={Math.round(totalCost)}
 			{fundingPct}

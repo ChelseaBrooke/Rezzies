@@ -48,6 +48,14 @@
 		const idsToSubmit = [...selectedBedIdsForEdit];
 		openBedsUserId = null;
 		if (!userId) return;
+
+		if (idsToSubmit.length === 0) {
+			// Use the dedicated clear form when unchecking all beds—more reliable than empty bedIds
+			const clearForm = document.querySelector<HTMLFormElement>(`form.clear-beds-form[data-clear-user-id="${userId}"]`);
+			if (clearForm) clearForm.requestSubmit();
+			return;
+		}
+
 		const form = document.querySelector<HTMLFormElement>(`form.beds-form[data-beds-user-id="${userId}"]`);
 		if (!form) return;
 		const container = form.querySelector('[data-bedids-container]');
@@ -61,7 +69,7 @@
 				container.appendChild(input);
 			}
 		}
-		setTimeout(() => form.requestSubmit(), 0);
+		form.requestSubmit();
 	}
 	function toggleBedForEdit(bedId: string) {
 		if (selectedBedIdsForEdit.includes(bedId)) {
@@ -605,7 +613,7 @@
 													{/each}
 												</select>
 											</form>
-											<form method="POST" action="?/assignBeds" class="clear-beds-form" use:enhance={() => invalidateAll()} style="display: none;">
+											<form method="POST" action="?/assignBeds" class="clear-beds-form" data-clear-user-id={row.userId ?? ''} use:enhance={() => invalidateAll()} style="display: none;">
 												<input type="hidden" name="userId" value={row.userId ?? ''} />
 											</form>
 										</div>

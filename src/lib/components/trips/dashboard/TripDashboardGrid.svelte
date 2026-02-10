@@ -39,6 +39,9 @@
 		bedsCurrent: number;
 		bedsTotal: number;
 		bedsPct: number;
+		roomsFilled?: number;
+		roomsTotal?: number;
+		roomsPct?: number;
 		fundingCurrent: number;
 		fundingTotal: number;
 		fundingPct: number;
@@ -87,6 +90,9 @@
 		bedsCurrent,
 		bedsTotal,
 		bedsPct,
+		roomsFilled = 0,
+		roomsTotal = 0,
+		roomsPct = 0,
 		fundingCurrent,
 		fundingTotal,
 		fundingPct,
@@ -136,6 +142,9 @@
 			Nudge pending
 		</button>
 	{/snippet}
+	{#snippet progressViewDetailButton()}
+		<a href={`/trips/${tripId}/guests`} class="view-detail-btn">View Detail</a>
+	{/snippet}
 	<!-- Layout: row1 = reminders | goals | recent, row2 = guests under reminders + goals only -->
 	<div class="dashboard-layout">
 		<div class="left-column">
@@ -173,7 +182,10 @@
 		</div>
 
 		<div class="recent-cell">
-			<DashboardCard>
+			<DashboardCard
+				title="Progress"
+				headerRight={progressViewDetailButton}
+			>
 				<TripGoalsCombined
 					{rsvpCurrent}
 					{rsvpTotal}
@@ -181,6 +193,9 @@
 					{bedsCurrent}
 					{bedsTotal}
 					{bedsPct}
+					{roomsFilled}
+					{roomsTotal}
+					{roomsPct}
 					{fundingCurrent}
 					{fundingTotal}
 					{fundingPct}
@@ -595,6 +610,25 @@
 
 	.pill-btn-text:hover {
 		text-decoration: underline;
+	}
+
+	.view-detail-btn {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.3rem 0.6rem;
+		border-radius: var(--radius-md);
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-decoration: none;
+		color: var(--text);
+		background: rgba(0, 0, 0, 0.05);
+		border: 1px solid var(--border-soft);
+		transition: all var(--transition-fast);
+	}
+
+	.view-detail-btn:hover {
+		background: rgba(0, 0, 0, 0.08);
+		border-color: var(--muted);
 	}
 
 	.for-you-row {
