@@ -26,7 +26,7 @@
 	let addManualEmail = $state('');
 	let addManualError = $state('');
 	let searchQuery = $state('');
-	let filterRsvp = $state<'all' | 'yes' | 'no' | 'no-response'>('all');
+	let filterRsvp = $state<'all' | 'yes' | 'no' | 'no-response' | 'reconfirm'>('all');
 	let filterAssignment = $state<'all' | 'assigned' | 'unassigned'>('all');
 	let filterDietary = $state<'all' | 'has-flags'>('all');
 	let sortBy = $state<'name' | 'rsvp' | 'party-size'>('name');
@@ -225,6 +225,7 @@
 		if (filterRsvp === 'yes') rows = rows.filter((r) => r.rsvpStatus === 'yes');
 		else if (filterRsvp === 'no') rows = rows.filter((r) => r.rsvpStatus === 'no');
 		else if (filterRsvp === 'no-response') rows = rows.filter((r) => r.rsvpStatus !== 'yes' && r.rsvpStatus !== 'no');
+		else if (filterRsvp === 'reconfirm') rows = rows.filter((r) => r.rsvpStatus === 'yes' && r.yesSubstatus === 'reconfirm_required');
 		if (filterAssignment === 'assigned') rows = rows.filter((r) => (r.assignedBedIds?.length ?? 0) > 0);
 		else if (filterAssignment === 'unassigned') rows = rows.filter((r) => r.type === 'member' && (r.assignedBedIds?.length ?? 0) === 0);
 		if (filterDietary === 'has-flags') rows = rows.filter((r) => r.hasDietaryFlags);
@@ -368,6 +369,7 @@
 					<option value="yes">Going</option>
 					<option value="no">Not going</option>
 					<option value="no-response">No response</option>
+					<option value="reconfirm">Needs reconfirmation</option>
 				</select>
 			</div>
 			<div class="filter-group">
@@ -497,9 +499,17 @@
 										{/if}
 									{:else}
 										<span class="status-pill status-{row.rsvpStatus ?? 'pending'}">
-											{row.rsvpStatus === 'yes' ? 'Going' : row.rsvpStatus === 'no' ? 'Not going' : row.rsvpStatus === 'maybe' ? 'Maybe' : 'No response'}
+											{row.rsvpStatus === 'yes'
+												? (row.yesSubstatus === 'confirmed' ? 'Going (Confirmed)' : 'Going (Reconfirm required)')
+												: row.rsvpStatus === 'no'
+													? 'Not going'
+													: row.rsvpStatus === 'maybe'
+														? 'Maybe'
+														: 'No response'}
 										</span>
-										{#if row.rsvpUpdatedAt}
+										{#if row.rsvpStatus === 'yes' && row.yesSubstatus !== 'confirmed' && row.reconfirmDeadlineAt}
+											<span class="updated-hint">By {new Date(row.reconfirmDeadlineAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
+										{:else if row.rsvpUpdatedAt}
 											<span class="updated-hint">{formatRsvpUpdated(row.rsvpUpdatedAt)}</span>
 										{/if}
 									{/if}

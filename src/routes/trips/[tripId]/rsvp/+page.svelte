@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: any } = $props();
@@ -32,6 +31,28 @@
 	});
 	const canSubmit = $derived(spotsSelected >= partySize);
 	const spotsShortfall = $derived(Math.max(0, partySize - spotsSelected));
+
+	let rsvpStatus = $state(data.currentRsvp?.status ?? 'maybe');
+	$effect(() => {
+		if (data.currentRsvp?.status != null) rsvpStatus = data.currentRsvp.status;
+	});
+	const isYes = $derived(rsvpStatus === 'yes');
+	const guestEstimate = $derived(data.guestEstimate ?? null);
+	const needsReconfirm = $derived(
+		data.currentRsvp?.status === 'yes' && data.currentRsvp?.yesSubstatus === 'reconfirm_required'
+	);
+	const reconfirmDeadlineAt = $derived(data.currentRsvp?.reconfirmDeadlineAt ?? null);
+
+	function formatCents(cents: number): string {
+		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(cents / 100);
+	}
+	function formatRange(lowCents: number, highCents: number): string {
+		if (lowCents === highCents) return formatCents(lowCents);
+		return `${formatCents(lowCents)}–${formatCents(highCents)}`;
+	}
+
+	let costCommitmentChecked = $state(false);
+	const canSubmitYes = $derived(isYes && costCommitmentChecked);
 </script>
 
 <div class="rsvp-page">
@@ -78,16 +99,28 @@
 			{#if activeTab === 'rsvp'}
 				<section class="rsvp-section">
 					<h2>RSVP</h2>
+					{#if data.currentRsvp?.status === 'yes' && data.currentRsvp?.yesSubstatus === 'reconfirm_required'}
+						<div class="reconfirm-banner" role="alert">
+							<strong>Your cost estimate changed.</strong> Please review and confirm to keep your YES RSVP.
+							{#if data.currentRsvp?.reconfirmDeadlineAt}
+								<span class="reconfirm-deadline">Please confirm by {new Date(data.currentRsvp.reconfirmDeadlineAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}.</span>
+							{/if}
+							<a href="#cost-commitment" class="btn btn-primary btn-sm reconfirm-cta">Review updated estimate</a>
+						</div>
+					{/if}
 					{#if form?.success}
 						<div class="success-message">RSVP updated!</div>
+					{/if}
+					{#if form?.error}
+						<div class="error-message" role="alert">{form.error}</div>
 					{/if}
 					<form method="POST" action="?/updateRsvp" use:enhance>
 						<div class="form-group">
 							<label for="status">Will you be attending?</label>
-							<select id="status" name="status" required>
-								<option value="yes" selected={data.currentRsvp?.status === 'yes'}>Yes</option>
-								<option value="maybe" selected={data.currentRsvp?.status === 'maybe'}>Maybe</option>
-								<option value="no" selected={data.currentRsvp?.status === 'no'}>No</option>
+							<select id="status" name="status" required bind:value={rsvpStatus}>
+								<option value="yes">Yes</option>
+								<option value="maybe">Maybe</option>
+								<option value="no">No</option>
 							</select>
 						</div>
 						<div class="form-group">
@@ -130,7 +163,43 @@
 						{#if (data.myClaimedBedIds?.length ?? 0) > 0}
 							<p class="helper-text">If you change party size, update your bed claims in the <strong>Room</strong> tab if needed.</p>
 						{/if}
-						<button type="submit" class="btn btn-primary">Save RSVP</button>
+						{#if isYes}
+							<div id="cost-commitment" class="cost-commitment-module">
+								<h3 class="estimate-heading">Estimated cost</h3>
+								{#if guestEstimate}
+									<p class="estimate-range"><strong>My estimated share: {formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
+									<p class="estimate-headcount">Based on {guestEstimate.hmin}–{guestEstimate.hmax} guests.</p>
+									<p class="estimate-microcopy">Final amount depends on the number of attendees.</p>
+									{#if guestEstimate.hmax > 0 && (guestEstimate.highCents - guestEstimate.lowCents) / 100 > 100}
+										<p class="estimate-warning">Estimate may vary significantly until more people RSVP.</p>
+									{/if}
+									<div class="form-group commitment-checkbox">
+										<label class="commitment-label">
+											<input type="checkbox" bind:checked={costCommitmentChecked} name="costCommitmentAccepted" value="true" />
+											<span class="commitment-text">
+												I agree to share the trip costs.<br />
+												My estimated share is {guestEstimate ? formatRange(guestEstimate.lowCents, guestEstimate.highCents) : ''} based on {guestEstimate?.hmin}–{guestEstimate?.hmax} guests.<br />
+												I understand the final amount depends on the number of attendees.<br />
+												If the estimate changes outside this range, I will be asked to review and confirm the updated amount.
+											</span>
+										</label>
+									</div>
+									<input type="hidden" name="costCommitmentAccepted" value={canSubmitYes ? 'true' : ''} />
+								{:else}
+									<p class="helper-text">Pick your room in the <strong>Room</strong> tab to see your cost estimate, or save as Maybe for now.</p>
+								{/if}
+							</div>
+							<button type="submit" class="btn btn-primary" disabled={!canSubmitYes}>
+								Submit YES RSVP
+							</button>
+							{#if !costCommitmentChecked && guestEstimate}
+								<span class="validation-hint">Check the box above to confirm your cost estimate and submit.</span>
+							{:else if !guestEstimate}
+								<span class="validation-hint">Select rooms in the Room tab to see your estimate and submit.</span>
+							{/if}
+						{:else}
+							<button type="submit" class="btn btn-primary">Save RSVP</button>
+						{/if}
 					</form>
 				</section>
 			{:else if activeTab === 'room'}
@@ -501,4 +570,36 @@
 		padding: var(--spacing-xs) var(--spacing-md);
 		font-size: 0.875rem;
 	}
+
+	.reconfirm-banner {
+		background: #fef3c7;
+		border: 1px solid #f59e0b;
+		border-radius: var(--radius-md);
+		padding: var(--spacing-md);
+		margin-bottom: var(--spacing-md);
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--spacing-sm);
+	}
+	.reconfirm-deadline { font-size: 0.9rem; color: #92400e; }
+	.reconfirm-cta { flex-shrink: 0; }
+
+	.cost-commitment-module {
+		margin: var(--spacing-lg) 0;
+		padding: var(--spacing-md);
+		background: var(--color-bg-light, #f8fafc);
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-border);
+	}
+	.estimate-heading { margin: 0 0 var(--spacing-sm) 0; font-size: 1rem; }
+	.estimate-range { margin: 0 0 0.25rem 0; }
+	.estimate-headcount { margin: 0; font-size: 0.9rem; color: var(--color-text-light); }
+	.estimate-microcopy { margin: 0 0 var(--spacing-sm) 0; font-size: 0.85rem; color: var(--color-text-light); }
+	.estimate-warning { margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--color-warning, #b45309); }
+	.commitment-checkbox { margin-top: var(--spacing-md); }
+	.commitment-label { display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-weight: normal; }
+	.commitment-label input { margin-top: 0.25rem; flex-shrink: 0; }
+	.commitment-text { font-size: 0.9rem; line-height: 1.45; }
+	.validation-hint { display: inline-block; margin-left: 0.5rem; font-size: 0.85rem; color: var(--color-text-light); }
 </style>

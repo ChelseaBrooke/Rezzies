@@ -1,0 +1,446 @@
+/**
+ * Guest cost estimate range for RSVP cost commitment.
+ * Computes low/high estimate based on headcount min/max; used for checkbox and reconfirm logic.
+ */
+
+import { prisma } from './prisma.js';
+import {
+	calculateReservationPrice,
+	calculateNights,
+	parseBedWeights,
+	getBedWeight
+} from './pricing-canonical.js';
+import { createHash } from 'crypto';
+
+export interface GuestEstimateRange {
+	lowCents: number;
+	highCents: number;
+	hmin: number;
+	hmax: number;
+	costBasisVersion: string;
+	explanationReason: string;
+}
+
+export interface ReconfirmPolicy {
+	enabled: boolean;
+	deadlineType: 'rolling' | 'fixed_trip_date' | 'host_configured';
+	rollingHours?: number;
+	fixedDaysBeforeTrip?: number;
+	hostConfiguredAt?: string; // ISO datetime
+}
+
+const DEFAULT_RECONFIRM_POLICY: ReconfirmPolicy = {
+	enabled: true,
+	deadlineType: 'rolling',
+	rollingHours: 72
+};
+
+export function parseReconfirmPolicy(json: string | null): ReconfirmPolicy {
+	if (!json?.trim()) return { ...DEFAULT_RECONFIRM_POLICY };
+	try {
+		const parsed = JSON.parse(json) as Partial<ReconfirmPolicy>;
+		return {
+			enabled: parsed.enabled ?? DEFAULT_RECONFIRM_POLICY.enabled,
+			deadlineType: parsed.deadlineType ?? DEFAULT_RECONFIRM_POLICY.deadlineType,
+			rollingHours: parsed.rollingHours ?? DEFAULT_RECONFIRM_POLICY.rollingHours,
+			fixedDaysBeforeTrip: parsed.fixedDaysBeforeTrip,
+			hostConfiguredAt: parsed.hostConfiguredAt
+		};
+	} catch {
+		return { ...DEFAULT_RECONFIRM_POLICY };
+	}
+}
+
+/**
+ * Compute a deterministic cost-basis version string from trip pricing inputs.
+ */
+function computeCostBasisVersion(trip: {
+	id: string;
+	totalCost: number;
+	pricingModel: string;
+	bedWeights: string | null;
+	expectedPeopleCount: number | null;
+	maxGuests: number | null;
+	rooms?: { id: number; privacyFactor: number | null; beds: { id: string; bedType: string; capacitySlots: number | null; capacity: number | null }[] }[];
+}): string {
+	const payload = {
+		tripId: trip.id,
+		totalCost: trip.totalCost,
+		pricingModel: trip.pricingModel,
+		bedWeights: trip.bedWeights,
+		expectedPeopleCount: trip.expectedPeopleCount,
+		maxGuests: trip.maxGuests,
+		rooms: trip.rooms?.map((r) => ({
+			id: r.id,
+			privacyFactor: r.privacyFactor,
+			beds: r.beds?.map((b) => ({ id: b.id, bedType: b.bedType, slots: b.capacitySlots ?? b.capacity }))
+		}))
+	};
+	return createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 16);
+}
+
+/**
+ * Compute guest's estimated cost range: low (if Hmax attend), high (if Hmin attend).
+ * Uses current trip + RSVPs for headcount bounds; if guest has no room assignment, uses first room/bed for estimate.
+ */
+export async function computeGuestEstimateRange(
+	tripId: string,
+	guestId: string
+): Promise<GuestEstimateRange> {
+	const [trip, rsvps, roomAssignments, guestRsvp] = await Promise.all([
+		prisma.trip.findUnique({
+			where: { id: tripId },
+			include: {
+				rooms: { include: { beds: true } },
+				roomAssignments: true
+			}
+		}),
+		prisma.rSVP.findMany({
+			where: { tripId, status: 'yes' },
+			select: { userId: true, adultsCount: true }
+		}),
+		prisma.roomAssignment.findMany({
+			where: { tripId },
+			include: { room: { include: { beds: true } } }
+		}),
+		prisma.rSVP.findUnique({
+			where: { tripId_userId: { tripId, userId: guestId } }
+		})
+	]);
+
+	if (!trip || trip.rooms.length === 0) {
+		throw new Error('Trip not found or has no rooms');
+	}
+
+	const totalSlots = trip.rooms.reduce(
+		(s, r) => s + r.beds.reduce((b, bed) => b + (bed.capacitySlots ?? bed.capacity ?? 1), 0),
+		0
+	);
+	const expectedPeople = trip.expectedPeopleCount ?? trip.maxGuests ?? totalSlots;
+
+	// Headcount bounds: Hmin = fewer people = higher share; Hmax = more people = lower share
+	const yesPartyTotal = rsvps.reduce((sum, r) => sum + (r.adultsCount ?? 1), 0);
+	const guestPartySize = Math.max(1, guestRsvp?.adultsCount ?? 1);
+	const guestAlreadyYes = rsvps.some((r) => r.userId === guestId);
+	// Effective min = current yes total (including this guest if they're already yes, else assume they join)
+	const hmin = Math.max(1, guestAlreadyYes ? yesPartyTotal : yesPartyTotal + guestPartySize);
+	const hmax = Math.max(hmin, expectedPeople, totalSlots);
+
+	const costBasisVersion = computeCostBasisVersion(trip);
+
+	// Get this guest's room/bed for price calc; if none, use first room + first bed
+	const guestAssignments = roomAssignments.filter((a) => a.userId === guestId);
+	const firstAssignment = guestAssignments[0];
+	let roomId: number;
+	let bedId: string | undefined;
+	let numberOfSlots: number;
+	let checkInDate: Date;
+	let checkOutDate: Date;
+
+	if (firstAssignment) {
+		roomId = firstAssignment.roomId;
+		bedId = firstAssignment.bedId ?? undefined;
+		numberOfSlots = firstAssignment.partySize || 1;
+		checkInDate = firstAssignment.startDate ?? trip.checkInDate;
+		checkOutDate = firstAssignment.endDate ?? trip.checkOutDate;
+	} else {
+		const firstRoom = trip.rooms.find((r) => (r.beds?.length ?? 0) > 0) ?? trip.rooms[0];
+		if (!firstRoom) throw new Error('Trip has no rooms');
+		const firstBed = firstRoom.beds?.[0];
+		if (!firstBed) throw new Error('Trip has no beds configured');
+		roomId = firstRoom.id;
+		bedId = firstBed.id;
+		numberOfSlots = guestPartySize;
+		checkInDate = trip.checkInDate;
+		checkOutDate = trip.checkOutDate;
+	}
+
+	const pricingModel = (trip.pricingModel || 'per_person').toLowerCase();
+
+	// For PER_PERSON and PER_PERSON_PER_NIGHT, price doesn't vary by headcount in the same way; use capacity.
+	let lowCents: number;
+	let highCents: number;
+	let explanationReason = 'Based on current headcount range.';
+
+	if (pricingModel === 'per_bed' || pricingModel === 'per_room') {
+		// Price at Hmax (more people) = lower share; at Hmin (fewer people) = higher share
+		const priceAtHmax = await calculateReservationPriceWithHeadcount(tripId, {
+			roomId,
+			bedId,
+			numberOfSlots,
+			checkInDate,
+			checkOutDate,
+			overrideHeadcount: hmax
+		});
+		const priceAtHmin = await calculateReservationPriceWithHeadcount(tripId, {
+			roomId,
+			bedId,
+			numberOfSlots,
+			checkInDate,
+			checkOutDate,
+			overrideHeadcount: hmin
+		});
+		lowCents = Math.round(priceAtHmax * 100);
+		highCents = Math.round(priceAtHmin * 100);
+		if (hmin < hmax) explanationReason = 'Fewer guests confirmed; final amount depends on headcount.';
+	} else {
+		// PER_PERSON / PER_PERSON_PER_NIGHT: use capacity-based single price; range = same or slight variance
+		const single = await calculateReservationPrice({
+			tripId,
+			roomId,
+			bedId,
+			numberOfSlots,
+			checkInDate,
+			checkOutDate
+		});
+		const cents = Math.round(single.totalPrice * 100);
+		lowCents = cents;
+		highCents = cents;
+		explanationReason = 'Fixed per-person rate for this trip.';
+	}
+
+	// Ensure low <= high
+	if (lowCents > highCents) {
+		const t = lowCents;
+		lowCents = highCents;
+		highCents = t;
+	}
+
+	return {
+		lowCents,
+		highCents,
+		hmin,
+		hmax,
+		costBasisVersion,
+		explanationReason
+	};
+}
+
+/**
+ * Calculate reservation price with an overridden headcount (for PER_BED/PER_ROOM estimate range).
+ */
+async function calculateReservationPriceWithHeadcount(
+	tripId: string,
+	params: {
+		roomId: number;
+		bedId?: string;
+		numberOfSlots: number;
+		checkInDate: Date;
+		checkOutDate: Date;
+		overrideHeadcount: number;
+	}
+): Promise<number> {
+	const trip = await prisma.trip.findUnique({
+		where: { id: tripId },
+		include: {
+			rooms: { include: { beds: true } },
+			roomAssignments: { include: { room: true } }
+		}
+	});
+	if (!trip) throw new Error('Trip not found');
+
+	const { roomId, bedId, numberOfSlots, checkInDate, checkOutDate, overrideHeadcount } = params;
+	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
+	const stayNights = calculateNights(checkInDate, checkOutDate);
+	const stayFactor = totalNights > 0 ? stayNights / totalNights : 1;
+	const room = trip.rooms.find((r) => r.id === roomId);
+	if (!room) throw new Error('Room not found');
+	const bedWeights = parseBedWeights(trip.bedWeights);
+	const privacyFactor = room.privacyFactor ?? 1.0;
+	const pricingModel = (trip.pricingModel || 'per_person').toLowerCase();
+
+	if (pricingModel === 'per_bed') {
+		const bed = bedId ? room.beds.find((b) => b.id === bedId) : room.beds[0];
+		if (!bed) throw new Error('Bed not found');
+		const thisWeight = getBedWeight(bedWeights, bed.bedType);
+		let totalSlots = 0;
+		let sumCombinedWeight = 0;
+		for (const r of trip.rooms) {
+			const p = r.privacyFactor ?? 1.0;
+			for (const b of r.beds) {
+				const slots = b.capacitySlots || b.capacity || 1;
+				totalSlots += slots;
+				sumCombinedWeight += slots * getBedWeight(bedWeights, b.bedType) * p;
+			}
+		}
+		const avgCombinedWeight = totalSlots > 0 ? sumCombinedWeight / totalSlots : 1;
+		const denominator = Math.max(1, overrideHeadcount);
+		const basePerPerson = trip.totalCost / denominator;
+		const pricePerPersonFullStay = (basePerPerson * (thisWeight * privacyFactor)) / avgCombinedWeight;
+		return pricePerPersonFullStay * stayFactor;
+	}
+
+	if (pricingModel === 'per_room') {
+		// Approximate: assume single room occupancy for this guest; denominator = overrideHeadcount * avg privacy
+		const avgPrivacy =
+			trip.rooms.reduce((s, r) => s + (r.privacyFactor ?? 1), 0) / trip.rooms.length || 1;
+		const denominator = Math.max(overrideHeadcount * avgPrivacy, 1);
+		const pricePerPersonFullStay = (trip.totalCost * privacyFactor) / denominator;
+		return pricePerPersonFullStay * stayFactor;
+	}
+
+	// Fallback: use standard calc
+	const result = await calculateReservationPrice({
+		tripId,
+		roomId,
+		bedId,
+		numberOfSlots,
+		checkInDate,
+		checkOutDate
+	});
+	return result.totalPrice;
+}
+
+/** Accepted range + assumptions as stored on RSVP */
+export interface AcceptedEstimate {
+	acceptedEstimateLowCents: number;
+	acceptedEstimateHighCents: number;
+	acceptedHeadcountMin: number | null;
+	acceptedHeadcountMax: number | null;
+	acceptedCostBasisVersion: string | null;
+}
+
+/**
+ * Determine if reconfirmation is required: latest range outside accepted range, or cost basis changed.
+ */
+export function requiresReconfirm(
+	accepted: AcceptedEstimate | null,
+	latest: GuestEstimateRange,
+	policy: ReconfirmPolicy
+): boolean {
+	if (!accepted || !policy.enabled) return false;
+	// Cost basis changed (e.g. lodging total, rooms, pricing model)
+	if (
+		accepted.acceptedCostBasisVersion != null &&
+		accepted.acceptedCostBasisVersion !== latest.costBasisVersion
+	) {
+		return true;
+	}
+	// Latest range outside accepted: if latest low < accepted low OR latest high > accepted high => out of range
+	if (latest.lowCents < accepted.acceptedEstimateLowCents) return true;
+	if (latest.highCents > accepted.acceptedEstimateHighCents) return true;
+	// Headcount assumptions changed materially (optional: could require reconfirm if Hmin/Hmax differ)
+	if (
+		accepted.acceptedHeadcountMin != null &&
+		accepted.acceptedHeadcountMax != null &&
+		(latest.hmin !== accepted.acceptedHeadcountMin || latest.hmax !== accepted.acceptedHeadcountMax)
+	) {
+		// Only require if the range actually moved (we already checked cents above; headcount change may have shifted range)
+		// So we already covered by cents check. Skip redundant headcount check unless we want stricter behavior.
+	}
+	return false;
+}
+
+/**
+ * Compute reconfirm deadline from policy (Rolling: now + N hours).
+ */
+export function getReconfirmDeadline(
+	policy: ReconfirmPolicy,
+	tripStartDate?: Date | null
+): Date | null {
+	if (!policy.enabled) return null;
+	if (policy.deadlineType === 'rolling' && policy.rollingHours != null) {
+		const d = new Date();
+		d.setHours(d.getHours() + policy.rollingHours);
+		return d;
+	}
+	if (policy.deadlineType === 'fixed_trip_date' && tripStartDate && policy.fixedDaysBeforeTrip != null) {
+		const d = new Date(tripStartDate);
+		d.setDate(d.getDate() - policy.fixedDaysBeforeTrip);
+		return d;
+	}
+	if (policy.deadlineType === 'host_configured' && policy.hostConfiguredAt) {
+		const d = new Date(policy.hostConfiguredAt);
+		return Number.isNaN(d.getTime()) ? null : d;
+	}
+	return null;
+}
+
+/**
+ * Check one or all YES guests and set yesSubstatus + reconfirm fields when latest estimate is out of range.
+ * Call after RSVP count, room assignments, or trip cost changes.
+ */
+export async function checkAndSetReconfirmRequired(
+	tripId: string,
+	options?: { guestId?: string }
+): Promise<void> {
+	const trip = await prisma.trip.findUnique({
+		where: { id: tripId },
+		select: { checkInDate: true }
+	});
+	if (!trip) return;
+	const policy = parseReconfirmPolicy(null);
+	if (!policy.enabled) return;
+
+	const where: { tripId: string; status: string; userId?: string } = {
+		tripId,
+		status: 'yes'
+	};
+	if (options?.guestId) where.userId = options.guestId;
+	const rsvps = await prisma.rSVP.findMany({
+		where,
+		select: {
+			userId: true,
+			costCommitmentAccepted: true,
+			acceptedEstimateLowCents: true,
+			acceptedEstimateHighCents: true,
+			acceptedHeadcountMin: true,
+			acceptedHeadcountMax: true,
+			acceptedCostBasisVersion: true
+		}
+	});
+
+	const deadline = getReconfirmDeadline(policy, trip.checkInDate);
+	const now = new Date();
+
+	for (const rsvp of rsvps) {
+		// Guest has no cost commitment (e.g. host set YES) -> require reconfirm
+		if (!rsvp.costCommitmentAccepted || rsvp.acceptedEstimateLowCents == null) {
+			await prisma.rSVP.update({
+				where: { tripId_userId: { tripId, userId: rsvp.userId } },
+				data: {
+					yesSubstatus: 'reconfirm_required',
+					reconfirmRequiredAt: now,
+					reconfirmDeadlineAt: deadline,
+					latestEstimateLowCents: null,
+					latestEstimateHighCents: null,
+					latestEstimateUpdatedAt: null
+				}
+			});
+			continue;
+		}
+		let latest: GuestEstimateRange;
+		try {
+			latest = await computeGuestEstimateRange(tripId, rsvp.userId);
+		} catch {
+			continue;
+		}
+		const accepted: AcceptedEstimate = {
+			acceptedEstimateLowCents: rsvp.acceptedEstimateLowCents,
+			acceptedEstimateHighCents: rsvp.acceptedEstimateHighCents ?? rsvp.acceptedEstimateLowCents,
+			acceptedHeadcountMin: rsvp.acceptedHeadcountMin,
+			acceptedHeadcountMax: rsvp.acceptedHeadcountMax,
+			acceptedCostBasisVersion: rsvp.acceptedCostBasisVersion
+		};
+		const needsReconfirm = requiresReconfirm(accepted, latest, policy);
+		await prisma.rSVP.update({
+			where: { tripId_userId: { tripId, userId: rsvp.userId } },
+			data: {
+				latestEstimateLowCents: latest.lowCents,
+				latestEstimateHighCents: latest.highCents,
+				latestEstimateUpdatedAt: now,
+				...(needsReconfirm
+					? {
+							yesSubstatus: 'reconfirm_required',
+							reconfirmRequiredAt: now,
+							reconfirmDeadlineAt: deadline
+						}
+					: {
+							yesSubstatus: 'confirmed',
+							reconfirmRequiredAt: null,
+							reconfirmDeadlineAt: null
+						})
+			}
+		});
+	}
+}

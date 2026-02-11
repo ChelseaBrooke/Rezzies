@@ -432,6 +432,21 @@ model RSVP {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  // Cost commitment (required for RSVP yes)
+  costCommitmentAccepted   Boolean?
+  rsvpYesAcceptedAt        DateTime?   // When guest last confirmed YES with cost range
+  yesSubstatus            String?     // When status=yes: "confirmed" | "reconfirm_required"
+  acceptedEstimateLowCents  Int?
+  acceptedEstimateHighCents Int?
+  acceptedHeadcountMin      Int?
+  acceptedHeadcountMax     Int?
+  acceptedCostBasisVersion  String?
+  reconfirmRequiredAt      DateTime?
+  reconfirmDeadlineAt      DateTime?
+  latestEstimateLowCents   Int?
+  latestEstimateHighCents  Int?
+  latestEstimateUpdatedAt  DateTime?
+
   trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

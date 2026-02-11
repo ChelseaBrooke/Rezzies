@@ -6,6 +6,7 @@ import { prisma } from '$lib/server/prisma.js';
 import { notifyExistingUserOfInvite } from '$lib/server/invite-service.js';
 import { createInvoiceForUser } from '$lib/server/invoice-calculator.js';
 import { hashPassword } from '$lib/server/auth.js';
+import { checkAndSetReconfirmRequired } from '$lib/server/guest-estimate.js';
 import { z } from 'zod';
 
 const PENDING_INVITE_STATUSES = ['sent', 'opened'];
@@ -19,6 +20,8 @@ export type GuestRow = {
 	avatarUrl?: string | null;
 	rsvpStatus: 'yes' | 'no' | 'maybe' | null;
 	rsvpUpdatedAt: string | null;
+	yesSubstatus: 'confirmed' | 'reconfirm_required' | null;
+	reconfirmDeadlineAt: string | null;
 	partySize: number;
 	roomName: string | null;
 	bedType: string | null;
@@ -166,6 +169,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 			avatarUrl: member.user?.avatarUrl,
 			rsvpStatus: status,
 			rsvpUpdatedAt: rsvp?.updatedAt ? rsvp.updatedAt.toISOString() : null,
+			yesSubstatus: rsvp?.yesSubstatus ?? null,
+			reconfirmDeadlineAt: rsvp?.reconfirmDeadlineAt ? rsvp.reconfirmDeadlineAt.toISOString() : null,
 			partySize: totalPartySize || (status === 'yes' ? (rsvp?.adultsCount ?? 1) + (rsvp?.kidsCount ?? 0) : 0),
 			roomName: firstAssignment?.room?.name ?? null,
 			bedType: firstAssignment?.bedType ?? null,
@@ -209,6 +214,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 			avatarUrl: null,
 			rsvpStatus: null,
 			rsvpUpdatedAt: null,
+			yesSubstatus: null,
+			reconfirmDeadlineAt: null,
 			partySize: 0,
 			roomName: null,
 			bedType: null,
@@ -475,6 +482,7 @@ export const actions: Actions = {
 		}
 
 		await createInvoiceForUser(tripId, userId).catch(() => {});
+		await checkAndSetReconfirmRequired(tripId);
 		return { updateGuestRsvpSuccess: true };
 	},
 

@@ -4,6 +4,11 @@ import { getSessionUser } from '$lib/server/session.js';
 import { isTripMember } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 import { totalSpotsForBeds, hasEnoughSpots, isPrismaUniqueConflict } from '$lib/server/bed-spot-validation.js';
+import {
+	computeGuestEstimateRange,
+	parseReconfirmPolicy,
+	checkAndSetReconfirmRequired
+} from '$lib/server/guest-estimate.js';
 import { z } from 'zod';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
@@ -73,6 +78,17 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	);
 	const selectedActivities = trip.activities.filter((a) => a.participants.length > 0);
 
+	// Cost commitment: estimate range when user has or is choosing YES
+	let guestEstimate: Awaited<ReturnType<typeof computeGuestEstimateRange>> | null = null;
+	if (currentRsvp?.status === 'yes' || true) {
+		try {
+			guestEstimate = await computeGuestEstimateRange(tripId, user.id);
+		} catch {
+			// Trip may have no rooms yet
+		}
+	}
+	const reconfirmPolicy = parseReconfirmPolicy(null);
+
 	return {
 		user,
 		trip,
@@ -80,7 +96,9 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		currentProfile,
 		myClaimedBedIds: Array.from(myAssignmentIds),
 		claimedBedIdsByOther: Array.from(claimedBedIdsByOther),
-		selectedActivities
+		selectedActivities,
+		guestEstimate,
+		reconfirmPolicy
 	};
 };
 
@@ -111,6 +129,9 @@ export const actions: Actions = {
 		if (!member) throw error(403, 'You must be a member of this trip');
 
 		const formData = await request.formData();
+		const status = (formData.get('status') as string) ?? '';
+		const costCommitmentAccepted = formData.get('costCommitmentAccepted') === 'true' || formData.get('costCommitmentAccepted') === '1';
+
 		const data = {
 			status: formData.get('status') as string,
 			arrivalDatetime: formData.get('arrivalDatetime') ? new Date(formData.get('arrivalDatetime') as string) : undefined,
@@ -123,32 +144,95 @@ export const actions: Actions = {
 
 		const validation = rsvpSchema.safeParse(data);
 		if (!validation.success) {
-			return { error: validation.error.errors[0]?.message };
+			return fail(400, { error: validation.error.errors[0]?.message });
 		}
 
-		// Upsert RSVP
-		await prisma.rSVP.upsert({
-			where: {
-				tripId_userId: {
+		// YES requires cost commitment: server recomputes estimate and persists accepted range
+		if (validation.data.status === 'yes') {
+			if (!costCommitmentAccepted) {
+				return fail(400, { error: 'Please agree to the cost estimate below to submit YES RSVP.' });
+			}
+			let estimate;
+			try {
+				estimate = await computeGuestEstimateRange(tripId, user.id);
+			} catch (e) {
+				return fail(400, { error: 'Could not compute cost estimate. Try again or pick a room first.' });
+			}
+			const now = new Date();
+			await prisma.rSVP.upsert({
+				where: { tripId_userId: { tripId, userId: user.id } },
+				create: {
 					tripId,
-					userId: user.id
+					userId: user.id,
+					...validation.data,
+					costCommitmentAccepted: true,
+					rsvpYesAcceptedAt: now,
+					yesSubstatus: 'confirmed',
+					acceptedEstimateLowCents: estimate.lowCents,
+					acceptedEstimateHighCents: estimate.highCents,
+					acceptedHeadcountMin: estimate.hmin,
+					acceptedHeadcountMax: estimate.hmax,
+					acceptedCostBasisVersion: estimate.costBasisVersion,
+					reconfirmRequiredAt: null,
+					reconfirmDeadlineAt: null,
+					latestEstimateLowCents: estimate.lowCents,
+					latestEstimateHighCents: estimate.highCents,
+					latestEstimateUpdatedAt: now
+				},
+				update: {
+					...validation.data,
+					costCommitmentAccepted: true,
+					rsvpYesAcceptedAt: now,
+					yesSubstatus: 'confirmed',
+					acceptedEstimateLowCents: estimate.lowCents,
+					acceptedEstimateHighCents: estimate.highCents,
+					acceptedHeadcountMin: estimate.hmin,
+					acceptedHeadcountMax: estimate.hmax,
+					acceptedCostBasisVersion: estimate.costBasisVersion,
+					reconfirmRequiredAt: null,
+					reconfirmDeadlineAt: null,
+					latestEstimateLowCents: estimate.lowCents,
+					latestEstimateHighCents: estimate.highCents,
+					latestEstimateUpdatedAt: now
 				}
-			},
+			});
+			await checkAndSetReconfirmRequired(tripId);
+			return { success: true };
+		}
+
+		// No or Maybe: clear cost commitment fields
+		await prisma.rSVP.upsert({
+			where: { tripId_userId: { tripId, userId: user.id } },
 			create: {
 				tripId,
 				userId: user.id,
 				...validation.data
 			},
-			update: validation.data
+			update: {
+				...validation.data,
+				costCommitmentAccepted: null,
+				rsvpYesAcceptedAt: null,
+				yesSubstatus: null,
+				acceptedEstimateLowCents: null,
+				acceptedEstimateHighCents: null,
+				acceptedHeadcountMin: null,
+				acceptedHeadcountMax: null,
+				acceptedCostBasisVersion: null,
+				reconfirmRequiredAt: null,
+				reconfirmDeadlineAt: null,
+				latestEstimateLowCents: null,
+				latestEstimateHighCents: null,
+				latestEstimateUpdatedAt: null
+			}
 		});
 
-		// When guest RSVPs "no", release their bed claims so beds become available again
 		if (validation.data.status === 'no') {
 			await prisma.roomAssignment.deleteMany({
 				where: { tripId, userId: user.id }
 			});
 		}
 
+		await checkAndSetReconfirmRequired(tripId);
 		return { success: true };
 	},
 
@@ -259,6 +343,7 @@ export const actions: Actions = {
 		const { createInvoiceForUser } = await import('$lib/server/invoice-calculator.js');
 		await createInvoiceForUser(tripId, user.id).catch(() => {});
 
+		await checkAndSetReconfirmRequired(tripId);
 		return { claimBedsSuccess: true };
 	},
 
