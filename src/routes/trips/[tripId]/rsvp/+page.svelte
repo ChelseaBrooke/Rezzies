@@ -1,23 +1,58 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
+	import { enhance, deserialize, applyAction } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
+	import DateRangePicker from '$lib/components/wizard/DateRangePicker.svelte';
 	import type { PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: any } = $props();
 
-	let activeTab = $state('rsvp');
-	const partySize = $derived(data.currentRsvp?.adultsCount ?? 1);
+	let adultsCount = $state(data.currentRsvp?.adultsCount ?? 1);
+	let kidsCount = $state(data.currentRsvp?.kidsCount ?? 0);
+	let petsCount = $state(data.currentRsvp?.petsCount ?? 0);
+	function tripDateKey(d: Date | string | null | undefined): string {
+		if (d == null) return '';
+		return new Date(d).toISOString().slice(0, 10);
+	}
+	const defaultArrival = tripDateKey(data.trip?.checkInDate);
+	const defaultDeparture = tripDateKey(data.trip?.checkOutDate);
+	let arrivalDate = $state(
+		data.currentRsvp?.arrivalDatetime ? new Date(data.currentRsvp.arrivalDatetime).toISOString().slice(0, 10) : defaultArrival
+	);
+	let departureDate = $state(
+		data.currentRsvp?.departureDatetime ? new Date(data.currentRsvp.departureDatetime).toISOString().slice(0, 10) : defaultDeparture
+	);
+	let noNotes = $state(data.currentRsvp?.status === 'no' ? (data.currentRsvp?.notes ?? '') : '');
+
+	const partySize = $derived(adultsCount);
 	const myClaimedSet = $derived(new Set(data.myClaimedBedIds ?? []));
 	const claimedByOtherSet = $derived(new Set(data.claimedBedIdsByOther ?? []));
 
 	let selectedBedIds = $state<string[]>([]);
+	let claimBedsFormEl = $state<HTMLFormElement | null>(null);
 	function initSelectedBeds() {
 		selectedBedIds = [...(data.myClaimedBedIds ?? [])];
 	}
 	$effect(() => {
-		if (activeTab === 'room' && data.myClaimedBedIds) {
-			initSelectedBeds();
-		}
+		if (data.myClaimedBedIds) initSelectedBeds();
 	});
+	async function onBedChange(checked: boolean, bedId: string) {
+		const nextIds = checked ? [...selectedBedIds, bedId] : selectedBedIds.filter((id) => id !== bedId);
+		selectedBedIds = nextIds;
+		await tick();
+		// Submit with explicit FormData so we send current selection (DOM checkboxes may not have updated yet)
+		const form = claimBedsFormEl;
+		if (!form) return;
+		const fd = new FormData(form);
+		fd.delete('bedIds');
+		for (const id of nextIds) fd.append('bedIds', id);
+		const actionUrl = `${$page.url.pathname}?/claimBeds`;
+		const res = await fetch(actionUrl, { method: 'POST', body: fd });
+		const result = deserialize(await res.text());
+		await applyAction(result);
+		if (result.type === 'success') await invalidateAll();
+	}
 
 	const rooms = $derived(data.trip?.rooms ?? []);
 	const spotsSelected = $derived.by(() => {
@@ -32,12 +67,55 @@
 	const canSubmit = $derived(spotsSelected >= partySize);
 	const spotsShortfall = $derived(Math.max(0, partySize - spotsSelected));
 
-	let rsvpStatus = $state(data.currentRsvp?.status ?? 'maybe');
+	let rsvpStatus = $state(data.currentRsvp?.status === 'no' ? 'no' : 'yes');
 	$effect(() => {
-		if (data.currentRsvp?.status != null) rsvpStatus = data.currentRsvp.status;
+		// Sync from server after submits
+		if (data.currentRsvp?.status === 'no') rsvpStatus = 'no';
+		else if (data.currentRsvp?.status === 'yes') rsvpStatus = 'yes';
+		if (data.currentRsvp?.adultsCount != null) adultsCount = data.currentRsvp.adultsCount;
+		if (data.currentRsvp?.kidsCount != null) kidsCount = data.currentRsvp.kidsCount;
+		if (data.currentRsvp?.petsCount != null) petsCount = data.currentRsvp.petsCount;
+		arrivalDate = data.currentRsvp?.arrivalDatetime ? new Date(data.currentRsvp.arrivalDatetime).toISOString().slice(0, 10) : tripDateKey(data.trip?.checkInDate);
+		departureDate = data.currentRsvp?.departureDatetime ? new Date(data.currentRsvp.departureDatetime).toISOString().slice(0, 10) : tripDateKey(data.trip?.checkOutDate);
+		noNotes = data.currentRsvp?.status === 'no' ? (data.currentRsvp?.notes ?? '') : '';
 	});
 	const isYes = $derived(rsvpStatus === 'yes');
-	const guestEstimate = $derived(data.guestEstimate ?? null);
+	const guestEstimateFromServer = $derived(data.guestEstimate ?? null);
+	let liveEstimate = $state<{ lowCents: number; highCents: number; hmin: number; hmax: number } | null>(null);
+	const guestEstimate = $derived(liveEstimate ?? guestEstimateFromServer);
+
+	$effect(() => {
+		if (!isYes) {
+			liveEstimate = null;
+			return;
+		}
+		const a = arrivalDate;
+		const d = departureDate;
+		const adults = adultsCount;
+		const beds = selectedBedIds;
+		const t = setTimeout(async () => {
+			const fd = new FormData();
+			if (a) fd.set('arrivalDate', a);
+			if (d) fd.set('departureDate', d);
+			fd.set('adultsCount', String(adults));
+			beds.forEach((id) => fd.append('bedIds', id));
+			const actionUrl = `${$page.url.pathname}?/getEstimate`;
+			try {
+				const res = await fetch(actionUrl, { method: 'POST', body: fd });
+				const text = await res.text();
+				const result = deserialize(text);
+				if (result.type === 'success' && result.data?.getEstimate) {
+					liveEstimate = result.data.getEstimate;
+				} else {
+					liveEstimate = null;
+				}
+			} catch {
+				liveEstimate = null;
+			}
+		}, 400);
+		return () => clearTimeout(t);
+	});
+
 	const needsReconfirm = $derived(
 		data.currentRsvp?.status === 'yes' && data.currentRsvp?.yesSubstatus === 'reconfirm_required'
 	);
@@ -52,169 +130,154 @@
 	}
 
 	let costCommitmentChecked = $state(false);
-	const canSubmitYes = $derived(isYes && costCommitmentChecked);
+	const canSubmitYes = $derived((isYes || needsReconfirm) && costCommitmentChecked);
+
+	function toDateKey(d: Date | string): string {
+		const date = typeof d === 'string' ? new Date(d) : d;
+		const y = date.getFullYear();
+		const m = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${y}-${m}-${day}`;
+	}
+	const tripMinDate = $derived(
+		data.trip?.checkInDate != null ? toDateKey(data.trip.checkInDate as Date | string) : undefined
+	);
+	const tripMaxDate = $derived(
+		data.trip?.checkOutDate != null ? toDateKey(data.trip.checkOutDate as Date | string) : undefined
+	);
+
+	const tripNights = $derived(data.roomPricing?.totalNights ?? 0);
+	const pricingByRoomId = $derived.by(() => {
+		const map = new Map<number, { slotPricePerNight: number; roomPricePerNight: number }>();
+		for (const r of data.roomPricing?.roomPricing ?? []) {
+			map.set(r.roomId, { slotPricePerNight: r.slotPricePerNight, roomPricePerNight: r.roomPricePerNight });
+		}
+		return map;
+	});
+	function formatDollars(dollars: number): string {
+		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(dollars);
+	}
+	function bedPricePerNight(roomId: number, slots: number): number {
+		const p = pricingByRoomId.get(roomId);
+		if (!p) return 0;
+		return p.slotPricePerNight * slots;
+	}
+	function bedTotal(roomId: number, slots: number): number {
+		return bedPricePerNight(roomId, slots) * tripNights;
+	}
+	function roomPricePerNight(roomId: number): number {
+		return pricingByRoomId.get(roomId)?.roomPricePerNight ?? 0;
+	}
+
+	const tripDateRange = $derived.by(() => {
+		const t = data.trip;
+		if (!t?.checkInDate || !t?.checkOutDate) return '';
+		const start = new Date(t.checkInDate as Date | string);
+		const end = new Date(t.checkOutDate as Date | string);
+		return start.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) + ' – ' + end.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+	});
+	const tripDestination = $derived((data.trip?.locationCity ?? data.trip?.location ?? '') || null);
 </script>
 
 <div class="rsvp-page">
 	<div class="container">
-		<div class="page-header">
-			<h1>RSVP & Trip Details</h1>
-			<a href="/trips/{data.trip.id}" class="btn btn-secondary">← Back to Trip</a>
-		</div>
+		<a href="/trips/{data.trip.id}" class="back-link">← Back to trip</a>
 
-		<div class="tabs">
-			<button 
-				class="tab {activeTab === 'rsvp' ? 'active' : ''}"
-				onclick={() => activeTab = 'rsvp'}
-			>
-				RSVP
-			</button>
-			<button 
-				class="tab {activeTab === 'room' ? 'active' : ''}"
-				onclick={() => activeTab = 'room'}
-			>
-				Room Selection
-			</button>
-			<button 
-				class="tab {activeTab === 'activities' ? 'active' : ''}"
-				onclick={() => activeTab = 'activities'}
-			>
-				Activities
-			</button>
-			<button 
-				class="tab {activeTab === 'extras' ? 'active' : ''}"
-				onclick={() => activeTab = 'extras'}
-			>
-				Extras
-			</button>
-			<button 
-				class="tab {activeTab === 'profile' ? 'active' : ''}"
-				onclick={() => activeTab = 'profile'}
-			>
-				Guest Info
-			</button>
-		</div>
+		<div class="rsvp-card">
+			<div class="card-invite">
+				<h1 class="trip-title">{data.trip?.name ?? 'Trip'}</h1>
+				{#if tripDateRange}
+					<p class="trip-dates">{tripDateRange}</p>
+				{/if}
+				{#if tripDestination}
+					<p class="trip-destination">{tripDestination}</p>
+				{/if}
+			</div>
 
-		<div class="tab-content">
-			{#if activeTab === 'rsvp'}
-				<section class="rsvp-section">
-					<h2>RSVP</h2>
-					{#if data.currentRsvp?.status === 'yes' && data.currentRsvp?.yesSubstatus === 'reconfirm_required'}
-						<div class="reconfirm-banner" role="alert">
-							<strong>Your cost estimate changed.</strong> Please review and confirm to keep your YES RSVP.
-							{#if data.currentRsvp?.reconfirmDeadlineAt}
-								<span class="reconfirm-deadline">Please confirm by {new Date(data.currentRsvp.reconfirmDeadlineAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}.</span>
-							{/if}
-							<a href="#cost-commitment" class="btn btn-primary btn-sm reconfirm-cta">Review updated estimate</a>
-						</div>
-					{/if}
-					{#if form?.success}
-						<div class="success-message">RSVP updated!</div>
-					{/if}
-					{#if form?.error}
-						<div class="error-message" role="alert">{form.error}</div>
-					{/if}
-					<form method="POST" action="?/updateRsvp" use:enhance>
-						<div class="form-group">
-							<label for="status">Will you be attending?</label>
-							<select id="status" name="status" required bind:value={rsvpStatus}>
-								<option value="yes">Yes</option>
-								<option value="maybe">Maybe</option>
-								<option value="no">No</option>
-							</select>
-						</div>
-						<div class="form-group">
-							<label for="arrivalDatetime">Arrival Date & Time</label>
-							<input 
-								type="datetime-local" 
-								id="arrivalDatetime" 
-								name="arrivalDatetime"
-								value={data.currentRsvp?.arrivalDatetime ? new Date(data.currentRsvp.arrivalDatetime).toISOString().slice(0, 16) : ''}
-							/>
-						</div>
-						<div class="form-group">
-							<label for="departureDatetime">Departure Date & Time</label>
-							<input 
-								type="datetime-local" 
-								id="departureDatetime" 
-								name="departureDatetime"
-								value={data.currentRsvp?.departureDatetime ? new Date(data.currentRsvp.departureDatetime).toISOString().slice(0, 16) : ''}
-							/>
-						</div>
-						<div class="form-row">
-							<div class="form-group">
-								<label for="adultsCount">How many people are you RSVPing for?</label>
-								<input type="number" id="adultsCount" name="adultsCount" value={data.currentRsvp?.adultsCount || 1} min="1" max="99" required title="Adults (you + plus-ones). Kids don’t count toward sleeping spots." />
-								<small class="form-hint">Adults only — kids don’t count toward bed spots.</small>
-							</div>
-							<div class="form-group">
-								<label for="kidsCount">Kids</label>
-								<input type="number" id="kidsCount" name="kidsCount" value={data.currentRsvp?.kidsCount || 0} min="0" />
-							</div>
-							<div class="form-group">
-								<label for="petsCount">Pets</label>
-								<input type="number" id="petsCount" name="petsCount" value={data.currentRsvp?.petsCount || 0} min="0" />
-							</div>
-						</div>
-						<div class="form-group">
-							<label for="notes">Notes</label>
-							<textarea id="notes" name="notes">{data.currentRsvp?.notes || ''}</textarea>
-						</div>
-						{#if (data.myClaimedBedIds?.length ?? 0) > 0}
-							<p class="helper-text">If you change party size, update your bed claims in the <strong>Room</strong> tab if needed.</p>
+			<section class="card-section rsvp-section">
+				<div class="rsvp-yes-no-row">
+					<h2 class="section-title">Will you join us?</h2>
+					<select id="status" name="status" required bind:value={rsvpStatus} class="yes-no-select" form="rsvp-form">
+						<option value="yes">Yes</option>
+						<option value="no">No</option>
+					</select>
+				</div>
+				{#if data.currentRsvp?.status === 'yes' && data.currentRsvp?.yesSubstatus === 'reconfirm_required'}
+					<div class="reconfirm-banner" role="alert">
+						<strong>Your cost estimate changed.</strong> Please review and confirm to keep your YES RSVP.
+						{#if data.currentRsvp?.reconfirmDeadlineAt}
+							<span class="reconfirm-deadline">Please confirm by {new Date(data.currentRsvp.reconfirmDeadlineAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}.</span>
 						{/if}
-						{#if isYes}
-							<div id="cost-commitment" class="cost-commitment-module">
-								<h3 class="estimate-heading">Estimated cost</h3>
-								{#if guestEstimate}
-									<p class="estimate-range"><strong>My estimated share: {formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
-									<p class="estimate-headcount">Based on {guestEstimate.hmin}–{guestEstimate.hmax} guests.</p>
-									<p class="estimate-microcopy">Final amount depends on the number of attendees.</p>
-									{#if guestEstimate.hmax > 0 && (guestEstimate.highCents - guestEstimate.lowCents) / 100 > 100}
-										<p class="estimate-warning">Estimate may vary significantly until more people RSVP.</p>
-									{/if}
-									<div class="form-group commitment-checkbox">
-										<label class="commitment-label">
-											<input type="checkbox" bind:checked={costCommitmentChecked} name="costCommitmentAccepted" value="true" />
-											<span class="commitment-text">
-												I agree to share the trip costs.<br />
-												My estimated share is {guestEstimate ? formatRange(guestEstimate.lowCents, guestEstimate.highCents) : ''} based on {guestEstimate?.hmin}–{guestEstimate?.hmax} guests.<br />
-												I understand the final amount depends on the number of attendees.<br />
-												If the estimate changes outside this range, I will be asked to review and confirm the updated amount.
-											</span>
-										</label>
-									</div>
-									<input type="hidden" name="costCommitmentAccepted" value={canSubmitYes ? 'true' : ''} />
-								{:else}
-									<p class="helper-text">Pick your room in the <strong>Room</strong> tab to see your cost estimate, or save as Maybe for now.</p>
-								{/if}
-							</div>
-							<button type="submit" class="btn btn-primary" disabled={!canSubmitYes}>
-								Submit YES RSVP
-							</button>
-							{#if !costCommitmentChecked && guestEstimate}
-								<span class="validation-hint">Check the box above to confirm your cost estimate and submit.</span>
-							{:else if !guestEstimate}
-								<span class="validation-hint">Select rooms in the Room tab to see your estimate and submit.</span>
-							{/if}
-						{:else}
-							<button type="submit" class="btn btn-primary">Save RSVP</button>
-						{/if}
-					</form>
-				</section>
-			{:else if activeTab === 'room'}
-				<section class="rsvp-section">
-					<h2>Claim your beds</h2>
-					{#if form?.claimBedsError}
+						<span class="reconfirm-hint">Scroll down to review your estimate and confirm.</span>
+					</div>
+				{/if}
+				{#if form?.success}
+					<div class="success-message">RSVP updated!</div>
+				{/if}
+				{#if form?.error}
+					<div class="error-message" role="alert">{form.error}</div>
+				{/if}
+				<form id="rsvp-form" method="POST" action="?/updateRsvp" use:enhance>
+					{#if isYes}
+					<div class="form-row form-row-single-line">
+						<div class="form-group date-range-form-group">
+							<label class="form-label">Arrival – Departure</label>
+							<DateRangePicker
+								checkInDate={arrivalDate}
+								checkOutDate={departureDate}
+								placeholder="Select your dates"
+								minDate={tripMinDate}
+								maxDate={tripMaxDate}
+								onRangeChange={(checkIn, checkOut) => {
+									arrivalDate = checkIn;
+									departureDate = checkOut;
+								}}
+							/>
+							<input type="hidden" name="arrivalDate" value={arrivalDate} />
+							<input type="hidden" name="departureDate" value={departureDate} />
+						</div>
+						<div class="form-group">
+							<label for="adultsCount">Adults</label>
+							<input type="number" id="adultsCount" name="adultsCount" bind:value={adultsCount} min="1" max="99" required title="Adults (you + plus-ones). Kids don’t count toward sleeping spots." />
+						</div>
+						<div class="form-group">
+							<label for="kidsCount">Kids</label>
+							<input type="number" id="kidsCount" name="kidsCount" bind:value={kidsCount} min="0" />
+						</div>
+						<div class="form-group">
+							<label for="petsCount">Pets</label>
+							<input type="number" id="petsCount" name="petsCount" bind:value={petsCount} min="0" />
+						</div>
+					</div>
+					{:else}
+					<input type="hidden" name="arrivalDate" value="" />
+					<input type="hidden" name="departureDate" value="" />
+					<input type="hidden" name="adultsCount" value="1" />
+					<input type="hidden" name="kidsCount" value="0" />
+					<input type="hidden" name="petsCount" value="0" />
+					{/if}
+					{#if rsvpStatus === 'no'}
+						<div class="form-group">
+							<label for="notes">Notes (optional)</label>
+							<textarea id="notes" name="notes" bind:value={noNotes}></textarea>
+						</div>
+					{/if}
+					{#if !isYes}
+						<button type="submit" class="btn btn-primary">Submit</button>
+					{/if}
+				</form>
+			</section>
+
+			{#if isYes}
+			<section class="card-section room-section">
+				<h2 class="section-title">Choose your room</h2>
+					{#if form?.claimBedsError && !form.claimBedsError.includes('You need at least')}
 						<div class="error-message" class:conflict={form?.bedClaimConflict}>
 							{form.claimBedsError}
 						</div>
 					{/if}
-					{#if form?.claimBedsSuccess !== undefined && form?.claimBedsSuccess}
-						<div class="success-message">Beds saved. You can adjust later if plans change.</div>
-					{/if}
 					{#if data.trip.rooms.length === 0}
-						<p>No rooms available yet. The host will add rooms soon.</p>
+						<p class="no-rooms">No rooms available yet. The host will add rooms soon.</p>
 					{:else}
 						<div class="spots-counter">
 							<span>Spots needed: <strong>{partySize}</strong></span>
@@ -223,143 +286,98 @@
 								<span class="spots-warn">Add {spotsShortfall} more spot(s) to cover your party.</span>
 							{/if}
 						</div>
-						<p class="helper-text">You’re reserving beds, not assigning individuals. You can adjust later if plans change.</p>
-						<form method="POST" action="?/claimBeds" use:enhance={() => ({ result }) => { if (result.type === 'success') initSelectedBeds(); }}>
-							<div class="rooms-grid beds-claim">
+						<form bind:this={claimBedsFormEl} method="POST" action="?/claimBeds" use:enhance>
+							<input type="hidden" name="partySize" value={adultsCount} />
+							<div class="rooms-grid hotel-rooms">
 								{#each rooms as room}
-									<div class="room-card beds-room">
-										<h3>{room.name}</h3>
-										{#if room.description}
-											<p>{room.description}</p>
-										{/if}
-										<div class="beds-list beds-checkboxes">
-											{#each (room.beds ?? []) as bed}
-												{@const spots = bed.capacitySlots ?? bed.capacity ?? 1}
-												{@const isClaimedByOther = claimedByOtherSet.has(bed.id)}
-												<label class="bed-option" class:disabled={isClaimedByOther}>
-													<input
-														type="checkbox"
-														name="bedIds"
-														value={bed.id}
-														checked={selectedBedIds.includes(bed.id)}
-														disabled={isClaimedByOther}
-														onchange={(e) => {
-															const checked = (e.currentTarget as HTMLInputElement).checked;
-															if (checked) selectedBedIds = [...selectedBedIds, bed.id];
-															else selectedBedIds = selectedBedIds.filter((id) => id !== bed.id);
-														}}
-													/>
-													<span>{bed.bedType}</span>
-													<span class="bed-spots">({spots} spot{spots !== 1 ? 's' : ''})</span>
-													{#if isClaimedByOther}
-														<span class="claimed-badge">Claimed</span>
-													{/if}
-												</label>
-											{/each}
+									<div class="hotel-room-card">
+										<div class="hotel-room-photo">
+											{#if room.photoUrls?.length > 0}
+												<img src={room.photoUrls[0]} alt="" />
+											{:else}
+												<div class="hotel-room-photo-placeholder">
+													<span>{room.name}</span>
+												</div>
+											{/if}
+										</div>
+										<div class="hotel-room-body">
+											<h3 class="hotel-room-name">{room.name}</h3>
+											{#if room.description}
+												<p class="hotel-room-desc">{room.description}</p>
+											{/if}
+											<div class="beds-list beds-checkboxes">
+												{#each (room.beds ?? []) as bed}
+													{@const spots = bed.capacitySlots ?? bed.capacity ?? 1}
+													{@const isClaimedByOther = claimedByOtherSet.has(bed.id)}
+													{@const bp = data.bedPricing?.[bed.id]}
+													{@const perNight = bp ? bp.perNight : bedPricePerNight(room.id, spots)}
+													{@const total = bp ? bp.total : bedTotal(room.id, spots)}
+													<label class="bed-option hotel-bed" class:disabled={isClaimedByOther} class:selected={selectedBedIds.includes(bed.id)}>
+														<input
+															type="checkbox"
+															name="bedIds"
+															value={bed.id}
+															checked={selectedBedIds.includes(bed.id)}
+															disabled={isClaimedByOther}
+															onchange={(e) => onBedChange((e.currentTarget as HTMLInputElement).checked, bed.id)}
+														/>
+														<span class="bed-type">{bed.bedType}</span>
+														{#if perNight > 0 && tripNights > 0}
+															<span class="bed-price">{formatDollars(perNight)}/night · {formatDollars(total)} total</span>
+														{/if}
+														{#if isClaimedByOther}
+															<span class="claimed-badge">Claimed</span>
+														{/if}
+													</label>
+												{/each}
+											</div>
 										</div>
 									</div>
 								{/each}
 							</div>
-							<div class="beds-form-actions">
-								<button type="submit" class="btn btn-primary" disabled={!canSubmit}>
-									Save beds
-								</button>
-								{#if !canSubmit && spotsSelected > 0}
-									<span class="validation-hint">Select enough beds to cover {partySize} spot(s).</span>
+							{#if !canSubmit && spotsSelected > 0}
+								<p class="helper-text">Select enough beds to cover {partySize} spot(s).</p>
+							{/if}
+						</form>
+						{#if isYes || needsReconfirm}
+							<div id="cost-commitment" class="cost-commitment-module">
+								{#if guestEstimate}
+									<div class="estimate-lines">
+										<p class="estimate-range"><strong>My estimated share: {formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
+										<p class="estimate-secondary">Based on {guestEstimate.hmin}–{guestEstimate.hmax} guests. Final amount depends on the number of attendees.</p>
+									</div>
+									<div class="form-group commitment-checkbox">
+										<label class="commitment-label">
+											<span class="commitment-line-one">
+												<input type="checkbox" bind:checked={costCommitmentChecked} name="costCommitmentAccepted" value="true" form="yes-confirm-form" class="commitment-checkbox-input" />
+												<span>I agree to share the trip costs.</span>
+											</span>
+											<span class="commitment-rest">I understand the final amount depends on the number of attendees. If the estimate changes outside your accepted range, you’ll be asked to review and confirm.</span>
+										</label>
+									</div>
+
+									<form id="yes-confirm-form" method="POST" action="?/updateRsvp" use:enhance class="submit-form">
+										<input type="hidden" name="status" value="yes" />
+										<input type="hidden" name="arrivalDate" value={arrivalDate} />
+										<input type="hidden" name="departureDate" value={departureDate} />
+										<input type="hidden" name="adultsCount" value={adultsCount} />
+										<input type="hidden" name="kidsCount" value={kidsCount} />
+										<input type="hidden" name="petsCount" value={petsCount} />
+										<div class="submit-row">
+											<button type="submit" class="btn btn-primary" disabled={!canSubmitYes}>
+												Submit
+											</button>
+											{#if !costCommitmentChecked}
+												<span class="validation-hint">Check the box above to confirm your estimate and submit.</span>
+											{/if}
+										</div>
+									</form>
+								{:else}
+									<p class="helper-text">For per-bed trips, you’ll see your estimate after you pick your bed(s) above.</p>
 								{/if}
 							</div>
-						</form>
-						{#if myClaimedSet.size > 0}
-							<p class="summary-hint">Your current claims: {spotsSelected} spot(s) across {selectedBedIds.length} bed(s).</p>
-						{/if}
-						{#if spotsSelected > partySize && partySize > 0}
-							<p class="helper-text">You’re holding extra spots—you can keep them or uncheck beds to release.</p>
 						{/if}
 					{/if}
-				</section>
-			{:else if activeTab === 'activities'}
-				<section class="rsvp-section">
-					<h2>Activities</h2>
-					{#if data.trip.activities.length === 0}
-						<p>No activities planned yet.</p>
-					{:else}
-						<div class="activities-list">
-							{#each data.trip.activities as activity}
-								{@const isParticipating = activity.participants.length > 0}
-								<div class="activity-card {isParticipating ? 'participating' : ''}">
-									<div class="activity-info">
-										<h3>{activity.title}</h3>
-										<p>{activity.date.toLocaleDateString()}</p>
-										{#if activity.time}
-											<p>{activity.time}</p>
-										{/if}
-										{#if activity.location}
-											<p>📍 {activity.location}</p>
-										{/if}
-										{#if activity.pricePerPerson > 0}
-											<p><strong>${activity.pricePerPerson} per person</strong></p>
-										{/if}
-									</div>
-									<form method="POST" action="?/toggleActivity" use:enhance>
-										<input type="hidden" name="activityId" value={activity.id} />
-										<input type="hidden" name="status" value={isParticipating ? 'out' : 'in'} />
-										<button type="submit" class="btn btn-sm {isParticipating ? 'btn-secondary' : 'btn-primary'}">
-											{isParticipating ? 'Opt Out' : 'Join'}
-										</button>
-									</form>
-								</div>
-							{/each}
-						</div>
-					{/if}
-				</section>
-			{:else if activeTab === 'extras'}
-				<section class="rsvp-section">
-					<h2>Extra Costs</h2>
-					{#if data.trip.extraCostRules.length === 0}
-						<p>No extra costs configured.</p>
-					{:else}
-						<div class="extras-list">
-							{#each data.trip.extraCostRules as rule}
-								<div class="extra-card">
-									<div class="extra-info">
-										<h3>{rule.label}</h3>
-										<p>${rule.amount} ({rule.type})</p>
-									</div>
-									<form method="POST" action="?/selectExtra" use:enhance>
-										<input type="hidden" name="ruleId" value={rule.id} />
-										<input type="number" name="quantity" value="0" min="0" class="quantity-input" />
-										<button type="submit" class="btn btn-sm btn-primary">Add</button>
-									</form>
-								</div>
-							{/each}
-						</div>
-					{/if}
-				</section>
-			{:else if activeTab === 'profile'}
-				<section class="rsvp-section">
-					<h2>Guest Information</h2>
-					{#if form?.success}
-						<div class="success-message">Profile updated!</div>
-					{/if}
-					<form method="POST" action="?/updateProfile" use:enhance>
-						<div class="form-group">
-							<label for="dietaryRestrictions">Dietary Restrictions</label>
-							<textarea id="dietaryRestrictions" name="dietaryRestrictions">{data.currentProfile?.dietaryRestrictions || ''}</textarea>
-						</div>
-						<div class="form-group">
-							<label for="allergies">Allergies</label>
-							<textarea id="allergies" name="allergies">{data.currentProfile?.allergies || ''}</textarea>
-						</div>
-						<div class="form-group">
-							<label for="phone">Phone Number</label>
-							<input type="tel" id="phone" name="phone" value={data.currentProfile?.phone || ''} />
-						</div>
-						<div class="form-group">
-							<label for="emergencyContact">Emergency Contact</label>
-							<input type="text" id="emergencyContact" name="emergencyContact" value={data.currentProfile?.emergencyContact || ''} />
-						</div>
-						<button type="submit" class="btn btn-primary">Save Profile</button>
-					</form>
 				</section>
 			{/if}
 		</div>
@@ -370,54 +388,99 @@
 	.rsvp-page {
 		min-height: calc(100vh - 80px);
 		padding: var(--spacing-xl) var(--spacing-md);
+		background: linear-gradient(160deg, #fdf8f3 0%, #f5ebe0 50%, #efe6dc 100%);
 	}
 
 	.container {
-		max-width: 1000px;
+		max-width: 960px;
 		margin: 0 auto;
 	}
 
-	.page-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: var(--spacing-xl);
-	}
-
-	.tabs {
-		display: flex;
-		gap: var(--spacing-sm);
-		border-bottom: 2px solid var(--color-border);
-		margin-bottom: var(--spacing-xl);
-		overflow-x: auto;
-	}
-
-	.tab {
-		padding: var(--spacing-md) var(--spacing-lg);
-		background: none;
-		border: none;
-		border-bottom: 2px solid transparent;
-		cursor: pointer;
-		font-size: 1rem;
+	.back-link {
+		display: inline-block;
+		margin-bottom: var(--spacing-md);
 		color: var(--color-text-light);
-		transition: all 0.2s;
+		font-size: 0.9rem;
+		text-decoration: none;
+	}
+	.back-link:hover {
+		color: var(--color-primary);
+	}
+
+	.rsvp-card {
+		background: #fefdfb;
+		padding: 2.5rem 2rem;
+		border-radius: 12px;
+		box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+		border: 1px solid rgba(180, 160, 140, 0.25);
+	}
+
+	.card-invite {
+		text-align: center;
+		margin-bottom: 2.5rem;
+		padding-bottom: 2rem;
+		border-bottom: 1px solid rgba(180, 160, 140, 0.3);
+	}
+	.trip-title {
+		font-family: Georgia, 'Times New Roman', serif;
+		font-size: clamp(1.75rem, 4vw, 2.25rem);
+		font-weight: 400;
+		color: #2c2419;
+		margin: 0 0 0.5rem 0;
+		letter-spacing: 0.02em;
+	}
+	.trip-dates {
+		font-size: 1rem;
+		color: #5c5248;
+		margin: 0 0 0.25rem 0;
+		font-style: italic;
+	}
+	.trip-destination {
+		font-size: 1rem;
+		color: #5c5248;
+		margin: 0;
+	}
+
+	.card-section {
+		margin-bottom: 2rem;
+	}
+	.rsvp-section.card-section {
+		margin-bottom: 0.75rem;
+	}
+	.card-section:last-of-type {
+		margin-bottom: 0;
+	}
+	.section-title {
+		font-family: Georgia, 'Times New Roman', serif;
+		font-size: 1.25rem;
+		font-weight: 400;
+		color: #2c2419;
+		margin: 0;
+	}
+
+	.rsvp-yes-no-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--spacing-md);
+		margin-bottom: var(--spacing-lg);
+		flex-wrap: nowrap;
+	}
+	.rsvp-yes-no-row .section-title {
+		flex: 0 1 auto;
+		margin: 0;
 		white-space: nowrap;
 	}
-
-	.tab:hover {
-		color: var(--color-text);
-	}
-
-	.tab.active {
-		color: var(--color-primary);
-		border-bottom-color: var(--color-primary);
-	}
-
-	.tab-content {
+	.yes-no-select {
+		flex: 0 0 auto;
+		width: 15rem;
+		min-width: unset;
+		padding: var(--spacing-sm) 0.5rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		font-size: 1rem;
 		background: white;
-		padding: var(--spacing-xl);
-		border-radius: var(--radius-md);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		color: var(--color-text);
 	}
 
 	.rsvp-section h2 {
@@ -443,6 +506,33 @@
 		border-radius: var(--radius-sm);
 		font-size: 1rem;
 	}
+
+	.date-range-form-group :global(.date-range-picker) {
+		width: 100%;
+	}
+	.date-range-form-group :global(.date-range-picker .trigger-input) {
+		width: 100%;
+		padding: var(--spacing-sm);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		font-size: 1rem;
+		color: var(--color-text);
+		background: white;
+	}
+	.date-range-form-group :global(.date-range-picker .trigger-input:hover) {
+		border-color: var(--color-border);
+	}
+	.date-range-form-group :global(.date-range-picker .trigger-input:focus) {
+		outline: none;
+		border-color: var(--color-primary);
+		box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+	}
+	.date-range-form-group :global(.date-range-picker .trigger-text.placeholder) {
+		color: var(--color-text-light);
+	}
+	.date-range-form-group :global(.date-range-picker .trigger-icon) {
+		color: var(--color-text-light);
+	}
 	.form-hint {
 		display: block;
 		margin-top: 0.25rem;
@@ -455,7 +545,18 @@
 		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 		gap: var(--spacing-md);
 	}
-
+	.form-row-single-line {
+		grid-template-columns: 1.5fr 80px 80px 80px;
+		align-items: end;
+	}
+	.rsvp-section .form-row-single-line .form-group {
+		margin-bottom: var(--spacing-xs);
+	}
+	@media (max-width: 700px) {
+		.form-row-single-line {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
 	.rooms-grid,
 	.activities-list,
 	.extras-list {
@@ -539,7 +640,7 @@
 		margin-bottom: var(--spacing-md);
 	}
 	.beds-claim .room-card { flex-direction: column; align-items: stretch; }
-	.beds-checkboxes { display: flex; flex-direction: column; gap: 0.25rem; }
+	.beds-checkboxes { display: flex; flex-direction: column; gap: 0.5rem; }
 	.bed-option {
 		display: flex;
 		align-items: center;
@@ -548,7 +649,6 @@
 	}
 	.bed-option.disabled { opacity: 0.6; cursor: not-allowed; }
 	.bed-option input { margin: 0; }
-	.bed-spots { font-size: 0.85rem; color: var(--color-text-light); }
 	.claimed-badge {
 		font-size: 0.75rem;
 		background: var(--color-bg-light);
@@ -570,6 +670,13 @@
 		padding: var(--spacing-xs) var(--spacing-md);
 		font-size: 0.875rem;
 	}
+	.date-range {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		align-items: center;
+		gap: var(--spacing-sm);
+	}
+	.date-range-sep { color: var(--color-text-light); }
 
 	.reconfirm-banner {
 		background: #fef3c7;
@@ -583,23 +690,140 @@
 		gap: var(--spacing-sm);
 	}
 	.reconfirm-deadline { font-size: 0.9rem; color: #92400e; }
-	.reconfirm-cta { flex-shrink: 0; }
+	.reconfirm-hint { display: block; margin-top: 0.5rem; font-size: 0.9rem; }
+	.room-section { margin-top: var(--spacing-xl); padding-top: var(--spacing-lg); border-top: 1px solid rgba(180, 160, 140, 0.3); }
+	.room-section-footer { margin-top: var(--spacing-lg); }
+
+	.no-rooms { color: #5c5248; margin: 0; }
+	.hotel-rooms {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 1.5rem;
+		align-items: stretch;
+	}
+	@media (max-width: 700px) {
+		.hotel-rooms { grid-template-columns: 1fr; }
+	}
+	.hotel-room-card {
+		display: grid;
+		grid-template-columns: 1fr;
+		grid-template-rows: 180px auto;
+		gap: 0;
+		background: #fff;
+		border-radius: 10px;
+		overflow: hidden;
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+		border: 1px solid rgba(180, 160, 140, 0.2);
+	}
+	.hotel-room-photo {
+		background: #e8e0d8;
+		overflow: hidden;
+		height: 180px;
+		display: flex;
+	}
+	.hotel-room-photo img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+		flex: 1;
+		min-height: 0;
+	}
+	.hotel-room-photo-placeholder {
+		width: 100%;
+		height: 100%;
+		min-height: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.85rem;
+		color: #8a7f75;
+		text-align: center;
+		padding: 0.5rem;
+	}
+	.hotel-room-body {
+		padding: 0.75rem 1rem;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		min-height: 0;
+	}
+	.hotel-room-name {
+		font-size: 1.1rem;
+		font-weight: 600;
+		color: #2c2419;
+		margin: 0 0 0.35rem 0;
+	}
+	.hotel-room-desc {
+		font-size: 0.9rem;
+		color: #5c5248;
+		margin: 0 0 0.5rem 0;
+		line-height: 1.4;
+	}
+	.hotel-bed {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.75rem;
+		padding: 0.6rem 0.75rem;
+		border-radius: 8px;
+		border: 2px solid rgba(180, 160, 140, 0.25);
+		transition: border-color 0.2s, background 0.2s;
+	}
+	.hotel-bed.selected {
+		border-color: var(--color-primary);
+		background: rgba(102, 126, 234, 0.06);
+	}
+	.hotel-bed .bed-type { font-weight: 500; text-transform: capitalize; }
+	.hotel-bed .bed-price { margin-left: auto; font-size: 0.85rem; color: #5c5248; }
 
 	.cost-commitment-module {
 		margin: var(--spacing-lg) 0;
-		padding: var(--spacing-md);
-		background: var(--color-bg-light, #f8fafc);
-		border-radius: var(--radius-md);
-		border: 1px solid var(--color-border);
+		padding: 1.25rem;
+		background: rgba(255, 255, 255, 0.7);
+		border-radius: 10px;
+		border: 1px solid rgba(180, 160, 140, 0.25);
 	}
-	.estimate-heading { margin: 0 0 var(--spacing-sm) 0; font-size: 1rem; }
+	.estimate-lines {
+		text-align: center;
+		margin-bottom: 0.5rem;
+	}
+	.estimate-lines .estimate-range { margin: 0 0 0.15rem 0; }
+	.estimate-lines .estimate-secondary { margin: 0; font-size: 0.9rem; color: var(--color-text-light); }
 	.estimate-range { margin: 0 0 0.25rem 0; }
 	.estimate-headcount { margin: 0; font-size: 0.9rem; color: var(--color-text-light); }
-	.estimate-microcopy { margin: 0 0 var(--spacing-sm) 0; font-size: 0.85rem; color: var(--color-text-light); }
+	.estimate-microcopy { margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--color-text-light); }
+	.submit-form { margin-top: 1.25rem; }
+	.submit-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem; }
 	.estimate-warning { margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--color-warning, #b45309); }
-	.commitment-checkbox { margin-top: var(--spacing-md); }
-	.commitment-label { display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-weight: normal; }
-	.commitment-label input { margin-top: 0.25rem; flex-shrink: 0; }
+	.commitment-checkbox { margin-top: 1rem; margin-bottom: 0; }
+	.commitment-checkbox.form-group { margin-bottom: 0; }
+	.commitment-label { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-weight: normal; }
+	.commitment-line-one {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: nowrap;
+		align-items: center;
+		gap: 0.5rem;
+		width: fit-content;
+	}
+	.commitment-line-one > span { white-space: nowrap; }
+	.commitment-label .commitment-checkbox-input {
+		flex-shrink: 0;
+		margin: 0;
+		vertical-align: middle;
+		width: 1rem;
+		height: 1rem;
+		min-width: 1rem;
+		min-height: 1rem;
+	}
+	.commitment-rest {
+		display: block;
+		font-size: 0.9rem;
+		line-height: 1.45;
+		color: var(--color-text-light);
+		margin: 0;
+	}
 	.commitment-text { font-size: 0.9rem; line-height: 1.45; }
 	.validation-hint { display: inline-block; margin-left: 0.5rem; font-size: 0.85rem; color: var(--color-text-light); }
 </style>

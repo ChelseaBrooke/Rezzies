@@ -18,7 +18,7 @@ export type GuestRow = {
 	name: string;
 	email: string;
 	avatarUrl?: string | null;
-	rsvpStatus: 'yes' | 'no' | 'maybe' | null;
+	rsvpStatus: 'yes' | 'no' | null;
 	rsvpUpdatedAt: string | null;
 	yesSubstatus: 'confirmed' | 'reconfirm_required' | null;
 	reconfirmDeadlineAt: string | null;
@@ -138,7 +138,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		const assignments = uid ? (assignmentsByUserId.get(uid) ?? []) : [];
 		const firstAssignment = assignments[0] ?? null;
 		const profile = uid ? profileByUserId.get(uid) : null;
-		const status = rsvp?.status ?? null;
+		const status = rsvp?.status === 'yes' ? 'yes' : rsvp?.status === 'no' ? 'no' : null;
 		const totalPartySize = assignments.reduce((s, a) => s + (a.partySize || 1), 0);
 		if (status === 'yes') {
 			goingCount++;
@@ -453,7 +453,7 @@ export const actions: Actions = {
 
 		if (rsvpStatusRaw === '' || rsvpStatusRaw === 'no-response') {
 			await prisma.rSVP.deleteMany({ where: { tripId, userId } });
-		} else if (rsvpStatusRaw === 'yes' || rsvpStatusRaw === 'no' || rsvpStatusRaw === 'maybe') {
+		} else if (rsvpStatusRaw === 'yes' || rsvpStatusRaw === 'no') {
 			await prisma.rSVP.upsert({
 				where: { tripId_userId: { tripId, userId } },
 				create: {

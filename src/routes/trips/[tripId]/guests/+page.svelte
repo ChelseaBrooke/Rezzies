@@ -231,7 +231,7 @@
 		if (filterDietary === 'has-flags') rows = rows.filter((r) => r.hasDietaryFlags);
 		if (sortBy === 'name') rows.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
 		else if (sortBy === 'rsvp') {
-			const order = { yes: 0, maybe: 1, no: 2, null: 3 };
+			const order = { yes: 0, no: 1, null: 2 };
 			rows.sort((a, b) => (order[a.rsvpStatus ?? 'null'] ?? 3) - (order[b.rsvpStatus ?? 'null'] ?? 3));
 		} else if (sortBy === 'party-size') rows.sort((a, b) => a.partySize - b.partySize);
 		if (sortDir === 'desc') rows.reverse();
@@ -491,7 +491,6 @@
 										>
 											<option value="yes">Going</option>
 											<option value="no">Not going</option>
-											<option value="maybe">Maybe</option>
 											<option value="no-response">No response</option>
 										</select>
 										{#if row.rsvpUpdatedAt}
@@ -503,8 +502,6 @@
 												? (row.yesSubstatus === 'confirmed' ? 'Going (Confirmed)' : 'Going (Reconfirm required)')
 												: row.rsvpStatus === 'no'
 													? 'Not going'
-													: row.rsvpStatus === 'maybe'
-														? 'Maybe'
 														: 'No response'}
 										</span>
 										{#if row.rsvpStatus === 'yes' && row.yesSubstatus !== 'confirmed' && row.reconfirmDeadlineAt}
@@ -885,7 +882,6 @@
 	.status-pill { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; text-transform: capitalize; }
 	.status-yes { background: #dcfce7; color: #166534; }
 	.status-no { background: #f3f4f6; color: #6b7280; }
-	.status-maybe { background: #fef3c7; color: #92400e; }
 	.status-pending, .status-null { background: #fef3c7; color: #92400e; }
 	.updated-hint { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 0.125rem; }
 

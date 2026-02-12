@@ -6,12 +6,16 @@
 		checkInDate = '',
 		checkOutDate = '',
 		onRangeChange,
-		placeholder = 'Select trip dates'
+		placeholder = 'Select trip dates',
+		minDate,
+		maxDate
 	}: {
 		checkInDate?: string;
 		checkOutDate?: string;
 		onRangeChange?: (checkIn: string, checkOut: string) => void;
 		placeholder?: string;
+		minDate?: string;
+		maxDate?: string;
 	} = $props();
 
 	let open = $state(false);
@@ -73,12 +77,16 @@
 		return checkOutDate === dateKey;
 	}
 
+	function isDateDisabled(dateKey: string): boolean {
+		if (dateKey < today) return true;
+		if (minDate && dateKey < minDate) return true;
+		if (maxDate && dateKey > maxDate) return true;
+		return false;
+	}
+
 	function selectCell(dateKey: string) {
 		if (!dateKey) return;
-		const cells = getMonthCells(viewYear, viewMonth);
-		const isCurrent = cells.some((c) => c.dateKey === dateKey && c.isCurrentMonth);
-		if (!isCurrent) return;
-		if (dateKey < today) return;
+		if (isDateDisabled(dateKey)) return;
 
 		let newStart = checkInDate;
 		let newEnd = checkOutDate;
@@ -121,8 +129,9 @@
 
 	function openDropdown() {
 		open = true;
-		if (checkInDate) {
-			const d = new Date(checkInDate + 'T12:00:00');
+		const dateStr = checkInDate || minDate;
+		if (dateStr) {
+			const d = new Date(dateStr + 'T12:00:00');
 			viewYear = d.getFullYear();
 			viewMonth = d.getMonth();
 		} else {
@@ -145,8 +154,10 @@
 	});
 
 	$effect(() => {
-		if (open && checkInDate) {
-			const d = new Date(checkInDate + 'T12:00:00');
+		if (!open) return;
+		const dateStr = checkInDate || minDate;
+		if (dateStr) {
+			const d = new Date(dateStr + 'T12:00:00');
 			viewYear = d.getFullYear();
 			viewMonth = d.getMonth();
 		}
@@ -191,14 +202,14 @@
 				</div>
 				<div class="days-grid">
 					{#each cells as cell}
-						{@const disabled = cell.isCurrentMonth && cell.dateKey < today}
+						{@const disabled = isDateDisabled(cell.dateKey)}
 						<button
 							type="button"
 							class="day-cell"
 							class:other-month={!cell.isCurrentMonth}
-							class:in-range={cell.isCurrentMonth && isInRange(cell.dateKey)}
-							class:range-start={cell.isCurrentMonth && isStart(cell.dateKey)}
-							class:range-end={cell.isCurrentMonth && isEnd(cell.dateKey)}
+							class:in-range={isInRange(cell.dateKey)}
+							class:range-start={isStart(cell.dateKey)}
+							class:range-end={isEnd(cell.dateKey)}
 							class:today={cell.dateKey === today}
 							class:disabled={disabled}
 							disabled={disabled}
@@ -370,6 +381,8 @@
 
 	.day-cell.other-month {
 		color: var(--muted);
+	}
+	.day-cell.other-month.disabled {
 		opacity: 0.5;
 	}
 

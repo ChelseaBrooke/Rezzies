@@ -6,9 +6,11 @@ import { prisma } from '$lib/server/prisma.js';
 import { totalSpotsForBeds, hasEnoughSpots, isPrismaUniqueConflict } from '$lib/server/bed-spot-validation.js';
 import {
 	computeGuestEstimateRange,
+	computeGuestEstimateWithOverrides,
 	parseReconfirmPolicy,
 	checkAndSetReconfirmRequired
 } from '$lib/server/guest-estimate.js';
+import { computeRoomPricing, calculateReservationPrice } from '$lib/server/pricing-canonical.js';
 import { z } from 'zod';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
@@ -89,6 +91,43 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	}
 	const reconfirmPolicy = parseReconfirmPolicy(null);
 
+	let roomPricing: Awaited<ReturnType<typeof computeRoomPricing>> | null = null;
+	if (trip.rooms.length > 0) {
+		try {
+			roomPricing = await computeRoomPricing(tripId);
+		} catch {
+			// Trip may have pricing config issues
+		}
+	}
+
+	// Per-bed pricing: compute price per bed (by bed type + privacy) for display when trip uses per_bed model
+	let bedPricing: Record<string, { perNight: number; total: number }> | null = null;
+	const pricingModel = (trip.pricingModel ?? '').toLowerCase();
+	const checkIn = trip.checkInDate instanceof Date ? trip.checkInDate : new Date(trip.checkInDate);
+	const checkOut = trip.checkOutDate instanceof Date ? trip.checkOutDate : new Date(trip.checkOutDate);
+	if (pricingModel === 'per_bed' && trip.rooms.length > 0 && !isNaN(checkIn.getTime()) && !isNaN(checkOut.getTime())) {
+		try {
+			const map: Record<string, { perNight: number; total: number }> = {};
+			for (const room of trip.rooms) {
+				for (const bed of room.beds ?? []) {
+					const slots = bed.capacitySlots ?? bed.capacity ?? 1;
+					const result = await calculateReservationPrice({
+						tripId,
+						roomId: room.id,
+						bedId: bed.id,
+						numberOfSlots: slots,
+						checkInDate: checkIn,
+						checkOutDate: checkOut
+					});
+					map[bed.id] = { perNight: result.perNightRate, total: result.totalPrice };
+				}
+			}
+			bedPricing = map;
+		} catch {
+			// Fall back to room-level pricing if per-bed calculation fails
+		}
+	}
+
 	return {
 		user,
 		trip,
@@ -98,12 +137,14 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		claimedBedIdsByOther: Array.from(claimedBedIdsByOther),
 		selectedActivities,
 		guestEstimate,
-		reconfirmPolicy
+		reconfirmPolicy,
+		roomPricing,
+		bedPricing
 	};
 };
 
 const rsvpSchema = z.object({
-	status: z.enum(['yes', 'no', 'maybe']),
+	status: z.enum(['yes', 'no']),
 	arrivalDatetime: z.coerce.date().optional(),
 	departureDatetime: z.coerce.date().optional(),
 	adultsCount: z.coerce.number().int().positive().default(1),
@@ -129,23 +170,26 @@ export const actions: Actions = {
 		if (!member) throw error(403, 'You must be a member of this trip');
 
 		const formData = await request.formData();
-		const status = (formData.get('status') as string) ?? '';
 		const costCommitmentAccepted = formData.get('costCommitmentAccepted') === 'true' || formData.get('costCommitmentAccepted') === '1';
+		const arrivalDateRaw = (formData.get('arrivalDate') as string | null)?.trim() || '';
+		const departureDateRaw = (formData.get('departureDate') as string | null)?.trim() || '';
 
 		const data = {
 			status: formData.get('status') as string,
-			arrivalDatetime: formData.get('arrivalDatetime') ? new Date(formData.get('arrivalDatetime') as string) : undefined,
-			departureDatetime: formData.get('departureDatetime') ? new Date(formData.get('departureDatetime') as string) : undefined,
+			arrivalDatetime: arrivalDateRaw ? new Date(`${arrivalDateRaw}T00:00:00`) : undefined,
+			departureDatetime: departureDateRaw ? new Date(`${departureDateRaw}T00:00:00`) : undefined,
 			adultsCount: Number(formData.get('adultsCount')),
 			kidsCount: Number(formData.get('kidsCount')),
 			petsCount: Number(formData.get('petsCount')),
-			notes: formData.get('notes') as string | null
+			// Notes are only stored for NO
+			notes: (formData.get('notes') as string | null) ?? null
 		};
 
 		const validation = rsvpSchema.safeParse(data);
 		if (!validation.success) {
 			return fail(400, { error: validation.error.errors[0]?.message });
 		}
+		const notesForStatus = validation.data.status === 'no' ? (data.notes ?? undefined) : undefined;
 
 		// YES requires cost commitment: server recomputes estimate and persists accepted range
 		if (validation.data.status === 'yes') {
@@ -165,6 +209,7 @@ export const actions: Actions = {
 					tripId,
 					userId: user.id,
 					...validation.data,
+					notes: null,
 					costCommitmentAccepted: true,
 					rsvpYesAcceptedAt: now,
 					yesSubstatus: 'confirmed',
@@ -181,6 +226,7 @@ export const actions: Actions = {
 				},
 				update: {
 					...validation.data,
+					notes: null,
 					costCommitmentAccepted: true,
 					rsvpYesAcceptedAt: now,
 					yesSubstatus: 'confirmed',
@@ -206,10 +252,12 @@ export const actions: Actions = {
 			create: {
 				tripId,
 				userId: user.id,
-				...validation.data
+				...validation.data,
+				notes: notesForStatus ?? null
 			},
 			update: {
 				...validation.data,
+				notes: notesForStatus ?? null,
 				costCommitmentAccepted: null,
 				rsvpYesAcceptedAt: null,
 				yesSubstatus: null,
@@ -288,11 +336,12 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const bedIdsRaw = formData.getAll('bedIds');
 		const bedIds = Array.isArray(bedIdsRaw) ? (bedIdsRaw as string[]).filter((id) => typeof id === 'string' && id.trim() !== '') : [];
+		const partySizeRaw = Number(formData.get('partySize'));
 
 		const rsvp = await prisma.rSVP.findUnique({
 			where: { tripId_userId: { tripId, userId: user.id } }
 		});
-		const partySize = Math.min(99, Math.max(1, rsvp?.adultsCount ?? 1));
+		const partySize = Math.min(99, Math.max(1, Number.isFinite(partySizeRaw) && partySizeRaw > 0 ? partySizeRaw : (rsvp?.adultsCount ?? 1)));
 
 		const trip = await prisma.trip.findUnique({
 			where: { id: tripId },
@@ -345,6 +394,29 @@ export const actions: Actions = {
 
 		await checkAndSetReconfirmRequired(tripId);
 		return { claimBedsSuccess: true };
+	},
+
+	getEstimate: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) throw error(403, 'You must be a member of this trip');
+
+		const formData = await request.formData();
+		const arrivalDate = (formData.get('arrivalDate') as string)?.trim() ?? '';
+		const departureDate = (formData.get('departureDate') as string)?.trim() ?? '';
+		const adultsCount = Math.max(1, Number(formData.get('adultsCount')) || 1);
+		const bedIdsRaw = formData.getAll('bedIds');
+		const bedIds = Array.isArray(bedIdsRaw) ? (bedIdsRaw as string[]).filter((id) => typeof id === 'string' && id.trim() !== '') : [];
+
+		const estimate = await computeGuestEstimateWithOverrides(tripId, user.id, {
+			...(arrivalDate && { arrivalDate }),
+			...(departureDate && { departureDate }),
+			adultsCount,
+			bedIds
+		});
+		return { getEstimate: estimate ?? undefined };
 	},
 
 	toggleActivity: async ({ request, params, cookies }) => {
