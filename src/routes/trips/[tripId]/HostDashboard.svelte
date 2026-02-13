@@ -55,8 +55,9 @@
 	const roomsFilled = $derived(new Set(roomAssignments.map((a) => a.roomId)).size);
 	const roomsPct = $derived(roomsTotal > 0 ? Math.round((roomsFilled / roomsTotal) * 100) : 0);
 
+	// Committed = sum of yes-RSVPs' current expected cost (their reserved beds/rooms/slots), not the estimate range
 	const committedFunds = $derived(
-		(trip?.invoices ?? []).reduce((s, i) => s + (i.status === 'paid' ? i.totalAmount : 0), 0)
+		data.committedFundsFromYesRsvps ?? (trip?.invoices ?? []).reduce((s, i) => s + (i.status === 'paid' ? i.totalAmount : 0), 0)
 	);
 	const fundingPct = $derived(totalCost > 0 ? Math.round((committedFunds / totalCost) * 100) : 0);
 

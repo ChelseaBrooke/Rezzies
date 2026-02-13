@@ -10,7 +10,7 @@ import {
 	parseReconfirmPolicy,
 	checkAndSetReconfirmRequired
 } from '$lib/server/guest-estimate.js';
-import { computeRoomPricing, calculateReservationPrice } from '$lib/server/pricing-canonical.js';
+import { computeRoomPricing, computePerBedPricingAtHeadcount } from '$lib/server/pricing-canonical.js';
 import { z } from 'zod';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
@@ -100,32 +100,17 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		}
 	}
 
-	// Per-bed pricing: compute price per bed (by bed type + privacy) for display when trip uses per_bed model
+	// Per-bed totals = what you'd pay at current yes-RSVP count (including plus-ones)
+	const yesRsvps = await prisma.rSVP.findMany({
+		where: { tripId, status: 'yes' },
+		select: { adultsCount: true }
+	});
+	const yesRsvpHeadcount = Math.max(1, yesRsvps.reduce((s, r) => s + (r.adultsCount ?? 1), 0));
+
 	let bedPricing: Record<string, { perNight: number; total: number }> | null = null;
-	const pricingModel = (trip.pricingModel ?? '').toLowerCase();
-	const checkIn = trip.checkInDate instanceof Date ? trip.checkInDate : new Date(trip.checkInDate);
-	const checkOut = trip.checkOutDate instanceof Date ? trip.checkOutDate : new Date(trip.checkOutDate);
-	if (pricingModel === 'per_bed' && trip.rooms.length > 0 && !isNaN(checkIn.getTime()) && !isNaN(checkOut.getTime())) {
-		try {
-			const map: Record<string, { perNight: number; total: number }> = {};
-			for (const room of trip.rooms) {
-				for (const bed of room.beds ?? []) {
-					const slots = bed.capacitySlots ?? bed.capacity ?? 1;
-					const result = await calculateReservationPrice({
-						tripId,
-						roomId: room.id,
-						bedId: bed.id,
-						numberOfSlots: slots,
-						checkInDate: checkIn,
-						checkOutDate: checkOut
-					});
-					map[bed.id] = { perNight: result.perNightRate, total: result.totalPrice };
-				}
-			}
-			bedPricing = map;
-		} catch {
-			// Fall back to room-level pricing if per-bed calculation fails
-		}
+	if ((trip.pricingModel ?? '').toLowerCase() === 'per_bed' && trip.rooms.length > 0) {
+		const perBed = await computePerBedPricingAtHeadcount(tripId, yesRsvpHeadcount);
+		if (perBed) bedPricing = perBed.bedPricing;
 	}
 
 	return {
@@ -139,7 +124,8 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		guestEstimate,
 		reconfirmPolicy,
 		roomPricing,
-		bedPricing
+		bedPricing,
+		yesRsvpHeadcount
 	};
 };
 

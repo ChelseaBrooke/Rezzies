@@ -45,6 +45,7 @@
 		mealSlots = []
 	}: Props = $props();
 
+	const destinationLabel = $derived((trip.locationCity ?? trip.fullAddress ?? trip.location)?.trim() ?? '');
 </script>
 
 <div class="hero-with-calendar">
@@ -83,7 +84,6 @@
 							<span>{dateRange}</span>
 						</span>
 					{/if}
-					{@const destinationLabel = (trip.locationCity ?? trip.fullAddress ?? trip.location)?.trim()}
 					{#if destinationLabel}
 						{#if mapsUrl}
 							<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Open in Google Maps">

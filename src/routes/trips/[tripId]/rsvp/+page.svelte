@@ -184,6 +184,7 @@
 	function roomPricePerNight(roomId: number): number {
 		return pricingByRoomId.get(roomId)?.roomPricePerNight ?? 0;
 	}
+	const tripTotalCost = $derived(data.trip?.totalCost ?? 0);
 
 	const tripDateRange = $derived.by(() => {
 		const t = data.trip;
@@ -369,12 +370,15 @@
 								<p class="helper-text">Select enough beds to cover {partySize} spot(s).</p>
 							{/if}
 						</form>
+						{#if tripNights > 0 && data.roomPricing && tripTotalCost > 0}
+							<p class="trip-total-line"><strong>Total Trip Cost:</strong> {formatDollars(tripTotalCost)} <span class="trip-total-note">(per-bed totals above are based on current {data.yesRsvpHeadcount ?? 0} guest{data.yesRsvpHeadcount === 1 ? '' : 's'})</span></p>
+						{/if}
 						{#if isYes || needsReconfirm}
 							<div id="cost-commitment" class="cost-commitment-module">
 								{#if guestEstimate}
 									<div class="estimate-lines">
 										<p class="estimate-range"><strong>My estimated share: {formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
-										<p class="estimate-secondary">Based on the host's estimates of {guestEstimate.hmin}–{guestEstimate.hmax} guests. Final amount depends on the number of attendees.</p>
+										<p class="estimate-secondary">Least if {guestEstimate.hmax} guests attend (max capacity); most if {guestEstimate.hmin} attend (host's min expected). Final amount depends on the number of attendees.</p>
 									</div>
 									<div class="form-group commitment-checkbox">
 										<label class="commitment-label">
@@ -722,6 +726,16 @@
 		color: var(--color-text-light);
 		font-size: 0.9rem;
 		margin-bottom: var(--spacing-md);
+	}
+	.trip-total-line {
+		margin: var(--spacing-md) 0 0;
+		font-size: 1rem;
+		color: var(--color-text);
+	}
+	.trip-total-note {
+		font-weight: normal;
+		color: var(--color-text-light);
+		font-size: 0.9rem;
 	}
 	.beds-claim .room-card { flex-direction: column; align-items: stretch; }
 	.beds-checkboxes { display: flex; flex-direction: column; gap: 0.5rem; }

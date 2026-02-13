@@ -3,6 +3,7 @@ import type { LayoutServerLoad } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { getUserTripMembership, isTripMember, getUserTrips } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { computeCommittedFundsFromYesRsvps } from '$lib/server/pricing-canonical.js';
 
 export const load: LayoutServerLoad = async ({ params, cookies }) => {
 	const user = await getSessionUser(cookies);
@@ -91,6 +92,8 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		pendingInviteToken = pendingInvite?.token ?? null;
 	}
 
+	const committedFundsFromYesRsvps = await computeCommittedFundsFromYesRsvps(tripId);
+
 	return {
 		user,
 		trip,
@@ -99,6 +102,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		isHost: membership?.role === 'host',
 		userRsvp,
 		canChat: userRsvp?.status === 'yes' || membership?.role === 'host',
-		pendingInviteToken
+		pendingInviteToken,
+		committedFundsFromYesRsvps
 	};
 };

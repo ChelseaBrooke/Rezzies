@@ -2,7 +2,7 @@
  * Calculate and format pricing display for rooms/beds based on pricing model
  */
 
-import { computeRoomPricing, getBedWeight, parseBedWeights, type PricingMode } from './pricing-canonical.js';
+import { computeRoomPricing, getBedWeight, getRoomEffectivePrivacy, parseBedWeights, type PricingMode } from './pricing-canonical.js';
 import { prisma } from './prisma.js';
 
 export interface RoomPricingDisplay {
@@ -99,12 +99,11 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 		const bedPricing: BedPricingDisplay[] = [];
 
 		if (pricingModel === 'PER_BED') {
-			// Price per person = (total ÷ max(effective guest count, yes-RSVPs)) × (bed weight × privacy ÷ average combined weight)
 			const bedWeights = parseBedWeights(trip.bedWeights);
 			let totalSlots = 0;
 			let sumCombinedWeight = 0;
 			for (const r of trip.rooms) {
-				const p = r.privacyFactor ?? 1.0;
+				const p = getRoomEffectivePrivacy(r.beds);
 				for (const b of r.beds) {
 					const slots = b.capacitySlots || b.capacity || 1;
 					totalSlots += slots;
@@ -114,7 +113,7 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 			const avgCombinedWeight = totalSlots > 0 ? sumCombinedWeight / totalSlots : 1;
 			const effectiveGuests = Math.max(1, trip.expectedPeopleCount ?? trip.maxGuests ?? totalSlots);
 			const base = trip.totalCost / effectiveGuests;
-			const roomPrivacy = room.privacyFactor ?? 1.0;
+			const roomPrivacy = getRoomEffectivePrivacy(room.beds);
 			for (const bed of room.beds) {
 				const w = getBedWeight(bedWeights, bed.bedType);
 				const bedPriceFullStay = (base * (w * roomPrivacy)) / avgCombinedWeight;
