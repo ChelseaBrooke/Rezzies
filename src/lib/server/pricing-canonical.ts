@@ -71,11 +71,16 @@ export function calculateNights(startDate: Date, endDate: Date): number {
 }
 
 /**
- * Normalize bed type for weight lookup: lowercase, spaces -> underscore
+ * Normalize bed type for weight lookup: lowercase, spaces -> underscore,
+ * and strip common suffixes (_bed, _size) so "queen_bed" / "Queen Bed" -> "queen", "twin_bed" -> "twin".
  */
 function normalizeBedType(bedType: string | null): string {
 	if (!bedType || !bedType.trim()) return 'other';
-	return bedType.trim().toLowerCase().replace(/\s+/g, '_');
+	let key = bedType.trim().toLowerCase().replace(/\s+/g, '_');
+	// Strip trailing _bed or _size so we match canonical keys (king, queen, twin, etc.)
+	if (key.endsWith('_bed')) key = key.slice(0, -4);
+	if (key.endsWith('_size')) key = key.slice(0, -5);
+	return key || 'other';
 }
 
 export function getBedWeight(weights: BedWeights, bedType: string | null): number {

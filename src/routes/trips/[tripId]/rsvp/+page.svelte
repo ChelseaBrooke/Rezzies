@@ -92,20 +92,36 @@
 		const a = arrivalDate;
 		const d = departureDate;
 		const adults = adultsCount;
-		const beds = selectedBedIds;
+		const beds = [...selectedBedIds];
+		const pathname = $page.url.pathname;
 		const t = setTimeout(async () => {
 			const fd = new FormData();
 			if (a) fd.set('arrivalDate', a);
 			if (d) fd.set('departureDate', d);
 			fd.set('adultsCount', String(adults));
 			beds.forEach((id) => fd.append('bedIds', id));
-			const actionUrl = `${$page.url.pathname}?/getEstimate`;
+			const actionUrl = `${pathname}?/getEstimate`;
 			try {
 				const res = await fetch(actionUrl, { method: 'POST', body: fd });
 				const text = await res.text();
+				if (!res.ok || res.redirected) {
+					liveEstimate = null;
+					return;
+				}
 				const result = deserialize(text);
-				if (result.type === 'success' && result.data?.getEstimate) {
-					liveEstimate = result.data.getEstimate;
+				if (result.type !== 'success' || !result.data) {
+					liveEstimate = null;
+					return;
+				}
+				const raw = result.data as Record<string, unknown>;
+				const est = (raw?.getEstimate ?? raw) as { lowCents?: number; highCents?: number; hmin?: number; hmax?: number } | undefined;
+				if (est && typeof est.lowCents === 'number' && typeof est.highCents === 'number') {
+					liveEstimate = {
+						lowCents: est.lowCents,
+						highCents: est.highCents,
+						hmin: typeof est.hmin === 'number' ? est.hmin : 0,
+						hmax: typeof est.hmax === 'number' ? est.hmax : 0
+					};
 				} else {
 					liveEstimate = null;
 				}
