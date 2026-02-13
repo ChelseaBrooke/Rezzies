@@ -181,17 +181,31 @@
 
 <div class="rsvp-page">
 	<div class="container">
-		<a href="/trips/{data.trip.id}" class="back-link">← Back to trip</a>
-
 		<div class="rsvp-card">
-			<div class="card-invite">
-				<h1 class="trip-title">{data.trip?.name ?? 'Trip'}</h1>
-				{#if tripDateRange}
-					<p class="trip-dates">{tripDateRange}</p>
-				{/if}
-				{#if tripDestination}
-					<p class="trip-destination">{tripDestination}</p>
-				{/if}
+			<div
+				class="card-invite"
+				style:--trip-photo={data.trip?.listingCoverPhoto ? `url(${data.trip.listingCoverPhoto})` : 'none'}
+			>
+				<div class="card-invite-photo" aria-hidden="true"></div>
+				<div class="card-invite-gradient" aria-hidden="true"></div>
+				<div class="card-invite-content">
+					<p class="invite-line">r.s.v.p.</p>
+					<div class="invite-divider" aria-hidden="true"></div>
+					<h1 class="trip-title">{data.trip?.name ?? 'Trip'}</h1>
+					{#if tripDateRange || tripDestination}
+						<div class="invite-meta">
+							{#if tripDateRange}
+								<span class="trip-dates">{tripDateRange}</span>
+							{/if}
+							{#if tripDateRange && tripDestination}
+								<span class="invite-meta-sep">·</span>
+							{/if}
+							{#if tripDestination}
+								<span class="trip-destination">{tripDestination}</span>
+							{/if}
+						</div>
+					{/if}
+				</div>
 			</div>
 
 			<section class="card-section rsvp-section">
@@ -344,7 +358,7 @@
 								{#if guestEstimate}
 									<div class="estimate-lines">
 										<p class="estimate-range"><strong>My estimated share: {formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
-										<p class="estimate-secondary">Based on {guestEstimate.hmin}–{guestEstimate.hmax} guests. Final amount depends on the number of attendees.</p>
+										<p class="estimate-secondary">Based on the host's estimates of {guestEstimate.hmin}–{guestEstimate.hmax} guests. Final amount depends on the number of attendees.</p>
 									</div>
 									<div class="form-group commitment-checkbox">
 										<label class="commitment-label">
@@ -385,6 +399,8 @@
 </div>
 
 <style>
+	@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Plus+Jakarta+Sans:wght@400;700&display=swap');
+
 	.rsvp-page {
 		min-height: calc(100vh - 80px);
 		padding: var(--spacing-xl) var(--spacing-md);
@@ -396,17 +412,6 @@
 		margin: 0 auto;
 	}
 
-	.back-link {
-		display: inline-block;
-		margin-bottom: var(--spacing-md);
-		color: var(--color-text-light);
-		font-size: 0.9rem;
-		text-decoration: none;
-	}
-	.back-link:hover {
-		color: var(--color-primary);
-	}
-
 	.rsvp-card {
 		background: #fefdfb;
 		padding: 2.5rem 2rem;
@@ -416,29 +421,92 @@
 	}
 
 	.card-invite {
+		position: relative;
 		text-align: center;
-		margin-bottom: 2.5rem;
-		padding-bottom: 2rem;
-		border-bottom: 1px solid rgba(180, 160, 140, 0.3);
+		margin: -2.5rem -2rem 1.25rem -2rem;
+		padding: 2.5rem 2rem 1.5rem;
+		min-height: 220px;
+		border-radius: 12px 12px 0 0;
+		overflow: hidden;
+	}
+	/* Photo layer only – no gradient */
+	.card-invite-photo {
+		position: absolute;
+		inset: 0;
+		background-image: var(--trip-photo, none);
+		background-size: cover;
+		background-position: center;
+		background-repeat: no-repeat;
+		background-color: #e8e0d8;
+	}
+	/* Gradient overlay – extends past bottom so no seam */
+	.card-invite-gradient {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 0;
+		bottom: -8px;
+		background: linear-gradient(
+			to bottom,
+			rgba(254, 253, 251, 0.08) 0%,
+			rgba(254, 253, 251, 0.12) 30%,
+			rgba(254, 253, 251, 0.18) 55%,
+			rgba(254, 253, 251, 0.32) 72%,
+			rgba(254, 253, 251, 0.55) 85%,
+			rgba(254, 253, 251, 0.82) 95%,
+			#fefdfb 100%
+		);
+		pointer-events: none;
+	}
+	.card-invite-content {
+		position: relative;
+		z-index: 1;
+	}
+	.invite-line {
+		font-family: 'Great Vibes', cursive;
+		font-size: 2.25rem;
+		letter-spacing: 0.08em;
+		color: #2c2419;
+		font-weight: 400;
+		margin: 0 0 0.5rem 0;
+		/* Soft glow so cursive reads on both light and dark parts of the photo */
+		text-shadow:
+			0 0 20px rgba(254, 253, 251, 0.9),
+			0 0 40px rgba(254, 253, 251, 0.6),
+			0 1px 2px rgba(0, 0, 0, 0.15);
+	}
+	.invite-divider {
+		width: 48px;
+		height: 1px;
+		background: linear-gradient(90deg, transparent, rgba(180, 160, 140, 0.5) 20%, rgba(180, 160, 140, 0.5) 80%, transparent);
+		margin: 0 auto 1.5rem;
 	}
 	.trip-title {
-		font-family: Georgia, 'Times New Roman', serif;
-		font-size: clamp(1.75rem, 4vw, 2.25rem);
-		font-weight: 400;
+		font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+		font-size: clamp(2rem, 5vw, 2.75rem);
+		font-weight: 700;
 		color: #2c2419;
-		margin: 0 0 0.5rem 0;
+		margin: 0;
+		letter-spacing: 0.02em;
+		line-height: 1.25;
+	}
+	.invite-meta {
+		margin-top: 0.35rem;
+		font-size: 0.95rem;
+		color: #5c5248;
+		font-style: italic;
 		letter-spacing: 0.02em;
 	}
-	.trip-dates {
-		font-size: 1rem;
-		color: #5c5248;
-		margin: 0 0 0.25rem 0;
-		font-style: italic;
+	.invite-meta-sep {
+		margin: 0 0.5rem;
+		opacity: 0.7;
+	}
+	.trip-dates,
+	.trip-destination {
+		margin: 0;
 	}
 	.trip-destination {
-		font-size: 1rem;
-		color: #5c5248;
-		margin: 0;
+		font-style: italic;
 	}
 
 	.card-section {

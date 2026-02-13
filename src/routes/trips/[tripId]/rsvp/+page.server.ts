@@ -181,12 +181,15 @@ export const actions: Actions = {
 			adultsCount: Number(formData.get('adultsCount')),
 			kidsCount: Number(formData.get('kidsCount')),
 			petsCount: Number(formData.get('petsCount')),
-			// Notes are only stored for NO
-			notes: (formData.get('notes') as string | null) ?? null
+			// Notes are only stored for NO; Zod .optional() accepts undefined but not null
+			notes: (formData.get('notes') as string | null)?.trim() || undefined
 		};
 
 		const validation = rsvpSchema.safeParse(data);
 		if (!validation.success) {
+			// Log validation failure so you can see which field failed (check terminal/server logs)
+			console.error('[RSVP updateRsvp] Validation failed. Data submitted:', JSON.stringify(data, null, 2));
+			console.error('[RSVP updateRsvp] Zod errors:', validation.error.errors.map((e) => ({ path: e.path.join('.'), message: e.message })));
 			return fail(400, { error: validation.error.errors[0]?.message });
 		}
 		const notesForStatus = validation.data.status === 'no' ? (data.notes ?? undefined) : undefined;
