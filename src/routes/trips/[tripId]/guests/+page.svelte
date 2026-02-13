@@ -303,7 +303,6 @@
 	<div class="page-header">
 		<div class="header-top">
 			<h1>Guests</h1>
-			<button type="button" class="btn-secondary" onclick={() => (showActivityLog = true)}>Recent activity</button>
 		</div>
 
 		<!-- RSVP visual: stacked bar -->
@@ -348,6 +347,7 @@
 	<div class="toolbar">
 		{#if data.canManageGuests}
 			<div class="toolbar-actions-row">
+				<button type="button" class="btn-secondary" onclick={() => (showActivityLog = true)}>Recent activity</button>
 				<button type="button" class="btn-secondary" onclick={copyInviteLink}>Copy link</button>
 				{#if data.isHost}
 					<button type="button" class="btn-secondary" onclick={openAddManual}>Add guest manually</button>
@@ -426,7 +426,6 @@
 							<th class="th-sortable" onclick={() => toggleSort('name')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('name')}>
 								Guest {#if sortBy === 'name'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
 							</th>
-							<th>State</th>
 							<th class="th-sortable" onclick={() => toggleSort('rsvp')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('rsvp')}>
 								RSVP {#if sortBy === 'rsvp'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
 							</th>
@@ -475,9 +474,6 @@
 											</div>
 										</div>
 									{/if}
-								</td>
-								<td>
-									<span class="state-pill state-{row.memberTripState ?? 'invite'}">{stateLabel(row)}</span>
 								</td>
 								<td>
 									{#if data.canManageGuests && row.type === 'member' && row.userId}

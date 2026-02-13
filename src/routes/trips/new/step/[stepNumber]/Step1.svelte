@@ -31,7 +31,8 @@
 	});
 	
 	function handleAddressSelect(address: string, details?: any) {
-		// draft.destinationCity is already updated via bind:value
+		// draft.destinationCity is already updated via bind:value; keep propertyAddress in sync for save
+		draft.propertyAddress = address?.trim() || draft.destinationCity || '';
 		if (details && details.address_components) {
 			const components = details.address_components;
 			let city = '';

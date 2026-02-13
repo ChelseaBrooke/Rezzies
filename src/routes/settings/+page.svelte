@@ -32,12 +32,6 @@
 				Profile
 			</button>
 			<button 
-				class="tab {activeTab === 'password' ? 'active' : ''}"
-				onclick={() => activeTab = 'password'}
-			>
-				Password
-			</button>
-			<button 
 				class="tab {activeTab === 'notifications' ? 'active' : ''}"
 				onclick={() => activeTab = 'notifications'}
 			>
@@ -47,7 +41,7 @@
 				class="tab {activeTab === 'security' ? 'active' : ''}"
 				onclick={() => activeTab = 'security'}
 			>
-				Security
+				Security & password
 			</button>
 			<button 
 				class="tab {activeTab === 'blocked' ? 'active' : ''}"
@@ -126,28 +120,6 @@
 						<button type="submit" class="btn btn-primary">Save basics</button>
 					</form>
 				</section>
-			{:else if activeTab === 'password'}
-				<section class="settings-section">
-					<h2>Change Password</h2>
-					{#if form?.success}
-						<div class="success-message">Password changed successfully!</div>
-					{/if}
-					{#if form?.error}
-						<div class="error-message">{form.error}</div>
-					{/if}
-					<form method="POST" action="?/changePassword" use:enhance>
-						<div class="form-group">
-							<label for="currentPassword">Current Password</label>
-							<input type="password" id="currentPassword" name="currentPassword" required />
-						</div>
-						<div class="form-group">
-							<label for="newPassword">New Password</label>
-							<input type="password" id="newPassword" name="newPassword" required minlength="8" />
-							<small>Must be at least 8 characters</small>
-						</div>
-						<button type="submit" class="btn btn-primary">Change Password</button>
-					</form>
-				</section>
 			{:else if activeTab === 'notifications'}
 				<section class="settings-section">
 					<h2>Notification settings</h2>
@@ -201,13 +173,31 @@
 				</section>
 			{:else if activeTab === 'security'}
 				<section class="settings-section" id="security-privacy" aria-labelledby="security-title">
-					<h2 id="security-title">Security & privacy</h2>
+					<h2 id="security-title">Security & password</h2>
 					<div class="security-body">
-						<div class="field-row">
-							<span class="field-label">Password</span>
-							<span class="field-value">Change your password below (Password tab).</span>
-							<button type="button" class="btn btn-ghost btn-sm" onclick={() => activeTab = 'password'}>Change password</button>
+						<div class="security-subsection">
+							<h3>Change password</h3>
+							{#if form?.success}
+								<div class="success-message">Password changed successfully!</div>
+							{/if}
+							{#if form?.error}
+								<div class="error-message">{form.error}</div>
+							{/if}
+							<form method="POST" action="?/changePassword" use:enhance>
+								<div class="form-group">
+									<label for="currentPassword">Current password</label>
+									<input type="password" id="currentPassword" name="currentPassword" required />
+								</div>
+								<div class="form-group">
+									<label for="newPassword">New password</label>
+									<input type="password" id="newPassword" name="newPassword" required minlength="8" />
+									<small>Must be at least 8 characters</small>
+								</div>
+								<button type="submit" class="btn btn-primary">Change password</button>
+							</form>
 						</div>
+						<hr class="section-divider" />
+						<h3>Two-factor & sessions</h3>
 						<div class="field-row">
 							<span class="field-label">Two-factor auth</span>
 							<span class="field-value">Off</span>
@@ -395,6 +385,22 @@
 		border-left: 3px solid var(--color-error);
 	}
 
+	.security-subsection {
+		margin-bottom: var(--spacing-lg);
+	}
+	.security-subsection h3 {
+		margin: 0 0 var(--spacing-md) 0;
+		font-size: 1rem;
+		font-weight: 600;
+	}
+	.security-body h3 {
+		margin: var(--spacing-sm) 0 var(--spacing-md) 0;
+		font-size: 1rem;
+		font-weight: 600;
+	}
+	.security-body h3:first-of-type {
+		margin-top: 0;
+	}
 	.security-body .field-row {
 		display: flex;
 		align-items: center;

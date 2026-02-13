@@ -288,6 +288,8 @@ export interface TripForDraft {
 	totalCost?: number | null;
 	pricingModel?: string | null;
 	location?: string | null;
+	fullAddress?: string | null;
+	locationCity?: string | null;
 	maxGuests?: number | null;
 	expectedPeopleCount?: number | null;
 	allowPartialStays?: boolean | null;
@@ -344,9 +346,9 @@ export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
 		listingUrl: trip.listingUrl ?? '',
 		coverPhoto: trip.listingCoverPhoto ?? '',
 		galleryPhotos: trip.listingCoverPhoto ? [trip.listingCoverPhoto] : [],
-		destinationCity: trip.location ?? '',
-		locationCity: (trip as { locationCity?: string | null }).locationCity ?? '',
-		propertyAddress: trip.location ?? '',
+		destinationCity: (trip.fullAddress ?? trip.location) ?? '',
+		locationCity: trip.locationCity ?? '',
+		propertyAddress: (trip.fullAddress ?? trip.location) ?? '',
 		checkInDate: toYmd(trip.checkInDate),
 		checkOutDate: toYmd(trip.checkOutDate),
 		rsvpByDate: trip.rsvpByDate ? toYmd(trip.rsvpByDate) : '',

@@ -132,8 +132,9 @@
 		if (rooms.some(r => !r.photoUrls || r.photoUrls.length === 0)) {
 			missing.push('room photos');
 		}
-		// Check destination
-		if (!trip?.location || trip.location.trim() === '') {
+		// Check destination (saved in settings or trip info)
+		const hasDestination = (trip?.fullAddress ?? trip?.location)?.trim();
+		if (!hasDestination) {
 			missing.push('destination');
 		}
 		return missing;

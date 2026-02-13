@@ -49,28 +49,6 @@
 			</div>
 		</section>
 
-		<section class="marketing-card">
-			<h2 class="section-heading">Pricing models</h2>
-			<div class="models-grid">
-				<div class="model-item">
-					<h4>Per Room</h4>
-					<p>Equal or weighted split per room. Perfect when rooms are similar in size and quality.</p>
-				</div>
-				<div class="model-item">
-					<h4>Per Person</h4>
-					<p>Simple equal split among all guests. Great for groups where everyone stays the full duration.</p>
-				</div>
-				<div class="model-item">
-					<h4>Per Bed</h4>
-					<p>Weighted by bed type (king, queen, twin). Larger beds cost more, ensuring fairness.</p>
-				</div>
-				<div class="model-item">
-					<h4>Per Person Per Night</h4>
-					<p>Most flexible option. Accounts for room quality, bed type, and stay duration. Recommended for most trips.</p>
-				</div>
-			</div>
-		</section>
-
 		<section class="marketing-card cta-card">
 			<h2 class="section-heading">Ready to get started?</h2>
 			<p class="cta-text">Start planning your next group trip today.</p>
@@ -128,34 +106,6 @@
 		margin: 0;
 	}
 
-	.models-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-		gap: 1.25rem;
-	}
-
-	.model-item {
-		text-align: center;
-		padding: 1rem;
-		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid rgba(255, 255, 255, 0.08);
-	}
-
-	.model-item h4 {
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--copper, #bf4e30);
-		margin: 0 0 0.35rem 0;
-	}
-
-	.model-item p {
-		font-size: 0.875rem;
-		color: rgba(255, 255, 255, 0.8);
-		line-height: 1.5;
-		margin: 0;
-	}
-
 	.cta-card {
 		text-align: center;
 	}
@@ -183,8 +133,7 @@
 	}
 
 	@media (max-width: 768px) {
-		.services-grid,
-		.models-grid {
+		.services-grid {
 			grid-template-columns: 1fr;
 		}
 	}

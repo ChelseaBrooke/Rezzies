@@ -17,32 +17,26 @@
 		inviteCode,
 		onInvite,
 		showToast,
-		tripInfoContent = '',
 		isHost = false
 	}: {
 		tripId: string;
 		inviteCode?: string;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
-		tripInfoContent?: string;
 		isHost?: boolean;
 	} = $props();
 
 	let shareOpen = $state(false);
 	let editOpen = $state(false);
-	let infoOpen = $state(false);
 
 	let shareTriggerEl: HTMLButtonElement | null = $state(null);
 	let editTriggerEl: HTMLButtonElement | null = $state(null);
-	let infoTriggerEl: HTMLButtonElement | null = $state(null);
 
 	let shareMenuEl: HTMLDivElement | null = $state(null);
 	let editMenuEl: HTMLDivElement | null = $state(null);
-	let infoMenuEl: HTMLDivElement | null = $state(null);
 
 	let shareMenuStyle = $state<{ top: string; left: string } | null>(null);
 	let editMenuStyle = $state<{ top: string; left: string } | null>(null);
-	let infoMenuStyle = $state<{ top: string; left: string } | null>(null);
 
 	const CLOSE_DELAY_MS = 250;
 	let closeTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -72,10 +66,6 @@
 			editOpen = false;
 			editMenuStyle = null;
 		}
-		if (infoOpen && infoTriggerEl && !infoTriggerEl.contains(target) && infoMenuEl && !infoMenuEl.contains(target)) {
-			infoOpen = false;
-			infoMenuStyle = null;
-		}
 	}
 
 	let documentClickBound = false;
@@ -91,7 +81,7 @@
 	}
 
 	$effect(() => {
-		if (shareOpen || editOpen || infoOpen) {
+		if (shareOpen || editOpen) {
 			bindDocumentClick();
 		} else {
 			unbindDocumentClick();
@@ -151,16 +141,13 @@
 	function closeAll() {
 		shareOpen = false;
 		editOpen = false;
-		infoOpen = false;
 		shareMenuStyle = null;
 		editMenuStyle = null;
-		infoMenuStyle = null;
 	}
 
 	function openShare() {
 		clearCloseSchedule();
 		editOpen = false;
-		infoOpen = false;
 		shareOpen = true;
 		positionMenu(shareTriggerEl, (s) => (shareMenuStyle = s));
 	}
@@ -168,17 +155,8 @@
 	function openEdit() {
 		clearCloseSchedule();
 		shareOpen = false;
-		infoOpen = false;
 		editOpen = true;
 		positionMenu(editTriggerEl, (s) => (editMenuStyle = s));
-	}
-
-	function openInfo() {
-		clearCloseSchedule();
-		shareOpen = false;
-		editOpen = false;
-		infoOpen = true;
-		positionMenu(infoTriggerEl, (s) => (infoMenuStyle = s));
 	}
 
 	/** Hover opens share menu; click toggles. */
@@ -206,10 +184,6 @@
 
 	function onEditClick() {
 		if (!editOpen) openEdit();
-	}
-
-	function onInfoClick() {
-		if (!infoOpen) openInfo();
 	}
 </script>
 
@@ -318,43 +292,6 @@
 		</div>
 	{/if}
 
-	<!-- Info: single button, one content span -->
-	{#if tripInfoContent}
-		<div class="dropdown-wrap">
-			<button
-				type="button"
-				class="action-btn"
-				title="Trip info"
-				bind:this={infoTriggerEl}
-				onmouseenter={openInfo}
-				onmouseleave={scheduleClose}
-				onclick={onInfoClick}
-				aria-expanded={infoOpen}
-			>
-				<span class="action-content" aria-hidden="true">
-					<span class="action-icon">
-						<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-					</span>
-					<span class="action-label">Info</span>
-				</span>
-			</button>
-			{#if infoOpen}
-				<div class="dropdown-backdrop" aria-hidden="true"></div>
-				<div
-					bind:this={infoMenuEl}
-					class="dropdown-menu dropdown-menu-fixed trip-info-overlay"
-					style={infoMenuStyle ? `top: ${infoMenuStyle.top}; left: ${infoMenuStyle.left};` : ''}
-					onmouseenter={clearCloseSchedule}
-					onmouseleave={scheduleClose}
-				>
-					<div class="trip-info-body">{tripInfoContent}</div>
-					<div class="trip-info-actions">
-						<a href="/trips/{tripId}/itinerary" class="trip-info-link">View all notes</a>
-					</div>
-				</div>
-			{/if}
-		</div>
-	{/if}
 </div>
 
 <style>
@@ -491,35 +428,5 @@
 
 	.dropdown-item.danger:hover {
 		background: rgba(191, 78, 48, 0.12);
-	}
-
-	.trip-info-overlay {
-		min-width: 16rem;
-		max-width: 22rem;
-		padding: 0;
-	}
-
-	.trip-info-body {
-		padding: 0.75rem 1rem;
-		font-size: 0.875rem;
-		color: var(--text);
-		line-height: 1.5;
-		white-space: pre-wrap;
-	}
-
-	.trip-info-actions {
-		padding: 0.5rem 1rem;
-		border-top: 1px solid var(--border);
-	}
-
-	.trip-info-link {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--primary);
-		text-decoration: none;
-	}
-
-	.trip-info-link:hover {
-		text-decoration: underline;
 	}
 </style>

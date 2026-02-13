@@ -11,11 +11,14 @@
 
 	/** Build a plain JSON-serializable payload from draft (avoids $state proxy serialization issues) */
 	function draftToPayload(d: TripDraft): Record<string, unknown> {
+		const address = (d.propertyAddress ?? d.destinationCity ?? '').trim();
 		return {
 			name: d.name,
 			description: d.description ?? '',
 			listingUrl: d.listingUrl ?? '',
-			propertyAddress: d.propertyAddress ?? d.destinationCity ?? '',
+			propertyAddress: address,
+			fullAddress: address,
+			locationCity: (d.locationCity ?? '').trim() || undefined,
 			coverPhoto: d.coverPhoto ?? '',
 			galleryPhotos: Array.isArray(d.galleryPhotos) ? d.galleryPhotos : [],
 			checkInDate: d.checkInDate,

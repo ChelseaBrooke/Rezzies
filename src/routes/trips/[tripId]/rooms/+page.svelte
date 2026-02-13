@@ -73,7 +73,7 @@
 	<div class="page-header">
 		<h1 class="page-title">Rooms & Beds</h1>
 		{#if isHost}
-			<a href="/trips/{tripId}/rooms/edit" class="manage-link">Manage rooms & beds</a>
+			<a href="/trips/{tripId}/settings" class="manage-link">Manage</a>
 		{/if}
 	</div>
 
@@ -142,13 +142,14 @@
 
 <style>
 	.page { padding: 0; max-width: none; }
-	.page-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; }
+	.page-header { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; margin-bottom: 1.25rem; }
 	.page-title { font-size: 1.5rem; font-weight: 600; margin: 0; color: var(--text); }
 	.manage-link {
 		font-size: 0.875rem;
 		color: var(--primary);
 		text-decoration: none;
 		font-weight: 500;
+		margin-top: 0.15rem;
 	}
 	.manage-link:hover { text-decoration: underline; }
 
