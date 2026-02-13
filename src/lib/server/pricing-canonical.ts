@@ -71,6 +71,118 @@ export function calculateNights(startDate: Date, endDate: Date): number {
 }
 
 /**
+ * Return array of UTC date keys (YYYY-MM-DD) for each night in [checkIn, checkOut), end exclusive.
+ * Used for per-night allocation in PER_BED and PER_ROOM.
+ */
+export function getNightsBetween(checkIn: Date, checkOut: Date): string[] {
+	const out: string[] = [];
+	const start = new Date(checkIn);
+	start.setUTCHours(0, 0, 0, 0);
+	const end = new Date(checkOut);
+	end.setUTCHours(0, 0, 0, 0);
+	const endMs = end.getTime();
+	for (let t = start.getTime(); t < endMs; t += 24 * 60 * 60 * 1000) {
+		const d = new Date(t);
+		const y = d.getUTCFullYear();
+		const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+		const day = String(d.getUTCDate()).padStart(2, '0');
+		out.push(`${y}-${m}-${day}`);
+	}
+	return out;
+}
+
+/**
+ * Distribute totalTripCostCents evenly across nights with deterministic rounding.
+ * Sum of returned array equals totalTripCostCents.
+ */
+export function distributeTripCostCentsToNights(
+	totalTripCostCents: number,
+	nightKeys: string[]
+): number[] {
+	if (nightKeys.length === 0) return [];
+	if (nightKeys.length === 1) return [totalTripCostCents];
+	const perNight = totalTripCostCents / nightKeys.length;
+	const base = nightKeys.map(() => Math.floor(perNight));
+	let remainder = totalTripCostCents - base.reduce((s, b) => s + b, 0);
+	// Deterministic: assign extra cents to first `remainder` nights (by sorted key)
+	const indices = nightKeys.map((_, i) => i).sort((a, b) => nightKeys[a].localeCompare(nightKeys[b]));
+	const out = [...base];
+	for (let j = 0; j < remainder && j < indices.length; j++) {
+		out[indices[j]] += 1;
+	}
+	return out;
+}
+
+/** Format Date as UTC YYYY-MM-DD for night-key comparison. */
+function dateToUtcKey(d: Date): string {
+	const y = d.getUTCFullYear();
+	const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+	const day = String(d.getUTCDate()).padStart(2, '0');
+	return `${y}-${m}-${day}`;
+}
+
+/**
+ * True if nightKey (YYYY-MM-DD) falls within [startDate, endDate), end exclusive.
+ * Uses startDate/endDate or trip bounds when null.
+ */
+export function isNightInRange(
+	nightKey: string,
+	startDate: Date | null,
+	endDate: Date | null,
+	tripCheckIn: Date,
+	tripCheckOut: Date
+): boolean {
+	const startKey = startDate ? dateToUtcKey(startDate) : dateToUtcKey(tripCheckIn);
+	const endKey = endDate ? dateToUtcKey(endDate) : dateToUtcKey(tripCheckOut);
+	return nightKey >= startKey && nightKey < endKey;
+}
+
+/** Spot with optional tag for aggregating by reservation (e.g. 'booking' vs assignment id). */
+export interface SpotForNight {
+	weight: number;
+	id: string;
+	bedId: string;
+	reservationTag: string;
+}
+
+/**
+ * Build list of claimed spots for a given night from assignments and optional prospective booking.
+ * Used for PER_BED nightly allocation.
+ */
+export function buildSpotsForNight(
+	nightKey: string,
+	trip: { checkInDate: Date; checkOutDate: Date; rooms: Array<{ id: number; beds: Array<{ id: string; bedType: string; capacitySlots?: number | null; capacity?: number | null }> }> },
+	bedWeights: BedWeights,
+	assignments: Array<{ id: string; roomId: number; bedId: string | null; partySize: number | null; startDate: Date | null; endDate: Date | null }>,
+	booking?: { roomId: number; bedId?: string; numberOfSlots: number }
+): SpotForNight[] {
+	const spots: SpotForNight[] = [];
+	for (const a of assignments) {
+		if (!isNightInRange(nightKey, a.startDate, a.endDate, trip.checkInDate, trip.checkOutDate)) continue;
+		const room = trip.rooms.find((r) => r.id === a.roomId);
+		if (!room?.beds?.length) continue;
+		const bed = a.bedId ? room.beds.find((b) => b.id === a.bedId) : room.beds[0];
+		if (!bed) continue;
+		const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
+		const partySize = a.partySize ?? 1;
+		for (let i = 0; i < partySize; i++) {
+			spots.push({ weight: spotWeight, id: `a-${a.id}-${i}`, bedId: bed.id, reservationTag: a.id });
+		}
+	}
+	if (booking) {
+		const room = trip.rooms.find((r) => r.id === booking.roomId);
+		if (!room?.beds?.length) return spots;
+		const bed = booking.bedId ? room.beds.find((b) => b.id === booking.bedId) : room.beds[0];
+		if (!bed) return spots;
+		const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
+		for (let i = 0; i < booking.numberOfSlots; i++) {
+			spots.push({ weight: spotWeight, id: `b-${i}`, bedId: bed.id, reservationTag: 'booking' });
+		}
+	}
+	return spots;
+}
+
+/**
  * Normalize bed type for weight lookup: lowercase, spaces -> underscore,
  * and strip common suffixes (_bed, _size) so "queen_bed" / "Queen Bed" -> "queen", "twin_bed" -> "twin".
  */
@@ -114,6 +226,29 @@ export function getRoomEffectivePrivacy(beds: { length: number } | unknown[]): n
 /** Spot count for a bed (PRICING_MATH: capacity in people). */
 export function getSpotCount(bed: { capacitySlots?: number | null; capacity?: number | null }): number {
 	return bed.capacitySlots ?? bed.capacity ?? 1;
+}
+
+/**
+ * PER_BED nightly allocation: when attendance is below minimum expected, scale up nightly cost
+ * and distribute across current RSVPs (no host gap). loadFactor = max(1, floorWeight/claimedWeight).
+ * Returns effectiveNightCostCents and cents per spot (same order as spots).
+ */
+export function runPerBedNightAllocation(
+	nightCostCents: number,
+	floorWeight: number,
+	spots: Array<{ weight: number; id: string }>
+): { effectiveNightCostCents: number; centsPerSpot: number[] } {
+	if (spots.length === 0) {
+		return { effectiveNightCostCents: nightCostCents, centsPerSpot: [] };
+	}
+	const claimedWeight = spots.reduce((s, p) => s + p.weight, 0);
+	if (claimedWeight <= 0) {
+		return { effectiveNightCostCents: nightCostCents, centsPerSpot: spots.map(() => 0) };
+	}
+	const loadFactor = Math.max(1, floorWeight / claimedWeight);
+	const effectiveNightCostCents = Math.round(nightCostCents * loadFactor);
+	const centsPerSpot = allocateNightCostCentsToSpots(effectiveNightCostCents, spots);
+	return { effectiveNightCostCents, centsPerSpot };
 }
 
 /**
@@ -373,13 +508,13 @@ export async function computePerBedDisplayPricing(tripId: string): Promise<{
 }
 
 /**
- * Per-bed pricing at a specific headcount (yes-RSVPs + plus-ones).
- * Use for RSVP page "X/night · Y total". PRICING_MATH: W_eff = max(W_d, W_floor), spotCharge = nightCost × (spotWeight/W_eff).
- * W_d approximated as headcount × avgW when no assignment detail.
+ * Per-bed pricing from current YES RSVPs: per-night allocation, no prospective booking.
+ * Use for RSVP page "X/night · Y total". Prices driven by current YES RSVP assignments;
+ * when attendance is below minimum expected, loadFactor scales cost and distributes across current RSVPs.
  */
 export async function computePerBedPricingAtHeadcount(
 	tripId: string,
-	headcount: number
+	_headcount: number
 ): Promise<{ totalNights: number; bedPricing: Record<string, PerBedDisplayPrice> } | null> {
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
@@ -389,56 +524,50 @@ export async function computePerBedPricingAtHeadcount(
 					id: true,
 					beds: { select: { id: true, bedType: true, capacitySlots: true, capacity: true } }
 				}
-			}
+			},
+			rsvps: { where: { status: 'yes' }, select: { userId: true } },
+			roomAssignments: true
 		}
 	});
 	if (!trip || trip.rooms.length === 0) return null;
 
+	const yesUserIds = new Set((trip.rsvps ?? []).map((r) => r.userId));
+	const yesAssignments = trip.roomAssignments.filter((a) => yesUserIds.has(a.userId));
+
 	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
 	const bedWeights = parseBedWeights(trip.bedWeights);
 	const inv = computePerBedInventoryWeights(trip, bedWeights);
-	const H = Math.max(1, headcount);
-	const W_d = H * inv.avgW;
-	const W_eff = Math.max(W_d, inv.W_floor);
+	const tripNightKeys = getNightsBetween(trip.checkInDate, trip.checkOutDate);
+	const totalTripCostCents = Math.round(trip.totalCost * 100);
+	const nightCostCentsList = distributeTripCostCentsToNights(totalTripCostCents, tripNightKeys);
 
-	// Integer cents to allocate per night = nightCost × (W_full/W_eff) so spot shares sum to that; then distribute with largest-remainder.
-	const nightCostDollars = totalNights > 0 ? trip.totalCost / totalNights : trip.totalCost;
-	const totalAllocCents = Math.round(nightCostDollars * 100 * (inv.W_full / W_eff));
-	const spots: Array<{ weight: number; id: string }> = [];
+	const bedTotalCents: Record<string, number> = {};
 	for (const room of trip.rooms) {
-		const roomPrivacy = getRoomEffectivePrivacy(room.beds);
 		for (const bed of room.beds) {
-			const slots = getSpotCount(bed);
-			const spotWeight = getBedWeight(bedWeights, bed.bedType) * roomPrivacy;
-			for (let s = 0; s < slots; s++) {
-				spots.push({ weight: spotWeight, id: `${bed.id}:${s}` });
-			}
+			bedTotalCents[bed.id] = 0;
 		}
 	}
-	const centsPerSpotOneNight = allocateNightCostCentsToSpots(totalAllocCents, spots);
 
-	// Map spot index back to bedId (same order as spots).
-	let idx = 0;
-	const bedCentsPerNight: Record<string, number> = {};
-	for (const room of trip.rooms) {
-		for (const bed of room.beds) {
-			const slots = getSpotCount(bed);
-			let sum = 0;
-			for (let s = 0; s < slots; s++) {
-				sum += centsPerSpotOneNight[idx++];
-			}
-			bedCentsPerNight[bed.id] = sum;
+	for (let n = 0; n < tripNightKeys.length; n++) {
+		const nightKey = tripNightKeys[n];
+		const nightCostCents = nightCostCentsList[n];
+		const spotsWithTag = buildSpotsForNight(nightKey, trip, bedWeights, yesAssignments);
+		if (spotsWithTag.length === 0) continue;
+		const spotsForAlloc = spotsWithTag.map((s) => ({ weight: s.weight, id: s.id }));
+		const { centsPerSpot } = runPerBedNightAllocation(nightCostCents, inv.W_floor, spotsForAlloc);
+		for (let j = 0; j < spotsWithTag.length; j++) {
+			const bid = spotsWithTag[j].bedId;
+			bedTotalCents[bid] = (bedTotalCents[bid] ?? 0) + centsPerSpot[j];
 		}
 	}
 
 	const bedPricing: Record<string, PerBedDisplayPrice> = {};
 	for (const room of trip.rooms) {
 		for (const bed of room.beds) {
-			const nightlyCents = bedCentsPerNight[bed.id] ?? 0;
-			const totalCents = nightlyCents * totalNights;
+			const totalCents = bedTotalCents[bed.id] ?? 0;
 			bedPricing[bed.id] = {
 				total: Math.round(totalCents) / 100,
-				perNight: totalNights > 0 ? Math.round(nightlyCents) / 100 : 0
+				perNight: totalNights > 0 ? Math.round(totalCents / totalNights) / 100 : 0
 			};
 		}
 	}
@@ -563,30 +692,44 @@ export async function calculateReservationPrice(
 	const pricingModel = (trip.pricingModel || 'per_person').toLowerCase();
 
 	if (pricingModel === 'per_bed') {
-		// PRICING_MATH: W_d = claimed weight (assignments + this booking), W_eff = max(W_d, W_floor), totalPrice = stayNights × nightCost × (k×w/W_eff)
+		// Per-night allocation: loadFactor = max(1, floorWeight/claimedWeight); current RSVPs absorb shortfall (no host gap).
 		const bed = bedId ? room.beds.find((b) => b.id === bedId) : room.beds[0];
-		if (!bed) {
-			throw new Error('Bed not found');
-		}
-		const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
+		if (!bed) throw new Error('Bed not found');
 		const inv = computePerBedInventoryWeights(trip, bedWeights);
-		let W_d = 0;
-		for (const a of trip.roomAssignments) {
-			const r = trip.rooms.find((x) => x.id === a.roomId);
-			if (!r || r.beds.length === 0) continue;
-			const b = a.bedId ? r.beds.find((x) => x.id === a.bedId) : r.beds[0];
-			if (b) {
-				W_d += (a.partySize || 1) * getSpotWeight(b, r.beds, bedWeights);
+		const tripNightKeys = getNightsBetween(trip.checkInDate, trip.checkOutDate);
+		const totalTripCostCents = Math.round(trip.totalCost * 100);
+		const nightCostCentsList = distributeTripCostCentsToNights(totalTripCostCents, tripNightKeys);
+		const stayNightKeys = getNightsBetween(checkInDate, checkOutDate);
+		// Exclude this reservation from assignments so we don't double-count when it's already in DB (e.g. committed funds).
+		const othersAssignments = trip.roomAssignments.filter((a) => {
+			if (a.roomId !== roomId) return true;
+			if ((a.bedId ?? '') !== (bedId ?? '')) return true;
+			const aStart = a.startDate ?? trip.checkInDate;
+			const aEnd = a.endDate ?? trip.checkOutDate;
+			if (checkOutDate <= aStart || checkInDate >= aEnd) return true;
+			return false;
+		});
+		let totalBookingCents = 0;
+		for (let i = 0; i < stayNightKeys.length; i++) {
+			const nightKey = stayNightKeys[i];
+			const nightIdx = tripNightKeys.indexOf(nightKey);
+			const nightCostCents = nightIdx >= 0 ? nightCostCentsList[nightIdx] : 0;
+			const spotsWithTag = buildSpotsForNight(
+				nightKey,
+				trip,
+				bedWeights,
+				othersAssignments,
+				{ roomId, bedId, numberOfSlots }
+			);
+			if (spotsWithTag.length === 0) continue;
+			const spotsForAlloc = spotsWithTag.map((s) => ({ weight: s.weight, id: s.id }));
+			const { centsPerSpot } = runPerBedNightAllocation(nightCostCents, inv.W_floor, spotsForAlloc);
+			for (let j = 0; j < spotsWithTag.length; j++) {
+				if (spotsWithTag[j].reservationTag === 'booking') totalBookingCents += centsPerSpot[j];
 			}
 		}
-		W_d += numberOfSlots * spotWeight; // include this booking
-		const W_eff = Math.max(W_d, inv.W_floor);
-		const nightCost = totalNights > 0 ? trip.totalCost / totalNights : trip.totalCost;
-		const totalPriceDollars = stayNights * nightCost * (numberOfSlots * spotWeight) / W_eff;
-		const totalPriceCents = Math.round(totalPriceDollars * 100);
-		const totalPrice = totalPriceCents / 100;
+		const totalPrice = totalBookingCents / 100;
 		const perNightRate = stayNights > 0 ? totalPrice / stayNights : totalPrice;
-
 		return {
 			nights: stayNights,
 			stayFactor,
@@ -597,34 +740,45 @@ export async function calculateReservationPrice(
 	}
 
 	if (pricingModel === 'per_room') {
-		// Price per person = totalCost × (room effective privacy) ÷ denominator
-		const peoplePerRoom: Record<number, number> = {};
-		for (const r of trip.rooms) {
-			peoplePerRoom[r.id] = 0;
+		// Per-night allocation when partial stays: nightly denominator = sum(roomPrivacy × peopleInRoom).
+		// Floor in weighted units (minExpected × avgPrivacy). No fullStayPrice × stayFactor.
+		const tripNightKeys = getNightsBetween(trip.checkInDate, trip.checkOutDate);
+		const totalTripCostCents = Math.round(trip.totalCost * 100);
+		const nightCostCentsList = distributeTripCostCentsToNights(totalTripCostCents, tripNightKeys);
+		const stayNightKeys = getNightsBetween(checkInDate, checkOutDate);
+		const avgPrivacy =
+			trip.rooms.reduce((s, r) => s + getRoomEffectivePrivacy(r.beds), 0) / (trip.rooms.length || 1);
+		const floorWeighted = Math.max(1, expectedPeople) * avgPrivacy;
+		let totalCents = 0;
+		for (let i = 0; i < stayNightKeys.length; i++) {
+			const nightKey = stayNightKeys[i];
+			const nightIdx = tripNightKeys.indexOf(nightKey);
+			const nightCostCents = nightIdx >= 0 ? nightCostCentsList[nightIdx] : 0;
+			const peoplePerRoom: Record<number, number> = {};
+			for (const r of trip.rooms) peoplePerRoom[r.id] = 0;
+			for (const a of trip.roomAssignments) {
+				if (!isNightInRange(nightKey, a.startDate, a.endDate, trip.checkInDate, trip.checkOutDate)) continue;
+				peoplePerRoom[a.roomId] = (peoplePerRoom[a.roomId] ?? 0) + (a.partySize || 1);
+			}
+			peoplePerRoom[roomId] = (peoplePerRoom[roomId] ?? 0) + numberOfSlots;
+			let denominator = 0;
+			for (const [rid, people] of Object.entries(peoplePerRoom)) {
+				if (people <= 0) continue;
+				const r = trip.rooms.find((x) => x.id === Number(rid));
+				const p = r ? getRoomEffectivePrivacy(r.beds) : PRIVACY_FACTOR_SHARED;
+				denominator += p * people;
+			}
+			denominator = Math.max(denominator, floorWeighted);
+			const shareCents = Math.round((nightCostCents * (privacyFactor * numberOfSlots)) / denominator);
+			totalCents += shareCents;
 		}
-		for (const a of trip.roomAssignments) {
-			peoplePerRoom[a.roomId] = (peoplePerRoom[a.roomId] ?? 0) + (a.partySize || 1);
-		}
-		peoplePerRoom[roomId] = (peoplePerRoom[roomId] ?? 0) + 1; // current booking
-
-		let denominator = 0;
-		for (const [rid, people] of Object.entries(peoplePerRoom)) {
-			if (people <= 0) continue;
-			const r = trip.rooms.find((x) => x.id === Number(rid));
-			const p = r ? getRoomEffectivePrivacy(r.beds) : PRIVACY_FACTOR_SHARED;
-			denominator += p * people;
-		}
-		denominator = Math.max(denominator, expectedPeople);
-
-		const pricePerPersonFullStay = (trip.totalCost * privacyFactor) / denominator;
-		const totalPrice = pricePerPersonFullStay * stayFactor;
-		const perNightRate = totalNights > 0 ? totalPrice / stayNights : totalPrice;
-
+		const totalPrice = totalCents / 100;
+		const perNightRate = stayNights > 0 ? totalPrice / stayNights : totalPrice;
 		return {
 			nights: stayNights,
 			stayFactor,
 			slotPriceForStay: totalPrice,
-			totalPrice: Math.round(totalPrice * 100) / 100,
+			totalPrice,
 			perNightRate: Math.round(perNightRate * 100) / 100
 		};
 	}
