@@ -119,71 +119,56 @@ Each person in Room B: 5000 × 1.0 / 5.5 ≈ $909.09.
 
 Everyone pays based on the bed they choose. Pricing is **per sleeping spot, per night**: larger beds and beds in rooms with fewer beds cost more (bed-type weight × effective room privacy). **partySize** = sleeping spots claimed by that RSVP.
 
-**Spot weight:**  
-Every sleeping spot has a weight:
+**Displayed price** assumes at least the host’s minimum expected guest count attend. If more guests RSVP, the price decreases proportionally.
 
+**Range** shows:
+- **High end:** price at effectiveGuests (same denominator as displayed price).
+- **Low end:** price at maxCapacityGuests.
+
+**Spot weight:**  
 ```
 spotWeight = bedTypeWeight × effectiveRoomPrivacyFactor
 ```
 
-**Night cost (cents):**  
-Distribute total trip cost in cents evenly across trip nights with deterministic rounding so the sum of nightly amounts equals total trip cost.
-
-**Per-night allocation (for each night *d*):**
-
-1. **nightCostCents** = that night’s share of total trip cost (integer cents).
-2. Determine all YES RSVPs active on night *d* (their stay dates include that night). Expand each assignment into **spotsClaimed** = **partySize** spots on the chosen bed(s).
-3. **claimedWeight** = sum of spotWeight for all claimed spots that night.
-4. If claimedWeight == 0, treat as zero occupancy (no allocation).
-5. **Load factor (minimum expected; no host gap):**  
-   When attendance is below minimum expected, the nightly cost is scaled up and distributed across **current RSVPs** proportionally by weight. Any shortfall is absorbed by current RSVPs, not the host.
-
-   ```
-   fullInventoryWeight = sum(spotWeight for every spot in inventory)
-   totalSpotCapacity = total sleeping spots across all beds
-   averageSpotWeight = fullInventoryWeight ÷ totalSpotCapacity
-   floorWeight = minimumExpectedGuestCount × averageSpotWeight
-   loadFactor = max(1, floorWeight ÷ claimedWeight)
-   effectiveNightCostCents = round(nightCostCents × loadFactor)
-   ```
-6. Allocate **effectiveNightCostCents** across claimed spots by weight. Ideal share per spot = effectiveNightCostCents × (spotWeight ÷ claimedWeight). Use integer cents and largest-remainder (or stable sort by spot id) so the night’s spot charges sum exactly to effectiveNightCostCents.
-7. **Reservation total** = sum of that reservation’s spot charges over all stayed nights.
-
-**Guest total:**
-
+**Night cost:**  
 ```
-guestTotal = sum(spotCharge_d over all their claimed spots and stayed nights)
+nightCost = totalTripCost ÷ totalTripNights
 ```
+
+**avgSpotWeight:**  
+```
+avgSpotWeight = fullInventoryWeight ÷ totalSpotCapacity
+```
+
+**effectiveGuests** (used for both displayed price and range high end):  
+```
+effectiveGuests = max(minExpectedGuests, yesRsvpGuests)
+```
+
+**effectiveWeight:**  
+```
+effectiveWeight = effectiveGuests × avgSpotWeight
+```
+
+**Displayed price and reservation total:**  
+```
+spotPricePerNight = nightCost × (spotWeight ÷ effectiveWeight)
+guestDisplayedTotal = spotPricePerNight × nightsStayed × spotsClaimed
+```
+
+**Range:**  
+```
+highEnd = nightCost × (spotWeight ÷ (effectiveGuests × avgSpotWeight)) × nightsStayed × spotsClaimed
+lowEnd  = nightCost × (spotWeight ÷ (maxCapacityGuests × avgSpotWeight)) × nightsStayed × spotsClaimed
+```
+
+Display and high end use the same denominator (effectiveWeight), so displayed price always lies within [lowEnd, highEnd]. Early RSVPs are not front-loaded; the range shrinks as more guests RSVP.
 
 **UI implications**
 
-- **Prices shown next to beds** are driven by **current YES RSVPs** (and when calculating a specific reservation, current YES RSVPs plus the prospective booking). Run the same nightly allocation to get per-night and total for each bed.
+- Prices shown next to beds use effectiveGuests; adding unused rooms does not change prices.
 - A bed with multiple spots can be partially claimed; show **claimedSpots / spotCount** (e.g. “1/2” for one of two spots on a King).
 - Enforce availability: a bed cannot exceed spotCount for any overlapping night.
-
----
-
-#### Estimate range (stable; does not use current YES RSVPs)
-
-The bottom-of-UI range (“My estimated share: $X–$Y”) uses **simulated** occupancy, not current YES RSVPs.
-
-**Two simulated denominators for PER_BED:**
-
-- **Max capacity scenario:**  
-  `W_max = W_full` (all spots filled).
-
-- **Min expected scenario:**  
-  `W_min = minExpectedGuests × avgW` (with *avgW* as above).
-
-For a guest selecting a bed with **spotWeight** = *w*, **party size** *k*, **nights stayed** *n*:
-
-```
-lowEstimate  = n × nightCost × (k × w / W_max)
-highEstimate = n × nightCost × (k × w / W_min)
-```
-
-**Note:**  
-Range assumes minimum expected guests represent average nightly occupancy; actual totals depend on who attends which nights and which beds they select.
 
 ---
 
@@ -192,9 +177,8 @@ Range assumes minimum expected guests represent average nightly occupancy; actua
 Partial stays are **model-dependent**.
 
 - **PER_PERSON and PER_PERSON_PER_NIGHT:** Multiplying by a stay factor (e.g. `nightsStayed / totalNights`) is valid.
-- **PER_ROOM and PER_BED:** Do **not** use “full stay price × stayFactor”. Allocate cost **per night**: for each night in the guest’s stay, compute that night’s share (nightly denominator for PER_ROOM, claimed spots and loadFactor for PER_BED), then **sum** across the guest’s stayed nights.
-- For PER_ROOM, the nightly denominator must be in weighted units (room effective privacy × number of people in that room); minimum expected floor in weighted units.
-- For PER_BED, nightly allocation uses loadFactor and distributes effectiveNightCostCents across claimed spots.
+- **PER_ROOM:** Do **not** use “full stay price × stayFactor”. Allocate cost **per night**: for each night in the guest’s stay, compute that night’s share (nightly denominator in weighted units), then **sum** across the guest’s stayed nights. Minimum expected floor in weighted units.
+- **PER_BED:** Do **not** use “full stay price × stayFactor”. Reservation total = nightCost × (spotWeight ÷ effectiveWeight) × nightsStayed × spotsClaimed (single formula; no per-night allocation by claimed spots or load factors).
 
 ---
 

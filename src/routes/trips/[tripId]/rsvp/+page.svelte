@@ -377,8 +377,14 @@
 							<div id="cost-commitment" class="cost-commitment-module">
 								{#if guestEstimate}
 									<div class="estimate-lines">
-										<p class="estimate-range"><strong>My estimated share: {formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
-										<p class="estimate-secondary">Least if {guestEstimate.hmax} guests attend (max capacity); most if {guestEstimate.hmin} attend (host's min expected). Final amount depends on the number of attendees.</p>
+										<p class="estimate-range"><strong>My estimated share: {guestEstimate.displayCents != null ? formatCents(guestEstimate.displayCents) : formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
+										<p class="estimate-secondary">
+											{#if guestEstimate.displayCents != null}
+												Range {formatRange(guestEstimate.lowCents, guestEstimate.highCents)} depending on final headcount.
+											{:else}
+												Least if {guestEstimate.hmax} guests attend (max capacity); most if {guestEstimate.hmin} attend (host's min expected). Final amount depends on the number of attendees.
+											{/if}
+										</p>
 									</div>
 									<div class="form-group commitment-checkbox">
 										<label class="commitment-label">
@@ -407,7 +413,17 @@
 										</div>
 									</form>
 								{:else}
-									<p class="helper-text">For per-bed trips, you’ll see your estimate after you pick your bed(s) above.</p>
+									{#if data.guestEstimateError}
+										<p class="helper-text">
+											{#if data.guestEstimateError.includes('not selected a bed')}
+												For per-bed trips, you'll see your estimate after you pick your bed(s) above.
+											{:else}
+												Estimate unavailable: {data.guestEstimateError}. Check that the trip has rooms and beds set up.
+											{/if}
+										</p>
+									{:else}
+										<p class="helper-text">For per-bed trips, you’ll see your estimate after you pick your bed(s) above.</p>
+									{/if}
 								{/if}
 							</div>
 						{/if}

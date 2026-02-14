@@ -82,11 +82,15 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 
 	// Cost commitment: estimate range when user has or is choosing YES
 	let guestEstimate: Awaited<ReturnType<typeof computeGuestEstimateRange>> | null = null;
+	let guestEstimateError: string | null = null;
 	if (currentRsvp?.status === 'yes' || true) {
 		try {
 			guestEstimate = await computeGuestEstimateRange(tripId, user.id);
-		} catch {
-			// Trip may have no rooms yet
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Unknown error';
+			guestEstimateError = message;
+			// Log so host/dev can see why estimate failed (e.g. no rooms, per-bed without bed selection)
+			console.warn('[RSVP] computeGuestEstimateRange failed:', message);
 		}
 	}
 	const reconfirmPolicy = parseReconfirmPolicy(null);
@@ -122,6 +126,7 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		claimedBedIdsByOther: Array.from(claimedBedIdsByOther),
 		selectedActivities,
 		guestEstimate,
+		guestEstimateError,
 		reconfirmPolicy,
 		roomPricing,
 		bedPricing,

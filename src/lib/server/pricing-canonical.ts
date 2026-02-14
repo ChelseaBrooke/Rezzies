@@ -333,6 +333,25 @@ export function computePerBedInventoryWeights(
 }
 
 /**
+ * Min/max guest counts for PER_BED. effectiveGuests = max(minExpectedGuests, yesRsvpGuests) used for display and range high end.
+ */
+export function getPerBedRangeGuestCounts(
+	trip: {
+		expectedPeopleCount?: number | null;
+		maxGuests?: number | null;
+		rooms: Array<{ beds: Array<{ capacitySlots?: number | null; capacity?: number | null }> }>;
+	}
+): { minExpectedGuests: number; maxCapacityGuests: number } {
+	const totalSpotCapacity = trip.rooms.reduce(
+		(s, r) => s + r.beds.reduce((b, bed) => b + getSpotCount(bed), 0),
+		0
+	);
+	const minExpectedGuests = Math.max(1, trip.expectedPeopleCount ?? 1);
+	const maxCapacityGuests = Math.max(1, trip.maxGuests ?? totalSpotCapacity);
+	return { minExpectedGuests, maxCapacityGuests };
+}
+
+/**
  * Parse bed weights from JSON string or use defaults
  */
 export function parseBedWeights(weightsJson: string | null): BedWeights {
@@ -508,9 +527,8 @@ export async function computePerBedDisplayPricing(tripId: string): Promise<{
 }
 
 /**
- * Per-bed pricing from current YES RSVPs: per-night allocation, no prospective booking.
- * Use for RSVP page "X/night · Y total". Prices driven by current YES RSVP assignments;
- * when attendance is below minimum expected, loadFactor scales cost and distributes across current RSVPs.
+ * Per-bed display pricing using effectiveGuests so display and range high end use the same rule.
+ * effectiveGuests = max(minExpectedGuests, yesRsvpGuests); effectiveWeight = effectiveGuests × avgSpotWeight.
  */
 export async function computePerBedPricingAtHeadcount(
 	tripId: string,
@@ -525,50 +543,49 @@ export async function computePerBedPricingAtHeadcount(
 					beds: { select: { id: true, bedType: true, capacitySlots: true, capacity: true } }
 				}
 			},
-			rsvps: { where: { status: 'yes' }, select: { userId: true } },
+			rsvps: { where: { status: 'yes' }, select: { userId: true, adultsCount: true } },
 			roomAssignments: true
 		}
 	});
 	if (!trip || trip.rooms.length === 0) return null;
 
-	const yesUserIds = new Set((trip.rsvps ?? []).map((r) => r.userId));
-	const yesAssignments = trip.roomAssignments.filter((a) => yesUserIds.has(a.userId));
-
-	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
+	const yesRsvpGuests = (trip.rsvps ?? []).reduce((s, r) => s + (r.adultsCount ?? 1), 0);
+	const { minExpectedGuests } = getPerBedRangeGuestCounts(trip);
+	const effectiveGuests = Math.max(minExpectedGuests, yesRsvpGuests);
 	const bedWeights = parseBedWeights(trip.bedWeights);
 	const inv = computePerBedInventoryWeights(trip, bedWeights);
-	const tripNightKeys = getNightsBetween(trip.checkInDate, trip.checkOutDate);
-	const totalTripCostCents = Math.round(trip.totalCost * 100);
-	const nightCostCentsList = distributeTripCostCentsToNights(totalTripCostCents, tripNightKeys);
-
-	const bedTotalCents: Record<string, number> = {};
-	for (const room of trip.rooms) {
-		for (const bed of room.beds) {
-			bedTotalCents[bed.id] = 0;
-		}
-	}
-
-	for (let n = 0; n < tripNightKeys.length; n++) {
-		const nightKey = tripNightKeys[n];
-		const nightCostCents = nightCostCentsList[n];
-		const spotsWithTag = buildSpotsForNight(nightKey, trip, bedWeights, yesAssignments);
-		if (spotsWithTag.length === 0) continue;
-		const spotsForAlloc = spotsWithTag.map((s) => ({ weight: s.weight, id: s.id }));
-		const { centsPerSpot } = runPerBedNightAllocation(nightCostCents, inv.W_floor, spotsForAlloc);
-		for (let j = 0; j < spotsWithTag.length; j++) {
-			const bid = spotsWithTag[j].bedId;
-			bedTotalCents[bid] = (bedTotalCents[bid] ?? 0) + centsPerSpot[j];
-		}
-	}
+	const effectiveWeight = effectiveGuests * inv.avgW;
+	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
+	const nightCost = totalNights > 0 ? trip.totalCost / totalNights : trip.totalCost;
 
 	const bedPricing: Record<string, PerBedDisplayPrice> = {};
 	for (const room of trip.rooms) {
-		for (const bed of room.beds) {
-			const totalCents = bedTotalCents[bed.id] ?? 0;
+		const roomBeds = room.beds;
+		const roomPrivacy = getRoomEffectivePrivacy(roomBeds);
+		const roomPerNights: { bedId: string; bedType: string; perNight: number }[] = [];
+		for (const bed of roomBeds) {
+			const bedTypeWeight = getBedWeight(bedWeights, bed.bedType);
+			const spotWeight = bedTypeWeight * roomPrivacy;
+			const spotCount = getSpotCount(bed);
+			const spotPricePerNight = effectiveWeight > 0 ? nightCost * (spotWeight / effectiveWeight) : 0;
+			const totalForBed = spotPricePerNight * totalNights * spotCount;
+			const perNight = totalNights > 0 ? Math.round(spotPricePerNight * 100) / 100 : 0;
 			bedPricing[bed.id] = {
-				total: Math.round(totalCents) / 100,
-				perNight: totalNights > 0 ? Math.round(totalCents / totalNights) / 100 : 0
+				total: Math.round(totalForBed * 100) / 100,
+				perNight
 			};
+			roomPerNights.push({ bedId: bed.id, bedType: bed.bedType, perNight });
+		}
+		if (roomPerNights.length >= 2) {
+			const distinctPrices = new Set(roomPerNights.map((p) => p.perNight));
+			const distinctTypes = new Set(roomPerNights.map((p) => (p.bedType ?? '').toLowerCase().trim()));
+			if (distinctPrices.size === 1) {
+				if (distinctTypes.size > 1) {
+					console.warn('[PER_BED] Same price for different bed types in one room — trip.bedWeights may set both to same value.', roomPerNights);
+				} else {
+					console.warn('[PER_BED] Same price for all beds in room — each bed has the same bedType in DB. Expected distinct types (e.g. queen vs bunk) to get different prices.', roomPerNights);
+				}
+			}
 		}
 	}
 	return { totalNights, bedPricing };
@@ -658,6 +675,7 @@ export async function calculateReservationPrice(
 			rooms: {
 				include: { beds: true }
 			},
+			rsvps: { where: { status: 'yes' }, select: { adultsCount: true } },
 			roomAssignments: {
 				include: { room: true }
 			}
@@ -692,49 +710,27 @@ export async function calculateReservationPrice(
 	const pricingModel = (trip.pricingModel || 'per_person').toLowerCase();
 
 	if (pricingModel === 'per_bed') {
-		// Per-night allocation: loadFactor = max(1, floorWeight/claimedWeight); current RSVPs absorb shortfall (no host gap).
+		// Same rule as display: effectiveGuests = max(minExpected, yesRsvpGuests); effectiveWeight = effectiveGuests × avgSpotWeight.
 		const bed = bedId ? room.beds.find((b) => b.id === bedId) : room.beds[0];
 		if (!bed) throw new Error('Bed not found');
+		const yesRsvpGuests = (trip.rsvps ?? []).reduce((s, r) => s + (r.adultsCount ?? 1), 0);
+		const { minExpectedGuests } = getPerBedRangeGuestCounts(trip);
+		const effectiveGuests = Math.max(minExpectedGuests, yesRsvpGuests);
 		const inv = computePerBedInventoryWeights(trip, bedWeights);
-		const tripNightKeys = getNightsBetween(trip.checkInDate, trip.checkOutDate);
-		const totalTripCostCents = Math.round(trip.totalCost * 100);
-		const nightCostCentsList = distributeTripCostCentsToNights(totalTripCostCents, tripNightKeys);
-		const stayNightKeys = getNightsBetween(checkInDate, checkOutDate);
-		// Exclude this reservation from assignments so we don't double-count when it's already in DB (e.g. committed funds).
-		const othersAssignments = trip.roomAssignments.filter((a) => {
-			if (a.roomId !== roomId) return true;
-			if ((a.bedId ?? '') !== (bedId ?? '')) return true;
-			const aStart = a.startDate ?? trip.checkInDate;
-			const aEnd = a.endDate ?? trip.checkOutDate;
-			if (checkOutDate <= aStart || checkInDate >= aEnd) return true;
-			return false;
-		});
-		let totalBookingCents = 0;
-		for (let i = 0; i < stayNightKeys.length; i++) {
-			const nightKey = stayNightKeys[i];
-			const nightIdx = tripNightKeys.indexOf(nightKey);
-			const nightCostCents = nightIdx >= 0 ? nightCostCentsList[nightIdx] : 0;
-			const spotsWithTag = buildSpotsForNight(
-				nightKey,
-				trip,
-				bedWeights,
-				othersAssignments,
-				{ roomId, bedId, numberOfSlots }
-			);
-			if (spotsWithTag.length === 0) continue;
-			const spotsForAlloc = spotsWithTag.map((s) => ({ weight: s.weight, id: s.id }));
-			const { centsPerSpot } = runPerBedNightAllocation(nightCostCents, inv.W_floor, spotsForAlloc);
-			for (let j = 0; j < spotsWithTag.length; j++) {
-				if (spotsWithTag[j].reservationTag === 'booking') totalBookingCents += centsPerSpot[j];
-			}
-		}
-		const totalPrice = totalBookingCents / 100;
+		const effectiveWeight = effectiveGuests * inv.avgW;
+		const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
+		const nightCost = totalNights > 0 ? trip.totalCost / totalNights : trip.totalCost;
+		const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
+		const totalPrice =
+			effectiveWeight > 0
+				? nightCost * (spotWeight / effectiveWeight) * stayNights * numberOfSlots
+				: 0;
 		const perNightRate = stayNights > 0 ? totalPrice / stayNights : totalPrice;
 		return {
 			nights: stayNights,
 			stayFactor,
 			slotPriceForStay: totalPrice,
-			totalPrice,
+			totalPrice: Math.round(totalPrice * 100) / 100,
 			perNightRate: Math.round(perNightRate * 100) / 100
 		};
 	}
@@ -937,4 +933,125 @@ export async function getPricingPreview(
 			};
 		}
 	}
+}
+
+// --- QC page: pure PER_BED estimate from inputs (no DB) ---
+
+export interface QCPerBedRoom {
+	beds: Array<{ bedType: string; spotCount: number }>;
+}
+
+export interface QCPerBedSelection {
+	roomIndex: number;
+	bedIndex: number;
+	spotsClaimed: number;
+	nightsStayed: number;
+}
+
+export interface QCPerBedInputs {
+	totalTripCost: number;
+	totalTripNights: number;
+	minExpectedGuests: number;
+	maxCapacityGuests: number;
+	yesRsvpGuests: number;
+	bedWeightsJson?: string | null;
+	rooms: QCPerBedRoom[];
+	selections: QCPerBedSelection[];
+}
+
+export interface QCPerBedResult {
+	displayPrice: number;
+	lowEnd: number;
+	highEnd: number;
+	totalTripNights: number;
+	nightCost: number;
+	effectiveGuests: number;
+	effectiveWeight: number;
+	minExpectedGuests: number;
+	maxCapacityGuests: number;
+	avgSpotWeight: number;
+	breakdown: Array<{ roomIndex: number; bedIndex: number; bedType: string; spotWeight: number; nightsStayed: number; spotsClaimed: number; contribution: number }>;
+}
+
+/**
+ * Compute PER_BED display price and estimate range from QC inputs (no DB).
+ * Display and high end use same rule: effectiveGuests = max(minExpected, yesRsvpGuests), effectiveWeight = effectiveGuests × avgSpotWeight.
+ */
+export function computePerBedEstimateFromInputs(inputs: QCPerBedInputs): QCPerBedResult {
+	const totalTripNights = Math.max(1, inputs.totalTripNights);
+	const nightCost = totalTripNights > 0 ? inputs.totalTripCost / totalTripNights : inputs.totalTripCost;
+
+	const bedWeights = parseBedWeights(inputs.bedWeightsJson ?? null);
+
+	const tripLike = {
+		expectedPeopleCount: inputs.minExpectedGuests,
+		maxGuests: inputs.maxCapacityGuests,
+		rooms: inputs.rooms.map((r) => ({
+			beds: r.beds.map((b) => ({
+				bedType: b.bedType,
+				capacitySlots: b.spotCount,
+				capacity: b.spotCount
+			}))
+		}))
+	};
+
+	const { minExpectedGuests, maxCapacityGuests } = getPerBedRangeGuestCounts(tripLike);
+	const inv = computePerBedInventoryWeights(tripLike, bedWeights);
+	const avgSpotWeight = inv.avgW;
+	const effectiveGuests = Math.max(minExpectedGuests, inputs.yesRsvpGuests);
+	const effectiveWeight = effectiveGuests * avgSpotWeight;
+
+	let displayPrice = 0;
+	let highEnd = 0;
+	let lowEnd = 0;
+	const breakdown: QCPerBedResult['breakdown'] = [];
+
+	for (const sel of inputs.selections) {
+		const room = inputs.rooms[sel.roomIndex];
+		if (!room) continue;
+		const bed = room.beds[sel.bedIndex];
+		if (!bed) continue;
+		const roomBeds = room.beds;
+		const spotWeight = getBedWeight(bedWeights, bed.bedType) * getRoomEffectivePrivacy(roomBeds);
+		const nightsStayed = Math.max(1, sel.nightsStayed);
+		const spotsClaimed = Math.max(1, sel.spotsClaimed);
+
+		const contribution =
+			effectiveWeight > 0
+				? nightCost * (spotWeight / effectiveWeight) * nightsStayed * spotsClaimed
+				: 0;
+		const highContribution =
+			effectiveWeight > 0
+				? nightCost * (spotWeight / effectiveWeight) * nightsStayed * spotsClaimed
+				: 0;
+		const lowContribution =
+			nightCost * (spotWeight / (maxCapacityGuests * avgSpotWeight)) * nightsStayed * spotsClaimed;
+
+		displayPrice += contribution;
+		highEnd += highContribution;
+		lowEnd += lowContribution;
+		breakdown.push({
+			roomIndex: sel.roomIndex,
+			bedIndex: sel.bedIndex,
+			bedType: bed.bedType,
+			spotWeight,
+			nightsStayed,
+			spotsClaimed,
+			contribution
+		});
+	}
+
+	return {
+		displayPrice: Math.round(displayPrice * 100) / 100,
+		lowEnd: Math.round(lowEnd * 100) / 100,
+		highEnd: Math.round(highEnd * 100) / 100,
+		totalTripNights,
+		nightCost: Math.round(nightCost * 100) / 100,
+		effectiveGuests,
+		effectiveWeight: Math.round(effectiveWeight * 1000) / 1000,
+		minExpectedGuests,
+		maxCapacityGuests,
+		avgSpotWeight: Math.round(avgSpotWeight * 1000) / 1000,
+		breakdown
+	};
 }

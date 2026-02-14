@@ -77,9 +77,11 @@ Reference for all pricing-related formulas used in the app. Variables are spelle
 - **Night cost (per night of trip)**  
   `night cost = total trip cost ÷ total trip nights`
 
+- **Spot weight**  
+  `spot weight = bed type weight × room privacy factor`
+
 - **Full inventory weight**  
-  `full inventory weight = sum over every sleeping spot in the trip of (that spot’s spot weight)`  
-  (Each bed contributes `spot count × spot weight`; spot weight = bed type weight × room privacy.)
+  `full inventory weight = sum over every sleeping spot in the trip of (that spot’s spot weight)`
 
 - **Total spot capacity**  
   `total spot capacity = sum over all beds of (spot count per bed)`
@@ -87,61 +89,57 @@ Reference for all pricing-related formulas used in the app. Variables are spelle
 - **Average spot weight**  
   `average spot weight = full inventory weight ÷ total spot capacity`
 
-- **Floor weight (minimum expected)**  
-  `floor weight = minimum expected guest count × average spot weight`  
-  (Minimum expected is trip’s expected guest count or similar, at least 1.)
+- **Effective guests** (used for both displayed price and range high end)  
+  `effective guests = max(min expected guests, yes RSVP guests)`
 
-- **Claimed weight (for a given night)**  
-  `claimed weight = sum over all claimed spots that night of (that spot’s spot weight)`  
-  (From current YES RSVP assignments active that night; include the prospective booking when calculating a reservation.)
-
-- **Load factor (no host gap)**  
-  When attendance is below minimum expected, current RSVPs absorb the shortfall.  
-  `load factor = max(1, floor weight ÷ claimed weight)`  
-  `effective night cost cents = round(night cost cents × load factor)`  
-  Then allocate effective night cost cents across claimed spots by weight.
+- **Effective weight**  
+  `effective weight = effective guests × average spot weight`
 
 ---
 
-## PER_BED — reservation price (one guest’s total)
+## PER_BED — displayed price and reservation total
 
-- **Do not use** full stay price × stay factor. Use **per-night summation**.
-- For each night in the guest’s stay:  
-  Build claimed spots (current YES RSVP assignments active that night + this booking).  
-  `claimed weight` = sum of spot weights.  
-  `load factor` = max(1, floor weight ÷ claimed weight).  
-  `effective night cost cents` = round(night cost cents × load factor).  
-  Allocate effective night cost cents across spots (largest remainder, tie-break by spot id).  
-  Sum the cents allocated to this reservation’s spots (“booking” tag).
-- **Total reservation price**  
-  `total price = (sum of this reservation’s spot cents over all stayed nights) ÷ 100`
+- **Displayed price formula:**  
+  `spot price per night = night cost × (spot weight ÷ effective weight)`  
+  `guest displayed total = spot price per night × nights stayed × spots claimed`  
+  (Effective weight = effective guests × average spot weight; same rule as range high end.)
+
+- **Reservation total:**  
+  Same formula: `total price = night cost × (spot weight ÷ effective weight) × nights stayed × spots claimed`  
+  (No per-night allocation by claimed spots; no load factors.)
 
 ---
 
 ## PER_BED — bed display (“X per night · Y total”)
 
-- **Driven by current YES RSVPs** (no prospective booking when showing the grid).
-- For each trip night:  
-  `night cost cents` = that night’s share of total trip cost.  
-  Build claimed spots from YES RSVP assignments active that night.  
-  `load factor` = max(1, floor weight ÷ claimed weight).  
-  `effective night cost cents` = round(night cost cents × load factor).  
-  Allocate across spots; aggregate allocated cents by bed id.
+- **Display and range high end use the same rule:**  
+  `effective guests = max(min expected guests, yes RSVP guests)`  
+  `effective weight = effective guests × average spot weight`  
+  `spot price per night = night cost × (spot weight ÷ effective weight)`  
+  `guest displayed total = spot price per night × nights stayed × spots claimed`
 - **Per bed**  
-  `bed total cents` = sum over trip nights of (cents allocated to that bed that night).  
-  Display: `total = bed total cents ÷ 100`, `per night = bed total cents ÷ total trip nights ÷ 100`.
+  Display: `total = bed total`, `per night = spot price per night` (for that bed’s spots).  
+  Bed type mapping (e.g. queen ≠ bunk) and spot count are respected via spot weight and spot count.
 
 ---
 
-## PER_BED — estimate range (“My estimated share: $X–$Y”)
+## PER_BED — estimate range (“My estimated share”)
 
-- **Low estimate (max capacity)**  
-  `low estimate = nights stayed × night cost × (party size × spot weight) ÷ full inventory weight`  
-  (Assumes “all spots filled”.)
+- **Range high-end formula** (same denominator as displayed price):  
+  `night cost × (guest claimed weight ÷ (max(min expected guests, yes RSVP guests) × average spot weight))`  
+  i.e. `night cost × (spot weight ÷ effective weight) × nights stayed × spots claimed`
 
-- **High estimate (min expected)**  
-  `high estimate = nights stayed × night cost × (party size × spot weight) ÷ floor weight`  
-  (Assumes only minimum expected guests.)
+- **Range low-end formula:**  
+  `night cost × (guest claimed weight ÷ (max capacity guests × average spot weight))`
+
+- **Per assignment:**  
+  `high end = night cost × (spot weight ÷ (effective guests × avg spot weight)) × nights stayed × spots claimed`  
+  `low end = night cost × (spot weight ÷ (max capacity guests × avg spot weight)) × nights stayed × spots claimed`  
+  Sum over each claimed bed/assignment when the guest has multiple beds.
+
+- **Displayed price always lies within [lowEnd, highEnd].** Range shrinks as more guests RSVP.
+- **UI**  
+  Show displayed price as “My estimated share: $X” with “Range: $low–$high depending on final headcount.”
 
 ---
 
@@ -157,7 +155,7 @@ Reference for all pricing-related formulas used in the app. Variables are spelle
 
 - **Committed funds**  
   `committed funds = sum over every yes-RSVP of (that person’s current expected cost)`  
-  Where “current expected cost” = reservation price using the same per-night logic as above (PER_BED: loadFactor and spot allocation; PER_ROOM: per-night weighted denominator). No host gap; shortfall distributed across current RSVPs. Yes-RSVPs with no assignment (e.g. PER_PERSON before room pick): use first room and 1 slot at current rate.
+  Where “current expected cost” = reservation price using the same per-night logic as above (PER_BED: allocate night cost by weight across claimed spots only; PER_ROOM: per-night weighted denominator). Yes-RSVPs with no assignment (e.g. PER_PERSON before room pick): use first room and 1 slot at current rate.
 
 ---
 
