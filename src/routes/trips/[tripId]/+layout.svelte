@@ -23,7 +23,13 @@
 	</div>
 {/if}
 
-<AppShell tripId={data.trip.id} user={data.user} onInvite={handleInvite}>
+<AppShell
+		tripId={data.trip.id}
+		user={data.user}
+		onInvite={handleInvite}
+		showGuestsTab={data.isHost || data.membership?.role === 'co-host'}
+		pollsUnvotedCount={data.pollsUnvotedCount ?? 0}
+	>
 	{#snippet children()}
 		{#if safeChildren}
 			{@render safeChildren()}

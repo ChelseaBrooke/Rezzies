@@ -70,6 +70,7 @@ model Trip {
   notifications        Notification[]
   chatMessages         ChatMessage[]
   tripActivities       TripActivity[]
+  polls                Poll[]
 
   @@index([inviteCode])
   @@index([isPublished])
@@ -218,6 +219,8 @@ model User {
   notifications        Notification[]
   sessions             Session[]
   chatMessages         ChatMessage[]
+  pollsCreated         Poll[]
+  pollVotes            PollVote[]
 
   @@index([email])
 }
@@ -548,6 +551,53 @@ model ChatMessage {
   @@index([tripId])
   @@index([createdAt])
   @@index([tripId, createdAt])
+}
+
+// Polls (any trip member can create)
+model Poll {
+  id          String   @id @default(uuid())
+  tripId      String
+  createdById String
+  question    String
+  status      String   @default("active") // "active" | "closed"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trip     Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  createdBy User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  options  PollOption[]
+  votes    PollVote[]
+
+  @@index([tripId])
+  @@index([tripId, status])
+}
+
+model PollOption {
+  id     String @id @default(uuid())
+  pollId String
+  label  String
+  order  Int    @default(0)
+
+  poll  Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes PollVote[]
+
+  @@index([pollId])
+}
+
+model PollVote {
+  id       String @id @default(uuid())
+  pollId   String
+  optionId String
+  userId   String
+  createdAt DateTime @default(now())
+
+  poll   Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+  @@index([userId])
 }
 
 // Activity log entries (poll created, photo added, etc.) – append-only

@@ -94,6 +94,20 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 
 	const committedFundsFromYesRsvps = await computeCommittedFundsFromYesRsvps(tripId);
 
+	// Count active polls the current user hasn't voted on (for sidebar badge)
+	let pollsUnvotedCount = 0;
+	if (user) {
+		const activePollIds = await prisma.poll
+			.findMany({ where: { tripId, status: 'active' }, select: { id: true } })
+			.then((rows) => rows.map((r) => r.id));
+		if (activePollIds.length > 0) {
+			const votedCount = await prisma.pollVote.count({
+				where: { userId: user.id, pollId: { in: activePollIds } }
+			});
+			pollsUnvotedCount = Math.max(0, activePollIds.length - votedCount);
+		}
+	}
+
 	return {
 		user,
 		trip,
@@ -103,6 +117,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		userRsvp,
 		canChat: userRsvp?.status === 'yes' || membership?.role === 'host',
 		pendingInviteToken,
-		committedFundsFromYesRsvps
+		committedFundsFromYesRsvps,
+		pollsUnvotedCount
 	};
 };

@@ -12,9 +12,13 @@
 		children?: Snippet;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
+		/** When false, Guests tab is hidden (guest portal only). Hosts and co-hosts see it. */
+		showGuestsTab?: boolean;
+		/** Count of active polls user hasn't voted on; badge on Polls icon until they view the page */
+		pollsUnvotedCount?: number;
 	}
 
-	let { tripId, user, children, onInvite, showToast }: Props = $props();
+	let { tripId, user, children, onInvite, showToast, showGuestsTab = true, pollsUnvotedCount = 0 }: Props = $props();
 
 	function openInvite() {
 		onInvite?.();
@@ -36,7 +40,7 @@
 		return currentPath.startsWith(href);
 	}
 
-	const navItems = [
+	const allNavItems = [
 		{ href: `/trips/${tripId}`, label: 'Dashboard', icon: 'dashboard' },
 		{ href: `/trips/${tripId}/guests`, label: 'Guests', icon: 'guests' },
 		{ href: `/trips/${tripId}/rooms`, label: 'Rooms', icon: 'rooms' },
@@ -45,6 +49,7 @@
 		{ href: `/trips/${tripId}/polls`, label: 'Polls', icon: 'polls' },
 		{ href: `/trips/${tripId}/files`, label: 'Files', icon: 'files' }
 	];
+	const navItems = $derived(showGuestsTab ? allNavItems : allNavItems.filter((item) => item.icon !== 'guests'));
 </script>
 
 <div class="app-shell">
@@ -62,6 +67,7 @@
 					aria-label={item.label}
 					title={item.label}
 				>
+					<span class="rail-nav-item-inner">
 					{#if item.icon === 'dashboard'}
 						<svg class="rail-icon-svg" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
 					{:else if item.icon === 'guests'}
@@ -79,6 +85,10 @@
 					{:else if item.icon === 'settings'}
 						<svg class="rail-icon-svg" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
 					{/if}
+					{#if item.icon === 'polls' && pollsUnvotedCount > 0 && !isActive(item.href)}
+						<span class="rail-nav-badge" aria-label="{pollsUnvotedCount} poll(s) need your vote">{pollsUnvotedCount > 9 ? '9+' : pollsUnvotedCount}</span>
+					{/if}
+					</span>
 				</a>
 				{/each}
 			</nav>
@@ -200,6 +210,34 @@
 	.rail-nav-item.active {
 		background: rgba(0, 0, 0, 0.1);
 		color: #111827;
+	}
+
+	.rail-nav-item-inner {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+	}
+
+	.rail-nav-badge {
+		position: absolute;
+		top: -2px;
+		right: -2px;
+		min-width: 16px;
+		height: 16px;
+		padding: 0 4px;
+		border-radius: 8px;
+		background: #dc2626;
+		color: white;
+		font-size: 0.65rem;
+		font-weight: 700;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		line-height: 1;
+		box-sizing: border-box;
 	}
 
 	.rail-nav .rail-icon-svg {

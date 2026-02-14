@@ -126,7 +126,7 @@
 		border-radius: 10px;
 		box-shadow: 0 4px 12px rgba(0, 27, 46, 0.15);
 		border: 1px solid var(--border, #e2e8f0);
-		z-index: 1000;
+		z-index: 99999;
 		pointer-events: none;
 		text-align: center;
 	}

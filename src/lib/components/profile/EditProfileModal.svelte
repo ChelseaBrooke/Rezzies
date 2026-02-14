@@ -244,7 +244,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		z-index: 1001;
+		z-index: 99998;
 		padding: 1rem;
 		box-sizing: border-box;
 		overflow-y: auto;
