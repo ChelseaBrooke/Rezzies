@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireInternalApiKey } from '$lib/server/api-protection.js';
 import { guestSubmissionSchema, createErrorResponse, createSuccessResponse } from '$lib/server/validation.js';
 import { prisma } from '$lib/server/prisma.js';
-import { calculateGuestPrice } from '$lib/server/pricing.js';
+import { calculatePrice } from '$lib/server/pricing.js';
 import { sendTemplateEmail } from '$lib/server/email/sendgrid.js';
 import { TEMPLATE_KEYS } from '$lib/server/email/templates.js';
 
@@ -31,7 +31,7 @@ export const POST: RequestHandler = async (event) => {
 		// Verify bed exists and is available
 		const bed = await prisma.bed.findUnique({
 			where: { id: data.bedId },
-			include: { room: true }
+			include: { room: { select: { tripId: true, name: true } } }
 		});
 
 		if (!bed) {
@@ -48,8 +48,10 @@ export const POST: RequestHandler = async (event) => {
 			);
 		}
 
-		// Recalculate price server-side to prevent tampering
-		const priceCalculation = calculateGuestPrice({
+		// Recalculate price server-side to prevent tampering (canonical formula for PER_BED)
+		const priceCalculation = await calculatePrice({
+			tripId: bed.room.tripId,
+			roomId: bed.roomId,
 			bedId: data.bedId,
 			checkInDate: data.checkInDate,
 			checkOutDate: data.checkOutDate

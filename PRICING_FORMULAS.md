@@ -155,7 +155,7 @@ Reference for all pricing-related formulas used in the app. Variables are spelle
 
 - **Committed funds**  
   `committed funds = sum over every yes-RSVP of (that person’s current expected cost)`  
-  Where “current expected cost” = reservation price using the same per-night logic as above (PER_BED: allocate night cost by weight across claimed spots only; PER_ROOM: per-night weighted denominator). Yes-RSVPs with no assignment (e.g. PER_PERSON before room pick): use first room and 1 slot at current rate.
+  Where “current expected cost” = reservation price (PER_BED: nightCost × (spotWeight ÷ effectiveWeight) × nightsStayed × spotsClaimed; PER_ROOM: per-night weighted denominator). Yes-RSVPs with no assignment (e.g. PER_PERSON before room pick): use first room and 1 slot at current rate.
 
 ---
 
@@ -178,5 +178,5 @@ Reference for all pricing-related formulas used in the app. Variables are spelle
 - **Trip cost to nights**  
   Total trip cost in cents is distributed evenly across trip nights with deterministic rounding so the sum of nightly amounts equals total trip cost.
 
-- **Integer cents per spot**  
-  For PER_BED, each night’s effective night cost (in cents) is allocated across claimed spots by weight. Use largest-remainder; tie-break by spot id so the sum of spot charges for that night equals effective night cost cents exactly. No unit mismatch (all in weighted or all in cents).
+- **PER_BED**  
+  Reservation total and displayed price use the single formula (effectiveWeight); rounding is applied to the final total. No per-night cents allocation across spots.

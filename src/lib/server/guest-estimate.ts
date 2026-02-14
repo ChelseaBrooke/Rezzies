@@ -480,8 +480,8 @@ export async function computeGuestEstimateWithOverrides(
 }
 
 /**
- * Calculate reservation price with an overridden headcount or W_eff (for PER_BED/PER_ROOM estimate range).
- * For PER_BED, when overrideWEff is set: low = n×nightCost×(k×w/W_max), high = n×nightCost×(k×w/W_min) (PRICING_MATH).
+ * Calculate reservation price with an overridden headcount (for PER_ROOM) or effective weight (for PER_BED range).
+ * PER_BED: overrideWEff = effectiveWeight or maxCap×avgW for range low/high.
  */
 async function calculateReservationPriceWithHeadcount(
 	tripId: string,

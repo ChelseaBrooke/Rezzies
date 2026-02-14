@@ -1,7 +1,9 @@
 // Pricing calculation logic for Divvi
 // Supports multiple pricing models: per_room, per_bed, per_person, per_person_per_night
+// PER_BED uses canonical effectiveGuests × effectiveWeight formula via pricing-canonical.
 
 import { prisma } from './prisma.js';
+import { calculateReservationPrice } from './pricing-canonical.js';
 
 export type PricingModel = 'per_room' | 'per_bed' | 'per_person' | 'per_person_per_night';
 
@@ -77,8 +79,24 @@ export async function calculatePrice(
 		case 'per_room':
 			return calculatePerRoomPrice(trip, roomId!, nights, totalNights);
 
-		case 'per_bed':
-			return await calculatePerBedPrice(trip, bedId!, nights, totalNights);
+		case 'per_bed': {
+			const resolvedRoomId =
+				roomId ?? trip.rooms.find((r) => r.beds.some((b) => b.id === bedId))?.id;
+			if (resolvedRoomId == null) throw new Error('Room not found for bed');
+			const canonical = await calculateReservationPrice({
+				tripId,
+				roomId: resolvedRoomId,
+				bedId: bedId!,
+				numberOfSlots: numberOfGuests ?? 1,
+				checkInDate,
+				checkOutDate
+			});
+			return {
+				nights: canonical.nights,
+				nightlyRate: Number(canonical.perNightRate.toFixed(2)),
+				totalPrice: Number(canonical.totalPrice.toFixed(2))
+			};
+		}
 
 		case 'per_person':
 			return calculatePerPersonPrice(trip, numberOfGuests, totalNights);
@@ -103,28 +121,6 @@ function calculatePerRoomPrice(
 	const totalRooms = trip.rooms.length;
 	const roomCostPerNight = trip.totalCost / totalNights / totalRooms;
 	const nightlyRate = roomCostPerNight;
-	const totalPrice = nightlyRate * nights;
-
-	return {
-		nights,
-		nightlyRate: Number(nightlyRate.toFixed(2)),
-		totalPrice: Number(totalPrice.toFixed(2))
-	};
-}
-
-/**
- * Per Bed: Total cost divided by number of beds, then by nights
- */
-async function calculatePerBedPrice(
-	trip: { totalCost: number; rooms: Array<{ id: number; beds: Array<{ id: string }> }> },
-	bedId: string,
-	nights: number,
-	totalNights: number
-): Promise<PriceCalculationResult> {
-	// Count total beds across all rooms
-	const totalBeds = trip.rooms.reduce((sum, room) => sum + room.beds.length, 0);
-	const bedCostPerNight = trip.totalCost / totalNights / totalBeds;
-	const nightlyRate = bedCostPerNight;
 	const totalPrice = nightlyRate * nights;
 
 	return {

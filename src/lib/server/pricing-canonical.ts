@@ -72,7 +72,7 @@ export function calculateNights(startDate: Date, endDate: Date): number {
 
 /**
  * Return array of UTC date keys (YYYY-MM-DD) for each night in [checkIn, checkOut), end exclusive.
- * Used for per-night allocation in PER_BED and PER_ROOM.
+ * Used in PER_ROOM and for night-key iteration (e.g. distributing trip cost to nights).
  */
 export function getNightsBetween(checkIn: Date, checkOut: Date): string[] {
 	const out: string[] = [];
@@ -137,51 +137,6 @@ export function isNightInRange(
 	return nightKey >= startKey && nightKey < endKey;
 }
 
-/** Spot with optional tag for aggregating by reservation (e.g. 'booking' vs assignment id). */
-export interface SpotForNight {
-	weight: number;
-	id: string;
-	bedId: string;
-	reservationTag: string;
-}
-
-/**
- * Build list of claimed spots for a given night from assignments and optional prospective booking.
- * Used for PER_BED nightly allocation.
- */
-export function buildSpotsForNight(
-	nightKey: string,
-	trip: { checkInDate: Date; checkOutDate: Date; rooms: Array<{ id: number; beds: Array<{ id: string; bedType: string; capacitySlots?: number | null; capacity?: number | null }> }> },
-	bedWeights: BedWeights,
-	assignments: Array<{ id: string; roomId: number; bedId: string | null; partySize: number | null; startDate: Date | null; endDate: Date | null }>,
-	booking?: { roomId: number; bedId?: string; numberOfSlots: number }
-): SpotForNight[] {
-	const spots: SpotForNight[] = [];
-	for (const a of assignments) {
-		if (!isNightInRange(nightKey, a.startDate, a.endDate, trip.checkInDate, trip.checkOutDate)) continue;
-		const room = trip.rooms.find((r) => r.id === a.roomId);
-		if (!room?.beds?.length) continue;
-		const bed = a.bedId ? room.beds.find((b) => b.id === a.bedId) : room.beds[0];
-		if (!bed) continue;
-		const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
-		const partySize = a.partySize ?? 1;
-		for (let i = 0; i < partySize; i++) {
-			spots.push({ weight: spotWeight, id: `a-${a.id}-${i}`, bedId: bed.id, reservationTag: a.id });
-		}
-	}
-	if (booking) {
-		const room = trip.rooms.find((r) => r.id === booking.roomId);
-		if (!room?.beds?.length) return spots;
-		const bed = booking.bedId ? room.beds.find((b) => b.id === booking.bedId) : room.beds[0];
-		if (!bed) return spots;
-		const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
-		for (let i = 0; i < booking.numberOfSlots; i++) {
-			spots.push({ weight: spotWeight, id: `b-${i}`, bedId: bed.id, reservationTag: 'booking' });
-		}
-	}
-	return spots;
-}
-
 /**
  * Normalize bed type for weight lookup: lowercase, spaces -> underscore,
  * and strip common suffixes (_bed, _size) so "queen_bed" / "Queen Bed" -> "queen", "twin_bed" -> "twin".
@@ -228,57 +183,6 @@ export function getSpotCount(bed: { capacitySlots?: number | null; capacity?: nu
 	return bed.capacitySlots ?? bed.capacity ?? 1;
 }
 
-/**
- * PER_BED nightly allocation: when attendance is below minimum expected, scale up nightly cost
- * and distribute across current RSVPs (no host gap). loadFactor = max(1, floorWeight/claimedWeight).
- * Returns effectiveNightCostCents and cents per spot (same order as spots).
- */
-export function runPerBedNightAllocation(
-	nightCostCents: number,
-	floorWeight: number,
-	spots: Array<{ weight: number; id: string }>
-): { effectiveNightCostCents: number; centsPerSpot: number[] } {
-	if (spots.length === 0) {
-		return { effectiveNightCostCents: nightCostCents, centsPerSpot: [] };
-	}
-	const claimedWeight = spots.reduce((s, p) => s + p.weight, 0);
-	if (claimedWeight <= 0) {
-		return { effectiveNightCostCents: nightCostCents, centsPerSpot: spots.map(() => 0) };
-	}
-	const loadFactor = Math.max(1, floorWeight / claimedWeight);
-	const effectiveNightCostCents = Math.round(nightCostCents * loadFactor);
-	const centsPerSpot = allocateNightCostCentsToSpots(effectiveNightCostCents, spots);
-	return { effectiveNightCostCents, centsPerSpot };
-}
-
-/**
- * Allocate a night's cost in integer cents across spots by weight.
- * Uses largest-remainder; tie-break by spot id for determinism. Sum of returned cents = totalCents.
- * PRICING_MATH: "distribute remaining cents using a deterministic method (e.g. largest remainder or stable sort by spot id)".
- */
-export function allocateNightCostCentsToSpots(
-	totalCents: number,
-	spots: Array<{ weight: number; id: string }>
-): number[] {
-	if (spots.length === 0) return [];
-	const totalWeight = spots.reduce((s, p) => s + p.weight, 0);
-	if (totalWeight <= 0) return spots.map(() => 0);
-	const exact = spots.map((p) => (totalCents * p.weight) / totalWeight);
-	const base = exact.map((e) => Math.floor(e));
-	let remainder = totalCents - base.reduce((s, b) => s + b, 0);
-	const indicesByRemainder = spots
-		.map((_, i) => ({ i, r: exact[i] - base[i], id: spots[i].id }))
-		.sort((a, b) => {
-			if (b.r !== a.r) return b.r - a.r;
-			return a.id.localeCompare(b.id);
-		});
-	const out = [...base];
-	for (let j = 0; j < remainder && j < indicesByRemainder.length; j++) {
-		out[indicesByRemainder[j].i] += 1;
-	}
-	return out;
-}
-
 /** Spot weight = bedTypeWeight × effectiveRoomPrivacy (PRICING_MATH). */
 export function getSpotWeight(
 	bed: { bedType: string },
@@ -298,8 +202,8 @@ export interface PerBedInventoryWeights {
 }
 
 /**
- * Compute PER_BED inventory weights for estimate range and W_eff (PRICING_MATH).
- * W_full = sum(spotWeight for every spot in inventory); W_floor = minExpected × avgW; W_max = W_full; W_min = W_floor.
+ * Compute PER_BED inventory weights for estimate range (avgSpotWeight, etc.).
+ * W_full = sum(spotWeight for every spot in inventory); avgW = W_full / totalSpotCapacity.
  */
 export function computePerBedInventoryWeights(
 	trip: {
@@ -593,8 +497,7 @@ export async function computePerBedPricingAtHeadcount(
 
 /**
  * Sum of current expected cost for all yes-RSVPs based on their reserved beds/rooms/slots.
- * Uses live pricing: W_eff = max(W_d, W_floor) (min expected guests or current claimed spots).
- * Not based on estimate range — this is the actual amount each would pay at current headcount.
+ * PER_BED: uses same formula as calculateReservationPrice (effectiveGuests × avgSpotWeight).
  * Used for "$ committed" on host/guest dashboard.
  * For yes users with no room assignment (e.g. PER_PERSON before room pick), uses first room and 1 slot.
  */

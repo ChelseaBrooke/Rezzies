@@ -2,7 +2,11 @@
  * Calculate and format pricing display for rooms/beds based on pricing model
  */
 
-import { computeRoomPricing, getBedWeight, getRoomEffectivePrivacy, parseBedWeights, type PricingMode } from './pricing-canonical.js';
+import {
+	computeRoomPricing,
+	computePerBedPricingAtHeadcount,
+	type PricingMode
+} from './pricing-canonical.js';
 import { prisma } from './prisma.js';
 
 export interface RoomPricingDisplay {
@@ -88,6 +92,12 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 		};
 	}
 
+	// PER_BED: use canonical pricing (effectiveGuests × avgSpotWeight) so display matches RSVP page
+	let perBedPricing: Awaited<ReturnType<typeof computePerBedPricingAtHeadcount>> = null;
+	if (pricingModel === 'PER_BED') {
+		perBedPricing = await computePerBedPricingAtHeadcount(tripId, 0);
+	}
+
 	// For PER_ROOM and PER_BED, use canonical pricing
 	for (const room of trip.rooms) {
 		const roomPricingData = computedPricing.roomPricing.find(r => r.roomId === room.id);
@@ -98,32 +108,16 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 
 		const bedPricing: BedPricingDisplay[] = [];
 
-		if (pricingModel === 'PER_BED') {
-			const bedWeights = parseBedWeights(trip.bedWeights);
-			let totalSlots = 0;
-			let sumCombinedWeight = 0;
-			for (const r of trip.rooms) {
-				const p = getRoomEffectivePrivacy(r.beds);
-				for (const b of r.beds) {
-					const slots = b.capacitySlots || b.capacity || 1;
-					totalSlots += slots;
-					sumCombinedWeight += slots * getBedWeight(bedWeights, b.bedType) * p;
-				}
-			}
-			const avgCombinedWeight = totalSlots > 0 ? sumCombinedWeight / totalSlots : 1;
-			const effectiveGuests = Math.max(1, trip.expectedPeopleCount ?? trip.maxGuests ?? totalSlots);
-			const base = trip.totalCost / effectiveGuests;
-			const roomPrivacy = getRoomEffectivePrivacy(room.beds);
+		if (pricingModel === 'PER_BED' && perBedPricing?.bedPricing) {
 			for (const bed of room.beds) {
-				const w = getBedWeight(bedWeights, bed.bedType);
-				const bedPriceFullStay = (base * (w * roomPrivacy)) / avgCombinedWeight;
-				const bedPricePerNight = bedPriceFullStay / totalNights;
-
-				bedPricing.push({
-					bedId: bed.id,
-					bedType: bed.bedType,
-					priceDisplay: `$${bedPricePerNight.toFixed(2)} per night ($${bedPriceFullStay.toFixed(2)} for ${totalNights} nights)`
-				});
+				const p = perBedPricing.bedPricing[bed.id];
+				if (p) {
+					bedPricing.push({
+						bedId: bed.id,
+						bedType: bed.bedType,
+						priceDisplay: `$${p.perNight.toFixed(2)} per night ($${p.total.toFixed(2)} for ${perBedPricing.totalNights} nights)`
+					});
+				}
 			}
 		}
 
