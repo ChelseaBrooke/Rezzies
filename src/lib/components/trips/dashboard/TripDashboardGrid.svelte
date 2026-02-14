@@ -3,6 +3,7 @@
 	import TripGoalsCombined from './TripGoalsCombined.svelte';
 	import TripInfoCard from './TripInfoCard.svelte';
 	import Checklist from './Checklist.svelte';
+	import GuestRsvpSummaryCard from './GuestRsvpSummaryCard.svelte';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 
@@ -29,6 +30,10 @@
 		userRsvp?: { status?: string; arrivalDatetime?: string | null } | null;
 		userProfile?: { dietaryRestrictions?: string | null; allergies?: string | null } | null;
 		myAssignment?: { room?: { name: string | null } | null } | null;
+		/** Guest only: current reservation price (may change as more RSVP) */
+		userReservationPrice?: number | null;
+		/** Guest only: current user's room/bed assignments for RSVP summary */
+		myAssignments?: Array<{ room?: { id: number; name: string | null; photoUrls?: string[] } | null; bed?: { id: string; bedType: string | null } | null; partySize?: number }>;
 		myDueTotal: number;
 		myPaidTotal: number;
 		nextUpcomingItem?: { title: string; date?: string | null } | null;
@@ -81,6 +86,8 @@
 		userRsvp,
 		userProfile,
 		myAssignment,
+		userReservationPrice = null,
+		myAssignments = [],
 		myDueTotal,
 		myPaidTotal,
 		nextUpcomingItem,
@@ -182,29 +189,40 @@
 		</div>
 
 		<div class="recent-cell">
-			<DashboardCard
-				title="Progress"
-				headerRight={progressViewDetailButton}
-			>
-				<TripGoalsCombined
-					{rsvpCurrent}
-					{rsvpTotal}
-					{rsvpPct}
-					{bedsCurrent}
-					{bedsTotal}
-					{bedsPct}
-					{roomsFilled}
-					{roomsTotal}
-					{roomsPct}
-					{fundingCurrent}
-					{fundingTotal}
-					{fundingPct}
-					{fundingDisplay}
-					{guestsHref}
-					{roomsHref}
-					{paymentsHref}
-				/>
-			</DashboardCard>
+			{#if isHost}
+				<DashboardCard
+					title="Progress"
+					headerRight={progressViewDetailButton}
+				>
+					<TripGoalsCombined
+						{rsvpCurrent}
+						{rsvpTotal}
+						{rsvpPct}
+						{bedsCurrent}
+						{bedsTotal}
+						{bedsPct}
+						{roomsFilled}
+						{roomsTotal}
+						{roomsPct}
+						{fundingCurrent}
+						{fundingTotal}
+						{fundingPct}
+						{fundingDisplay}
+						{guestsHref}
+						{roomsHref}
+						{paymentsHref}
+					/>
+				</DashboardCard>
+			{:else}
+				<DashboardCard title="Your RSVP">
+					<GuestRsvpSummaryCard
+						tripId={tripId}
+						{userRsvp}
+						myAssignments={myAssignments}
+						userReservationPrice={userReservationPrice}
+					/>
+				</DashboardCard>
+			{/if}
 		</div>
 
 		<div class="guests-row">

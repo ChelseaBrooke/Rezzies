@@ -1,12 +1,35 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { enhance, deserialize, applyAction } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import DateRangePicker from '$lib/components/wizard/DateRangePicker.svelte';
 	import type { PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: any } = $props();
+
+	let rsvpSuccessToast = $state(false);
+
+	/** On successful RSVP submit: show toast, then redirect to trip dashboard */
+	function enhanceRsvpSubmit() {
+		return async ({
+			result,
+			update
+		}: {
+			result: import('@sveltejs/kit').ActionResult;
+			update: (opts?: { reset: boolean }) => Promise<void>;
+		}) => {
+			if (result.type === 'success') {
+				rsvpSuccessToast = true;
+				setTimeout(() => {
+					const tripId = data.trip?.id;
+					if (tripId) goto(`/trips/${tripId}`);
+				}, 1400);
+			} else {
+				await update();
+			}
+		};
+	}
 
 	let adultsCount = $state(data.currentRsvp?.adultsCount ?? 1);
 	let kidsCount = $state(data.currentRsvp?.kidsCount ?? 0);
@@ -197,6 +220,9 @@
 </script>
 
 <div class="rsvp-page">
+	{#if rsvpSuccessToast}
+		<div class="rsvp-toast" role="status" aria-live="polite">RSVP saved! Taking you to the dashboard…</div>
+	{/if}
 	<div class="container">
 		<div class="rsvp-card">
 			<div
@@ -248,7 +274,7 @@
 				{#if form?.error}
 					<div class="error-message" role="alert">{form.error}</div>
 				{/if}
-				<form id="rsvp-form" method="POST" action="?/updateRsvp" use:enhance>
+				<form id="rsvp-form" method="POST" action="?/updateRsvp" use:enhance={enhanceRsvpSubmit}>
 					{#if isYes}
 					<div class="form-row form-row-single-line">
 						<div class="form-group date-range-form-group">
@@ -396,7 +422,7 @@
 										</label>
 									</div>
 
-									<form id="yes-confirm-form" method="POST" action="?/updateRsvp" use:enhance class="submit-form">
+									<form id="yes-confirm-form" method="POST" action="?/updateRsvp" use:enhance={enhanceRsvpSubmit} class="submit-form">
 										<input type="hidden" name="status" value="yes" />
 										<input type="hidden" name="arrivalDate" value={arrivalDate} />
 										<input type="hidden" name="departureDate" value={departureDate} />
@@ -441,6 +467,32 @@
 		min-height: calc(100vh - 80px);
 		padding: var(--spacing-xl) var(--spacing-md);
 		background: linear-gradient(160deg, #fdf8f3 0%, #f5ebe0 50%, #efe6dc 100%);
+	}
+
+	.rsvp-toast {
+		position: fixed;
+		bottom: 1.5rem;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 100;
+		background: #166534;
+		color: white;
+		padding: 0.75rem 1.25rem;
+		border-radius: var(--radius-md, 8px);
+		font-size: 0.9375rem;
+		font-weight: 500;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		animation: rsvp-toast-in 0.25s ease-out;
+	}
+	@keyframes rsvp-toast-in {
+		from {
+			opacity: 0;
+			transform: translateX(-50%) translateY(0.5rem);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(-50%) translateY(0);
+		}
 	}
 
 	.container {

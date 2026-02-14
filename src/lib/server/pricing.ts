@@ -74,8 +74,9 @@ export async function calculatePrice(
 
 	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
 
-	// Calculate price based on model
-	switch (trip.pricingModel) {
+	// Calculate price based on model (normalize to lowercase; DB may store PER_BED, per_bed, etc.)
+	const pricingModel = (trip.pricingModel ?? '').toLowerCase();
+	switch (pricingModel) {
 		case 'per_room':
 			return calculatePerRoomPrice(trip, roomId!, nights, totalNights);
 
@@ -105,7 +106,7 @@ export async function calculatePrice(
 			return calculatePerPersonPerNightPrice(trip, numberOfGuests, nights, totalNights);
 
 		default:
-			throw new Error(`Unknown pricing model: ${trip.pricingModel}`);
+			throw new Error(`Unknown pricing model: ${trip.pricingModel ?? '(empty)'}`);
 	}
 }
 

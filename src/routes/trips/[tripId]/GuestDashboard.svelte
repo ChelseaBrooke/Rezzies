@@ -47,6 +47,12 @@
 	const guestPreviewList = $derived(members.slice(0, 8));
 
 	const myAssignment = $derived(user ? roomAssignments.find((a) => a.userId === user.id) : null);
+	// Page load includes bed on assignments; use for guest RSVP summary card
+	const myAssignments = $derived(
+		user && data.roomAssignments
+			? data.roomAssignments.filter((a) => a.userId === user.id)
+			: []
+	);
 	const myPaidTotal = $derived(
 		userInvoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0)
 	);
@@ -163,6 +169,8 @@
 			{userRsvp}
 			{userProfile}
 			{myAssignment}
+			userReservationPrice={data.userReservationPrice ?? null}
+			{myAssignments}
 			{myDueTotal}
 			{myPaidTotal}
 			{nextUpcomingItem}

@@ -137,9 +137,24 @@ export function isNightInRange(
 	return nightKey >= startKey && nightKey < endKey;
 }
 
+/** Canonical bed-type keys used in DEFAULT_BED_WEIGHTS (order: prefer longer matches first to avoid "king" in "bunk") */
+const BED_TYPE_CANONICAL_KEYS = [
+	'air_mattress',
+	'sofa_bed',
+	'sofa',
+	'king',
+	'queen',
+	'bunk',
+	'twin',
+	'single',
+	'double',
+	'full',
+	'other'
+];
+
 /**
  * Normalize bed type for weight lookup: lowercase, spaces -> underscore,
- * and strip common suffixes (_bed, _size) so "queen_bed" / "Queen Bed" -> "queen", "twin_bed" -> "twin".
+ * strip common suffixes (_bed, _size), then match exact or substring so "Queen Bed" -> "queen", "Bunk" -> "bunk".
  */
 function normalizeBedType(bedType: string | null): string {
 	if (!bedType || !bedType.trim()) return 'other';
@@ -147,7 +162,15 @@ function normalizeBedType(bedType: string | null): string {
 	// Strip trailing _bed or _size so we match canonical keys (king, queen, twin, etc.)
 	if (key.endsWith('_bed')) key = key.slice(0, -4);
 	if (key.endsWith('_size')) key = key.slice(0, -5);
-	return key || 'other';
+	if (!key) return 'other';
+	// Exact match
+	if (DEFAULT_BED_WEIGHTS[key] !== undefined) return key;
+	// Substring match: e.g. "queen_primary" or "bunk_bed" (already stripped) or "room_queen"
+	for (const canon of BED_TYPE_CANONICAL_KEYS) {
+		if (canon === 'other') continue;
+		if (key === canon || key.includes(canon)) return canon;
+	}
+	return 'other';
 }
 
 export function getBedWeight(weights: BedWeights, bedType: string | null): number {
