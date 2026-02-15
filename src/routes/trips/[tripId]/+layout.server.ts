@@ -98,7 +98,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 	let pollsUnvotedCount = 0;
 	if (user) {
 		const activePollIds = await prisma.poll
-			.findMany({ where: { tripId, status: 'active' }, select: { id: true } })
+			.findMany({ where: { tripId, status: 'open' }, select: { id: true } })
 			.then((rows) => rows.map((r) => r.id));
 		if (activePollIds.length > 0) {
 			const votedCount = await prisma.pollVote.count({

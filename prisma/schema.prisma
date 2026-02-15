@@ -553,15 +553,21 @@ model ChatMessage {
   @@index([tripId, createdAt])
 }
 
-// Polls (any trip member can create)
+// Polls (hosts create/manage, guests vote)
 model Poll {
-  id          String   @id @default(uuid())
-  tripId      String
-  createdById String
-  question    String
-  status      String   @default("active") // "active" | "closed"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String    @id @default(uuid())
+  tripId           String
+  createdById      String
+  title            String    // Display title (maps from legacy "question")
+  description      String?
+  category         String    @default("Other") // Scheduling, Meals, Activities, Rooms/Beds, Other
+  pollType         String    @default("single") // single | multi | datetime
+  status           String    @default("draft") // draft | open | closed | canceled
+  showResultsLive  Boolean   @default(true)
+  startAt          DateTime?
+  endAt            DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   trip     Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
   createdBy User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
@@ -570,13 +576,14 @@ model Poll {
 
   @@index([tripId])
   @@index([tripId, status])
+  @@index([tripId, category])
 }
 
 model PollOption {
-  id     String @id @default(uuid())
-  pollId String
-  label  String
-  order  Int    @default(0)
+  id        String @id @default(uuid())
+  pollId    String
+  label     String
+  sortOrder Int    @default(0) @map("order")
 
   poll  Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
   votes PollVote[]
@@ -585,17 +592,17 @@ model PollOption {
 }
 
 model PollVote {
-  id       String @id @default(uuid())
-  pollId   String
-  optionId String
-  userId   String
+  id        String   @id @default(uuid())
+  pollId    String
+  optionId  String
+  userId    String
   createdAt DateTime @default(now())
 
   poll   Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
   option PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
   user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([pollId, userId])
+  @@unique([pollId, userId, optionId])
   @@index([pollId])
   @@index([userId])
 }
