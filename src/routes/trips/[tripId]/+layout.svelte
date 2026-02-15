@@ -28,7 +28,7 @@
 		user={data.user}
 		onInvite={handleInvite}
 		showGuestsTab={data.isHost || data.membership?.role === 'co-host'}
-		pollsUnvotedCount={data.pollsUnvotedCount ?? 0}
+		pollsBadgeCount={data.pollsBadgeCount ?? 0}
 	>
 	{#snippet children()}
 		{#if safeChildren}

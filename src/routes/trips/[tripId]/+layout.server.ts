@@ -94,17 +94,19 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 
 	const committedFundsFromYesRsvps = await computeCommittedFundsFromYesRsvps(tripId);
 
-	// Count active polls the current user hasn't voted on (for sidebar badge)
-	let pollsUnvotedCount = 0;
+	// Badge: only show when a new poll was added since last visit (hidden when on polls page)
+	let pollsBadgeCount = 0;
 	if (user) {
-		const activePollIds = await prisma.poll
-			.findMany({ where: { tripId, status: 'open' }, select: { id: true } })
-			.then((rows) => rows.map((r) => r.id));
-		if (activePollIds.length > 0) {
-			const votedCount = await prisma.pollVote.count({
-				where: { userId: user.id, pollId: { in: activePollIds } }
+		const lastVisitRaw = cookies.get(`polls_visit_${tripId}`);
+		const lastVisit = lastVisitRaw ? new Date(lastVisitRaw).getTime() : 0;
+
+		if (lastVisit > 0) {
+			pollsBadgeCount = await prisma.poll.count({
+				where: {
+					tripId,
+					createdAt: { gt: new Date(lastVisit) }
+				}
 			});
-			pollsUnvotedCount = Math.max(0, activePollIds.length - votedCount);
 		}
 	}
 
@@ -118,6 +120,6 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		canChat: userRsvp?.status === 'yes' || membership?.role === 'host',
 		pendingInviteToken,
 		committedFundsFromYesRsvps,
-		pollsUnvotedCount
+		pollsBadgeCount
 	};
 };

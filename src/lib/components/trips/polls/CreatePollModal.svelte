@@ -1,15 +1,15 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import type { PollCategory } from './types.js';
 	import { POLL_CATEGORIES } from './types.js';
 
 	interface Props {
 		open: boolean;
 		onClose: () => void;
-		onSubmit: (data: CreatePollFormData, action: 'draft' | 'open') => void;
-		/** When editing a draft */
-		initialData?: Partial<CreatePollFormData> | null;
+		/** Form action URL to POST to (e.g. /trips/xxx/polls?/create) */
+		formAction: string;
+		onSuccess?: () => void;
 		error?: string | null;
-		submitting?: boolean;
 	}
 
 	export interface CreatePollFormData {
@@ -25,10 +25,9 @@
 	let {
 		open,
 		onClose,
-		onSubmit,
-		initialData,
-		error = null,
-		submitting = false
+		formAction,
+		onSuccess,
+		error = null
 	}: Props = $props();
 
 	$effect(() => {
@@ -40,24 +39,17 @@
 		return () => window.removeEventListener('keydown', onKey);
 	});
 
-	let title = $state(initialData?.title ?? '');
-	let description = $state(initialData?.description ?? '');
-	let category = $state<PollCategory>((initialData?.category as PollCategory) ?? 'Other');
-	let pollType = $state<'single' | 'multi'>(initialData?.pollType ?? 'single');
-	let options = $state<string[]>(initialData?.options?.length ? [...initialData.options] : ['', '']);
-	let durationHours = $state(initialData?.durationHours ?? 48);
-	let showResultsLive = $state(initialData?.showResultsLive ?? true);
+	let title = $state('');
+	let description = $state('');
+	let category = $state<PollCategory>('Other');
+	let pollType = $state<'single' | 'multi'>('single');
+	let options = $state<string[]>(['', '']);
+	let durationHours = $state(48);
+	let showResultsLive = $state(true);
+	let submitting = $state(false);
 
 	$effect(() => {
-		if (open && initialData) {
-			title = initialData.title ?? '';
-			description = initialData.description ?? '';
-			category = (initialData.category as PollCategory) ?? 'Other';
-			pollType = initialData.pollType ?? 'single';
-			options = initialData.options?.length ? [...initialData.options] : ['', ''];
-			durationHours = initialData.durationHours ?? 48;
-			showResultsLive = initialData.showResultsLive ?? true;
-		} else if (open && !initialData) {
+		if (open) {
 			title = '';
 			description = '';
 			category = 'Other';
@@ -82,24 +74,6 @@
 	function updateOption(i: number, v: string) {
 		options = options.map((o, idx) => (idx === i ? v : o));
 	}
-
-	function handleSubmit(action: 'draft' | 'open') {
-		const trimmedOptions = options.map((o) => o.trim()).filter(Boolean);
-		if (action === 'open' && trimmedOptions.length < 2) return;
-		if (action === 'open' && !title.trim()) return;
-		onSubmit(
-			{
-				title: title.trim(),
-				description: description.trim(),
-				category,
-				pollType,
-				options: trimmedOptions,
-				durationHours,
-				showResultsLive
-			},
-			action
-		);
-	}
 </script>
 
 {#if open}
@@ -121,15 +95,25 @@
 				{/if}
 				<form
 					class="create-form"
-					onsubmit={(e) => {
-						e.preventDefault();
-						handleSubmit('open');
+					method="POST"
+					action={formAction}
+					use:enhance={() => {
+						submitting = true;
+						return async ({ result, update }) => {
+							await update();
+							submitting = false;
+							if (result.type === 'success' && result.data?.createSuccess) {
+								onSuccess?.();
+								onClose();
+							}
+						};
 					}}
 				>
 					<div class="form-group">
 						<label for="poll-title">Title <span class="required">*</span></label>
 						<input
 							id="poll-title"
+							name="title"
 							type="text"
 							bind:value={title}
 							placeholder="e.g. Where should we have dinner Friday?"
@@ -141,6 +125,7 @@
 						<label for="poll-desc">Description (optional)</label>
 						<textarea
 							id="poll-desc"
+							name="description"
 							bind:value={description}
 							rows="2"
 							placeholder="Add more context..."
@@ -148,7 +133,7 @@
 					</div>
 					<div class="form-group">
 						<label for="poll-category">Category <span class="required">*</span></label>
-						<select id="poll-category" bind:value={category}>
+						<select id="poll-category" name="category" bind:value={category}>
 							{#each categoriesForSelect as c}
 								<option value={c}>{c}</option>
 							{/each}
@@ -158,15 +143,16 @@
 						<label>Poll Type</label>
 						<div class="radio-group">
 							<label class="radio-label">
-								<input type="radio" bind:group={pollType} value="single" />
+								<input type="radio" name="pollType" bind:group={pollType} value="single" />
 								Single choice
 							</label>
 							<label class="radio-label">
-								<input type="radio" bind:group={pollType} value="multi" />
+								<input type="radio" name="pollType" bind:group={pollType} value="multi" />
 								Multiple choice
 							</label>
 						</div>
 					</div>
+					<input type="hidden" name="options" value={options.map((o) => o.trim()).filter(Boolean).join('\n')} />
 					<div class="form-group">
 						<label>Options <span class="required">*</span> (min 2)</label>
 						{#each options as opt, i}
@@ -195,7 +181,7 @@
 					</div>
 					<div class="form-group">
 						<label for="poll-duration">Duration</label>
-						<select id="poll-duration" bind:value={durationHours}>
+						<select id="poll-duration" name="durationHours" bind:value={durationHours}>
 							<option value={24}>24 hours</option>
 							<option value={48}>48 hours</option>
 							<option value={72}>72 hours</option>
@@ -203,21 +189,13 @@
 					</div>
 					<div class="form-group checkbox-group">
 						<label class="checkbox-label">
-							<input type="checkbox" bind:checked={showResultsLive} />
+							<input type="checkbox" name="showResultsLive" value="1" bind:checked={showResultsLive} />
 							Show results live (guests see counts as they vote)
 						</label>
 					</div>
 					<div class="form-actions">
-						<button
-							type="button"
-							class="btn-secondary"
-							onclick={() => handleSubmit('draft')}
-							disabled={submitting}
-						>
-							Save Draft
-						</button>
 						<button type="submit" class="btn-primary" disabled={submitting}>
-							{submitting ? 'Saving…' : 'Open Poll'}
+							{submitting ? 'Creating…' : 'Create poll'}
 						</button>
 					</div>
 				</form>

@@ -9,7 +9,7 @@ import { getStatusDisplay, getTimeLabel } from '$lib/components/trips/polls/util
 const POLL_CATEGORIES = ['Scheduling', 'Meals', 'Activities', 'Rooms/Beds', 'Other'];
 const VALID_SORTS = ['recent', 'ending_soon', 'most_votes', 'newest', 'oldest'];
 
-export const load: PageServerLoad = async ({ parent, params, url }) => {
+export const load: PageServerLoad = async ({ parent, params, url, cookies }) => {
 	const parentData = await parent();
 	const user = parentData.user;
 	if (!user) throw redirect(303, `/login?redirect=/trips/${params.tripId}/polls`);
@@ -165,6 +165,13 @@ export const load: PageServerLoad = async ({ parent, params, url }) => {
 		];
 	}
 
+	// Mark polls page visit (clears "new since last visit" badge)
+	cookies.set(`polls_visit_${tripId}`, new Date().toISOString(), {
+		path: '/',
+		maxAge: 60 * 60 * 24 * 365,
+		sameSite: 'lax'
+	});
+
 	return {
 		trip: parentData.trip,
 		polls,
@@ -189,8 +196,7 @@ const createPollSchema = z.object({
 	showResultsLive: z
 		.string()
 		.optional()
-		.transform((v) => v === '1' || v === 'on' || v === 'true'),
-	asDraft: z.string().optional()
+		.transform((v) => v === '1' || v === 'on' || v === 'true')
 });
 
 export const actions: Actions = {
@@ -199,8 +205,7 @@ export const actions: Actions = {
 		if (!user) throw redirect(303, '/login');
 
 		const tripId = params.tripId;
-		const canCreate = await isTripHostOrCoHost(tripId, user.id);
-		if (!canCreate) throw error(403, 'Only hosts can create polls');
+		if (!(await isTripMember(tripId, user.id))) throw error(403, 'Must be a trip member to create polls');
 
 		const formData = await request.formData();
 		const title = (formData.get('title') as string)?.trim() ?? '';
@@ -209,8 +214,7 @@ export const actions: Actions = {
 		const pollType = ((formData.get('pollType') as string) || 'single') as string;
 		const optionsRaw = (formData.get('options') as string)?.trim() ?? '';
 		const durationHours = parseInt((formData.get('durationHours') as string) || '48', 10);
-		const showResultsLive = (formData.get('showResultsLive') as string) === '1';
-		const asDraft = (formData.get('asDraft') as string) === '1';
+		const showResultsLiveRaw = formData.get('showResultsLive');
 
 		const options = optionsRaw.split('\n').map((l) => l.trim()).filter(Boolean);
 		const parsed = createPollSchema.safeParse({
@@ -220,8 +224,7 @@ export const actions: Actions = {
 			pollType: (formData.get('pollType') as string) || 'single',
 			options: optionsRaw,
 			durationHours,
-			showResultsLive,
-			asDraft
+			showResultsLive: typeof showResultsLiveRaw === 'string' ? showResultsLiveRaw : undefined
 		});
 
 		if (!parsed.success) {
@@ -233,8 +236,8 @@ export const actions: Actions = {
 		const pType = data.pollType === 'multi' ? 'multi' : 'single';
 
 		const now = new Date();
-		const endAt = asDraft ? null : new Date(now.getTime() + data.durationHours * 60 * 60 * 1000);
-		const startAt = asDraft ? null : now;
+		const endAt = new Date(now.getTime() + data.durationHours * 60 * 60 * 1000);
+		const startAt = now;
 
 		await prisma.poll.create({
 			data: {
@@ -244,7 +247,7 @@ export const actions: Actions = {
 				description: data.description || null,
 				category: cat,
 				pollType: pType,
-				status: asDraft ? 'draft' : 'open',
+				status: 'open',
 				showResultsLive: data.showResultsLive ?? true,
 				startAt,
 				endAt,
@@ -267,7 +270,7 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const pollId = formData.get('pollId') as string;
 		const optionIdsRaw = (formData.get('optionIds') as string) ?? '';
-		const optionIds = optionIdsRaw.split(',').map((id) => id.trim()).filter(Boolean);
+		const optionIds = [...new Set(optionIdsRaw.split(',').map((id) => id.trim()).filter(Boolean))];
 
 		if (!pollId || optionIds.length === 0) return fail(400, { voteError: 'Missing poll or option' });
 
@@ -288,12 +291,15 @@ export const actions: Actions = {
 		}
 
 		// Delete existing votes for this user in this poll, then create new ones
-		await prisma.pollVote.deleteMany({
-			where: { pollId, userId: user.id }
-		});
-
-		await prisma.pollVote.createMany({
-			data: optionIds.map((optionId) => ({ pollId, optionId, userId: user.id }))
+		// Use transaction + skipDuplicates to avoid unique constraint errors from double-submit or races
+		await prisma.$transaction(async (tx) => {
+			await tx.pollVote.deleteMany({
+				where: { pollId, userId: user.id }
+			});
+			await tx.pollVote.createMany({
+				data: optionIds.map((optionId) => ({ pollId, optionId, userId: user.id })),
+				skipDuplicates: true
+			});
 		});
 
 		return { voteSuccess: true };

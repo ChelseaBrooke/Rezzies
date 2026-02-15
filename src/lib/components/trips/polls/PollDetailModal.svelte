@@ -89,11 +89,13 @@
 			<div class="modal-body">
 				<div class="poll-meta-row">
 					<span class="category-badge">{poll.category}</span>
-					<span class="status-badge" data-status={poll.statusDisplay}>
-						{poll.statusDisplay === 'closing_soon'
-							? 'Closing soon'
-							: poll.statusDisplay.charAt(0).toUpperCase() + poll.statusDisplay.slice(1)}
-					</span>
+					{#if poll.statusDisplay !== 'closed' && poll.statusDisplay !== 'canceled'}
+						<span class="status-badge" data-status={poll.statusDisplay}>
+							{poll.statusDisplay === 'closing_soon'
+								? 'Closing soon'
+								: poll.statusDisplay.charAt(0).toUpperCase() + poll.statusDisplay.slice(1)}
+						</span>
+					{/if}
 					<span class="time-badge">{poll.timeLabel}</span>
 				</div>
 				{#if poll.description}

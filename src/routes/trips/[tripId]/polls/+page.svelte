@@ -5,6 +5,7 @@
 	import {
 		PollFiltersBar,
 		PollCard,
+		PollClosedCard,
 		CreatePollModal,
 		PollDetailModal,
 		type PollWithMeta,
@@ -12,7 +13,6 @@
 		type PollSort,
 		getStatusDisplay,
 		getTimeLabel,
-		type CreatePollFormData
 	} from '$lib/components/trips/polls';
 
 	let { data, form }: { data: PageData; form: any } = $props();
@@ -28,7 +28,7 @@
 
 	// Modals
 	let showCreateModal = $state(false);
-	let detailPoll = $state<PollWithMeta | null>(null);
+	let detailPollId = $state<string | null>(null);
 	let showDetailModal = $state(false);
 
 	// Build polls with meta (from server or fallback dummy)
@@ -92,46 +92,50 @@
 		return list;
 	});
 
+	// Partition into 3 sections
+	const pollsUnvoted = $derived(
+		filteredPolls.filter(
+			(p) =>
+				(p.statusDisplay === 'open' || p.statusDisplay === 'closing_soon') && !p.userVoted
+		)
+	);
+	const pollsVotedActive = $derived(
+		filteredPolls.filter(
+			(p) =>
+				(p.statusDisplay === 'open' || p.statusDisplay === 'closing_soon') && p.userVoted
+		)
+	);
+	const pollsClosed = $derived(
+		filteredPolls.filter(
+			(p) => p.statusDisplay === 'closed' || p.statusDisplay === 'canceled'
+		)
+	);
+	const pollsDrafts = $derived(filteredPolls.filter((p) => p.statusDisplay === 'draft'));
+
+	// Derive detailPoll from server data so vote counts stay correct after voting
+	const detailPoll = $derived(
+		showDetailModal && detailPollId ? pollsWithMeta.find((p) => p.id === detailPollId) ?? null : null
+	);
+
 	function openDetail(poll: PollWithMeta) {
-		detailPoll = poll;
+		detailPollId = poll.id;
 		showDetailModal = true;
 	}
 
 	function closeDetail() {
 		showDetailModal = false;
-		detailPoll = null;
+		detailPollId = null;
 	}
 
-	function handleCreateSubmit(formData: CreatePollFormData, action: 'draft' | 'open') {
-		const form = document.getElementById('create-poll-form') as HTMLFormElement;
-		if (!form) return;
-		const fd = new FormData();
-		fd.set('title', formData.title);
-		fd.set('description', formData.description);
-		fd.set('category', formData.category);
-		fd.set('pollType', formData.pollType);
-		fd.set('options', formData.options.join('\n'));
-		fd.set('durationHours', String(formData.durationHours));
-		fd.set('showResultsLive', formData.showResultsLive ? '1' : '0');
-		fd.set('asDraft', action === 'draft' ? '1' : '0');
-		fetch(form.action, { method: 'POST', body: fd }).then(async () => {
-			await invalidateAll();
-			showCreateModal = false;
-		});
-	}
-
-	function handleVote(optionIds: string[]) {
+	async function handleVote(optionIds: string[]) {
 		const form = document.getElementById('vote-form') as HTMLFormElement;
 		if (!form || !detailPoll) return;
 		const fd = new FormData(form);
 		fd.set('pollId', detailPoll.id);
 		fd.set('optionIds', optionIds.join(','));
-		fetch(form.action, { method: 'POST', body: fd }).then(() => {
-			invalidateAll();
-			if (detailPoll) {
-				detailPoll = { ...detailPoll, userVoted: true, userOptionIds: optionIds };
-			}
-		});
+		await fetch(form.action, { method: 'POST', body: fd });
+		await invalidateAll();
+		// detailPoll is derived from pollsWithMeta, so it auto-updates with fresh vote counts
 	}
 
 	function handleNudge() {
@@ -164,16 +168,6 @@
 </svelte:head>
 
 <!-- Hidden forms for form actions -->
-<form id="create-poll-form" method="POST" action="?/create" use:enhance style="display:none">
-	<input type="hidden" name="title" />
-	<input type="hidden" name="description" />
-	<input type="hidden" name="category" />
-	<input type="hidden" name="pollType" />
-	<input type="hidden" name="options" />
-	<input type="hidden" name="durationHours" />
-	<input type="hidden" name="showResultsLive" />
-	<input type="hidden" name="asDraft" />
-</form>
 <form id="vote-form" method="POST" action="?/vote" use:enhance style="display:none">
 	<input type="hidden" name="pollId" />
 	<input type="hidden" name="optionIds" />
@@ -203,40 +197,67 @@
 		sort={sort}
 		onSortChange={(s) => (sort = s)}
 		onAddNewPoll={() => (showCreateModal = true)}
-		canCreate={isHost}
+		canCreate={true}
 	/>
 
-	<div class="polls-grid">
-		{#if filteredPolls.length === 0}
-			<div class="empty-state">
-				<div class="empty-icon" aria-hidden="true">🗳️</div>
-				<p>No polls yet.</p>
-				<p class="empty-hint">
-					{isHost ? 'Click "Add New Poll" to create one.' : 'Check back later for new polls.'}
-				</p>
-				{#if isHost}
-					<button type="button" class="btn-add-empty" onclick={() => (showCreateModal = true)}>
-						Add New Poll
-					</button>
+	{#if filteredPolls.length === 0}
+		<div class="empty-state">
+			<div class="empty-icon" aria-hidden="true">🗳️</div>
+			<p>No polls yet.</p>
+			<p class="empty-hint">
+				{isHost ? 'Click "Add New Poll" to create one.' : 'Check back later for new polls.'}
+			</p>
+			<button type="button" class="btn-add-empty" onclick={() => (showCreateModal = true)}>
+				Add New Poll
+			</button>
+		</div>
+	{:else}
+		<div class="polls-side-by-side">
+			<div class="polls-column polls-column-open">
+				<h2 id="section-open" class="column-title">Open</h2>
+				{#if pollsUnvoted.length > 0 || pollsVotedActive.length > 0 || (isHost && pollsDrafts.length > 0)}
+					<div class="polls-grid">
+						{#each pollsUnvoted as poll}
+							<PollCard poll={poll} onClick={() => openDetail(poll)} />
+						{/each}
+						{#each pollsVotedActive as poll}
+							<PollCard poll={poll} onClick={() => openDetail(poll)} />
+						{/each}
+						{#if isHost}
+							{#each pollsDrafts as poll}
+								<PollCard poll={poll} onClick={() => openDetail(poll)} />
+							{/each}
+						{/if}
+					</div>
+				{:else}
+					<p class="column-empty">No open polls</p>
 				{/if}
 			</div>
-		{:else}
-			{#each filteredPolls as poll}
-				<PollCard
-					poll={poll}
-					onClick={() => openDetail(poll)}
-				/>
-			{/each}
-		{/if}
-	</div>
+			<div class="polls-column polls-column-closed">
+				<h2 id="section-closed" class="column-title">Closed</h2>
+				{#if pollsClosed.length > 0}
+					<div class="polls-grid">
+						{#each pollsClosed as poll}
+							<PollClosedCard poll={poll} onClick={() => openDetail(poll)} />
+						{/each}
+					</div>
+				{:else}
+					<p class="column-empty">No closed polls</p>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <CreatePollModal
 	open={showCreateModal}
 	onClose={() => (showCreateModal = false)}
-	onSubmit={(d, action) => handleCreateSubmit(d, action)}
+	formAction={`/trips/${tripId}/polls?/create`}
+	onSuccess={() => {
+		showCreateModal = false;
+		invalidateAll();
+	}}
 	error={form?.createError}
-	submitting={form?.submitting}
 />
 
 <PollDetailModal
@@ -245,16 +266,52 @@
 	onClose={closeDetail}
 	onVote={handleVote}
 	onNudge={handleNudge}
-	onClosePoll={isHost && detailPoll?.createdById === currentUserId ? handleClosePoll : undefined}
+	onClosePoll={
+				isHost || detailPoll?.createdById === currentUserId ? handleClosePoll : undefined
+			}
 	canManage={isHost}
 	voteError={form?.voteError}
 />
 
 <style>
 	.polls-page {
-		max-width: 960px;
+		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0 1rem 2rem;
+	}
+	.polls-side-by-side {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 2rem;
+		align-items: start;
+	}
+	@media (max-width: 900px) {
+		.polls-side-by-side {
+			grid-template-columns: 1fr;
+		}
+	}
+	.polls-column {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		min-width: 0;
+	}
+	.column-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--muted);
+		margin: 0 0 0.5rem 0;
+		letter-spacing: 0.02em;
+	}
+	.column-empty {
+		font-size: 0.9375rem;
+		color: var(--muted);
+		margin: 0;
+		padding: 2rem 1rem;
+		text-align: center;
+		background: var(--surface);
+		border-radius: var(--radius-xl);
+		border: 1px dashed var(--border-soft);
 	}
 	.page-header {
 		margin-bottom: 1.5rem;
@@ -270,18 +327,22 @@
 		color: var(--muted);
 		margin: 0;
 	}
-	.polls-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 1.25rem;
+	.poll-section {
+		margin-bottom: 0;
 	}
-	@media (max-width: 768px) {
-		.polls-grid {
-			grid-template-columns: 1fr;
-		}
+	.section-title {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--muted);
+		margin: 0 0 0.5rem 0;
+		letter-spacing: 0.02em;
+	}
+	.polls-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
 	}
 	.empty-state {
-		grid-column: 1 / -1;
 		text-align: center;
 		padding: 3rem 1.5rem;
 		background: var(--surface);

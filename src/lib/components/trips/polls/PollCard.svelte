@@ -22,12 +22,18 @@
 		canceled: poll.statusDisplay === 'canceled'
 	});
 
+	const isActive = $derived(poll.statusDisplay === 'open' || poll.statusDisplay === 'closing_soon');
+	const needsVote = $derived(isActive && !poll.userVoted);
+	const voted = $derived(isActive && poll.userVoted);
+
 	const icon = $derived(CATEGORY_ICONS[poll.category] ?? '📋');
 </script>
 
 <article
 	class="poll-card"
 	class:clickable={!!onClick}
+	class:needs-vote={needsVote}
+	class:voted={voted}
 	role={onClick ? 'button' : 'article'}
 	tabindex={onClick ? 0 : undefined}
 	onclick={onClick}
@@ -99,6 +105,21 @@
 	.poll-card.clickable:focus-visible {
 		outline: none;
 		box-shadow: 0 0 0 3px var(--focusRing);
+	}
+	/* Gmail-like: unvoted = white/bold, voted = gray/muted */
+	.poll-card.needs-vote {
+		background: var(--surfaceSolid, #fff);
+	}
+	.poll-card.needs-vote .poll-title {
+		font-weight: 700;
+		color: var(--text);
+	}
+	.poll-card.voted {
+		background: var(--surface2, #f3f4f6);
+	}
+	.poll-card.voted .poll-title {
+		font-weight: 500;
+		color: var(--muted);
 	}
 	.card-top {
 		display: flex;
