@@ -26,7 +26,7 @@
 		{
 			label: 'Trip dashboard',
 			path: '/trips/[tripId]',
-			fromHere: ['Guests', 'Rooms', 'Payments', 'Invoice', 'Itinerary', 'Meals', 'Polls', 'Files', 'RSVP', 'Settings'],
+			fromHere: ['Guests (with per-guest totals & invoice)', 'Rooms', 'Itinerary', 'Meals', 'Polls', 'Files', 'RSVP', 'Settings'],
 		},
 	];
 
@@ -42,13 +42,12 @@
 		{
 			label: 'Trip dashboard (guest)',
 			path: '/trips/[tripId]',
-			fromHere: ['RSVP', 'Itinerary', 'Meals', 'Activities', 'Files', 'Polls'],
+			fromHere: ['RSVP', 'Itinerary', 'Meals', 'Activities', 'Files', 'Polls', 'Guests'],
 		},
 	];
 
 	const otherPages: StepSingle[] = [
-		{ label: 'Confirmation', path: '/confirmation/[id]' },
-		{ label: 'Reservation', path: '/reservation/[id]' },
+		{ label: 'Confirmation (room selection success)', path: '/confirmation/[id]' },
 		{ label: 'Account settings', path: '/settings' },
 	];
 </script>

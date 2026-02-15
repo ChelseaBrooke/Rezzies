@@ -67,7 +67,7 @@
 				title: 'Management',
 				items: [
 					{ label: 'Activities', icon: '🎯', path: `/trips/${tripId}/activities` },
-					{ label: 'Payments', icon: '💳', path: `/trips/${tripId}/payments` },
+					{ label: 'Guest invoices', icon: '💳', path: `/trips/${tripId}/guests` },
 					{ label: 'Guest List', icon: '👥', path: `/trips/${tripId}/guests` },
 					{ label: 'Files', icon: '📁', path: `/trips/${tripId}/files` }
 				]

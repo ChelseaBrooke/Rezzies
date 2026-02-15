@@ -12,8 +12,7 @@
 	const tabs = [
 		{ href: `/trips/${tripId}`, label: 'Overview' },
 		{ href: `/trips/${tripId}/rooms`, label: 'Rooms' },
-		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary' },
-		{ href: `/trips/${tripId}/payments`, label: 'Payments' }
+		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary' }
 	];
 
 	function isActive(href: string): boolean {

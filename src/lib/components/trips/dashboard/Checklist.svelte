@@ -41,7 +41,7 @@
 		items.push({
 			key: 'host_receive_payments',
 			label: `Receive all payments (${paymentPending} pending confirmation)`,
-			href: `/trips/${tripId}/payments?filter=pending`,
+			href: `/trips/${tripId}/guests`,
 			isComplete: paymentPending === 0
 		});
 

@@ -439,6 +439,7 @@ model RSVP {
   costCommitmentAccepted   Boolean?
   rsvpYesAcceptedAt        DateTime?   // When guest last confirmed YES with cost range
   yesSubstatus            String?     // When status=yes: "confirmed" | "reconfirm_required"
+  priceApprovedByHost      Boolean?    // Host override: true = approved, false = not approved, null = use yesSubstatus
   acceptedEstimateLowCents  Int?
   acceptedEstimateHighCents Int?
   acceptedHeadcountMin      Int?

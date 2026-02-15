@@ -189,7 +189,7 @@
 			fundingDisplay={totalCost > 0 ? `$${committedFunds.toFixed(0)} / $${totalCost.toFixed(0)}` : 'Not set'}
 			guestsHref="/trips/{trip.id}/guests"
 			roomsHref="/trips/{trip.id}/rooms"
-			paymentsHref="/trips/{trip.id}/payments"
+			paymentsHref="/trips/{trip.id}/guests"
 			{checklistStats}
 			tripDescription={trip?.description ?? null}
 			extraCostRules={trip?.extraCostRules ?? []}

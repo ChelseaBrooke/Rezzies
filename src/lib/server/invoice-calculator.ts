@@ -5,8 +5,15 @@ export interface InvoiceBreakdown {
 	rooms: {
 		roomId: number;
 		roomName: string;
+		bedType?: string;
 		amount: number;
 		nights: number;
+	}[];
+	meals?: {
+		label: string;
+		amount: number;
+		partySize: number;
+		perPerson: number;
 	}[];
 	activities: {
 		activityId: string;
@@ -46,7 +53,8 @@ export async function calculateInvoiceForUser(tripId: string, userId: string): P
 			}
 		}),
 		prisma.trip.findUnique({
-			where: { id: tripId }
+			where: { id: tripId },
+			include: { mealPlan: true }
 		})
 	]);
 
@@ -84,6 +92,7 @@ export async function calculateInvoiceForUser(tripId: string, userId: string): P
 			breakdown.rooms.push({
 				roomId: roomAssignment.roomId,
 				roomName: roomAssignment.room.name,
+				bedType: bed.bedType ?? undefined,
 				amount: priceCalculation.totalPrice,
 				nights
 			});
@@ -91,6 +100,21 @@ export async function calculateInvoiceForUser(tripId: string, userId: string): P
 	}
 
 	const firstAssignment = roomAssignments[0];
+
+	// Meal share (food fund) - when host pools money for food
+	const mealPlan = trip.mealPlan;
+	if (mealPlan?.perGuestMealContribution != null && mealPlan.perGuestMealContribution > 0 && roomAssignments.length > 0) {
+		const partySize = roomAssignments.reduce((s, a) => s + (a.partySize || 1), 0);
+		const mealAmount = partySize * mealPlan.perGuestMealContribution;
+		breakdown.meals = [
+			{
+				label: 'Meal share (food fund)',
+				amount: mealAmount,
+				partySize,
+				perPerson: mealPlan.perGuestMealContribution
+			}
+		];
+	}
 
 	// Calculate activity costs
 	for (const participant of activityParticipants) {
@@ -128,8 +152,9 @@ export async function calculateInvoiceForUser(tripId: string, userId: string): P
 	}
 
 	// Calculate total
-	breakdown.total = 
+	breakdown.total =
 		breakdown.rooms.reduce((sum, r) => sum + r.amount, 0) +
+		(breakdown.meals?.reduce((sum, m) => sum + m.amount, 0) ?? 0) +
 		breakdown.activities.reduce((sum, a) => sum + a.amount, 0) +
 		breakdown.extras.reduce((sum, e) => sum + e.amount, 0);
 

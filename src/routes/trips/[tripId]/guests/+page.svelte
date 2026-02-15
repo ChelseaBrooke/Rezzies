@@ -7,6 +7,7 @@
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import ActivityLogModal from '$lib/components/trips/dashboard/ActivityLogModal.svelte';
+	import GuestInvoiceModal from '$lib/components/trips/GuestInvoiceModal.svelte';
 	import { buildTripActivityLog } from '$lib/trip-activity-log.js';
 
 	let { data }: { data: PageData } = $props();
@@ -37,6 +38,7 @@
 	let roomSaveError = $state<string | null>(null);
 	let openBedsUserId = $state<string | null>(null);
 	let selectedBedIdsForEdit = $state<string[]>([]);
+	let invoiceModalRow = $state<GuestRow | null>(null);
 
 	function openBedsForRow(row: GuestRow) {
 		if (openBedsUserId && openBedsUserId !== (row.userId ?? null)) closeBedsDropdown();
@@ -162,6 +164,20 @@
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+	}
+	function formatDate(iso: string) {
+		return new Date(iso).toLocaleDateString();
+	}
+	function triggerCsvDownload(csv: string, filename: string) {
+		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+		const url = window.URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		window.URL.revokeObjectURL(url);
 	}
 
 	function stateLabel(row: GuestRow): string {
@@ -432,7 +448,7 @@
 							<th class="th-sortable" onclick={() => toggleSort('party-size')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('party-size')}>
 								Party size {#if sortBy === 'party-size'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
 							</th>
-							<th>To Pay (Total)</th>
+							<th colspan="3" class="th-section">Payments</th>
 							<th>Room / bed</th>
 							{#if data.trip?.allowPartialStays}
 								<th>Arrival</th>
@@ -440,6 +456,22 @@
 							{/if}
 							{#if data.isHost}
 								<th class="th-actions">Actions</th>
+							{/if}
+						</tr>
+						<tr class="subheader-row">
+							<th></th>
+							<th></th>
+							<th></th>
+							<th class="th-sub">To Pay (Total)</th>
+							<th class="th-sub">Approved</th>
+							<th class="th-sub">Paid</th>
+							<th></th>
+							{#if data.trip?.allowPartialStays}
+								<th></th>
+								<th></th>
+							{/if}
+							{#if data.isHost}
+								<th></th>
 							{/if}
 						</tr>
 					</thead>
@@ -530,7 +562,88 @@
 								</td>
 								<td>
 									{#if row.toPayTotal != null && row.toPayTotal > 0}
-										{formatCurrency(row.toPayTotal)}
+										{#if data.canManageGuests && row.userId}
+											<button
+												type="button"
+												class="to-pay-btn"
+												onclick={() => (invoiceModalRow = row)}
+												title="View invoice"
+											>
+												{formatCurrency(row.toPayTotal)}
+											</button>
+										{:else}
+											{formatCurrency(row.toPayTotal)}
+										{/if}
+									{:else}
+										—
+									{/if}
+								</td>
+								<td class="approved-cell">
+									{#if row.type === 'member' && row.userId && (row.rsvpStatus === 'yes' || row.priceApproved != null)}
+										{#if data.canManageGuests}
+											<form method="POST" action="?/updatePriceApproved" class="approved-form" use:enhance={() => invalidateAll()}>
+												<input type="hidden" name="userId" value={row.userId} />
+												<button
+													type="submit"
+													name="approved"
+													value={row.priceApproved ? 'false' : 'true'}
+													class="approved-toggle"
+													title={row.priceApproved ? 'Mark not approved' : 'Mark approved'}
+													aria-label={row.priceApproved ? 'Approved – click to mark not approved' : 'Not approved – click to mark approved'}
+												>
+													{#if row.priceApproved}
+														<span class="check" aria-hidden="true">✓</span>
+													{:else}
+														<span class="cross" aria-hidden="true">✗</span>
+													{/if}
+												</button>
+											</form>
+										{:else}
+											{#if row.priceApproved}
+												<span class="check" aria-hidden="true">✓</span>
+											{:else}
+												<span class="cross" aria-hidden="true">✗</span>
+											{/if}
+										{/if}
+									{:else}
+										—
+									{/if}
+								</td>
+								<td class="paid-cell">
+									{#if row.type === 'member' && row.userId && (row.toPayTotal != null || row.invoicePaid)}
+										{#if data.canManageGuests}
+											{#if row.invoicePaid}
+												<form method="POST" action="?/markInvoiceUnpaid" class="paid-form" use:enhance={() => invalidateAll()}>
+													<input type="hidden" name="userId" value={row.userId} />
+													<button
+														type="submit"
+														class="paid-toggle"
+														title="Mark as unpaid"
+														aria-label="Paid – click to mark unpaid"
+													>
+														<span class="check" aria-hidden="true">✓</span>
+													</button>
+												</form>
+											{:else}
+												<form method="POST" action="?/markInvoicePaid" class="paid-form" use:enhance={() => invalidateAll()}>
+													<input type="hidden" name="userId" value={row.userId} />
+													<button
+														type="submit"
+														class="paid-toggle"
+														title="Mark as paid"
+														aria-label="Unpaid – click to mark paid"
+													>
+														<span class="cross" aria-hidden="true">✗</span>
+													</button>
+												</form>
+											{/if}
+										{:else}
+											{#if row.invoicePaid}
+												<span class="check" aria-hidden="true">✓</span>
+											{:else}
+												<span class="cross" aria-hidden="true">✗</span>
+											{/if}
+										{/if}
 									{:else}
 										—
 									{/if}
@@ -678,6 +791,88 @@
 		{/if}
 	</div>
 
+	{#if data.canManageGuests && ((data.legacyReservations?.length ?? 0) > 0 || (data.legacyStats?.totalReservations ?? 0) > 0)}
+		<div class="card legacy-card">
+			<div class="card-body">
+				<div class="legacy-header">
+					<div>
+						<h3 class="section-title">Legacy bookings</h3>
+						<p class="legacy-hint">Bookings from the public trip link (before the RSVP flow). Read-only.</p>
+					</div>
+					{#if (data.legacyReservations?.length ?? 0) > 0}
+						<form
+							method="POST"
+							action="?/exportLegacyBookings"
+							use:enhance={async ({ result }) => {
+								if (result.type === 'success' && result.data?.exportLegacyCsv) {
+									triggerCsvDownload(result.data.exportLegacyCsv, result.data.exportLegacyFilename ?? 'legacy_bookings.csv');
+									await invalidateAll();
+								}
+							}}
+						>
+							<button type="submit" class="btn-secondary btn-small">Export CSV</button>
+						</form>
+					{/if}
+				</div>
+				{#if data.legacyStats && data.legacyStats.totalReservations > 0}
+					<div class="legacy-stats">
+						<span class="legacy-stat">Reservations: <strong>{data.legacyStats.totalReservations}</strong></span>
+						<span class="legacy-stat">Revenue: <strong>${data.legacyStats.totalRevenue.toFixed(2)}</strong></span>
+						<span class="legacy-stat">Nights: <strong>{data.legacyStats.totalNights}</strong></span>
+						<span class="legacy-stat">Avg: <strong>${data.legacyStats.averagePrice.toFixed(2)}</strong></span>
+					</div>
+				{/if}
+				{#if (data.legacyReservations?.length ?? 0) === 0}
+					<p class="empty">No legacy bookings for this trip.</p>
+				{:else}
+					<div class="table-wrap">
+						<table class="legacy-table">
+							<thead>
+								<tr>
+									<th>Name</th>
+									<th>Email</th>
+									<th>Room</th>
+									<th>Bed</th>
+									<th>Check-in</th>
+									<th>Check-out</th>
+									<th>Nights</th>
+									<th>Guests</th>
+									<th>Total</th>
+									<th>Submitted</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each data.legacyReservations ?? [] as r}
+									<tr>
+										<td>{r.name}</td>
+										<td>{r.email}</td>
+										<td>{r.roomName}</td>
+										<td>{r.bedType ? r.bedType.toUpperCase() : '—'}</td>
+										<td>{formatDate(r.checkInDate)}</td>
+										<td>{formatDate(r.checkOutDate)}</td>
+										<td>{r.nights}</td>
+										<td>{r.numberOfGuests}</td>
+										<td>${r.calculatedPrice.toFixed(2)}</td>
+										<td>{formatDate(r.submittedAt)}</td>
+									</tr>
+								{/each}
+							</tbody>
+							{#if data.legacyStats && data.legacyStats.totalReservations > 0}
+								<tfoot>
+									<tr class="total-row">
+										<td colspan="8"><strong>Total</strong></td>
+										<td><strong>${data.legacyStats.totalRevenue.toFixed(2)}</strong></td>
+										<td></td>
+									</tr>
+								</tfoot>
+							{/if}
+						</table>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
 	{#if data.canManageGuests && (data.removedRows?.length ?? 0) > 0}
 		<div class="card removed-section">
 			<h3 class="removed-section-title">Removed from trip</h3>
@@ -780,6 +975,17 @@
 	</div>
 {/if}
 
+<GuestInvoiceModal
+	open={!!invoiceModalRow}
+	guestName={invoiceModalRow?.name ?? ''}
+	breakdown={invoiceModalRow?.invoiceBreakdown ?? null}
+	total={invoiceModalRow?.toPayTotal ?? 0}
+	tripId={data.trip?.id ?? ''}
+	userId={invoiceModalRow?.userId ?? ''}
+	canMarkAsPaid={!!(data.canManageGuests && invoiceModalRow?.userId && (invoiceModalRow?.toPayTotal ?? 0) > 0)}
+	onClose={() => (invoiceModalRow = null)}
+/>
+
 <ActivityLogModal
 	open={showActivityLog}
 	items={allActivityItems}
@@ -866,6 +1072,9 @@
 	.table th { font-weight: 500; color: var(--muted); }
 	.table tbody tr:hover { background: var(--surface2); }
 	.th-actions, .td-actions { width: 1%; white-space: nowrap; }
+	.th-section { font-weight: 600; color: var(--text); }
+	.th-sub { font-weight: 500; font-size: 0.8125rem; color: var(--muted); }
+	.subheader-row th { padding-top: 0.25rem; border-top: none; }
 
 	.guest-cell { display: flex; align-items: center; gap: 0.75rem; }
 	.guest-cell-btn { width: 100%; text-align: left; background: none; border: none; font: inherit; cursor: pointer; padding: 0; }
@@ -903,6 +1112,51 @@
 	.btn-icon-img { display: block; object-fit: contain; }
 	.btn-icon.btn-remove { border: 1px solid rgba(185, 28, 28, 0.4); color: #b91c1c; }
 	.btn-icon.btn-remove:hover { background: rgba(185, 28, 28, 0.08); }
+	.to-pay-btn {
+		background: none;
+		border: none;
+		font: inherit;
+		color: var(--primary, #2563eb);
+		cursor: pointer;
+		text-decoration: underline;
+		padding: 0;
+	}
+	.to-pay-btn:hover { color: var(--primaryHover, #1d4ed8); }
+
+	.approved-cell, .paid-cell { text-align: center; }
+	.approved-form, .paid-form { display: inline; }
+	.approved-toggle, .paid-toggle {
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		width: 2rem;
+		height: 2rem;
+		padding: 0;
+		cursor: pointer;
+		font-size: 1rem;
+		line-height: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		transition: background 0.15s, border-color 0.15s;
+	}
+	.approved-toggle:hover, .paid-toggle:hover { background: var(--surface2); }
+	.approved-cell .check, .paid-cell .check { color: var(--success, #16a34a); font-weight: 700; }
+	.approved-cell .cross, .paid-cell .cross { color: var(--muted); }
+	.approved-toggle .check, .paid-toggle .check { color: var(--success, #16a34a); }
+	.approved-toggle .cross, .paid-toggle .cross { color: var(--muted); }
+
+	.legacy-card { margin-top: 1.5rem; }
+	.legacy-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+	.legacy-hint { font-size: 0.8125rem; color: var(--muted); margin: 0.25rem 0 0 0; }
+	.legacy-stats { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; font-size: 0.875rem; }
+	.legacy-stat { color: var(--muted); }
+	.legacy-stat strong { color: var(--text); }
+	.legacy-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+	.legacy-table th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); font-weight: 600; color: var(--muted); }
+	.legacy-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+	.legacy-table tbody tr:hover { background: var(--surface2); }
+	.legacy-table .total-row { font-weight: 600; }
 	.removed-section { margin-top: 1.5rem; }
 	.removed-section-title { font-size: 1.125rem; margin: 0 0 0.25rem 0; color: var(--text); }
 	.removed-section-hint { font-size: 0.875rem; color: var(--muted); margin: 0 0 1rem 0; }

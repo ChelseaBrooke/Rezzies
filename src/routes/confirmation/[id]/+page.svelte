@@ -13,37 +13,51 @@
 		<div class="summary-card">
 			<h2>Reservation Summary</h2>
 			<div class="summary-details">
+				{#if data.confirmation.tripName}
+					<div class="detail-row">
+						<span class="label">Trip:</span>
+						<span class="value">{data.confirmation.tripName}</span>
+					</div>
+				{/if}
 				<div class="detail-row">
 					<span class="label">Guest Name:</span>
-					<span class="value">{data.submission.name}</span>
+					<span class="value">{data.confirmation.name}</span>
 				</div>
 				<div class="detail-row">
 					<span class="label">Email:</span>
-					<span class="value">{data.submission.email}</span>
+					<span class="value">{data.confirmation.email}</span>
 				</div>
 				<div class="detail-row">
 					<span class="label">Room:</span>
-					<span class="value">{data.submission.room.name}</span>
+					<span class="value">{data.confirmation.roomName}</span>
 				</div>
-				<div class="detail-row">
-					<span class="label">Bed Type:</span>
-					<span class="value">{data.submission.bed.bedType.toUpperCase()}</span>
-				</div>
+				{#if data.confirmation.bedType}
+					<div class="detail-row">
+						<span class="label">Bed Type:</span>
+						<span class="value">{data.confirmation.bedType.toUpperCase()}</span>
+					</div>
+				{/if}
+				{#if data.confirmation.numberOfGuests != null}
+					<div class="detail-row">
+						<span class="label">Number of Guests:</span>
+						<span class="value">{data.confirmation.numberOfGuests}</span>
+					</div>
+				{/if}
 				<div class="detail-row">
 					<span class="label">Check-in:</span>
-					<span class="value">{new Date(data.submission.checkInDate).toLocaleDateString()}</span>
+					<span class="value">{new Date(data.confirmation.checkInDate).toLocaleDateString()}</span>
 				</div>
 				<div class="detail-row">
 					<span class="label">Check-out:</span>
-					<span class="value">{new Date(data.submission.checkOutDate).toLocaleDateString()}</span>
+					<span class="value">{new Date(data.confirmation.checkOutDate).toLocaleDateString()}</span>
 				</div>
 				<div class="detail-row">
 					<span class="label">Nights:</span>
-					<span class="value">{data.submission.nights}</span>
+					<span class="value">{data.confirmation.nights}</span>
 				</div>
 				<div class="detail-row total">
-					<span class="label">Total Estimated Cost:</span>
-					<span class="value">${data.submission.calculatedPrice.toFixed(2)}</span>
+					<span class="label">Total Cost:</span>
+					<span class="value">${data.confirmation.calculatedPrice.toFixed(2)}</span>
 				</div>
 			</div>
 		</div>
@@ -57,7 +71,7 @@
 				details about payment and any additional information you need.
 			</p>
 			<p>
-				A confirmation email has been sent to <strong>{data.submission.email}</strong>.
+				A confirmation email has been sent to <strong>{data.confirmation.email}</strong>.
 			</p>
 		</div>
 	</div>

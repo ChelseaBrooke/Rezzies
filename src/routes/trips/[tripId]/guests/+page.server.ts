@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost, isTripHostOrCoHost, getMemberTripState, type MemberTripState } from '$lib/server/trip-access.js';
+import type { InvoiceBreakdown } from '$lib/server/invoice-calculator.js';
 import { prisma } from '$lib/server/prisma.js';
 import { notifyExistingUserOfInvite } from '$lib/server/invite-service.js';
 import { createInvoiceForUser } from '$lib/server/invoice-calculator.js';
@@ -34,6 +35,14 @@ export type GuestRow = {
 	allergies: string | null;
 	/** Total amount due for this guest (from invoices for this trip). Members only. */
 	toPayTotal: number | null;
+	/** Price approved: either within original RSVP range (yesSubstatus=confirmed) or host override. */
+	priceApproved: boolean | null;
+	/** Host override for price approved (null = use yesSubstatus). */
+	priceApprovedByHost: boolean | null;
+	/** All invoices for this user are paid (only relevant when they have amount due). */
+	invoicePaid: boolean | null;
+	/** Invoice breakdown for modal (host/co-host only). */
+	invoiceBreakdown?: InvoiceBreakdown | null;
 	/** Bed IDs currently assigned (for multi-select beds UI). */
 	assignedBedIds: string[];
 	/** Display state: invited | accepted | rsvp_yes | rsvp_no (only for active members; removed are in removedRows). */
@@ -64,6 +73,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 			})
 		:	[];
 	const isHost = parentData.isHost ?? false;
+	const canManageGuests = isHost || parentData.membership?.role === 'co-host';
 
 	const memberEmails = new Set(
 		members.map((m) => m.user?.email?.trim()?.toLowerCase()).filter(Boolean)
@@ -104,14 +114,23 @@ export const load: PageServerLoad = async ({ parent }) => {
 		tripId &&
 		(await prisma.invoice.findMany({
 			where: { tripId },
-			select: { userId: true, totalAmount: true, status: true }
+			select: { userId: true, totalAmount: true, status: true, breakdownJson: true }
 		}));
-	// Per-user total to pay: sum of totalAmount for invoices with status 'due'
+	// Per-user total to pay and breakdown for host/co-host
 	const toPayByUserId = new Map<string, number>();
+	const breakdownByUserId = new Map<string, import('$lib/server/invoice-calculator.js').InvoiceBreakdown>();
 	for (const inv of invoices ?? []) {
 		if (inv.status === 'due') {
 			const cur = toPayByUserId.get(inv.userId) ?? 0;
 			toPayByUserId.set(inv.userId, cur + inv.totalAmount);
+			if (inv.breakdownJson && canManageGuests) {
+				try {
+					const b = JSON.parse(inv.breakdownJson) as InvoiceBreakdown;
+					breakdownByUserId.set(inv.userId, b);
+				} catch {
+					// ignore parse errors
+				}
+			}
 		}
 	}
 
@@ -150,6 +169,18 @@ export const load: PageServerLoad = async ({ parent }) => {
 			!!(profile?.dietaryRestrictions?.trim() || profile?.allergies?.trim());
 
 		const toPayTotal = uid ? (toPayByUserId.get(uid) ?? null) : null;
+		const invoiceBreakdown = uid && canManageGuests ? (breakdownByUserId.get(uid) ?? null) : null;
+		const priceApprovedByHost = rsvp?.priceApprovedByHost ?? null;
+		const priceApproved =
+			priceApprovedByHost !== null
+				? priceApprovedByHost
+				: status === 'yes' && rsvp?.yesSubstatus === 'confirmed'
+					? true
+					: status === 'yes' && rsvp?.yesSubstatus === 'reconfirm_required'
+						? false
+						: null;
+		const invoicePaid =
+			uid && assignments.length > 0 ? (toPayTotal === null || toPayTotal === 0) : null;
 		const assignedBedIds: string[] = [];
 		for (const a of assignments) {
 			if (a.bedId) {
@@ -190,6 +221,10 @@ export const load: PageServerLoad = async ({ parent }) => {
 			dietaryRestrictions: profile?.dietaryRestrictions ?? null,
 			allergies: profile?.allergies ?? null,
 			toPayTotal: toPayTotal !== null && toPayTotal > 0 ? toPayTotal : null,
+			priceApproved,
+			priceApprovedByHost,
+			invoicePaid,
+			invoiceBreakdown: invoiceBreakdown ?? null,
 			assignedBedIds,
 			memberTripState
 		});
@@ -227,6 +262,9 @@ export const load: PageServerLoad = async ({ parent }) => {
 			dietaryRestrictions: null,
 			allergies: null,
 			toPayTotal: null,
+			priceApproved: null,
+			priceApprovedByHost: null,
+			invoicePaid: null,
 			assignedBedIds: []
 		});
 	}
@@ -243,7 +281,35 @@ export const load: PageServerLoad = async ({ parent }) => {
 			beds: (r.beds ?? []).map((b) => ({ id: b.id, bedType: b.bedType }))
 		})) ?? [];
 
-	const canManageGuests = isHost || parentData.membership?.role === 'co-host';
+	let legacyReservations: { id: string; name: string; email: string; roomName: string; bedType: string | null; checkInDate: string; checkOutDate: string; nights: number; numberOfGuests: number; calculatedPrice: number; submittedAt: string }[] = [];
+	let legacyStats: { totalReservations: number; totalRevenue: number; totalNights: number; averagePrice: number } | null = null;
+	if (canManageGuests && tripId) {
+		const reservations = await prisma.reservation.findMany({
+			where: { tripId },
+			include: { room: true, bed: true },
+			orderBy: { submittedAt: 'desc' }
+		});
+		legacyReservations = reservations.map((r) => ({
+			id: r.id,
+			name: r.name,
+			email: r.email,
+			roomName: r.room.name,
+			bedType: r.bed?.bedType ?? null,
+			checkInDate: r.checkInDate.toISOString(),
+			checkOutDate: r.checkOutDate.toISOString(),
+			nights: r.nights,
+			numberOfGuests: r.numberOfGuests,
+			calculatedPrice: r.calculatedPrice,
+			submittedAt: r.submittedAt.toISOString()
+		}));
+		const totalRevenue = reservations.reduce((s, r) => s + r.calculatedPrice, 0);
+		legacyStats = {
+			totalReservations: reservations.length,
+			totalRevenue,
+			totalNights: reservations.reduce((s, r) => s + r.nights, 0),
+			averagePrice: reservations.length > 0 ? totalRevenue / reservations.length : 0
+		};
+	}
 
 	return {
 		trip: trip
@@ -269,7 +335,9 @@ export const load: PageServerLoad = async ({ parent }) => {
 		rooms,
 		invites,
 		isHost,
-		canManageGuests
+		canManageGuests,
+		legacyReservations,
+		legacyStats
 	};
 };
 
@@ -620,5 +688,80 @@ export const actions: Actions = {
 		}
 
 		return { addManualGuestSuccess: true };
+	},
+	exportLegacyBookings: async ({ params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) return fail(401, { message: 'Not logged in' });
+		const canManage = await isTripHostOrCoHost(params.tripId, user.id);
+		if (!canManage) return fail(403, { message: 'Only host or co-host can export' });
+		const trip = await prisma.trip.findUnique({
+			where: { id: params.tripId },
+			include: {
+				reservations: {
+					include: { room: true, bed: true },
+					orderBy: { submittedAt: 'asc' }
+				}
+			}
+		});
+		if (!trip) return fail(404, { message: 'Trip not found' });
+		const headers = ['Name', 'Email', 'Room', 'Bed', 'Check-in', 'Check-out', 'Nights', 'Guests', 'Total Price'];
+		const rows = trip.reservations.map((r) => [
+			r.name,
+			r.email,
+			r.room.name,
+			r.bed?.bedType ?? 'N/A',
+			new Date(r.checkInDate).toLocaleDateString(),
+			new Date(r.checkOutDate).toLocaleDateString(),
+			r.nights.toString(),
+			r.numberOfGuests.toString(),
+			r.calculatedPrice.toFixed(2)
+		]);
+		const csv = [headers.join(','), ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n');
+		const filename = `${trip.name.replace(/[^a-z0-9]/gi, '_')}_legacy_bookings.csv`;
+		return { exportLegacyCsv: csv, exportLegacyFilename: filename };
+	},
+	markInvoicePaid: async ({ params, cookies, request }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) return fail(401, { message: 'Not logged in' });
+		const canManage = await isTripHostOrCoHost(params.tripId, user.id);
+		if (!canManage) return fail(403, { message: 'Only host or co-host can mark invoices as paid' });
+		const formData = await request.formData();
+		const targetUserId = (formData.get('userId') as string)?.trim();
+		if (!targetUserId) return fail(400, { message: 'Missing user' });
+		await prisma.invoice.updateMany({
+			where: { tripId: params.tripId, userId: targetUserId, status: 'due' },
+			data: { status: 'paid', updatedAt: new Date() }
+		});
+		return { markInvoicePaidSuccess: true };
+	},
+	markInvoiceUnpaid: async ({ params, cookies, request }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) return fail(401, { message: 'Not logged in' });
+		const canManage = await isTripHostOrCoHost(params.tripId, user.id);
+		if (!canManage) return fail(403, { message: 'Only host or co-host can update payment status' });
+		const formData = await request.formData();
+		const targetUserId = (formData.get('userId') as string)?.trim();
+		if (!targetUserId) return fail(400, { message: 'Missing user' });
+		await prisma.invoice.updateMany({
+			where: { tripId: params.tripId, userId: targetUserId, status: 'paid' },
+			data: { status: 'due', updatedAt: new Date() }
+		});
+		return { markInvoiceUnpaidSuccess: true };
+	},
+	updatePriceApproved: async ({ params, cookies, request }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) return fail(401, { message: 'Not logged in' });
+		const canManage = await isTripHostOrCoHost(params.tripId, user.id);
+		if (!canManage) return fail(403, { message: 'Only host or co-host can update price approval' });
+		const formData = await request.formData();
+		const targetUserId = (formData.get('userId') as string)?.trim();
+		const approvedRaw = formData.get('approved');
+		if (!targetUserId) return fail(400, { message: 'Missing user' });
+		const approved = approvedRaw === 'true' ? true : approvedRaw === 'false' ? false : null;
+		await prisma.rSVP.updateMany({
+			where: { tripId: params.tripId, userId: targetUserId },
+			data: { priceApprovedByHost: approved }
+		});
+		return { updatePriceApprovedSuccess: true };
 	}
 };

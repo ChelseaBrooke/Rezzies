@@ -180,12 +180,12 @@ export const actions: Actions = {
 					checkOutDate: data.checkOutDate.toISOString().split('T')[0],
 					nights: priceCalculation.nights,
 					totalPrice: priceCalculation.totalPrice.toFixed(2),
-					confirmationUrl: `${process.env.APP_BASE_URL || 'http://localhost:5173'}/reservation/${reservation.id}`
+					confirmationUrl: `${process.env.APP_BASE_URL || 'http://localhost:5173'}/confirmation/${reservation.id}`
 				},
 				categories: ['guest-confirmation']
 			});
 
-			throw redirect(303, `/reservation/${reservation.id}`);
+			throw redirect(303, `/confirmation/${reservation.id}`);
 		} catch (error) {
 			if (error && typeof error === 'object' && 'status' in error && error.status === 303) {
 				throw error; // Re-throw redirects
