@@ -221,6 +221,8 @@ model User {
   chatMessages         ChatMessage[]
   pollsCreated         Poll[]
   pollVotes            PollVote[]
+  directMessagesSent   DirectMessage[] @relation("DirectMessageSender")
+  directMessagesReceived DirectMessage[] @relation("DirectMessageRecipient")
 
   @@index([email])
 }
@@ -552,6 +554,23 @@ model ChatMessage {
   @@index([tripId])
   @@index([createdAt])
   @@index([tripId, createdAt])
+}
+
+// Direct messages (anyone can message anyone)
+model DirectMessage {
+  id          String   @id @default(uuid())
+  senderId    String
+  recipientId String
+  message     String
+  createdAt   DateTime @default(now())
+
+  sender    User @relation("DirectMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("DirectMessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([senderId, recipientId])
+  @@index([createdAt])
 }
 
 // Polls (hosts create/manage, guests vote)

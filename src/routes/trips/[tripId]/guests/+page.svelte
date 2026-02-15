@@ -1,14 +1,25 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import { onDestroy } from 'svelte';
 	import type { PageData } from './$types';
 	import type { GuestRow, RemovedRow } from './+page.server';
-	import pokeIcon from '$lib/assets/images/poke.png';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import ActivityLogModal from '$lib/components/trips/dashboard/ActivityLogModal.svelte';
+	import GuestEditModal from '$lib/components/trips/GuestEditModal.svelte';
 	import GuestInvoiceModal from '$lib/components/trips/GuestInvoiceModal.svelte';
 	import { buildTripActivityLog } from '$lib/trip-activity-log.js';
+	import pokeIcon from '$lib/assets/images/poke.png';
+
+	function portal(node: HTMLElement) {
+		document.body.appendChild(node);
+		return {
+			destroy() {
+				if (node.parentNode) node.parentNode.removeChild(node);
+			}
+		};
+	}
 
 	let { data }: { data: PageData } = $props();
 
@@ -26,7 +37,6 @@
 	let addManualName = $state('');
 	let addManualEmail = $state('');
 	let addManualError = $state('');
-	let searchQuery = $state('');
 	let filterRsvp = $state<'all' | 'yes' | 'no' | 'no-response' | 'reconfirm'>('all');
 	let filterAssignment = $state<'all' | 'assigned' | 'unassigned'>('all');
 	let filterDietary = $state<'all' | 'has-flags'>('all');
@@ -36,50 +46,78 @@
 	let copyToast = $state(false);
 	let nudgeToast = $state(false);
 	let roomSaveError = $state<string | null>(null);
-	let openBedsUserId = $state<string | null>(null);
-	let selectedBedIdsForEdit = $state<string[]>([]);
-	let invoiceModalRow = $state<GuestRow | null>(null);
 
-	function openBedsForRow(row: GuestRow) {
-		if (openBedsUserId && openBedsUserId !== (row.userId ?? null)) closeBedsDropdown();
-		openBedsUserId = row.userId ?? null;
-		selectedBedIdsForEdit = [...(row.assignedBedIds ?? [])];
+	// Add Guest dropdown (Share-style hover/click)
+	let addGuestOpen = $state(false);
+	let addGuestTriggerEl: HTMLButtonElement | null = $state(null);
+	let addGuestMenuEl: HTMLDivElement | null = $state(null);
+	let addGuestMenuStyle = $state<{ top: string; left: string } | null>(null);
+	const ADD_GUEST_CLOSE_DELAY_MS = 250;
+	let addGuestCloseTimeoutId: ReturnType<typeof setTimeout> | null = null;
+	function clearAddGuestClose() {
+		if (addGuestCloseTimeoutId != null) {
+			clearTimeout(addGuestCloseTimeoutId);
+			addGuestCloseTimeoutId = null;
+		}
 	}
-	function closeBedsDropdown() {
-		const userId = openBedsUserId;
-		const idsToSubmit = [...selectedBedIdsForEdit];
-		openBedsUserId = null;
-		if (!userId) return;
-
-		if (idsToSubmit.length === 0) {
-			// Use the dedicated clear form when unchecking all beds—more reliable than empty bedIds
-			const clearForm = document.querySelector<HTMLFormElement>(`form.clear-beds-form[data-clear-user-id="${userId}"]`);
-			if (clearForm) clearForm.requestSubmit();
+	function scheduleAddGuestClose() {
+		clearAddGuestClose();
+		addGuestCloseTimeoutId = setTimeout(() => {
+			addGuestOpen = false;
+			addGuestMenuStyle = null;
+			addGuestCloseTimeoutId = null;
+		}, ADD_GUEST_CLOSE_DELAY_MS);
+	}
+	function positionAddGuestMenu() {
+		if (!addGuestTriggerEl) return;
+		const rect = addGuestTriggerEl.getBoundingClientRect();
+		addGuestMenuStyle = { top: `${rect.bottom}px`, left: `${rect.left}px` };
+	}
+	function openAddGuestDropdown() {
+		clearAddGuestClose();
+		addGuestOpen = true;
+		positionAddGuestMenu();
+		requestAnimationFrame(positionAddGuestMenu);
+	}
+	function onAddGuestMouseEnter() {
+		clearAddGuestClose();
+		openAddGuestDropdown();
+	}
+	function onAddGuestClick(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (addGuestOpen) {
+			addGuestOpen = false;
+			addGuestMenuStyle = null;
 			return;
 		}
-
-		const form = document.querySelector<HTMLFormElement>(`form.beds-form[data-beds-user-id="${userId}"]`);
-		if (!form) return;
-		const container = form.querySelector('[data-bedids-container]');
-		if (container) {
-			container.innerHTML = '';
-			for (const id of idsToSubmit) {
-				const input = document.createElement('input');
-				input.type = 'hidden';
-				input.name = 'bedIds';
-				input.value = id;
-				container.appendChild(input);
-			}
-		}
-		form.requestSubmit();
+		openAddGuestDropdown();
 	}
-	function toggleBedForEdit(bedId: string) {
-		if (selectedBedIdsForEdit.includes(bedId)) {
-			selectedBedIdsForEdit = selectedBedIdsForEdit.filter((id) => id !== bedId);
-		} else {
-			selectedBedIdsForEdit = [...selectedBedIdsForEdit, bedId];
+	function handleAddGuestDocClick(e: MouseEvent) {
+		const target = e.target as Node;
+		if (addGuestOpen && addGuestTriggerEl && !addGuestTriggerEl.contains(target) && addGuestMenuEl && !addGuestMenuEl.contains(target)) {
+			addGuestOpen = false;
+			addGuestMenuStyle = null;
 		}
 	}
+	let addGuestDocClickBound = false;
+	function bindAddGuestDocClick() {
+		if (addGuestDocClickBound) return;
+		addGuestDocClickBound = true;
+		document.addEventListener('click', handleAddGuestDocClick, true);
+	}
+	function unbindAddGuestDocClick() {
+		if (!addGuestDocClickBound) return;
+		addGuestDocClickBound = false;
+		document.removeEventListener('click', handleAddGuestDocClick, true);
+	}
+	$effect(() => {
+		if (addGuestOpen) bindAddGuestDocClick();
+		else unbindAddGuestDocClick();
+	});
+	onDestroy(unbindAddGuestDocClick);
+	let invoiceModalRow = $state<GuestRow | null>(null);
+	let editModalRow = $state<GuestRow | null>(null);
 
 	function clickOutside(
 		node: HTMLElement,
@@ -221,23 +259,15 @@
 	}
 
 	const rsvpVisual = $derived.by(() => {
-		const total = data.summary?.totalInvited ?? 0;
-		const going = data.summary?.goingCount ?? 0;
+		const going = data.summary?.goingPartySize ?? 0;
 		const notGoing = data.summary?.notGoingCount ?? 0;
 		const unresponded = data.summary?.unrespondedCount ?? 0;
+		const total = going + notGoing + unresponded;
 		return { total, going, notGoing, unresponded };
 	});
 
 	const filteredAndSorted = $derived.by(() => {
 		let rows = [...(data.guestRows ?? [])];
-		const q = searchQuery.trim().toLowerCase();
-		if (q) {
-			rows = rows.filter(
-				(r) =>
-					r.name.toLowerCase().includes(q) ||
-					r.email.toLowerCase().includes(q)
-			);
-		}
 		if (filterRsvp === 'yes') rows = rows.filter((r) => r.rsvpStatus === 'yes');
 		else if (filterRsvp === 'no') rows = rows.filter((r) => r.rsvpStatus === 'no');
 		else if (filterRsvp === 'no-response') rows = rows.filter((r) => r.rsvpStatus !== 'yes' && r.rsvpStatus !== 'no');
@@ -269,6 +299,24 @@
 			copyToast = true;
 			setTimeout(() => (copyToast = false), 2000);
 		} catch (_) {}
+		addGuestOpen = false;
+		addGuestMenuStyle = null;
+	}
+	function closeAddGuestDropdown() {
+		addGuestOpen = false;
+		addGuestMenuStyle = null;
+	}
+
+	/** Half-donut segment path (semicircle, 0% = left, 100% = right). Top arc visible in viewBox. */
+	function halfDonutSegmentPath(cx: number, cy: number, rOuter: number, rInner: number, startPct: number, endPct: number): string {
+		const toRad = (d: number) => (d * Math.PI) / 180;
+		const x = (r: number, deg: number) => cx + r * Math.cos(toRad(deg));
+		const y = (r: number, deg: number) => cy - r * Math.sin(toRad(deg));
+		const startDeg = 180 - (endPct / 100) * 180;
+		const endDeg = 180 - (startPct / 100) * 180;
+		const sweep = endDeg - startDeg;
+		const largeArc = sweep >= 180 ? 1 : 0;
+		return `M ${x(rInner, startDeg)} ${y(rInner, startDeg)} L ${x(rOuter, startDeg)} ${y(rOuter, startDeg)} A ${rOuter} ${rOuter} 0 ${largeArc} 0 ${x(rOuter, endDeg)} ${y(rOuter, endDeg)} L ${x(rInner, endDeg)} ${y(rInner, endDeg)} A ${rInner} ${rInner} 0 ${largeArc} 1 ${x(rInner, startDeg)} ${y(rInner, startDeg)} Z`;
 	}
 
 	function exportCsv() {
@@ -298,21 +346,6 @@
 		URL.revokeObjectURL(a.href);
 	}
 
-	/** Room assign/clear use form POST only (assignRoom/clearRoom actions) — no fetch, so nothing can send a stray clear. */
-
-	/** POST to form action so RSVP/party size persist (avoids form action URL issues) */
-	async function updateGuestRsvp(userId: string, rsvpStatus: string, partySize: number) {
-		if (!data.trip?.id) return;
-		const formData = new FormData();
-		formData.set('userId', userId);
-		formData.set('rsvpStatus', rsvpStatus);
-		formData.set('partySize', String(partySize));
-		const url = `/trips/${data.trip.id}/guests?/updateGuestRsvp`;
-		const res = await fetch(url, { method: 'POST', body: formData });
-		if (res.ok) {
-			await invalidateAll();
-		}
-	}
 </script>
 
 <div class="page">
@@ -321,117 +354,121 @@
 			<h1>Guests</h1>
 		</div>
 
-		<!-- RSVP visual: stacked bar -->
+		<!-- RSVP visual: donut chart -->
 		{#if rsvpVisual.total > 0}
+			{@const segments = [
+				{ key: 'going', count: rsvpVisual.going, pct: rsvpVisual.total ? (100 * rsvpVisual.going / rsvpVisual.total) : 0, class: 'segment-going', label: 'Going' },
+				{ key: 'notGoing', count: rsvpVisual.notGoing, pct: rsvpVisual.total ? (100 * rsvpVisual.notGoing / rsvpVisual.total) : 0, class: 'segment-no', label: 'Not going' },
+				{ key: 'unresponded', count: rsvpVisual.unresponded, pct: rsvpVisual.total ? (100 * rsvpVisual.unresponded / rsvpVisual.total) : 0, class: 'segment-pending', label: 'No response' }
+			]}
+			{@const filteredSegs = segments.filter((s) => s.count > 0)}
 			<div class="rsvp-visual" aria-label="RSVP breakdown">
-				<div class="rsvp-bar">
-					{#each [
-						{ key: 'going', count: rsvpVisual.going, pct: rsvpVisual.total ? (100 * rsvpVisual.going / rsvpVisual.total) : 0, class: 'segment-going', label: 'Going' },
-						{ key: 'notGoing', count: rsvpVisual.notGoing, pct: rsvpVisual.total ? (100 * rsvpVisual.notGoing / rsvpVisual.total) : 0, class: 'segment-no', label: 'Not going' },
-						{ key: 'unresponded', count: rsvpVisual.unresponded, pct: rsvpVisual.total ? (100 * rsvpVisual.unresponded / rsvpVisual.total) : 0, class: 'segment-pending', label: 'No response' }
-					] as seg (seg.key)}
-						{#if seg.count > 0}
-							<span
+				<div class="rsvp-pie-wrap">
+					<svg class="rsvp-half-donut" viewBox="0 0 64 40" role="img" aria-label="RSVP breakdown">
+						{#each filteredSegs as seg, i}
+							{@const startPct = filteredSegs.slice(0, i).reduce((sum, s) => sum + s.pct, 0)}
+							{@const endPct = startPct + seg.pct}
+							<path
 								class="rsvp-segment {seg.class}"
-								style="width: {Math.max(seg.pct, 2)}%"
+								d={halfDonutSegmentPath(32, 40, 32, 14, startPct, endPct)}
 								title="{seg.label}: {seg.count}"
-							></span>
-						{/if}
-					{/each}
+							/>
+						{/each}
+					</svg>
 				</div>
 				<div class="rsvp-legend">
 					<span class="legend-dot segment-going"></span><span class="legend-label">Going <strong>{rsvpVisual.going}</strong></span>
 					<span class="legend-dot segment-no"></span><span class="legend-label">Not going <strong>{rsvpVisual.notGoing}</strong></span>
 					<span class="legend-dot segment-pending"></span><span class="legend-label">No response <strong>{rsvpVisual.unresponded}</strong></span>
-					<span class="legend-total">{rsvpVisual.total} invited</span>
+					<span class="legend-total">{rsvpVisual.total} total</span>
 				</div>
 			</div>
 		{/if}
 
 		<!-- Summary + Nudge all -->
 		<div class="summary-bar">
-			{#if (data.summary?.goingPartySize ?? 0) > (data.summary?.goingCount ?? 0)}
-				<span class="summary-sub"><strong>{data.summary?.goingPartySize}</strong> total with +1s</span>
-			{/if}
 			{#if data.trip?.rsvpByDate}
 				<span class="summary-item rsvp-by">RSVP by <strong>{new Date(data.trip.rsvpByDate).toLocaleDateString()}</strong></span>
 			{/if}
 		</div>
 	</div>
 
-	<!-- Toolbar: actions (right, above) then search + filters (search on right) -->
-	<div class="toolbar">
-		{#if data.canManageGuests}
-			<div class="toolbar-actions-row">
-				<button type="button" class="btn-secondary" onclick={() => (showActivityLog = true)}>Recent activity</button>
-				<button type="button" class="btn-secondary" onclick={copyInviteLink}>Copy link</button>
-				{#if data.isHost}
-					<button type="button" class="btn-secondary" onclick={openAddManual}>Add guest manually</button>
-				{/if}
-				<button type="button" class="btn-primary" onclick={openInvite}>Invite</button>
-				{#if copyToast}
-					<span class="toast">Link copied</span>
-				{/if}
-				{#if nudgeToast}
-					<span class="toast">Nudge sent</span>
-				{/if}
-			</div>
-		{/if}
-		<div class="filters-row">
-			<div class="filter-group">
-				<label>RSVP</label>
-				<select bind:value={filterRsvp} class="filter-select">
-					<option value="all">All</option>
+	<div class="card">
+		<div class="controls-row">
+			<div class="filters-left">
+				<select bind:value={filterRsvp} class="control-select" aria-label="Filter by RSVP">
+					<option value="all">All RSVP</option>
 					<option value="yes">Going</option>
 					<option value="no">Not going</option>
 					<option value="no-response">No response</option>
 					<option value="reconfirm">Needs reconfirmation</option>
 				</select>
-			</div>
-			<div class="filter-group">
-				<label>Assignment</label>
-				<select bind:value={filterAssignment} class="filter-select">
-					<option value="all">All</option>
+				<select bind:value={filterAssignment} class="control-select" aria-label="Filter by assignment">
+					<option value="all">All assignments</option>
 					<option value="assigned">Has room/bed</option>
 					<option value="unassigned">Needs assignment</option>
 				</select>
-			</div>
-			<div class="filter-group">
-				<label>Dietary</label>
-				<select bind:value={filterDietary} class="filter-select">
-					<option value="all">All</option>
+				<select bind:value={filterDietary} class="control-select" aria-label="Filter by dietary">
+					<option value="all">All dietary</option>
 					<option value="has-flags">Has dietary flags</option>
 				</select>
 			</div>
-			<div class="search-wrap">
-				<input
-					type="search"
-					class="search-input"
-					placeholder="Search by name…"
-					bind:value={searchQuery}
-				/>
+			<div class="actions-right">
+				{#if data.canManageGuests}
+					<button type="button" class="btn-secondary-header" onclick={() => (showActivityLog = true)}>Recent activity</button>
+					<div class="add-guest-dropdown-wrap">
+						<button
+							type="button"
+							class="btn-primary-invite add-guest-trigger"
+							title="Add guest"
+							bind:this={addGuestTriggerEl}
+							onmouseenter={onAddGuestMouseEnter}
+							onmouseleave={scheduleAddGuestClose}
+							onclick={onAddGuestClick}
+							aria-expanded={addGuestOpen}
+							aria-haspopup="menu"
+						>
+							<span class="add-guest-content">+ Add Guest</span>
+						</button>
+						{#if addGuestOpen}
+							<div use:portal class="add-guest-portal" role="presentation">
+								<div
+									class="add-guest-backdrop"
+									aria-hidden="true"
+									onclick={closeAddGuestDropdown}
+									role="button"
+									tabindex="-1"
+								></div>
+								<div
+									bind:this={addGuestMenuEl}
+									class="add-guest-menu"
+									role="menu"
+									style={addGuestMenuStyle ? `top: ${addGuestMenuStyle.top}; left: ${addGuestMenuStyle.left};` : ''}
+									onmouseenter={clearAddGuestClose}
+									onmouseleave={scheduleAddGuestClose}
+								>
+									<button type="button" class="add-guest-item" role="menuitem" onclick={() => { openInvite(); closeAddGuestDropdown(); }}>Invite</button>
+									<button type="button" class="add-guest-item" role="menuitem" onclick={() => { copyInviteLink(); }}>Copy link</button>
+									{#if data.isHost}
+										<button type="button" class="add-guest-item" role="menuitem" onclick={() => { openAddManual(); closeAddGuestDropdown(); }}>Add manual</button>
+									{/if}
+								</div>
+							</div>
+						{/if}
+					</div>
+					{#if copyToast}
+						<span class="toast">Link copied</span>
+					{/if}
+					{#if nudgeToast}
+						<span class="toast">Nudge sent</span>
+					{/if}
+				{/if}
 			</div>
 		</div>
-	</div>
-
-	<div class="card">
 		{#if roomSaveError}
 			<div class="room-save-error" role="alert">
 				{roomSaveError}
 				<button type="button" class="btn-dismiss" onclick={() => (roomSaveError = null)} aria-label="Dismiss">×</button>
-			</div>
-		{/if}
-		{#if data.isHost && (data.summary?.unrespondedCount ?? 0) > 0}
-			<div class="card-header-row">
-				<form method="POST" action="?/nudgeAllPending" class="card-header-nudge-form" use:enhance={async ({ result }) => {
-					if (result.type === 'success') {
-						nudgeToast = true;
-						await invalidateAll();
-						setTimeout(() => (nudgeToast = false), 2000);
-					}
-				}}>
-					<button type="submit" class="btn-summary-nudge">Nudge All Pending RSVPs</button>
-				</form>
 			</div>
 		{/if}
 		<div class="card-body table-wrap">
@@ -442,35 +479,33 @@
 							<th class="th-sortable" onclick={() => toggleSort('name')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('name')}>
 								Guest {#if sortBy === 'name'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
 							</th>
-							<th class="th-sortable" onclick={() => toggleSort('rsvp')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('rsvp')}>
-								RSVP {#if sortBy === 'rsvp'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
-							</th>
-							<th class="th-sortable" onclick={() => toggleSort('party-size')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('party-size')}>
-								Party size {#if sortBy === 'party-size'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
-							</th>
+							<th colspan="3" class="th-section">RSVP</th>
 							<th colspan="3" class="th-section">Payments</th>
-							<th>Room / bed</th>
 							{#if data.trip?.allowPartialStays}
 								<th>Arrival</th>
 								<th>Departure</th>
 							{/if}
-							{#if data.isHost}
+							{#if data.canManageGuests}
 								<th class="th-actions">Actions</th>
 							{/if}
 						</tr>
 						<tr class="subheader-row">
 							<th></th>
-							<th></th>
-							<th></th>
+							<th class="th-sub th-sortable" onclick={() => toggleSort('rsvp')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('rsvp')}>
+								Status {#if sortBy === 'rsvp'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+							</th>
+							<th class="th-sub th-sortable" onclick={() => toggleSort('party-size')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('party-size')}>
+								Party size {#if sortBy === 'party-size'}<span class="sort-icon" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+							</th>
+							<th class="th-sub">Room / bed</th>
 							<th class="th-sub">To Pay (Total)</th>
 							<th class="th-sub">Approved</th>
 							<th class="th-sub">Paid</th>
-							<th></th>
 							{#if data.trip?.allowPartialStays}
 								<th></th>
 								<th></th>
 							{/if}
-							{#if data.isHost}
+							{#if data.canManageGuests}
 								<th></th>
 							{/if}
 						</tr>
@@ -508,56 +543,31 @@
 									{/if}
 								</td>
 								<td>
-									{#if data.canManageGuests && row.type === 'member' && row.userId}
-										<select
-											class="rsvp-select status-pill status-{row.rsvpStatus ?? 'pending'}"
-											value={row.rsvpStatus || 'no-response'}
-											onchange={async (e) => {
-												const v = (e.currentTarget as HTMLSelectElement).value;
-												await updateGuestRsvp(row.userId!, v, row.partySize || 1);
-											}}
-										>
-											<option value="yes">Going</option>
-											<option value="no">Not going</option>
-											<option value="no-response">No response</option>
-										</select>
-										{#if row.rsvpUpdatedAt}
-											<span class="updated-hint">{formatRsvpUpdated(row.rsvpUpdatedAt)}</span>
-										{/if}
-									{:else}
-										<span class="status-pill status-{row.rsvpStatus ?? 'pending'}">
-											{row.rsvpStatus === 'yes'
-												? (row.yesSubstatus === 'confirmed' ? 'Going (Confirmed)' : 'Going (Reconfirm required)')
-												: row.rsvpStatus === 'no'
-													? 'Not going'
-														: 'No response'}
-										</span>
-										{#if row.rsvpStatus === 'yes' && row.yesSubstatus !== 'confirmed' && row.reconfirmDeadlineAt}
-											<span class="updated-hint">By {new Date(row.reconfirmDeadlineAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
-										{:else if row.rsvpUpdatedAt}
-											<span class="updated-hint">{formatRsvpUpdated(row.rsvpUpdatedAt)}</span>
-										{/if}
+									<span class="status-pill status-{row.rsvpStatus ?? 'pending'}">
+										{row.rsvpStatus === 'yes'
+											? (row.yesSubstatus === 'confirmed' ? 'Going (Confirmed)' : 'Going (Reconfirm required)')
+											: row.rsvpStatus === 'no'
+												? 'Not going'
+													: 'No response'}
+									</span>
+									{#if row.rsvpStatus === 'yes' && row.yesSubstatus !== 'confirmed' && row.reconfirmDeadlineAt}
+										<span class="updated-hint">By {new Date(row.reconfirmDeadlineAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
+									{:else if row.rsvpUpdatedAt}
+										<span class="updated-hint">{formatRsvpUpdated(row.rsvpUpdatedAt)}</span>
 									{/if}
 								</td>
 								<td>
-									{#if data.canManageGuests && row.type === 'member' && row.userId}
-										<input
-											type="number"
-											min="1"
-											max="20"
-											value={row.partySize || 1}
-											class="party-size-input"
-											onchange={async (e) => {
-												const n = Math.min(20, Math.max(1, parseInt((e.currentTarget as HTMLInputElement).value, 10) || 1));
-												await updateGuestRsvp(row.userId!, row.rsvpStatus || 'no-response', n);
-											}}
-										/>
+									{#if row.partySize > 0}
+										{row.partySize} {row.partySize > 1 ? '(+' + (row.partySize - 1) + ')' : ''}
 									{:else}
-										{#if row.partySize > 0}
-											{row.partySize} {row.partySize > 1 ? '(+' + (row.partySize - 1) + ')' : ''}
-										{:else}
-											—
-										{/if}
+										—
+									{/if}
+								</td>
+								<td>
+									{#if (row.assignedBedIds?.length ?? 0) > 0}
+										{bedsLabel(row)}
+									{:else}
+										<span class="muted">No beds selected</span>
 									{/if}
 								</td>
 								<td>
@@ -580,30 +590,10 @@
 								</td>
 								<td class="approved-cell">
 									{#if row.type === 'member' && row.userId && (row.rsvpStatus === 'yes' || row.priceApproved != null)}
-										{#if data.canManageGuests}
-											<form method="POST" action="?/updatePriceApproved" class="approved-form" use:enhance={() => invalidateAll()}>
-												<input type="hidden" name="userId" value={row.userId} />
-												<button
-													type="submit"
-													name="approved"
-													value={row.priceApproved ? 'false' : 'true'}
-													class="approved-toggle"
-													title={row.priceApproved ? 'Mark not approved' : 'Mark approved'}
-													aria-label={row.priceApproved ? 'Approved – click to mark not approved' : 'Not approved – click to mark approved'}
-												>
-													{#if row.priceApproved}
-														<span class="check" aria-hidden="true">✓</span>
-													{:else}
-														<span class="cross" aria-hidden="true">✗</span>
-													{/if}
-												</button>
-											</form>
+										{#if row.priceApproved}
+											<span class="check" aria-hidden="true">✓</span>
 										{:else}
-											{#if row.priceApproved}
-												<span class="check" aria-hidden="true">✓</span>
-											{:else}
-												<span class="cross" aria-hidden="true">✗</span>
-											{/if}
+											<span class="cross" aria-hidden="true">✗</span>
 										{/if}
 									{:else}
 										—
@@ -611,144 +601,40 @@
 								</td>
 								<td class="paid-cell">
 									{#if row.type === 'member' && row.userId && (row.toPayTotal != null || row.invoicePaid)}
-										{#if data.canManageGuests}
-											{#if row.invoicePaid}
-												<form method="POST" action="?/markInvoiceUnpaid" class="paid-form" use:enhance={() => invalidateAll()}>
-													<input type="hidden" name="userId" value={row.userId} />
-													<button
-														type="submit"
-														class="paid-toggle"
-														title="Mark as unpaid"
-														aria-label="Paid – click to mark unpaid"
-													>
-														<span class="check" aria-hidden="true">✓</span>
-													</button>
-												</form>
-											{:else}
-												<form method="POST" action="?/markInvoicePaid" class="paid-form" use:enhance={() => invalidateAll()}>
-													<input type="hidden" name="userId" value={row.userId} />
-													<button
-														type="submit"
-														class="paid-toggle"
-														title="Mark as paid"
-														aria-label="Unpaid – click to mark paid"
-													>
-														<span class="cross" aria-hidden="true">✗</span>
-													</button>
-												</form>
-											{/if}
+										{#if row.invoicePaid}
+											<span class="check" aria-hidden="true">✓</span>
 										{:else}
-											{#if row.invoicePaid}
-												<span class="check" aria-hidden="true">✓</span>
-											{:else}
-												<span class="cross" aria-hidden="true">✗</span>
-											{/if}
+											<span class="cross" aria-hidden="true">✗</span>
 										{/if}
 									{:else}
 										—
-									{/if}
-								</td>
-								<td>
-									{#if row.type === 'member' && data.canManageGuests}
-										<div
-											class="beds-cell beds-dropdown-wrap"
-											use:clickOutside={{ onOutside: closeBedsDropdown, active: openBedsUserId === row.userId }}
-											role="presentation"
-										>
-											<form
-												method="POST"
-												action="?/assignBeds"
-												class="beds-form"
-												data-beds-user-id={row.userId ?? ''}
-												use:enhance={async ({ result }) => {
-													if (result.type === 'success') openBedsUserId = null;
-													await invalidateAll();
-												}}
-											>
-												<input type="hidden" name="userId" value={row.userId ?? ''} />
-												<input type="hidden" name="partySize" value={row.partySize || 1} />
-												{#if data.trip?.allowPartialStays}
-													<input type="hidden" name="startDate" value={row.arrivalDate ?? data.trip?.checkInDate ?? ''} />
-													<input type="hidden" name="endDate" value={row.departureDate ?? data.trip?.checkOutDate ?? ''} />
-												{/if}
-												<div data-bedids-container aria-hidden="true"></div>
-												<button
-													type="button"
-													class="beds-dropdown-trigger edit-select"
-													onclick={(e) => {
-														e.stopPropagation();
-														openBedsForRow(row);
-													}}
-													aria-haspopup="listbox"
-													aria-expanded={openBedsUserId === row.userId}
-												>
-													{#if (row.assignedBedIds?.length ?? 0) > 0}
-														{bedsLabel(row)}
-													{:else}
-														Choose beds…
-													{/if}
-												</button>
-												{#if openBedsUserId === row.userId}
-													<div class="beds-dropdown-panel" role="listbox" onclick={(e) => e.stopPropagation()}>
-														{#each (data.rooms ?? []) as room, ri}
-															<div class="beds-dropdown-room">
-																<div class="beds-dropdown-room-name">{room.name?.trim() || `Room ${ri + 1}`}</div>
-																{#each (room.beds ?? []) as bed}
-																	<label class="beds-dropdown-option">
-																		<input
-																			type="checkbox"
-																			checked={selectedBedIdsForEdit.includes(bed.id)}
-																			onchange={() => toggleBedForEdit(bed.id)}
-																		/>
-																		<span>{bed.bedType}</span>
-																	</label>
-																{/each}
-															</div>
-														{/each}
-														<div class="beds-form-actions">
-															<button type="button" class="btn-secondary btn-small" onclick={() => closeBedsDropdown()}>Done</button>
-															<button
-																type="button"
-																class="btn-link clear-room"
-																onclick={() => {
-																	selectedBedIdsForEdit = [];
-																	closeBedsDropdown();
-																}}
-															>Clear</button>
-														</div>
-													</div>
-												{/if}
-												<!-- bed IDs submitted via data-bedids-container hidden inputs on Save -->
-												<select multiple class="beds-hidden-select" aria-hidden="true" tabindex={-1} style="display:none">
-													{#each (data.rooms ?? []) as room, ri}
-														<optgroup label={room.name?.trim() || `Room ${ri + 1}`}>
-															{#each (room.beds ?? []) as bed}
-																<option value={bed.id}>{bed.bedType}</option>
-															{/each}
-														</optgroup>
-													{/each}
-												</select>
-											</form>
-											<form method="POST" action="?/assignBeds" class="clear-beds-form" data-clear-user-id={row.userId ?? ''} use:enhance={() => invalidateAll()} style="display: none;">
-												<input type="hidden" name="userId" value={row.userId ?? ''} />
-											</form>
-										</div>
-									{:else}
-										{#if (row.assignedBedIds?.length ?? 0) > 0}
-											{bedsLabel(row)}
-										{:else}
-											<span class="muted">No beds selected</span>
-										{/if}
 									{/if}
 								</td>
 								{#if data.trip?.allowPartialStays}
 									<td>{row.arrivalDate ?? '—'}</td>
 									<td>{row.departureDate ?? '—'}</td>
 								{/if}
-								{#if data.isHost}
+								{#if data.canManageGuests}
 									<td class="td-actions">
 										<div class="action-buttons">
-											{#if row.type === 'member' && (row.rsvpStatus !== 'yes' && row.rsvpStatus !== 'no')}
+											{#if row.type === 'member' && row.userId}
+												<button
+													type="button"
+													class="btn-icon btn-edit"
+													title="Edit guest"
+													aria-label="Edit guest"
+													onclick={() => (editModalRow = row)}
+												>
+													<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+												</button>
+											{/if}
+											{#if row.type === 'member' && row.userId && row.userId !== data.user?.id}
+												<a href="/messages?with={row.userId}" class="btn-icon btn-message" title="Message {row.name || row.email}" aria-label="Message">
+													<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
+												</a>
+											{/if}
+											{#if row.type === 'member' && row.userId && row.role !== 'host'}
+												{@const nudgeDisabled = (row.rsvpStatus === 'yes' && row.priceApproved) || row.rsvpStatus === 'no'}
 												<form method="POST" action="?/nudgeUnresponded" class="inline-form" use:enhance={async ({ result }) => {
 													if (result.type === 'success') {
 														nudgeToast = true;
@@ -757,8 +643,8 @@
 													}
 												}}>
 													<input type="hidden" name="userId" value={row.userId ?? ''} />
-													<button type="submit" class="btn-icon" title="Send a reminder to respond to the RSVP" aria-label="Nudge">
-														<img src={pokeIcon} alt="" width="16" height="16" class="btn-icon-img" />
+													<button type="submit" class="btn-icon btn-nudge" class:btn-nudge-disabled={nudgeDisabled} disabled={nudgeDisabled} title={nudgeDisabled ? 'RSVP and cost approved' : 'Send a reminder to respond to the RSVP'} aria-label="Nudge">
+														<img src={pokeIcon} alt="" width="20" height="20" class="btn-icon-img nudge-icon-img" />
 													</button>
 												</form>
 											{/if}
@@ -781,14 +667,12 @@
 					</tbody>
 				</table>
 			{:else}
-				<p class="empty">No guests match your filters. {searchQuery || filterRsvp !== 'all' || filterAssignment !== 'all' || filterDietary !== 'all' ? 'Try changing filters.' : 'Use Invite to add people.'}</p>
+				<p class="empty">No guests match your filters. {filterRsvp !== 'all' || filterAssignment !== 'all' || filterDietary !== 'all' ? 'Try changing filters.' : 'Use Add Guest to add people.'}</p>
 			{/if}
 		</div>
-		{#if data.isHost}
-			<div class="card-footer-row">
-				<button type="button" class="btn-secondary" onclick={exportCsv}>Export CSV</button>
-			</div>
-		{/if}
+		<div class="card-footer-row card-footer-export">
+			<button type="button" class="btn-export" onclick={exportCsv}>Export All Data</button>
+		</div>
 	</div>
 
 	{#if data.canManageGuests && ((data.legacyReservations?.length ?? 0) > 0 || (data.legacyStats?.totalReservations ?? 0) > 0)}
@@ -975,6 +859,17 @@
 	</div>
 {/if}
 
+<GuestEditModal
+	open={!!editModalRow}
+	row={editModalRow}
+	rooms={data.rooms ?? []}
+	tripId={data.trip?.id ?? ''}
+	checkInDate={data.trip?.checkInDate ?? undefined}
+	checkOutDate={data.trip?.checkOutDate ?? undefined}
+	allowPartialStays={data.trip?.allowPartialStays ?? false}
+	onClose={() => (editModalRow = null)}
+/>
+
 <GuestInvoiceModal
 	open={!!invoiceModalRow}
 	guestName={invoiceModalRow?.name ?? ''}
@@ -1023,12 +918,14 @@
 	.toolbar-actions-row { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
 	.search-wrap { margin-left: auto; min-width: 20rem; max-width: 42rem; flex: 1; }
 
-	.rsvp-visual { margin-top: 1rem; margin-bottom: 0.75rem; }
-	.rsvp-bar { display: flex; height: 1.5rem; border-radius: var(--radius-md); overflow: hidden; background: var(--surface2); min-width: 12rem; max-width: 28rem; }
-	.rsvp-segment { display: block; min-width: 4px; transition: width 0.2s ease; }
-	.rsvp-segment.segment-going { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
-	.rsvp-segment.segment-no { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
-	.rsvp-segment.segment-pending { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); }
+	.rsvp-visual { margin-top: 1rem; margin-bottom: 0.75rem; display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap; width: 100%; overflow: visible; }
+	.rsvp-pie-wrap { flex-shrink: 0; min-width: 6rem; overflow: visible; }
+	.rsvp-half-donut { width: 6rem; height: 3.75rem; display: block; overflow: visible; }
+	.rsvp-segment { transition: opacity 0.2s ease; }
+	.rsvp-segment:hover { opacity: 0.9; }
+	.rsvp-segment.segment-going { fill: #22c55e; }
+	.rsvp-segment.segment-no { fill: #94a3b8; }
+	.rsvp-segment.segment-pending { fill: #fbbf24; }
 	.rsvp-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-top: 0.5rem; font-size: 0.8125rem; color: var(--muted); }
 	.legend-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
 	.legend-dot.segment-going { background: #22c55e; }
@@ -1051,32 +948,146 @@
 
 	.toast { font-size: 0.8125rem; color: var(--success, #166534); }
 
-	.toolbar { margin-bottom: 1rem; }
-	.filters-row { display: flex; align-items: center; gap: 1rem; overflow-x: auto; flex-wrap: wrap; }
-	.filter-group { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
-	.filter-group label { font-size: 0.8125rem; color: var(--muted); white-space: nowrap; }
-	.filter-select { padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8125rem; min-width: 10rem; width: 10rem; box-sizing: border-box; }
-	.search-input { padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.875rem; width: 100%; }
+	.btn-export {
+		padding: 0.5rem 1rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		background: #fff;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		color: #374151;
+		cursor: pointer;
+	}
+	.btn-export:hover { background: #f9fafb; border-color: #9ca3af; }
+	.btn-secondary-header {
+		padding: 0.5rem 1rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		background: #fff;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		color: #374151;
+		cursor: pointer;
+	}
+	.btn-secondary-header:hover { background: #f9fafb; border-color: #9ca3af; }
+	.btn-primary-invite {
+		padding: 0.5rem 1rem;
+		font-size: 0.875rem;
+		font-weight: 600;
+		background: #e85d04;
+		border: none;
+		border-radius: 8px;
+		color: #fff;
+		cursor: pointer;
+	}
+	.btn-primary-invite:hover { background: #d45203; }
+
+	.add-guest-dropdown-wrap { position: relative; display: inline-flex; }
+	.add-guest-content { pointer-events: none; }
+	.add-guest-portal {
+		position: fixed;
+		inset: 0;
+		z-index: 10000;
+		pointer-events: none;
+	}
+	.add-guest-portal .add-guest-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 9998;
+		pointer-events: auto;
+		cursor: default;
+	}
+	.add-guest-portal .add-guest-menu { pointer-events: auto; }
+	.add-guest-menu {
+		position: fixed;
+		top: 0;
+		left: 0;
+		margin-top: 0;
+		background: white;
+		border: 1px solid var(--border, #e5e7eb);
+		border-radius: 8px;
+		box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+		min-width: 10rem;
+		z-index: 9999;
+		overflow: hidden;
+	}
+	.add-guest-item {
+		display: block;
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border: none;
+		background: none;
+		text-align: left;
+		font-size: 0.875rem;
+		color: var(--text, #374151);
+		cursor: pointer;
+		font-family: inherit;
+	}
+	.add-guest-item:hover { background: rgba(232, 93, 4, 0.1); }
+	.controls-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		flex-wrap: wrap;
+		padding: 0.75rem 1.25rem;
+		background: #f3f4f6;
+		border-bottom: 1px solid #e5e7eb;
+	}
+	.filters-left {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-shrink: 0;
+	}
+	.actions-right {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		margin-left: auto;
+	}
+	.control-select {
+		padding: 0.5rem 2rem 0.5rem 0.75rem;
+		font-size: 0.875rem;
+		background: #fff;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		color: #374151;
+		cursor: pointer;
+		width: auto;
+		min-width: 10rem;
+	}
+	.control-select:hover { border-color: #9ca3af; }
 	.th-sortable { cursor: pointer; user-select: none; }
 	.th-sortable:hover { color: var(--text); }
 	.sort-icon { margin-left: 0.25rem; font-size: 0.75rem; opacity: 0.8; }
 
 	.card { background: var(--surface); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
-	.card-header-row { display: flex; justify-content: flex-end; padding: 0.35rem 1rem 0; }
-	.card-header-nudge-form { display: inline; }
 	.card-body { padding: 1rem; }
 	.card-footer-row { display: flex; justify-content: flex-end; padding: 0.75rem 1rem 1rem; border-top: 1px solid var(--border); }
+	.card-footer-export { justify-content: flex-start; }
 	.table-wrap { overflow-x: auto; }
 	.table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-	.table th, .table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
-	.table th { font-weight: 500; color: var(--muted); }
-	.table tbody tr:hover { background: var(--surface2); }
+	.table th, .table td { padding: 0.75rem 1rem; text-align: center; border-bottom: 1px solid var(--border); vertical-align: middle; }
+	.table th:first-child, .table td:first-child { text-align: left; }
+	.table thead { background: #f3f4f6; }
+	.table th { font-weight: 600; color: #374151; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.025em; }
+	.table tbody tr { background: #fff; height: 5rem; }
+	.table tbody tr td { height: 5rem; vertical-align: middle; }
+	.table tbody tr:hover { background: #f9fafb; }
 	.th-actions, .td-actions { width: 1%; white-space: nowrap; }
-	.th-section { font-weight: 600; color: var(--text); }
-	.th-sub { font-weight: 500; font-size: 0.8125rem; color: var(--muted); }
-	.subheader-row th { padding-top: 0.25rem; border-top: none; }
+	.table th.th-section {
+		font-weight: 600;
+		color: var(--text);
+		text-align: center;
+		border-left: 1px solid rgba(0, 0, 0, 0.08);
+		border-right: 1px solid rgba(0, 0, 0, 0.08);
+	}
+	.th-sub { font-weight: 500; font-size: 0.6875rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+	.subheader-row th { padding-top: 0.5rem; padding-bottom: 0.25rem; border-top: none; }
 
-	.guest-cell { display: flex; align-items: center; gap: 0.75rem; }
+	.guest-cell { display: flex; align-items: center; justify-content: flex-start; gap: 0.75rem; }
 	.guest-cell-btn { width: 100%; text-align: left; background: none; border: none; font: inherit; cursor: pointer; padding: 0; }
 	.guest-cell-btn:hover { opacity: 0.9; }
 	.avatar { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--surface2); display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; color: var(--text); flex-shrink: 0; }
@@ -1105,13 +1116,29 @@
 	.edit-link { margin-left: 0.5rem; font-size: 0.8125rem; }
 	.btn-link { background: none; border: none; color: var(--primary); cursor: pointer; font-size: inherit; padding: 0; text-decoration: underline; }
 	.btn-link:hover { color: var(--primaryHover); }
-	.action-buttons { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+	.action-buttons {
+		display: grid;
+		grid-template-columns: repeat(2, auto);
+		gap: 0.35rem;
+		align-items: center;
+		justify-content: center;
+		justify-items: center;
+	}
 	.btn-icon { display: inline-flex; align-items: center; justify-content: center; padding: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface2); color: var(--text); cursor: pointer; }
 	.btn-icon:hover { background: var(--focusRing); }
 	.btn-icon svg { display: block; }
 	.btn-icon-img { display: block; object-fit: contain; }
+	.btn-icon.btn-edit { color: var(--muted, #6b7280); }
+	.btn-icon.btn-edit:hover { color: var(--text, #222); background: var(--focusRing); }
 	.btn-icon.btn-remove { border: 1px solid rgba(185, 28, 28, 0.4); color: #b91c1c; }
 	.btn-icon.btn-remove:hover { background: rgba(185, 28, 28, 0.08); }
+	.btn-icon.btn-nudge { color: #e85d04; border: 1.5px solid #e85d04; background: var(--surface2); padding: 0.2rem; }
+	.btn-icon.btn-nudge .nudge-icon-img { width: 20px; height: 20px; }
+	.btn-icon.btn-nudge:hover:not(:disabled) { background: rgba(232, 93, 4, 0.12); color: #d45203; border-color: #d45203; }
+	.btn-icon.btn-nudge.btn-nudge-disabled,
+	.btn-icon.btn-nudge:disabled { color: #9ca3af; border: 1.5px solid #d1d5db; background: #f3f4f6; cursor: default; opacity: 0.6; }
+	.btn-icon.btn-message { color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.5); background: var(--surface2); text-decoration: none; }
+	.btn-icon.btn-message:hover { background: rgba(37, 99, 235, 0.1); color: #1d4ed8; }
 	.to-pay-btn {
 		background: none;
 		border: none;
@@ -1169,7 +1196,7 @@
 	.inline-form { display: inline; }
 	.room-cell-form, .clear-room-form { display: inline; }
 	.clear-room-form .clear-room { margin-left: 0.25rem; }
-	.beds-cell { display: flex; flex-direction: column; gap: 0.35rem; }
+	.beds-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 0.35rem; }
 	.beds-dropdown-wrap { position: relative; }
 	.beds-dropdown-trigger {
 		display: block;

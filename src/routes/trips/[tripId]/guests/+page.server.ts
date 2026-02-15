@@ -763,5 +763,118 @@ export const actions: Actions = {
 			data: { priceApprovedByHost: approved }
 		});
 		return { updatePriceApprovedSuccess: true };
+	},
+	/** Combined update for Edit modal: RSVP, beds, price approval, paid status */
+	updateGuestDetails: async ({ params, cookies, request }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) return fail(401, { message: 'Not logged in' });
+		const canManage = await isTripHostOrCoHost(params.tripId, user.id);
+		if (!canManage) return fail(403, { message: 'Only host or co-host can edit guests' });
+		const formData = await request.formData();
+		const targetUserId = (formData.get('userId') as string)?.trim();
+		if (!targetUserId) return fail(400, { message: 'Missing user' });
+
+		const tripId = params.tripId;
+		const rsvpStatusRaw = (formData.get('rsvpStatus') as string)?.trim() || 'yes';
+		const partySize = Math.min(20, Math.max(1, parseInt(String(formData.get('partySize')), 10) || 1));
+		const bedIds = formData.getAll('bedIds');
+		const priceApproved = formData.get('priceApproved') === 'true';
+		const invoicePaid = formData.get('invoicePaid') === 'true';
+
+		// Update RSVP
+		if (rsvpStatusRaw === 'no-response' || rsvpStatusRaw === '') {
+			await prisma.rSVP.deleteMany({ where: { tripId, userId: targetUserId } });
+		} else {
+			await prisma.rSVP.upsert({
+				where: { tripId_userId: { tripId, userId: targetUserId } },
+				create: {
+					tripId,
+					userId: targetUserId,
+					status: rsvpStatusRaw,
+					adultsCount: partySize
+				},
+				update: { status: rsvpStatusRaw, adultsCount: partySize }
+			});
+		}
+
+		const assignment = await prisma.roomAssignment.findFirst({
+			where: { tripId, userId: targetUserId }
+		});
+		if (assignment) {
+			await prisma.roomAssignment.update({
+				where: { id: assignment.id },
+				data: { partySize }
+			});
+		}
+
+		// Update price approved
+		await prisma.rSVP.updateMany({
+			where: { tripId, userId: targetUserId },
+			data: { priceApprovedByHost: priceApproved }
+		});
+
+		// Assign beds
+		const trip = await prisma.trip.findUnique({
+			where: { id: tripId },
+			select: { checkInDate: true, checkOutDate: true, allowPartialStays: true }
+		});
+		if (trip) {
+			let startDate: Date | null = trip.checkInDate;
+			let endDate: Date | null = trip.checkOutDate;
+			if (trip.allowPartialStays) {
+				const startRaw = (formData.get('startDate') as string)?.trim();
+				const endRaw = (formData.get('endDate') as string)?.trim();
+				if (startRaw) {
+					const d = new Date(startRaw);
+					if (!Number.isNaN(d.getTime())) startDate = d;
+				}
+				if (endRaw) {
+					const d = new Date(endRaw);
+					if (!Number.isNaN(d.getTime())) endDate = d;
+				}
+			}
+			await prisma.roomAssignment.deleteMany({ where: { tripId, userId: targetUserId } });
+			const validBedIds = (Array.isArray(bedIds) ? bedIds : [bedIds])
+				.filter((id): id is string => typeof id === 'string')
+				.map((id) => id.trim())
+				.filter((id) => id !== '');
+			for (const bedId of validBedIds) {
+				const bed = await prisma.bed.findFirst({
+					where: { id: bedId },
+					include: { room: { select: { tripId: true } } }
+				});
+				if (bed && bed.room.tripId === tripId) {
+					await prisma.roomAssignment.create({
+						data: {
+							tripId,
+							userId: targetUserId,
+							roomId: bed.roomId,
+							bedId: bed.id,
+							bedType: bed.bedType,
+							partySize: 1,
+							...(startDate && { startDate }),
+							...(endDate && { endDate })
+						}
+					});
+				}
+			}
+		}
+
+		// Invoice paid status
+		if (invoicePaid) {
+			await prisma.invoice.updateMany({
+				where: { tripId, userId: targetUserId, status: 'due' },
+				data: { status: 'paid', updatedAt: new Date() }
+			});
+		} else {
+			await prisma.invoice.updateMany({
+				where: { tripId, userId: targetUserId, status: 'paid' },
+				data: { status: 'due', updatedAt: new Date() }
+			});
+		}
+
+		await createInvoiceForUser(tripId, targetUserId).catch(() => {});
+		await checkAndSetReconfirmRequired(tripId, { guestId: targetUserId });
+		return { updateGuestDetailsSuccess: true };
 	}
 };

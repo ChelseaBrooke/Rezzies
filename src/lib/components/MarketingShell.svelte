@@ -20,8 +20,13 @@
 		<div class="marketing-header-right">
 			{#if user}
 				<a href="/trips" class="marketing-header-btn">My Trips</a>
-				<div class="marketing-bell-wrap">
-					<NotificationTray />
+				<div class="marketing-msg-bell">
+					<a href="/messages" class="marketing-icon-btn" title="Messages" aria-label="Messages">
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
+					</a>
+					<div class="marketing-bell-wrap">
+						<NotificationTray />
+					</div>
 				</div>
 				<AvatarMenu user={user} class="marketing-avatar" />
 			{:else}
@@ -121,6 +126,25 @@
 	}
 	.marketing-header-btn-primary:hover {
 		background: var(--primaryHover, #a03d24);
+	}
+	.marketing-icon-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		border-radius: 6px;
+		color: white;
+		text-decoration: none;
+		transition: background 0.2s;
+	}
+	.marketing-icon-btn:hover {
+		background: rgba(255, 255, 255, 0.1);
+	}
+	.marketing-msg-bell {
+		display: flex;
+		align-items: center;
+		gap: 0.125rem;
 	}
 	.marketing-bell-wrap {
 		display: inline-flex;

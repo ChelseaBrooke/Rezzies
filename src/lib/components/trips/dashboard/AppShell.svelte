@@ -100,9 +100,14 @@
 		</div>
 	</aside>
 	<main class="main-content">
-		<span class="top-bell">
-			<NotificationTray />
-		</span>
+		<div class="top-actions">
+			<a href="/messages" class="top-action-btn" title="Messages" aria-label="Messages">
+				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
+			</a>
+			<span class="top-bell">
+				<NotificationTray />
+			</span>
+		</div>
 		{#if children != null && typeof children === 'function'}
 			<div class="main-content-inner">
 				{@render children()}
@@ -307,12 +312,32 @@
 		position: relative;
 	}
 
-	.top-bell {
+	.top-actions {
 		position: absolute;
 		top: 0.5rem;
 		right: 2rem;
-		display: inline-flex;
+		display: flex;
+		align-items: center;
+		gap: 0.125rem;
 		z-index: 5;
+	}
+	.top-action-btn {
+		width: 44px;
+		height: 44px;
+		border-radius: 8px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		color: #374151;
+		transition: all 0.2s;
+		text-decoration: none;
+	}
+	.top-action-btn:hover {
+		background: transparent;
+		color: #111827;
+	}
+	.top-bell {
+		display: inline-flex;
 	}
 	.top-bell :global(.tray-trigger) {
 		width: 44px;

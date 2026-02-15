@@ -115,9 +115,14 @@
 								{/if}
 							</div>
 							<div class="trip-top-bar" aria-label="Trip actions">
-								<span class="trip-notification-bell">
-									<NotificationTray />
-								</span>
+								<div class="trip-msg-bell">
+									<a href="/messages" class="trip-icon-btn" title="Messages" aria-label="Messages">
+										<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
+									</a>
+									<span class="trip-notification-bell">
+										<NotificationTray />
+									</span>
+								</div>
 								{#if user}
 									<AvatarMenu user={user} class="trip-top-avatar-wrap" />
 								{/if}
@@ -162,9 +167,14 @@
 				<span>☰</span>
 			</button>
 			<span class="mobile-title">{trip?.name ?? 'Trip'}</span>
-			<span class="mobile-notification-bell">
-				<NotificationTray />
-			</span>
+			<div class="mobile-msg-bell">
+				<a href="/messages" class="mobile-icon-btn" title="Messages" aria-label="Messages">
+					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
+				</a>
+				<span class="mobile-notification-bell">
+					<NotificationTray />
+				</span>
+			</div>
 			{#if user}
 				<AvatarMenu user={user} class="mobile-top-avatar-wrap" />
 			{/if}
@@ -263,11 +273,28 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
+		gap: 0.5rem;
 		min-height: 2.25rem;
 		min-width: 0;
 	}
+	.trip-msg-bell {
+		display: flex;
+		align-items: center;
+		gap: 0.125rem;
+	}
 
+	.trip-icon-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: var(--radius-md);
+		color: var(--text);
+		text-decoration: none;
+		transition: color var(--transition-fast);
+	}
+	.trip-icon-btn:hover { color: var(--primary); }
 	.trip-notification-bell {
 		display: inline-flex;
 		align-items: center;
@@ -459,6 +486,22 @@
 			flex: 1;
 		}
 
+		.mobile-icon-btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 2.5rem;
+			height: 2.5rem;
+			border-radius: var(--radius-md);
+			color: var(--text);
+			text-decoration: none;
+		}
+		.mobile-icon-btn:hover { color: var(--primary); }
+		.mobile-msg-bell {
+			display: flex;
+			align-items: center;
+			gap: 0.125rem;
+		}
 		.mobile-notification-bell {
 			display: inline-flex;
 			align-items: center;

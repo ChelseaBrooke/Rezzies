@@ -120,14 +120,6 @@
 		shareOpen = false;
 	}
 
-	function handleEmailLink() {
-		const link = getTripLink();
-		const subject = encodeURIComponent('Trip invite');
-		const body = encodeURIComponent(`You're invited to view this trip:\n\n${link}`);
-		window.location.href = `mailto:?subject=${subject}&body=${body}`;
-		shareOpen = false;
-	}
-
 	function handleEdit() {
 		goto(`/trips/${tripId}/settings`);
 		editOpen = false;
@@ -233,7 +225,6 @@
 					{#if onInvite}
 						<button type="button" class="dropdown-item" role="menuitem" onclick={() => { onInvite?.(); shareOpen = false; shareMenuStyle = null; }}>Invite guests</button>
 					{/if}
-					<button type="button" class="dropdown-item" role="menuitem" onclick={handleEmailLink}>Email link</button>
 					<button type="button" class="dropdown-item" role="menuitem" onclick={handleCopyLink}>Copy link</button>
 				</div>
 			</div>
