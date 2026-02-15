@@ -48,6 +48,7 @@
 		<TripNavItem href="/trips/{trip.id}/rooms" iconName="rooms" label="Rooms" badge={badges.rooms} />
 		<TripNavItem href="/trips/{trip.id}/itinerary" iconName="itinerary" label="Itinerary" badge={mealsEnabled ? badges.meals : badges.itinerary} />
 		<TripNavItem href="/trips/{trip.id}/polls" iconName="polls" label="Polls" />
+		<TripNavItem href="/trips/{trip.id}/games" iconName="games" label="Games" />
 		<TripNavItem href="/trips/{trip.id}/files" iconName="files" label="Files" badge={badges.files} />
 	</nav>
 

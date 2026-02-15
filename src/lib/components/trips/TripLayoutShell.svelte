@@ -67,7 +67,9 @@
 		{ href: `/trips/${tripId}/guests`, label: 'Guests', icon: '👥' },
 		{ href: `/trips/${tripId}/rooms`, label: 'Rooms', icon: '🛏️' },
 		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary', icon: '📋' },
-		{ href: `/trips/${tripId}/polls`, label: 'Polls', icon: '🗳️' }
+		{ href: `/trips/${tripId}/polls`, label: 'Polls', icon: '🗳️' },
+		{ href: `/trips/${tripId}/games`, label: 'Games', icon: '🎮' },
+		{ href: `/trips/${tripId}/files`, label: 'Files', icon: '📁' }
 	];
 
 	function isActive(href: string) {
