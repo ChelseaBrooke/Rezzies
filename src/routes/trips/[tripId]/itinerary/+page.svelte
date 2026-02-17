@@ -1,65 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { page } from '$app/stores';
 	import type { PageData } from './$types';
 
 	let { data, form }: { data: PageData; form?: Record<string, unknown> } = $props();
 
-	const MEAL_LABELS: Record<string, string> = {
-		breakfast: 'Breakfast',
-		lunch: 'Lunch',
-		dinner: 'Dinner',
-		snack: 'Snacks'
-	};
-
-	type TabId = 'meals' | 'activities' | 'itinerary';
-	const TAB_IDS: TabId[] = ['meals', 'activities', 'itinerary'];
-
-	const tabParam = $derived($page.url.searchParams.get('tab'));
-	const activeTab = $derived(
-		(TAB_IDS.includes(tabParam as TabId) ? tabParam : 'itinerary') as TabId
-	);
-
-	function setTab(tab: TabId) {
-		const url = new URL($page.url);
-		url.searchParams.set('tab', tab);
-		return url.pathname + url.search;
-	}
-
-	const sortedDates = $derived(Object.keys(data.eventsByDate).sort());
-
-	const slotsByDay = $derived.by(() => {
-		const map = new Map<string, typeof data.mealSlots>();
-		for (const slot of data.mealSlots ?? []) {
-			const key = new Date(slot.date).toISOString().slice(0, 10);
-			if (!map.has(key)) map.set(key, []);
-			map.get(key)!.push(slot);
-		}
-		for (const arr of map.values()) {
-			arr.sort((a, b) => {
-				const order = { breakfast: 0, lunch: 1, dinner: 2, snack: 3 };
-				return (order[a.mealType as keyof typeof order] ?? 4) - (order[b.mealType as keyof typeof order] ?? 4);
-			});
-		}
-		const entries = [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-		return entries;
-	});
-
-	let editingSlotId = $state<string | null>(null);
 	let dragOverTarget = $state<string | null>(null); // 'meal-SLOTID' | 'activity-ACTIVITYID'
-	let addSlotDate = $state('');
-	let addSlotMealType = $state('dinner');
-	let addSlotTime = $state('');
-	let addSlotMenu = $state('');
-	let addSlotNotes = $state('');
-
-	let activitiesQuery = $state('');
-	let activitiesSearching = $state(false);
-	let activitiesResults = $state<{ name: string; placeId?: string }[]>([]);
-
-	function closeEdit() {
-		editingSlotId = null;
-	}
 
 	const tripDays = $derived(data.tripDays ?? []);
 	const goingUsers = $derived(data.goingUsers ?? []);
@@ -115,7 +60,7 @@
 		new Date(calendarMonth.year, calendarMonth.month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 	);
 
-	function handleMealsResult() {
+	function handleScheduleResult() {
 		return async ({
 			result,
 			update
@@ -123,25 +68,16 @@
 			result: { data?: Record<string, unknown>; type: string };
 			update: (opts?: { reset?: boolean }) => Promise<void>;
 		}) => {
-			await update(); // Apply default behavior (invalidateAll, form reset, etc.)
+			await update();
 			if (result.type === 'success' && result.data) {
 				if (
-					result.data.setMealPlanSuccess ||
-					result.data.createMealSlotSuccess ||
-					result.data.updateMealSlotSuccess ||
-					result.data.deleteMealSlotSuccess ||
-					result.data.generateSlotsSuccess ||
 					result.data.assignMealMakerSuccess ||
 					result.data.addActivityParticipantSuccess ||
 					result.data.removeActivityParticipantSuccess ||
 					result.data.moveMealSlotSuccess ||
 					result.data.moveActivitySuccess
 				) {
-					closeEdit();
-					addSlotDate = '';
-					addSlotTime = '';
-					addSlotMenu = '';
-					addSlotNotes = '';
+					// list refreshes via invalidation
 				}
 			}
 		};
@@ -186,30 +122,18 @@
 	function setDragOver(id: string | null) {
 		dragOverTarget = id;
 	}
-
-	async function searchActivities() {
-		if (!activitiesQuery.trim()) return;
-		activitiesSearching = true;
-		activitiesResults = [];
-		try {
-			await new Promise((r) => setTimeout(r, 300));
-		} finally {
-			activitiesSearching = false;
-		}
-	}
 </script>
 
 <div class="itinerary-page">
-	<div class="container" class:wide={activeTab === 'itinerary'}>
+	<div class="container wide">
 		<div class="page-header">
 			<h1>Itinerary: {data.trip.name}</h1>
 			<a href="/trips/{data.trip.id}" class="btn btn-secondary">← Back to Trip</a>
 		</div>
 
-		<div class="tabs">
-			<a href={setTab('meals')} class="tab" class:active={activeTab === 'meals'}>Meals</a>
-			<a href={setTab('activities')} class="tab" class:active={activeTab === 'activities'}>Activities</a>
-			<a href={setTab('itinerary')} class="tab" class:active={activeTab === 'itinerary'}>Itinerary</a>
+		<div class="sub-nav">
+			<a href="/trips/{data.trip.id}/meals" class="sub-nav-link">Meals</a>
+			<a href="/trips/{data.trip.id}/activities" class="sub-nav-link">Activities</a>
 		</div>
 
 		<div class="trip-dates">
@@ -218,212 +142,7 @@
 			</p>
 		</div>
 
-		{#if activeTab === 'meals'}
-			<!-- Meals Tab -->
-			<div class="tab-panel">
-				{#if !data.mealPlan || !data.mealPlan.enabled}
-					<div class="card off-state">
-						<div class="card-body">
-							<p class="summary">Meal planning is off for this trip.</p>
-							{#if form?.setMealPlanError}
-								<p class="error-message" role="alert">{form.setMealPlanError as string}</p>
-							{/if}
-							{#if data.isHost}
-								<form method="POST" action="?/setMealPlanEnabled" use:enhance={handleMealsResult()}>
-									<input type="hidden" name="enabled" value="true" />
-									<button type="submit" class="btn-primary">Enable meal planning</button>
-								</form>
-							{:else}
-								<p class="muted">Ask the host to enable meals if you'd like to plan or sign up for meals.</p>
-							{/if}
-						</div>
-					</div>
-				{:else}
-					{#if data.isHost}
-						<div class="card toolbar">
-							<div class="card-body">
-								<form method="POST" action="?/setMealPlanEnabled" use:enhance={handleMealsResult()} class="toggle-form">
-									<input type="hidden" name="enabled" value="false" />
-									<button type="submit" class="btn-secondary">Turn off meal planning</button>
-								</form>
-								{#if data.trip?.checkInDate && data.trip?.checkOutDate}
-									<form method="POST" action="?/generateSlots" use:enhance={handleMealsResult()} class="generate-form">
-										<button type="submit" class="btn-secondary">Generate slots from trip dates</button>
-									</form>
-								{/if}
-							</div>
-						</div>
-					{/if}
-
-					{#if slotsByDay.length === 0 && !data.isHost}
-						<div class="card">
-							<div class="card-body">
-								<p class="empty">No meal slots yet. The host can add a schedule.</p>
-							</div>
-						</div>
-					{:else}
-						{#each slotsByDay as [dateKey, slots]}
-							{@const dateLabel = new Date(dateKey + 'T12:00:00').toLocaleDateString(undefined, {
-								weekday: 'long',
-								month: 'short',
-								day: 'numeric',
-								year: 'numeric'
-							})}
-							<div class="day-card card">
-								<div class="meals-day-header">
-									<h2 class="day-title">{dateLabel}</h2>
-									{#if data.isHost}
-										<button
-											type="button"
-											class="btn-add-slot"
-											onclick={() => {
-												addSlotDate = dateKey;
-												editingSlotId = 'new-' + dateKey;
-											}}
-										>
-											+ Add slot
-										</button>
-									{/if}
-								</div>
-								<div class="card-body">
-									<ul class="slots-list">
-										{#each slots as slot (slot.id)}
-											<li class="slot-item">
-												{#if editingSlotId === slot.id}
-													<form method="POST" action="?/updateMealSlot" use:enhance={handleMealsResult()} class="slot-edit-form">
-														<input type="hidden" name="slotId" value={slot.id} />
-														<div class="slot-edit-row">
-															<select name="mealType" class="input-sm">
-																{#each Object.entries(MEAL_LABELS) as [value, label]}
-																	<option value={value} selected={slot.mealType === value}>{label}</option>
-																{/each}
-															</select>
-															<input type="date" name="date" value={new Date(slot.date).toISOString().slice(0, 10)} class="input-sm" />
-															<input type="time" name="time" value={slot.time ?? ''} class="input-sm" />
-														</div>
-														<input type="text" name="menuText" value={slot.menuText ?? ''} placeholder="Menu (optional)" class="input-full" />
-														<input type="text" name="notes" value={slot.notes ?? ''} placeholder="Notes (optional)" class="input-full" />
-														<select name="assignedUserId" class="input-sm assign-select">
-															<option value="">Unclaimed</option>
-															{#each data.members as member}
-																<option value={member.id} selected={slot.assignedUserId === member.id}>
-																	{member.name}
-																</option>
-															{/each}
-														</select>
-														<div class="slot-edit-actions">
-															<button type="submit" class="btn-primary btn-sm">Save</button>
-															<button type="button" class="btn-secondary btn-sm" onclick={closeEdit}>Cancel</button>
-														</div>
-													</form>
-												{:else}
-													<div class="slot-display">
-														<span class="slot-type">{MEAL_LABELS[slot.mealType] ?? slot.mealType}</span>
-														{#if slot.time}
-															<span class="slot-time">{slot.time}</span>
-														{/if}
-														{#if slot.menuText}
-															<span class="slot-menu">{slot.menuText}</span>
-														{/if}
-														{#if slot.notes}
-															<span class="slot-notes">{slot.notes}</span>
-														{/if}
-														<div class="slot-assign">
-															<form method="POST" action="?/updateMealSlot" use:enhance={handleMealsResult()} class="assign-form">
-																<input type="hidden" name="slotId" value={slot.id} />
-																<input type="hidden" name="mealType" value={slot.mealType} />
-																<input type="hidden" name="date" value={new Date(slot.date).toISOString().slice(0, 10)} />
-																<input type="hidden" name="time" value={slot.time ?? ''} />
-																<input type="hidden" name="menuText" value={slot.menuText ?? ''} />
-																<input type="hidden" name="notes" value={slot.notes ?? ''} />
-																<select name="assignedUserId" class="assign-select" onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}>
-																	<option value="" selected={!slot.assignedUserId}>Unclaimed</option>
-																	{#each data.members as member}
-																		<option value={member.id} selected={slot.assignedUserId === member.id}>
-																			{member.name}
-																		</option>
-																	{/each}
-																</select>
-															</form>
-														</div>
-														{#if data.isHost}
-															<div class="slot-actions">
-																<button type="button" class="btn-icon" onclick={() => (editingSlotId = slot.id)} aria-label="Edit slot">✎</button>
-																<form method="POST" action="?/deleteMealSlot" use:enhance={handleMealsResult()} class="inline-form">
-																	<input type="hidden" name="slotId" value={slot.id} />
-																	<button type="submit" class="btn-icon btn-danger" aria-label="Delete slot">×</button>
-																</form>
-															</div>
-														{/if}
-													</div>
-												{/if}
-											</li>
-										{/each}
-									</ul>
-
-									{#if data.isHost && editingSlotId === 'new-' + dateKey}
-										<form method="POST" action="?/createMealSlot" use:enhance={handleMealsResult()} class="add-slot-form">
-											<input type="hidden" name="date" value={addSlotDate} />
-											<input type="hidden" name="mealType" value={addSlotMealType} />
-											<input type="hidden" name="time" value={addSlotTime} />
-											<input type="hidden" name="menuText" value={addSlotMenu} />
-											<input type="hidden" name="notes" value={addSlotNotes} />
-											<div class="add-slot-row">
-												<select bind:value={addSlotMealType} name="mealType" class="input-sm">
-													{#each Object.entries(MEAL_LABELS) as [value, label]}
-														<option value={value}>{label}</option>
-													{/each}
-												</select>
-												<input type="time" bind:value={addSlotTime} name="time" class="input-sm" />
-												<input type="text" bind:value={addSlotMenu} name="menuText" placeholder="Menu (optional)" class="input-flex" />
-												<button type="submit" class="btn-primary btn-sm">Add</button>
-												<button type="button" class="btn-secondary btn-sm" onclick={closeEdit}>Cancel</button>
-											</div>
-										</form>
-									{/if}
-								</div>
-							</div>
-						{/each}
-					{/if}
-				{/if}
-			</div>
-
-		{:else if activeTab === 'activities'}
-			<!-- Activities Tab -->
-			<div class="tab-panel">
-				<div class="card search-card">
-					<div class="card-body">
-						<form class="search-form" onsubmit={(e) => { e.preventDefault(); searchActivities(); }}>
-							<input
-								type="search"
-								placeholder="Search for activities, restaurants, things to do…"
-								bind:value={activitiesQuery}
-								class="search-input"
-							/>
-							<button type="submit" class="btn btn-primary" disabled={activitiesSearching}>
-								{activitiesSearching ? 'Searching…' : 'Search'}
-							</button>
-						</form>
-					</div>
-				</div>
-				<div class="card">
-					<div class="card-body">
-						{#if activitiesResults.length > 0}
-							<ul class="results-list">
-								{#each activitiesResults as r}
-									<li class="result-item">{r.name}</li>
-								{/each}
-							</ul>
-						{:else}
-							<p class="empty">Search for nearby activities above. Results will appear here once the discover API is wired up.</p>
-						{/if}
-					</div>
-				</div>
-			</div>
-
-		{:else}
-			<!-- Itinerary Tab: Calendar-style weekly grid -->
-			<div class="tab-panel schedule-panel">
+		<div class="tab-panel schedule-panel">
 				{#if tripDays.length === 0}
 					<div class="empty-state">
 						<p>Set trip check-in and check-out dates to see the daily schedule.</p>
@@ -479,7 +198,10 @@
 									– {new Date(tripDays[tripDays.length - 1] + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
 								</span>
 								<span class="schedule-view-badge">Week</span>
-								<a href={setTab('meals')} class="btn-add-schedule">+ Add</a>
+								<div class="schedule-add-buttons">
+									<a href="/trips/{data.trip.id}/meals" class="btn-add-schedule">+ Add meal</a>
+									<a href="/trips/{data.trip.id}/activities" class="btn-add-schedule">+ Add activity</a>
+								</div>
 							</div>
 
 							<!-- Grid: time × days -->
@@ -538,7 +260,7 @@
 														{:else}
 															<span class="event-meta unassigned">Drop to assign</span>
 														{/if}
-														<form id="assign-meal-{event.slotId}" method="POST" action="?/assignMealMaker" use:enhance={handleMealsResult()} class="assign-form-hidden">
+														<form id="assign-meal-{event.slotId}" method="POST" action="?/assignMealMaker" use:enhance={handleScheduleResult()} class="assign-form-hidden">
 															<input type="hidden" name="slotId" value={event.slotId} />
 															<input type="hidden" name="assignedUserId" value="" />
 														</form>
@@ -550,7 +272,7 @@
 														{:else}
 															<span class="event-meta unassigned">Drop to add</span>
 														{/if}
-														<form id="add-participant-{event.activityId}" method="POST" action="?/addActivityParticipant" use:enhance={handleMealsResult()} class="assign-form-hidden">
+														<form id="add-participant-{event.activityId}" method="POST" action="?/addActivityParticipant" use:enhance={handleScheduleResult()} class="assign-form-hidden">
 															<input type="hidden" name="activityId" value={event.activityId} />
 															<input type="hidden" name="userId" value="" />
 														</form>
@@ -578,8 +300,7 @@
 						</div>
 					</div>
 				{/if}
-			</div>
-		{/if}
+		</div>
 	</div>
 </div>
 
@@ -604,30 +325,24 @@
 		margin-bottom: var(--spacing-lg);
 	}
 
-	.tabs {
+	.sub-nav {
 		display: flex;
-		gap: 0.25rem;
+		gap: 1rem;
 		margin-bottom: var(--spacing-lg);
-		border-bottom: 2px solid var(--border);
 	}
 
-	.tab {
-		padding: 0.75rem 1.25rem;
+	.sub-nav-link {
+		padding: 0.5rem 1rem;
 		font-weight: 500;
-		color: var(--muted);
-		text-decoration: none;
-		border-bottom: 2px solid transparent;
-		margin-bottom: -2px;
-		transition: color 0.2s, border-color 0.2s;
-	}
-
-	.tab:hover {
-		color: var(--text);
-	}
-
-	.tab.active {
 		color: var(--primary);
-		border-bottom-color: var(--primary);
+		text-decoration: none;
+		border-radius: var(--radius-md);
+		background: var(--surface2);
+		transition: background 0.2s;
+	}
+
+	.sub-nav-link:hover {
+		background: var(--border);
 	}
 
 	.trip-dates {
@@ -1181,8 +896,13 @@
 		font-size: 0.8rem;
 		color: var(--muted);
 	}
-	.btn-add-schedule {
+	.schedule-add-buttons {
+		display: flex;
+		gap: 0.5rem;
 		margin-left: auto;
+	}
+
+	.btn-add-schedule {
 		padding: 0.5rem 1rem;
 		background: var(--primary);
 		color: white;

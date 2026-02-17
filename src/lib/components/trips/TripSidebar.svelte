@@ -46,7 +46,9 @@
 		<TripNavItem href="/trips/{trip.id}" iconName="overview" label="Dashboard" />
 		<TripNavItem href="/trips/{trip.id}/guests" iconName="guests" label="Guests" badge={badges.guests} />
 		<TripNavItem href="/trips/{trip.id}/rooms" iconName="rooms" label="Rooms" badge={badges.rooms} />
-		<TripNavItem href="/trips/{trip.id}/itinerary" iconName="itinerary" label="Itinerary" badge={mealsEnabled ? badges.meals : badges.itinerary} />
+		<TripNavItem href="/trips/{trip.id}/itinerary" iconName="itinerary" label="Itinerary" badge={badges.itinerary} />
+		<TripNavItem href="/trips/{trip.id}/meals" iconName="meals" label="Meals" badge={mealsEnabled ? badges.meals : null} />
+		<TripNavItem href="/trips/{trip.id}/activities" iconName="activities" label="Activities" />
 		<TripNavItem href="/trips/{trip.id}/polls" iconName="polls" label="Polls" />
 		<TripNavItem href="/trips/{trip.id}/games" iconName="games" label="Games" />
 		<TripNavItem href="/trips/{trip.id}/files" iconName="files" label="Files" badge={badges.files} />

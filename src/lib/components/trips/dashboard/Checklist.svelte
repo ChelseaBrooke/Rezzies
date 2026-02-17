@@ -50,7 +50,7 @@
 		items.push({
 			key: 'host_add_meals',
 			label: 'Add 1+ meals for your trip',
-			href: `/trips/${tripId}/itinerary?tab=meals`,
+			href: `/trips/${tripId}/meals`,
 			isComplete: mealsTotal >= 1
 		});
 
@@ -59,7 +59,7 @@
 		items.push({
 			key: 'host_add_activities',
 			label: 'Add 1+ activities for your trip',
-			href: `/trips/${tripId}/itinerary?tab=activities`,
+			href: `/trips/${tripId}/activities`,
 			isComplete: activitiesTotal >= 1
 		});
 
@@ -103,7 +103,7 @@
 		items.push({
 			key: 'guest_add_meals',
 			label: 'Add 1+ meals for your trip',
-			href: `/trips/${tripId}/itinerary?tab=meals`,
+			href: `/trips/${tripId}/meals`,
 			isComplete: mealsContributed >= 1
 		});
 
@@ -112,7 +112,7 @@
 		items.push({
 			key: 'guest_add_activities',
 			label: 'Add 1+ activities for your trip',
-			href: `/trips/${tripId}/itinerary?tab=activities`,
+			href: `/trips/${tripId}/activities`,
 			isComplete: activitiesContributed >= 1
 		});
 
