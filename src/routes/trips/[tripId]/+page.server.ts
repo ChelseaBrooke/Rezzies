@@ -32,18 +32,19 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 	if (!isHost && trip.checkInDate && trip.checkOutDate) {
 		const myAssignments = roomAssignments.filter((a) => a.userId === user.id);
 		if (myAssignments.length > 0) {
-			let total = 0;
-			for (const a of myAssignments) {
-				const result = await calculatePrice({
-					tripId,
-					roomId: a.roomId,
-					bedId: a.bedId ?? undefined,
-					numberOfGuests: a.partySize ?? 1,
-					checkInDate: trip.checkInDate,
-					checkOutDate: trip.checkOutDate
-				});
-				total += result.totalPrice;
-			}
+			const results = await Promise.all(
+				myAssignments.map((a) =>
+					calculatePrice({
+						tripId,
+						roomId: a.roomId,
+						bedId: a.bedId ?? undefined,
+						numberOfGuests: a.partySize ?? 1,
+						checkInDate: trip.checkInDate!,
+						checkOutDate: trip.checkOutDate!
+					})
+				)
+			);
+			const total = results.reduce((sum, r) => sum + r.totalPrice, 0);
 			userReservationPrice = Math.round(total * 100) / 100;
 		}
 	}

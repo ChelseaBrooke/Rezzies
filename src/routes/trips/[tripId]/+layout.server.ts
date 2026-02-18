@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
-import { getUserTripMembership, isTripMember, getUserTrips } from '$lib/server/trip-access.js';
+import { getUserTripMembership, getUserTrips } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 import { computeCommittedFundsFromYesRsvps } from '$lib/server/pricing-canonical.js';
 
@@ -13,13 +13,14 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 	}
 
 	const tripId = params.tripId;
-	const isMember = await isTripMember(tripId, user.id);
-	if (!isMember) {
+	// Single membership query — replaces the previous isTripMember() + getUserTripMembership() double-hit
+	let membership = await getUserTripMembership(tripId, user.id);
+	const ACTIVE_STATUSES = ['invited', 'accepted'];
+	if (!membership || !ACTIVE_STATUSES.includes(membership.inviteStatus)) {
 		throw error(403, 'You do not have access to this trip');
 	}
 
 	// First visit: if user was "invited" (hadn't visited trip page yet), mark as "accepted"
-	let membership = await getUserTripMembership(tripId, user.id);
 	if (membership?.inviteStatus === 'invited') {
 		await prisma.tripMember.update({
 			where: { tripId_userId: { tripId, userId: user.id } },
@@ -28,7 +29,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		membership = { ...membership, inviteStatus: 'accepted' };
 	}
 
-	const [trip, , tripsResult, userRsvp] = await Promise.all([
+	const [trip, , tripsResult, userRsvp, committedFunds] = await Promise.all([
 		prisma.trip.findUnique({
 			where: { id: tripId },
 			include: {
@@ -56,20 +57,18 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 						recipient: { select: { id: true, name: true } }
 					}
 				},
-				tripActivities: { orderBy: { createdAt: 'desc' } },
+				// Limit to latest 50 — prevents full table scans on active trips
+				tripActivities: { orderBy: { createdAt: 'desc' }, take: 50 },
 				extraCostRules: true
 			}
 		}),
 		Promise.resolve(membership),
-		getUserTrips(user.id),
+		getUserTrips(user.id, { skipBackfill: true }),
 		prisma.rSVP.findUnique({
-			where: {
-				tripId_userId: {
-					tripId,
-					userId: user.id
-				}
-			}
-		})
+			where: { tripId_userId: { tripId, userId: user.id } }
+		}),
+		// Runs in parallel with trip fetch instead of serially after
+		computeCommittedFundsFromYesRsvps(tripId)
 	]);
 
 	if (!trip) {
@@ -92,7 +91,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		pendingInviteToken = pendingInvite?.token ?? null;
 	}
 
-	const committedFundsFromYesRsvps = await computeCommittedFundsFromYesRsvps(tripId);
+	// committedFunds already resolved from the parallel Promise.all above
 
 	// Badge: only show when a new poll was added since last visit (hidden when on polls page)
 	let pollsBadgeCount = 0;
@@ -119,7 +118,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		userRsvp,
 		canChat: userRsvp?.status === 'yes' || membership?.role === 'host',
 		pendingInviteToken,
-		committedFundsFromYesRsvps,
+		committedFundsFromYesRsvps: committedFunds,
 		pollsBadgeCount
 	};
 };

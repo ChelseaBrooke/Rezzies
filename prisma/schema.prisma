@@ -258,6 +258,7 @@ model TripMember {
   @@unique([tripId, userId])
   @@index([tripId])
   @@index([userId])
+  @@index([userId, inviteStatus]) // getUserTrips filters on both fields
 }
 
 // Invites
@@ -281,6 +282,7 @@ model Invite {
 
   @@index([tripId])
   @@index([token])
+  @@index([tripId, status]) // guests page queries pending invites by tripId + status
 }
 
 // Room Assignments (one row per bed selected for a guest; multiple rows per user for multi-bed)
@@ -309,6 +311,7 @@ model RoomAssignment {
   @@index([roomId])
   @@index([userId])
   @@index([bedId])
+  @@index([tripId, userId]) // common filter: assignments for a user on a specific trip
 }
 
 // Meal Plan
@@ -502,6 +505,8 @@ model Invoice {
   @@index([tripId])
   @@index([userId])
   @@index([status])
+  @@index([tripId, userId])        // invoice refresh: findFirst({ tripId, userId, status })
+  @@index([tripId, userId, status]) // invoice read: findMany({ tripId, userId }) + status filter
 }
 
 // Payments
