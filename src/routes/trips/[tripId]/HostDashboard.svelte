@@ -7,6 +7,8 @@
 
 	let { data }: { data: PageData } = $props();
 
+	let dashboardMode = $state<'planning' | 'vacation' | 'recap'>('planning');
+
 	const quickActions = getContext<{ onInvite: () => void; showToast: (msg: string) => void }>('tripQuickActions');
 
 	const trip = $derived(data.trip);
@@ -188,6 +190,7 @@
 			checkOutDate={trip.checkOutDate ?? ''}
 			{activities}
 			{mealSlots}
+			bind:selectedMode={dashboardMode}
 		/>
 		<TripDashboardGrid
 			isHost={true}

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import TripQuickActions from '$lib/components/trips/TripQuickActions.svelte';
 	import TripCalendarWidget from '$lib/components/trips/TripCalendarWidget.svelte';
+	import DashboardModeSelector from '$lib/components/trips/dashboard/DashboardModeSelector.svelte';
+	import type { DashboardMode } from '$lib/components/trips/dashboard/DashboardModeSelector.svelte';
 
 	interface Props {
 		trip: {
@@ -27,6 +29,8 @@
 		checkOutDate?: string;
 		activities?: Array<{ id: string; title: string; date: Date | string; time?: string | null; location?: string | null }>;
 		mealSlots?: Array<unknown>;
+		/** Dashboard mode (Planning / Vacation / Recap); bind from parent */
+		selectedMode?: DashboardMode;
 	}
 
 	let {
@@ -42,13 +46,22 @@
 		checkInDate = '',
 		checkOutDate = '',
 		activities = [],
-		mealSlots = []
+		mealSlots = [],
+		selectedMode = $bindable('planning')
 	}: Props = $props();
 
 	const destinationLabel = $derived((trip.locationCity ?? trip.fullAddress ?? trip.location)?.trim() ?? '');
 </script>
 
 <div class="hero-with-calendar">
+	<!-- Pill in same top band as calendar (top of pill = top of calendar) -->
+	<div class="hero-mode-bar">
+		<DashboardModeSelector
+			{checkInDate}
+			{checkOutDate}
+			bind:selectedMode
+		/>
+	</div>
 	<div class="trip-hero">
 		<div class="hero-image-wrap">
 			{#if trip.listingCoverPhoto}
@@ -118,19 +131,19 @@
 			</div>
 		</div>
 	</div>
-	<!-- Calendar and bell layered over hero -->
+	<!-- Calendar layered over hero (same as before) -->
 	<div class="hero-calendar-layer">
 		<div class="hero-calendar-outer">
 			<div class="hero-calendar-back" aria-hidden="true"></div>
 			<div class="hero-calendar-wrap">
-			<TripCalendarWidget
-				tripId={trip.id}
-				placement="sidebar"
-				{checkInDate}
-				{checkOutDate}
-				{activities}
-				{mealSlots}
-			/>
+				<TripCalendarWidget
+					tripId={trip.id}
+					placement="sidebar"
+					{checkInDate}
+					{checkOutDate}
+					{activities}
+					{mealSlots}
+				/>
 			</div>
 		</div>
 	</div>
@@ -143,6 +156,22 @@
 		overflow: visible;
 		/* Reserve space so calendar/bell (top: -3rem) aren’t clipped by main-content */
 		margin-top: 3rem;
+	}
+
+	.hero-mode-bar {
+		position: absolute;
+		top: -3rem;
+		left: 0;
+		right: 0;
+		display: flex;
+		justify-content: center;
+		align-items: flex-start;
+		z-index: 2;
+		pointer-events: auto;
+	}
+
+	.hero-mode-bar :global(.mode-selector-wrap) {
+		margin-bottom: 0;
 	}
 
 	.trip-hero {
@@ -225,7 +254,7 @@
 	.hero-calendar-layer {
 		position: absolute;
 		top: -3rem;
-		right: 3rem;
+		right: 6rem;
 		left: auto;
 		display: flex;
 		flex-direction: row;
