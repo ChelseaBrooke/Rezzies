@@ -5,11 +5,13 @@
 	interface Props {
 		checkInDate: Date | string | null | undefined;
 		checkOutDate: Date | string | null | undefined;
-		/** Current selection; bind to override or read. Initialized from date. */
+		/** Current selection; bind to override or read. When onModeChange is set, this is read-only. */
 		selectedMode?: DashboardMode;
+		/** When set, use instead of bindable; parent (e.g. header) owns state (e.g. store). */
+		onModeChange?: (mode: DashboardMode) => void;
 	}
 
-	let { checkInDate, checkOutDate, selectedMode = $bindable('planning') }: Props = $props();
+	let { checkInDate, checkOutDate, selectedMode = $bindable('planning'), onModeChange }: Props = $props();
 
 	const MODES: { id: DashboardMode; label: string }[] = [
 		{ id: 'planning', label: 'Planning' },
@@ -33,15 +35,24 @@
 		return 'recap';
 	});
 
-	/** Initialize selectedMode from date once; user can then click to switch. */
+	/** Initialize selectedMode from date once when not controlled by parent. */
 	let initialized = false;
 	$effect(() => {
+		if (onModeChange) return;
 		const m = modeFromDate;
 		if (!initialized) {
 			selectedMode = m;
 			initialized = true;
 		}
 	});
+
+	function selectMode(mode: DashboardMode) {
+		if (onModeChange) {
+			onModeChange(mode);
+		} else {
+			selectedMode = mode;
+		}
+	}
 </script>
 
 <div class="mode-selector-wrap">
@@ -60,7 +71,7 @@
 				class:current-by-date={modeFromDate === mode.id}
 				aria-pressed={selectedMode === mode.id}
 				aria-current={modeFromDate === mode.id ? 'true' : undefined}
-				onclick={() => (selectedMode = mode.id)}
+				onclick={() => selectMode(mode.id)}
 			>
 				{mode.label}
 			</button>

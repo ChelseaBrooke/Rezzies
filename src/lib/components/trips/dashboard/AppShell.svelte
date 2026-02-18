@@ -5,19 +5,57 @@
 	import divviLogo from '$lib/assets/images/divvi logo.png';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
+	import DashboardModeSelector from '$lib/components/trips/dashboard/DashboardModeSelector.svelte';
+	import { dashboardModeByTripId } from '$lib/stores/dashboardMode.js';
+	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
+
 	interface Props {
 		tripId: string;
 		user?: { id: string; name: string | null; email: string; avatarUrl?: string | null } | null;
 		children?: Snippet;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
-		/** When false, Guests tab is hidden (guest portal only). Hosts and co-hosts see it. */
 		showGuestsTab?: boolean;
-		/** Badge count: new polls since last visit; hidden when on polls page */
 		pollsBadgeCount?: number;
+		tripLockedForRecap?: boolean;
+		/** Trip dates for dashboard mode pill (Planning/Vacation/Recap) */
+		checkInDate?: Date | string | null;
+		checkOutDate?: Date | string | null;
 	}
 
-	let { tripId, user, children, onInvite, showToast, showGuestsTab = true, pollsBadgeCount = 0 }: Props = $props();
+	let { tripId, user, children, onInvite, showToast, showGuestsTab = true, pollsBadgeCount = 0, tripLockedForRecap = false, checkInDate = null, checkOutDate = null }: Props = $props();
+
+	const modeFromDate = $derived.by((): DashboardMode => {
+		const checkIn = checkInDate ? new Date(checkInDate) : null;
+		const checkOut = checkOutDate ? new Date(checkOutDate) : null;
+		if (!checkIn || !checkOut) return 'planning';
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const start = new Date(checkIn);
+		start.setHours(0, 0, 0, 0);
+		const end = new Date(checkOut);
+		end.setHours(23, 59, 59, 999);
+		if (today < start) return 'planning';
+		if (today >= start && today <= end) return 'vacation';
+		return 'recap';
+	});
+
+	$effect(() => {
+		if (!tripId || !checkInDate || !checkOutDate) return;
+		const m = modeFromDate;
+		dashboardModeByTripId.update((byId) => {
+			if (byId[tripId] !== undefined) return byId;
+			return { ...byId, [tripId]: m };
+		});
+	});
+
+	const headerMode = $derived(($dashboardModeByTripId)[tripId] ?? modeFromDate);
+
+	function setHeaderMode(mode: DashboardMode) {
+		dashboardModeByTripId.update((m) => ({ ...m, [tripId]: mode }));
+	}
+
+	const showModePill = $derived(!!(checkInDate && checkOutDate));
 
 	function openInvite() {
 		onInvite?.();
@@ -100,19 +138,34 @@
 			{#if user}
 				<AvatarMenu user={user} class="user-avatar-wrap" placement="above" />
 			{/if}
+			{#if !tripLockedForRecap}
 			<a href="/trips/{tripId}/settings" class="rail-util" aria-label="Settings" title="Settings">
 				<svg class="rail-icon-svg" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
 			</a>
+			{/if}
 		</div>
 	</aside>
 	<main class="main-content">
 		<div class="top-actions">
+			{#if showModePill}
+				<div class="top-actions-spacer" aria-hidden="true"></div>
+				<div class="top-actions-pill">
+					<DashboardModeSelector
+						{checkInDate}
+						{checkOutDate}
+						selectedMode={headerMode}
+						onModeChange={setHeaderMode}
+					/>
+				</div>
+			{/if}
+			<div class="top-actions-right">
 			<a href="/messages" class="top-action-btn" title="Messages" aria-label="Messages">
 				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
 			</a>
 			<span class="top-bell">
 				<NotificationTray />
 			</span>
+			</div>
 		</div>
 		{#if children != null && typeof children === 'function'}
 			<div class="main-content-inner">
@@ -321,11 +374,31 @@
 	.top-actions {
 		position: absolute;
 		top: 0.5rem;
+		left: 0;
 		right: 2rem;
 		display: flex;
 		align-items: center;
-		gap: 0.125rem;
+		justify-content: space-between;
+		gap: 0.5rem;
 		z-index: 5;
+	}
+	.top-actions-spacer {
+		flex: 1;
+		min-width: 0;
+	}
+	.top-actions-pill {
+		flex-shrink: 0;
+	}
+	.top-actions-pill :global(.mode-selector-wrap) {
+		margin: 0;
+	}
+	.top-actions-right {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.125rem;
 	}
 	.top-action-btn {
 		width: 44px;

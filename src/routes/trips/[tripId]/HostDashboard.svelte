@@ -4,14 +4,32 @@
 	import type { PageData } from './$types';
 	import TripHero from '$lib/components/trips/dashboard/TripHero.svelte';
 	import TripDashboardGrid from '$lib/components/trips/dashboard/TripDashboardGrid.svelte';
+	import VacationModeView from '$lib/components/trips/dashboard/VacationModeView.svelte';
+	import RecapModeView from '$lib/components/trips/dashboard/RecapModeView.svelte';
+	import { dashboardModeByTripId } from '$lib/stores/dashboardMode.js';
+	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
 
 	let { data }: { data: PageData } = $props();
 
-	let dashboardMode = $state<'planning' | 'vacation' | 'recap'>('planning');
+	const trip = $derived(data.trip);
+	const modeFromDate = $derived.by((): DashboardMode => {
+		const checkIn = trip?.checkInDate ? new Date(trip.checkInDate) : null;
+		const checkOut = trip?.checkOutDate ? new Date(trip.checkOutDate) : null;
+		if (!checkIn || !checkOut) return 'planning';
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const start = new Date(checkIn);
+		start.setHours(0, 0, 0, 0);
+		const end = new Date(checkOut);
+		end.setHours(23, 59, 59, 999);
+		if (today < start) return 'planning';
+		if (today >= start && today <= end) return 'vacation';
+		return 'recap';
+	});
+	const dashboardMode = $derived((($dashboardModeByTripId)[trip?.id ?? ''] ?? modeFromDate) as DashboardMode);
 
 	const quickActions = getContext<{ onInvite: () => void; showToast: (msg: string) => void }>('tripQuickActions');
 
-	const trip = $derived(data.trip);
 	const user = $derived(data.user);
 	const userRsvp = $derived(data.userRsvp);
 	const userProfile = $derived(data.userProfile);
@@ -190,8 +208,43 @@
 			checkOutDate={trip.checkOutDate ?? ''}
 			{activities}
 			{mealSlots}
-			bind:selectedMode={dashboardMode}
+			selectedMode={dashboardMode}
 		/>
+		{#if dashboardMode === 'vacation'}
+			<VacationModeView
+				tripId={trip.id}
+				isHost={true}
+				trip={{
+					fullAddress: trip.fullAddress,
+					location: trip.location,
+					parkingNotes: trip.parkingNotes,
+					houseRules: trip.houseRules,
+					description: trip.description
+				}}
+				{activities}
+				{mealSlots}
+				roomAssignments={roomAssignments}
+				{rsvps}
+				{members}
+				{myAssignment}
+			/>
+		{:else if dashboardMode === 'recap'}
+			<RecapModeView
+				tripId={trip.id}
+				isHost={true}
+				trip={{
+					name: trip.name,
+					checkInDate: trip.checkInDate,
+					checkOutDate: trip.checkOutDate
+				}}
+				{activities}
+				{mealSlots}
+				{members}
+				userInvoices={userInvoices}
+				totalCost={totalCost}
+				{rsvps}
+			/>
+		{:else}
 		<TripDashboardGrid
 			isHost={true}
 			tripId={trip.id}
@@ -239,5 +292,6 @@
 				tripInfoEditedAt: trip?.tripInfoEditedAt
 			}}
 		/>
+		{/if}
 {/if}
 

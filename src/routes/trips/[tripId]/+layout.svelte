@@ -6,6 +6,17 @@
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
+	// Trip is in recap (past checkout) — disable editing (e.g. hide Settings)
+	const tripLockedForRecap = $derived.by(() => {
+		const out = data.trip?.checkOutDate;
+		if (!out) return false;
+		const checkout = new Date(out);
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		checkout.setHours(0, 0, 0, 0);
+		return checkout < today;
+	});
+
 	// Only treat as callable when it's actually a function (avoids "undefined is not a function" on refresh)
 	const safeChildren = $derived(
 		typeof children === 'function' ? (children as () => unknown) : null
@@ -29,6 +40,9 @@
 		onInvite={handleInvite}
 		showGuestsTab={data.isHost || data.membership?.role === 'co-host'}
 		pollsBadgeCount={data.pollsBadgeCount ?? 0}
+		tripLockedForRecap={tripLockedForRecap}
+		checkInDate={data.trip?.checkInDate ?? null}
+		checkOutDate={data.trip?.checkOutDate ?? null}
 	>
 	{#snippet children()}
 		{#if safeChildren}
