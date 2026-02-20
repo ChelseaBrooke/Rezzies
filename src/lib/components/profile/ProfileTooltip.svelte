@@ -74,6 +74,7 @@
 
 <div
 	class="profile-tooltip-wrap"
+	class:profile-tooltip-open={show}
 	onmouseenter={onEnter}
 	onmouseleave={onLeave}
 	role="presentation"
@@ -114,6 +115,10 @@
 		position: relative;
 		display: inline-flex;
 	}
+	/* When tooltip is open, raise wrap so tray appears above sibling containers (e.g. room cards) */
+	.profile-tooltip-wrap.profile-tooltip-open {
+		z-index: 100000;
+	}
 	.profile-tooltip {
 		position: absolute;
 		left: 50%;
@@ -126,7 +131,7 @@
 		border-radius: 10px;
 		box-shadow: 0 4px 12px rgba(0, 27, 46, 0.15);
 		border: 1px solid var(--border, #e2e8f0);
-		z-index: 99999;
+		z-index: 100001;
 		pointer-events: none;
 		text-align: center;
 	}

@@ -192,6 +192,8 @@
 		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
 		box-shadow: var(--shadow-soft);
 		margin-bottom: 0;
+		/* Match Planning: gap under pill before main photo section */
+		margin-top: 3rem;
 	}
 
 	.compact-bg-img {

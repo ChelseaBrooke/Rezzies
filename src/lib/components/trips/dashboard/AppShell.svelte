@@ -55,8 +55,6 @@
 		dashboardModeByTripId.update((m) => ({ ...m, [tripId]: mode }));
 	}
 
-	const showModePill = $derived(!!(checkInDate && checkOutDate));
-
 	function openInvite() {
 		onInvite?.();
 	}
@@ -71,6 +69,10 @@
 	});
 
 	const currentPath = $derived($page.url.pathname);
+	const isDashboardPage = $derived(
+		currentPath === `/trips/${tripId}` || currentPath.replace(/\/$/, '') === `/trips/${tripId}`
+	);
+	const showModePillOnDashboard = $derived(!!(checkInDate && checkOutDate && isDashboardPage));
 
 	function isActive(href: string): boolean {
 		if (href === `/trips/${tripId}`) return currentPath === href;
@@ -147,7 +149,7 @@
 	</aside>
 	<main class="main-content">
 		<div class="top-actions">
-			{#if showModePill}
+			{#if showModePillOnDashboard}
 				<div class="top-actions-spacer" aria-hidden="true"></div>
 				<div class="top-actions-pill">
 					<DashboardModeSelector

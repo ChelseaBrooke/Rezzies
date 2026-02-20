@@ -352,17 +352,19 @@ model MealSlot {
 
 // Activities
 model Activity {
-  id              String   @id @default(uuid())
-  tripId          String
-  title           String
-  date            DateTime
-  time            String?
-  location        String?
-  pricePerPerson  Float    @default(0)
-  maxParticipants Int?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(uuid())
+  tripId           String
+  title            String
+  date             DateTime
+  time             String?
+  location         String?
+  pricePerPerson   Float    @default(0)
+  totalCostToSplit Float?   // When set, split evenly among participants (overrides pricePerPerson for display)
+  maxParticipants  Int?
+  notes            String?
+  status           String   @default("planned") // "planned" | "tentative" (tentative: others can join; someone can lock as planned)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   trip         Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
   participants ActivityParticipant[]

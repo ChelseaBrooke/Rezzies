@@ -55,6 +55,83 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 };
 
 export const actions: Actions = {
+	addDiscoveredActivity: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) return { addDiscoveredActivityError: 'You do not have access to this trip.' };
+
+		const formData = await request.formData();
+		const title = (formData.get('title') as string)?.trim();
+		if (!title) return { addDiscoveredActivityError: 'Activity name is required.' };
+
+		const trip = await prisma.trip.findUnique({
+			where: { id: tripId },
+			select: { checkInDate: true, checkOutDate: true }
+		});
+		if (!trip?.checkInDate) return { addDiscoveredActivityError: 'Trip has no check-in date set.' };
+
+		const location = (formData.get('location') as string)?.trim() || null;
+		const notes = (formData.get('notes') as string)?.trim() || null;
+		const dateStr = (formData.get('date') as string)?.trim();
+		const activityDate = dateStr ? new Date(dateStr) : trip.checkInDate;
+		if (isNaN(activityDate.getTime())) return { addDiscoveredActivityError: 'Invalid date.' };
+
+		const time = (formData.get('time') as string)?.trim() || null;
+		const additionType = (formData.get('additionType') as string) || 'planned';
+		const totalCostRaw = (formData.get('totalCostToSplit') as string)?.trim();
+		const totalCostToSplit =
+			totalCostRaw && !Number.isNaN(parseFloat(totalCostRaw)) && parseFloat(totalCostRaw) >= 0
+				? parseFloat(totalCostRaw)
+				: null;
+
+		if (additionType === 'poll') {
+			const now = new Date();
+			const endAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+			await prisma.poll.create({
+				data: {
+					tripId,
+					createdById: user.id,
+					title: `Activity: ${title}`,
+					description: notes || undefined,
+					category: 'Activities',
+					pollType: 'single',
+					status: 'open',
+					showResultsLive: true,
+					startAt: now,
+					endAt,
+					options: {
+						create: [
+							{ label: 'Add to itinerary', sortOrder: 0 },
+							{ label: 'Skip', sortOrder: 1 }
+						]
+					}
+				}
+			});
+			return { addDiscoveredActivitySuccess: true, pollCreated: true };
+		}
+
+		const status = additionType === 'tentative' ? 'tentative' : 'planned';
+		const activity = await prisma.activity.create({
+			data: {
+				tripId,
+				title,
+				date: activityDate,
+				time,
+				location,
+				notes: notes || undefined,
+				pricePerPerson: totalCostToSplit != null && totalCostToSplit > 0 ? totalCostToSplit : 0,
+				totalCostToSplit: totalCostToSplit ?? undefined,
+				status
+			}
+		});
+		await prisma.activityParticipant.create({
+			data: { activityId: activity.id, userId: user.id, status: 'in' }
+		});
+		return { addDiscoveredActivitySuccess: true, activityId: activity.id, pollCreated: false };
+	},
+
 	addActivityParticipant: async ({ request, params, cookies }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');

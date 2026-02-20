@@ -1,35 +1,34 @@
-/* Divvi Design System - Premium palette & semantic tokens
- * PALETTE: navy #001B2E | slate #294C60 | beige #F8F4DD | copper #BF4E30 | chocolate #732C2C
- * Rules: page bg neutral; beige = surfaces only; navy = headings/hero; slate = secondary/borders;
- * copper = primary CTA (small areas); chocolate = destructive/error only.
+/* Divvi Design System - Neutral palette & semantic tokens
+ * PALETTE: navy #001B2E | slate #294C60 | cool neutrals (no beige/copper).
+ * Rules: page bg neutral gray; surfaces light gray/white; navy = headings/hero; slate = primary & borders.
  */
 :root {
 	/* Raw palette (use via semantic tokens) */
 	--navy: #001B2E;
 	--slate: #294C60;
-	--beige: #F8F4DD;
-	--copper: #BF4E30;
+	--beige: #f2f3f5;
+	--copper: #294C60;
 	--chocolate: #732C2C;
 
 	/* Semantic tokens */
-	--bg: #f6f7f8;
-	--surface: rgba(255,255,255,0.86);
+	--bg: #f4f5f7;
+	--surface: rgba(255,255,255,0.92);
 	--surfaceSolid: #ffffff;
-	--surface2: #F0EDE5;
+	--surface2: #eef0f3;
 	--text: #111827;
 	--muted: var(--slate);
 	--border: #294C6033;
 	--border-soft: rgba(17,24,39,0.06);
 	--border-strong: var(--slate);
-	--primary: var(--copper);
-	--primaryHover: #A03D24;
-	--focusRing: rgba(191, 78, 48, 0.35);
+	--primary: var(--slate);
+	--primaryHover: #1e3a4d;
+	--focusRing: rgba(41, 76, 96, 0.35);
 	--danger: var(--chocolate);
 	--dangerHover: #5A2222;
-	--sticky: #f3f7c9;
+	--sticky: #e8ecf0;
 
 	/* Legacy aliases for components that reference these */
-	--primary-accent: var(--copper);
+	--primary-accent: var(--slate);
 	--sidebar-width: 280px;
 	--color-primary: var(--primary);
 	--color-primary-dark: var(--primaryHover);

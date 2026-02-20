@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import { deserialize, applyAction } from '$app/forms';
 
 	interface GuestRow {
 		userId?: string;
@@ -48,6 +48,8 @@
 	let formPartySize = $state(1);
 	let formPriceApproved = $state(true);
 	let formInvoicePaid = $state(false);
+	let submitError = $state<string | null>(null);
+	let saving = $state(false);
 
 	$effect(() => {
 		if (open && row) {
@@ -56,6 +58,7 @@
 			formPartySize = row.partySize || 1;
 			formPriceApproved = row.priceApproved ?? false;
 			formInvoicePaid = row.invoicePaid ?? false;
+			submitError = null;
 		}
 	});
 
@@ -75,6 +78,41 @@
 			selectedBedIds = [...selectedBedIds, bedId];
 		}
 	}
+
+	const formActionUrl = $derived(`/trips/${tripId}/guests?/updateGuestDetails`);
+
+	async function handleSubmit(e: SubmitEvent) {
+		e.preventDefault();
+		if (!row || saving) return;
+		submitError = null;
+		saving = true;
+		try {
+			const fd = new FormData();
+			fd.set('userId', row.userId ?? '');
+			fd.set('rsvpStatus', formRsvpStatus);
+			fd.set('partySize', String(formPartySize));
+			for (const bedId of selectedBedIds) fd.append('bedIds', bedId);
+			fd.set('priceApproved', String(formPriceApproved));
+			fd.set('invoicePaid', String(formInvoicePaid));
+			if (allowPartialStays) {
+				fd.set('startDate', row.arrivalDate ?? checkInDate);
+				fd.set('endDate', row.departureDate ?? checkOutDate);
+			}
+			const res = await fetch(formActionUrl, { method: 'POST', body: fd });
+			const result = deserialize(await res.text());
+			await applyAction(result);
+			if (result.type === 'success') {
+				await invalidateAll();
+				onClose();
+			} else if (result.type === 'failure' && result.data) {
+				submitError = (result.data as { message?: string }).message ?? 'Save failed. Please try again.';
+			}
+		} catch (err) {
+			submitError = err instanceof Error ? err.message : 'Save failed. Please try again.';
+		} finally {
+			saving = false;
+		}
+	}
 </script>
 
 {#if open && row}
@@ -86,26 +124,13 @@
 
 			<form
 				method="POST"
-				action="?/updateGuestDetails"
+				action={formActionUrl}
 				class="edit-form"
-				use:enhance={async ({ result }) => {
-					if (result.type === 'success') {
-						await invalidateAll();
-						onClose();
-					}
-				}}
+				onsubmit={handleSubmit}
 			>
-				<input type="hidden" name="userId" value={row.userId ?? ''} />
-				<input type="hidden" name="rsvpStatus" value={formRsvpStatus} />
-				<input type="hidden" name="partySize" value={formPartySize} />
-				{#each selectedBedIds as bedId}
-					<input type="hidden" name="bedIds" value={bedId} />
-				{/each}
-				<input type="hidden" name="priceApproved" value={String(formPriceApproved)} />
-				<input type="hidden" name="invoicePaid" value={String(formInvoicePaid)} />
-				{#if allowPartialStays}
-					<input type="hidden" name="startDate" value={row.arrivalDate ?? checkInDate} />
-					<input type="hidden" name="endDate" value={row.departureDate ?? checkOutDate} />
+
+				{#if submitError}
+					<p class="form-error" role="alert">{submitError}</p>
 				{/if}
 
 				<div class="form-group">
@@ -169,8 +194,8 @@
 				{/if}
 
 				<div class="modal-actions">
-					<button type="button" class="btn-secondary" onclick={onClose}>Cancel</button>
-					<button type="submit" class="btn-primary">Save</button>
+					<button type="button" class="btn-secondary" onclick={onClose} disabled={saving}>Cancel</button>
+					<button type="submit" class="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
 				</div>
 			</form>
 		</div>
@@ -228,6 +253,11 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;
+	}
+	.form-error {
+		color: var(--error, #b91c1c);
+		font-size: 0.875rem;
+		margin: 0 0 0.25rem 0;
 	}
 	.form-group label {
 		display: block;

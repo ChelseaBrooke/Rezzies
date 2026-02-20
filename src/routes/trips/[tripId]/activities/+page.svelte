@@ -28,6 +28,14 @@
 	// Expanded card state
 	let expandedId = $state<string | null>(null);
 
+	// Add-to-trip modal: selected discover result and form state
+	let addModalResult = $state<Record<string, unknown> | null>(null);
+	let addModalDate = $state('');
+	let addModalTime = $state('');
+	let addModalAdditionType = $state<'tentative' | 'planned'>('planned');
+	let addModalTotalCost = $state('');
+	let addModalSubmitting = $state(false);
+
 	// Carousel state: tracks current photo index per result id
 	let carouselIndex = $state<Record<string, number>>({});
 
@@ -47,6 +55,58 @@
 
 	const trip = $derived(data.trip);
 	const tripLocation = $derived(trip.locationCity || trip.fullAddress || trip.location || 'Unknown location');
+
+	const tripDateOptions = $derived.by(() => {
+		const start = trip.checkInDate ? new Date(trip.checkInDate) : null;
+		const end = trip.checkOutDate ? new Date(trip.checkOutDate) : null;
+		if (!start || !end) return [] as { value: string; label: string }[];
+		const out: { value: string; label: string }[] = [];
+		const d = new Date(start);
+		while (d <= end) {
+			const yyyy = d.getFullYear();
+			const mm = String(d.getMonth() + 1).padStart(2, '0');
+			const dd = String(d.getDate()).padStart(2, '0');
+			out.push({
+				value: `${yyyy}-${mm}-${dd}`,
+				label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+			});
+			d.setDate(d.getDate() + 1);
+		}
+		return out;
+	});
+
+	function openAddModal(result: Record<string, unknown>) {
+		addModalResult = result;
+		const eventDate = result.event_date as string | undefined;
+		const opts = tripDateOptions;
+		const firstDay = opts[0]?.value ?? '';
+		addModalDate = eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate) ? eventDate : firstDay;
+		addModalTime = '';
+		addModalAdditionType = 'planned';
+		addModalTotalCost = '';
+	}
+	function closeAddModal() {
+		addModalResult = null;
+	}
+
+	/** Find a trip activity that matches this discover result (by title). */
+	function getBookedActivityForResult(resultName: string): { date: Date; time: string | null } | null {
+		const name = (resultName ?? '').trim().toLowerCase();
+		if (!name || !data.activities?.length) return null;
+		const activity = data.activities.find(
+			(a: { title?: string | null }) => (a.title ?? '').trim().toLowerCase() === name
+		);
+		if (!activity?.date) return null;
+		return {
+			date: new Date(activity.date),
+			time: (activity.time as string)?.trim() || null
+		};
+	}
+
+	function formatBookedSlot(activity: { date: Date; time: string | null }): string {
+		const day = activity.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+		return activity.time ? `${day} · ${activity.time}` : day;
+	}
 
 	const budgetOptions = [
 		{ value: 'any', label: 'Any Price' },
@@ -188,6 +248,20 @@
 			await update();
 		};
 	}
+
+	function buildDiscoverNotes(result: Record<string, unknown>): string {
+		const parts: string[] = [];
+		if (result.description && typeof result.description === 'string') {
+			parts.push(result.description.slice(0, 500) + (result.description.length > 500 ? '…' : ''));
+		}
+		if (result.booking_url && typeof result.booking_url === 'string') {
+			parts.push(`Book: ${result.booking_url}`);
+		}
+		if (result.website && typeof result.website === 'string') {
+			parts.push(`Website: ${result.website}`);
+		}
+		return parts.join('\n\n') || '';
+	}
 </script>
 
 <svelte:head>
@@ -304,6 +378,14 @@
 			<p>{searchError}</p>
 		</div>
 	{/if}
+	{#if form?.addDiscoveredActivitySuccess}
+		<div class="success-toast" role="status">
+			{form.pollCreated ? 'Poll created! Group can vote on the Polls page.' : 'Added to trip! You can see it in the itinerary.'}
+		</div>
+	{/if}
+	{#if form?.addDiscoveredActivityError}
+		<div class="error-card" role="alert">{form.addDiscoveredActivityError}</div>
+	{/if}
 
 	<!-- Results -->
 	{#if searching}
@@ -329,6 +411,7 @@
 
 		<div class="results-grid">
 			{#each results as result (result.id)}
+				{@const booked = getBookedActivityForResult(result.name)}
 				<div class="result-card" class:result-card-expanded={expandedId === result.id}>
 					<!-- Photo Carousel -->
 					{#if result.photos && result.photos.length > 0}
@@ -439,9 +522,26 @@
 						{/if}
 
 						<div class="result-actions">
-							<button type="button" class="btn btn-ghost" onclick={() => toggleExpand(result.id)} aria-expanded={expandedId === result.id}>
-								{expandedId === result.id ? 'Less' : 'More'}
-							</button>
+							<div class="result-actions-left">
+								<button type="button" class="btn btn-ghost" onclick={() => toggleExpand(result.id)} aria-expanded={expandedId === result.id}>
+									{expandedId === result.id ? 'Less' : 'More'}
+								</button>
+							</div>
+							<div class="result-actions-center">
+								{#if booked}
+									<span class="result-booked-slot">{formatBookedSlot(booked)}</span>
+								{:else}
+									<button type="button" class="btn btn-add-to-trip btn-sm" onclick={() => openAddModal(result)}>Add to trip</button>
+								{/if}
+								<form method="POST" action="?/addDiscoveredActivity" use:enhance={handleResult()} class="action-link-form">
+									<input type="hidden" name="title" value={result.name ?? ''} />
+									<input type="hidden" name="location" value={result.address ?? ''} />
+									<input type="hidden" name="notes" value={buildDiscoverNotes(result)} />
+									<input type="hidden" name="additionType" value="poll" />
+									<input type="hidden" name="date" value={tripDateOptions[0]?.value ?? ''} />
+									<button type="submit" class="btn btn-poll btn-sm">Propose as poll</button>
+								</form>
+							</div>
 							<div class="action-links">
 								{#if result.booking_url}
 									<a href={result.booking_url} target="_blank" rel="noopener" class="btn btn-primary btn-sm">Book</a>
@@ -490,6 +590,75 @@
 		</div>
 	{/if}
 
+	<!-- Add to trip modal -->
+	{#if addModalResult}
+		<div class="add-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="add-modal-title" onclick={(e) => e.target === e.currentTarget && closeAddModal()}>
+			<div class="add-modal">
+				<div class="add-modal-header">
+					<h2 id="add-modal-title">Add to trip</h2>
+					<button type="button" class="add-modal-close" onclick={closeAddModal} aria-label="Close">×</button>
+				</div>
+				<p class="add-modal-activity-name">{addModalResult.name as string}</p>
+				<form
+					method="POST"
+					action="?/addDiscoveredActivity"
+					use:enhance={() => {
+						addModalSubmitting = true;
+						return async ({ result, update }) => {
+							await update();
+							addModalSubmitting = false;
+							if (result.type === 'success' && result.data?.addDiscoveredActivitySuccess) {
+								closeAddModal();
+							}
+						};
+					}}
+					class="add-modal-form"
+				>
+					<input type="hidden" name="title" value={(addModalResult.name as string) ?? ''} />
+					<input type="hidden" name="location" value={(addModalResult.address as string) ?? ''} />
+					<input type="hidden" name="notes" value={buildDiscoverNotes(addModalResult)} />
+
+					<label class="add-modal-label">Day</label>
+					<select name="date" class="add-modal-select" bind:value={addModalDate} required>
+						{#each tripDateOptions as opt}
+							<option value={opt.value}>{opt.label}</option>
+						{/each}
+					</select>
+
+					<label class="add-modal-label">Time <span class="muted">(optional)</span></label>
+					<input type="text" name="time" class="add-modal-input" bind:value={addModalTime} placeholder="e.g. 2:00 PM" />
+
+					<fieldset class="add-modal-fieldset">
+						<legend class="add-modal-label">Add to itinerary</legend>
+						<label class="add-modal-radio">
+							<input type="radio" name="additionType" value="tentative" bind:group={addModalAdditionType} />
+							<span>As tentative</span>
+						</label>
+						<p class="add-modal-hint">Others can add it to their schedules; someone can lock it as planned when there’s enough interest.</p>
+						<label class="add-modal-radio">
+							<input type="radio" name="additionType" value="planned" bind:group={addModalAdditionType} />
+							<span>As planned</span>
+						</label>
+						<p class="add-modal-hint">Add it directly to the trip itinerary.</p>
+					</fieldset>
+
+					<label class="add-modal-label">Total cost to split <span class="muted">(optional)</span></label>
+					<p class="add-modal-hint">If this activity has a cost, enter the total amount. It will be split evenly among everyone who adds it to their itinerary.</p>
+					<input type="number" name="totalCostToSplit" class="add-modal-input" bind:value={addModalTotalCost} placeholder="0" min="0" step="0.01" />
+
+					<p class="add-modal-note">Adding an activity to your itinerary does not book or reserve anything with the provider. Tickets and bookings still need to be made through the activity provider’s website.</p>
+
+					<div class="add-modal-actions">
+						<button type="button" class="btn btn-secondary" onclick={closeAddModal}>Cancel</button>
+						<button type="submit" class="btn btn-add-to-trip" disabled={addModalSubmitting || !addModalDate}>
+							{addModalSubmitting ? 'Adding…' : 'Add to trip'}
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Existing Trip Activities -->
 	{#if data.activities && data.activities.length > 0}
 		<div class="saved-activities">
@@ -499,9 +668,16 @@
 					<div class="saved-card">
 						<div class="saved-header">
 							<h3>{activity.title}</h3>
-							{#if activity.pricePerPerson > 0}
-								<span class="saved-price">${activity.pricePerPerson}/person</span>
-							{/if}
+							<div class="saved-header-badges">
+								{#if activity.status === 'tentative'}
+									<span class="saved-badge tentative">Tentative</span>
+								{/if}
+								{#if activity.totalCostToSplit != null && activity.totalCostToSplit > 0}
+									<span class="saved-price">Split ${activity.totalCostToSplit.toFixed(2)} among participants</span>
+								{:else if activity.pricePerPerson > 0}
+									<span class="saved-price">${activity.pricePerPerson}/person</span>
+								{/if}
+							</div>
 						</div>
 						<div class="saved-meta">
 							{#if activity.date}
@@ -1004,16 +1180,186 @@
 
 	/* Actions */
 	.result-actions {
-		display: flex;
-		justify-content: space-between;
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
 		padding-top: 0.5rem;
 		border-top: 1px solid var(--border);
+		gap: 0.5rem;
+	}
+
+	.result-actions-left {
+		justify-self: start;
+	}
+	.result-actions-center {
+		justify-self: center;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.action-links {
+		justify-self: end;
+	}
+	.result-actions-center .add-to-trip-form {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+	.result-actions-center .btn-add-to-trip {
+		margin: 0;
+	}
+	.result-booked-slot {
+		font-size: 0.8125rem;
+		color: var(--muted);
+		font-weight: 500;
+	}
+
+	.btn-add-to-trip {
+		background: linear-gradient(135deg, var(--primary) 0%, var(--primaryHover) 100%);
+		color: #fff;
+		border: 1px solid transparent;
+	}
+	.btn-add-to-trip:hover {
+		background: var(--primaryHover);
+		color: #fff;
 	}
 
 	.action-links {
 		display: flex;
 		gap: 0.5rem;
+		align-items: center;
+	}
+	.action-link-form {
+		display: inline-flex;
+	}
+	.btn-poll {
+		background: var(--surfaceSolid);
+		color: var(--text);
+		border: 1px solid var(--border);
+	}
+	.btn-poll:hover {
+		background: var(--surface2);
+	}
+
+	/* Add to trip modal */
+	.add-modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.45);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1100;
+		padding: 1rem;
+	}
+	.add-modal {
+		background: var(--surfaceSolid);
+		border-radius: var(--radius-xl);
+		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+		max-width: 440px;
+		width: 100%;
+		max-height: 90vh;
+		overflow-y: auto;
+	}
+	.add-modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 1.25rem 1.25rem 0.5rem;
+	}
+	.add-modal-header h2 {
+		margin: 0;
+		font-size: 1.25rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+	.add-modal-close {
+		background: none;
+		border: none;
+		font-size: 1.5rem;
+		line-height: 1;
+		color: var(--muted);
+		cursor: pointer;
+		padding: 0.25rem;
+	}
+	.add-modal-close:hover {
+		color: var(--text);
+	}
+	.add-modal-activity-name {
+		margin: 0 1.25rem 1rem;
+		font-size: 0.9375rem;
+		color: var(--muted);
+	}
+	.add-modal-form {
+		padding: 0 1.25rem 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+	.add-modal-label {
+		display: block;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+	.add-modal-label .muted {
+		font-weight: 400;
+		color: var(--muted);
+	}
+	.add-modal-select,
+	.add-modal-input {
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		font-size: 0.9375rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: var(--surfaceSolid);
+		color: var(--text);
+	}
+	.add-modal-fieldset {
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		padding: 1rem;
+		margin: 0;
+	}
+	.add-modal-fieldset .add-modal-label {
+		margin-bottom: 0.5rem;
+	}
+	.add-modal-radio {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.9375rem;
+		cursor: pointer;
+	}
+	.add-modal-radio + .add-modal-hint {
+		margin-top: 0.25rem;
+		margin-bottom: 0.75rem;
+	}
+	.add-modal-radio:last-of-type + .add-modal-hint {
+		margin-bottom: 0;
+	}
+	.add-modal-hint {
+		margin: 0 0 0 1.5rem;
+		font-size: 0.8125rem;
+		color: var(--muted);
+		line-height: 1.35;
+	}
+	.add-modal-note {
+		margin: 0;
+		padding: 0.75rem;
+		font-size: 0.8125rem;
+		color: var(--muted);
+		background: var(--surface2);
+		border-radius: var(--radius-md);
+		line-height: 1.4;
+	}
+
+	.add-modal-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.75rem;
+		margin-top: 0.5rem;
 	}
 
 	/* Loading */
@@ -1108,6 +1454,16 @@
 		font-size: 0.9375rem;
 	}
 
+	.success-toast {
+		background: rgba(41, 76, 96, 0.1);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		padding: 0.75rem 1.25rem;
+		margin-bottom: 1.25rem;
+		font-size: 0.9375rem;
+		color: var(--text);
+	}
+
 	/* Pagination */
 	.pagination {
 		display: flex;
@@ -1163,6 +1519,20 @@
 		color: var(--text);
 	}
 
+	.saved-header-badges {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.saved-badge.tentative {
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--muted);
+		background: var(--surface2);
+		padding: 0.2rem 0.5rem;
+		border-radius: var(--radius-md);
+	}
 	.saved-price {
 		font-size: 0.8125rem;
 		color: var(--primary);
