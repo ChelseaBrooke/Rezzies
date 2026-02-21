@@ -1,42 +1,66 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
+	import type { Meal, MealType } from '$lib/components/trips/meals/types.js';
+	import CoverageTracker from '$lib/components/trips/meals/CoverageTracker.svelte';
+	import MealCard from '$lib/components/trips/meals/MealCard.svelte';
+	import MealDetailDrawer from '$lib/components/trips/meals/MealDetailDrawer.svelte';
+	import AddMealModal from '$lib/components/trips/meals/AddMealModal.svelte';
 
 	let { data, form }: { data: PageData; form?: Record<string, unknown> } = $props();
 
-	const MEAL_LABELS: Record<string, string> = {
-		breakfast: 'Breakfast',
-		lunch: 'Lunch',
-		dinner: 'Dinner',
-		snack: 'Snacks'
-	};
+	let addModalOpen = $state(false);
+	let addModalPrefill = $state<{ date: string; mealType: MealType; time?: string } | null>(null);
+	let detailMeal = $state<Meal | null>(null);
+	let detailOpen = $state(false);
 
-	const slotsByDay = $derived.by(() => {
-		const map = new Map<string, typeof data.mealSlots>();
-		for (const slot of data.mealSlots ?? []) {
-			const key = new Date(slot.date).toISOString().slice(0, 10);
-			if (!map.has(key)) map.set(key, []);
-			map.get(key)!.push(slot);
-		}
-		for (const arr of map.values()) {
-			arr.sort((a, b) => {
-				const order = { breakfast: 0, lunch: 1, dinner: 2, snack: 3 };
-				return (order[a.mealType as keyof typeof order] ?? 4) - (order[b.mealType as keyof typeof order] ?? 4);
-			});
-		}
-		const entries = [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-		return entries;
-	});
+	const tripDays = $derived(data.trip?.checkInDate && data.trip?.checkOutDate
+		? (() => {
+				const start = new Date(data.trip!.checkInDate);
+				const end = new Date(data.trip!.checkOutDate);
+				const out: string[] = [];
+				for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+					out.push(d.toISOString().slice(0, 10));
+				}
+				return out;
+			})()
+		: []);
 
-	let editingSlotId = $state<string | null>(null);
-	let addSlotDate = $state('');
-	let addSlotMealType = $state('dinner');
-	let addSlotTime = $state('');
-	let addSlotMenu = $state('');
-	let addSlotNotes = $state('');
+	const tripDayOptions = $derived(
+		tripDays.map((date) => ({
+			value: date,
+			label: new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+				weekday: 'short',
+				month: 'short',
+				day: 'numeric',
+				year: 'numeric'
+			})
+		}))
+	);
 
-	function closeEdit() {
-		editingSlotId = null;
+	function openAddModal(date?: string, mealType?: MealType, time?: string) {
+		addModalPrefill = date && mealType ? { date, mealType, time } : null;
+		addModalOpen = true;
+	}
+
+	function closeAddModal() {
+		addModalOpen = false;
+		addModalPrefill = null;
+	}
+
+	function openDetail(meal: Meal) {
+		detailMeal = meal;
+		detailOpen = true;
+	}
+
+	function closeDetail() {
+		detailOpen = false;
+		detailMeal = null;
+	}
+
+	function scrollToMeal(mealId: string) {
+		const el = document.querySelector(`[data-meal-id="${mealId}"]`);
+		el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
 
 	function handleMealsResult() {
@@ -50,498 +74,307 @@
 			await update();
 			if (result.type === 'success' && result.data) {
 				if (
-					result.data.setMealPlanSuccess ||
-					result.data.createMealSlotSuccess ||
+					result.data.createMealSuccess ||
+					result.data.setMealAttendanceSuccess ||
 					result.data.updateMealSlotSuccess ||
-					result.data.deleteMealSlotSuccess ||
-					result.data.generateSlotsSuccess ||
-					result.data.assignMealMakerSuccess
+					result.data.deleteMealSlotSuccess
 				) {
-					closeEdit();
-					addSlotDate = '';
-					addSlotTime = '';
-					addSlotMenu = '';
-					addSlotNotes = '';
+					closeDetail();
 				}
 			}
 		};
 	}
+
+	const mealPlanEnabled = $derived(!!data.mealPlan?.enabled);
+	const openSlotsCount = $derived(
+		data.coverage?.filter((c: { meal: Meal | null }) => !c.meal).length ?? 0
+	);
 </script>
+
+<svelte:head>
+	<title>Meals – {data.trip?.name}</title>
+</svelte:head>
 
 <div class="meals-page">
 	<div class="container">
-		<div class="page-header">
-			<h1>Meals: {data.trip.name}</h1>
-			<a href="/trips/{data.trip.id}" class="btn btn-secondary">← Back to Trip</a>
-		</div>
+		<!-- A) Top Header -->
+		<header class="page-header">
+			<div class="header-text">
+				<h1>Meals</h1>
+				<p class="subtext">Meals created here automatically appear on everyone's itinerary.</p>
+			</div>
+			<div class="header-actions">
+				<a href="#meal-coverage" class="btn btn-secondary">Meal coverage</a>
+				<button type="button" class="btn btn-primary" onclick={() => openAddModal()}>
+					Add meal
+				</button>
+			</div>
+		</header>
 
-		<div class="trip-dates">
-			<p>
-				📅 {data.trip.checkInDate.toLocaleDateString()} - {data.trip.checkOutDate.toLocaleDateString()}
-			</p>
-		</div>
+		{#if form?.createMealSuccess}
+			<div class="toast success" role="status">Meal added to itinerary.</div>
+		{/if}
+		{#if form?.createMealError}
+			<div class="toast error" role="alert">{form.createMealError}</div>
+		{/if}
+		{#if form?.setMealAttendanceError}
+			<div class="toast error" role="alert">{form.setMealAttendanceError}</div>
+		{/if}
 
-		<div class="tab-panel">
-			{#if !data.mealPlan || !data.mealPlan.enabled}
-				<div class="card off-state">
-					<div class="card-body">
-						<p class="summary">Meal planning is off for this trip.</p>
-						{#if form?.setMealPlanError}
-							<p class="error-message" role="alert">{form.setMealPlanError as string}</p>
-						{/if}
-						{#if data.isHost}
-							<form method="POST" action="?/setMealPlanEnabled" use:enhance={handleMealsResult()}>
-								<input type="hidden" name="enabled" value="true" />
-								<button type="submit" class="btn-primary">Enable meal planning</button>
-							</form>
-						{:else}
-							<p class="muted">Ask the host to enable meals if you'd like to plan or sign up for meals.</p>
-						{/if}
-					</div>
+		{#if !mealPlanEnabled}
+			<!-- Off state: enable meal planning -->
+			<div class="card off-state">
+				<div class="card-body">
+					<p class="summary">Meal planning is off for this trip.</p>
+					{#if form?.setMealPlanError}
+						<p class="error-message" role="alert">{form.setMealPlanError}</p>
+					{/if}
+					{#if data.isHost}
+						<form method="POST" action="?/setMealPlanEnabled" use:enhance={handleMealsResult()}>
+							<input type="hidden" name="enabled" value="true" />
+							<button type="submit" class="btn btn-primary">Enable meal planning</button>
+						</form>
+					{:else}
+						<p class="muted">Ask the host to enable meals to plan or sign up for meals.</p>
+					{/if}
+				</div>
+			</div>
+		{:else}
+			<!-- B) Coverage Tracker -->
+			{#if tripDays.length > 0}
+				<CoverageTracker
+					coverage={data.coverage ?? []}
+					tripDays={tripDays}
+					onOpenSlot={openAddModal}
+					onScrollToMeal={scrollToMeal}
+				/>
+			{/if}
+
+			<!-- C) Meal Timeline by Day -->
+			{#if data.daySections && data.daySections.length > 0}
+				{#if openSlotsCount > 0}
+					<p class="open-slots-hint">{openSlotsCount} meal slot{openSlotsCount === 1 ? '' : 's'} still open</p>
+				{/if}
+				<div class="day-sections">
+					{#each data.daySections as section (section.date)}
+						<section class="day-section" data-day={section.date}>
+							<h2 class="day-header">{section.label}</h2>
+							<div class="meal-cards">
+								{#each section.meals as meal (meal.id)}
+									<MealCard
+										meal={meal}
+										currentUserId={data.user?.id ?? ''}
+										isHost={data.isHost ?? false}
+										onOpenDetail={openDetail}
+									/>
+								{/each}
+							</div>
+						</section>
+					{/each}
 				</div>
 			{:else}
-				{#if data.isHost}
-					<div class="card toolbar">
-						<div class="card-body">
-							<form method="POST" action="?/setMealPlanEnabled" use:enhance={handleMealsResult()} class="toggle-form">
-								<input type="hidden" name="enabled" value="false" />
-								<button type="submit" class="btn-secondary">Turn off meal planning</button>
-							</form>
-							{#if data.trip?.checkInDate && data.trip?.checkOutDate}
-								<form method="POST" action="?/generateSlots" use:enhance={handleMealsResult()} class="generate-form">
-									<button type="submit" class="btn-secondary">Generate slots from trip dates</button>
-								</form>
-							{/if}
-						</div>
-					</div>
-				{/if}
-
-				{#if slotsByDay.length === 0 && !data.isHost}
-					<div class="card">
-						<div class="card-body">
-							<p class="empty">No meal slots yet. The host can add a schedule.</p>
-						</div>
-					</div>
-				{:else}
-					{#each slotsByDay as [dateKey, slots]}
-						{@const dateLabel = new Date(dateKey + 'T12:00:00').toLocaleDateString(undefined, {
-							weekday: 'long',
-							month: 'short',
-							day: 'numeric',
-							year: 'numeric'
-						})}
-						<div class="day-card card">
-							<div class="meals-day-header">
-								<h2 class="day-title">{dateLabel}</h2>
-								{#if data.isHost}
-									<button
-										type="button"
-										class="btn-add-slot"
-										onclick={() => {
-											addSlotDate = dateKey;
-											editingSlotId = 'new-' + dateKey;
-										}}
-									>
-										+ Add slot
-									</button>
-								{/if}
-							</div>
-							<div class="card-body">
-								<ul class="slots-list">
-									{#each slots as slot (slot.id)}
-										<li class="slot-item">
-											{#if editingSlotId === slot.id}
-												<form method="POST" action="?/updateMealSlot" use:enhance={handleMealsResult()} class="slot-edit-form">
-													<input type="hidden" name="slotId" value={slot.id} />
-													<div class="slot-edit-row">
-														<select name="mealType" class="input-sm">
-															{#each Object.entries(MEAL_LABELS) as [value, label]}
-																<option value={value} selected={slot.mealType === value}>{label}</option>
-															{/each}
-														</select>
-														<input type="date" name="date" value={new Date(slot.date).toISOString().slice(0, 10)} class="input-sm" />
-														<input type="time" name="time" value={slot.time ?? ''} class="input-sm" />
-													</div>
-													<input type="text" name="menuText" value={slot.menuText ?? ''} placeholder="Menu (optional)" class="input-full" />
-													<input type="text" name="notes" value={slot.notes ?? ''} placeholder="Notes (optional)" class="input-full" />
-													<select name="assignedUserId" class="input-sm assign-select">
-														<option value="">Unclaimed</option>
-														{#each data.members as member}
-															<option value={member.id} selected={slot.assignedUserId === member.id}>
-																{member.name}
-															</option>
-														{/each}
-													</select>
-													<div class="slot-edit-actions">
-														<button type="submit" class="btn-primary btn-sm">Save</button>
-														<button type="button" class="btn-secondary btn-sm" onclick={closeEdit}>Cancel</button>
-													</div>
-												</form>
-											{:else}
-												<div class="slot-display">
-													<span class="slot-type">{MEAL_LABELS[slot.mealType] ?? slot.mealType}</span>
-													{#if slot.time}
-														<span class="slot-time">{slot.time}</span>
-													{/if}
-													{#if slot.menuText}
-														<span class="slot-menu">{slot.menuText}</span>
-													{/if}
-													{#if slot.notes}
-														<span class="slot-notes">{slot.notes}</span>
-													{/if}
-													<div class="slot-assign">
-														<form method="POST" action="?/updateMealSlot" use:enhance={handleMealsResult()} class="assign-form">
-															<input type="hidden" name="slotId" value={slot.id} />
-															<input type="hidden" name="mealType" value={slot.mealType} />
-															<input type="hidden" name="date" value={new Date(slot.date).toISOString().slice(0, 10)} />
-															<input type="hidden" name="time" value={slot.time ?? ''} />
-															<input type="hidden" name="menuText" value={slot.menuText ?? ''} />
-															<input type="hidden" name="notes" value={slot.notes ?? ''} />
-															<select name="assignedUserId" class="assign-select" onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}>
-																<option value="" selected={!slot.assignedUserId}>Unclaimed</option>
-																{#each data.members as member}
-																	<option value={member.id} selected={slot.assignedUserId === member.id}>
-																		{member.name}
-																	</option>
-																{/each}
-															</select>
-														</form>
-													</div>
-													{#if data.isHost}
-														<div class="slot-actions">
-															<button type="button" class="btn-icon" onclick={() => (editingSlotId = slot.id)} aria-label="Edit slot">✎</button>
-															<form method="POST" action="?/deleteMealSlot" use:enhance={handleMealsResult()} class="inline-form">
-																<input type="hidden" name="slotId" value={slot.id} />
-																<button type="submit" class="btn-icon btn-danger" aria-label="Delete slot">×</button>
-															</form>
-														</div>
-													{/if}
-												</div>
-											{/if}
-										</li>
-									{/each}
-								</ul>
-
-								{#if data.isHost && editingSlotId === 'new-' + dateKey}
-									<form method="POST" action="?/createMealSlot" use:enhance={handleMealsResult()} class="add-slot-form">
-										<input type="hidden" name="date" value={addSlotDate} />
-										<input type="hidden" name="mealType" value={addSlotMealType} />
-										<input type="hidden" name="time" value={addSlotTime} />
-										<input type="hidden" name="menuText" value={addSlotMenu} />
-										<input type="hidden" name="notes" value={addSlotNotes} />
-										<div class="add-slot-row">
-											<select bind:value={addSlotMealType} name="mealType" class="input-sm">
-												{#each Object.entries(MEAL_LABELS) as [value, label]}
-													<option value={value}>{label}</option>
-												{/each}
-											</select>
-											<input type="time" bind:value={addSlotTime} name="time" class="input-sm" />
-											<input type="text" bind:value={addSlotMenu} name="menuText" placeholder="Menu (optional)" class="input-flex" />
-											<button type="submit" class="btn-primary btn-sm">Add</button>
-											<button type="button" class="btn-secondary btn-sm" onclick={closeEdit}>Cancel</button>
-										</div>
-									</form>
-								{/if}
-							</div>
-						</div>
-					{/each}
-				{/if}
+				<!-- E) Empty state -->
+				<div class="empty-state">
+					<div class="empty-icon" aria-hidden="true">🍽️</div>
+					<p class="empty-title">No meals yet</p>
+					<p class="empty-hint">Add your first meal and it'll show on everyone's itinerary.</p>
+					<button type="button" class="btn btn-primary" onclick={() => openAddModal()}>
+						Add first meal
+					</button>
+				</div>
 			{/if}
-		</div>
+		{/if}
 	</div>
+
+	<!-- Add Meal Modal -->
+	<AddMealModal
+		open={addModalOpen}
+		members={data.members ?? []}
+		tripDays={tripDayOptions}
+		prefill={addModalPrefill}
+		onClose={closeAddModal}
+		onSuccess={() => {}}
+	/>
+
+	<!-- Meal Detail Drawer -->
+	<MealDetailDrawer
+		meal={detailMeal}
+		open={detailOpen}
+		currentUserId={data.user?.id ?? ''}
+		isHost={data.isHost ?? false}
+		onClose={closeDetail}
+		onUpdate={() => {}}
+	/>
 </div>
 
 <style>
 	.meals-page {
 		min-height: calc(100vh - 80px);
-		padding: var(--spacing-xl) var(--spacing-md);
+		padding: var(--spacing-lg) var(--spacing-md) 2rem;
+		background: var(--bg);
 	}
-
 	.container {
-		max-width: 1000px;
+		max-width: 900px;
 		margin: 0 auto;
 	}
-
 	.page-header {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: space-between;
-		align-items: center;
-		margin-bottom: var(--spacing-lg);
+		align-items: flex-start;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
 	}
-
-	.trip-dates {
-		background: white;
-		padding: var(--spacing-md);
-		border-radius: var(--radius-md);
-		margin-bottom: var(--spacing-xl);
-		text-align: center;
+	.header-text h1 {
+		font-size: 1.75rem;
+		font-weight: 600;
+		color: var(--text);
+		margin: 0 0 0.25rem 0;
 	}
-
-	.tab-panel {
-		min-height: 200px;
-	}
-
-	.error-message {
-		color: var(--danger, #b91c1c);
-		font-size: 0.9rem;
-		margin: 0 0 0.75rem 0;
-	}
-
-	.card {
-		background: var(--surface);
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--border);
-		overflow: hidden;
-		margin-bottom: 1rem;
-	}
-
-	.card-body {
-		padding: 1.25rem;
-	}
-
-	.off-state .summary {
-		margin: 0 0 1rem 0;
-	}
-
-	.muted {
+	.subtext {
+		font-size: 0.9375rem;
 		color: var(--muted);
-		font-size: 0.875rem;
 		margin: 0;
 	}
-
-	.btn-primary {
+	.header-actions {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+	}
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		padding: 0.5rem 1rem;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		border-radius: var(--radius-lg);
+		border: none;
+		cursor: pointer;
+		text-decoration: none;
+		transition: background var(--transition-fast);
+	}
+	.btn-primary {
 		background: var(--primary);
 		color: white;
-		border: none;
-		border-radius: 0.5rem;
-		font-weight: 500;
-		cursor: pointer;
-		font-size: 0.875rem;
 	}
-
 	.btn-primary:hover {
-		opacity: 0.9;
+		background: var(--primaryHover);
 	}
-
 	.btn-secondary {
-		padding: 0.5rem 1rem;
-		background: transparent;
-		border: 1px solid var(--border);
-		border-radius: 0.5rem;
-		cursor: pointer;
-		font-size: 0.875rem;
+		background: var(--surfaceSolid);
 		color: var(--text);
+		border: 1px solid var(--border);
 	}
-
 	.btn-secondary:hover {
 		background: var(--surface2);
 	}
-
-	.btn-sm {
-		padding: 0.35rem 0.75rem;
-		font-size: 0.8125rem;
+	.toast {
+		padding: 0.75rem 1rem;
+		border-radius: var(--radius-lg);
+		margin-bottom: 1rem;
+		font-size: 0.9375rem;
 	}
-
-	.toolbar .card-body {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.75rem;
-		align-items: center;
-	}
-
-	.toggle-form,
-	.generate-form {
-		display: inline;
-	}
-
-	.meals-day-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		padding: 1rem 1.25rem 0 1.25rem;
-	}
-
-	.day-title {
-		font-size: 1.125rem;
-		font-weight: 600;
-		margin: 0;
-	}
-
-	.btn-add-slot {
-		padding: 0.35rem 0.75rem;
-		font-size: 0.8125rem;
-		background: var(--primary);
-		color: white;
-		border: none;
-		border-radius: 0.375rem;
-		cursor: pointer;
-	}
-
-	.btn-add-slot:hover {
-		opacity: 0.9;
-	}
-
-	.slots-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-	}
-
-	.slot-item {
-		padding: 0.75rem 0;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.slot-item:last-child {
-		border-bottom: none;
-	}
-
-	.slot-display {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.5rem 1rem;
-	}
-
-	.slot-type {
-		font-weight: 500;
-		min-width: 5rem;
-	}
-
-	.slot-time {
-		font-size: 0.875rem;
-		color: var(--muted);
-	}
-
-	.slot-menu,
-	.slot-notes {
-		font-size: 0.875rem;
-		color: var(--muted);
-	}
-
-	.slot-assign {
-		margin-left: auto;
-	}
-
-	.assign-form {
-		display: inline;
-	}
-
-	.assign-select {
-		padding: 0.35rem 0.5rem;
-		font-size: 0.8125rem;
-		border: 1px solid var(--border);
-		border-radius: 0.375rem;
-		background: white;
-		min-width: 8rem;
-		cursor: pointer;
-	}
-
-	.slot-actions {
-		display: flex;
-		gap: 0.25rem;
-		align-items: center;
-	}
-
-	.btn-icon {
-		width: 1.75rem;
-		height: 1.75rem;
-		padding: 0;
-		border: 1px solid var(--border);
-		background: white;
-		border-radius: 0.25rem;
-		cursor: pointer;
-		font-size: 0.875rem;
-		line-height: 1;
-		color: var(--muted);
-	}
-
-	.btn-icon:hover {
-		background: var(--surface2);
+	.toast.success {
+		background: rgba(41, 76, 96, 0.1);
+		border: 1px solid var(--border-soft);
 		color: var(--text);
 	}
-
-	.btn-icon.btn-danger:hover {
-		background: #fef2f2;
-		color: #b91c1c;
-		border-color: #fecaca;
+	.toast.error {
+		background: rgba(115, 44, 44, 0.08);
+		border: 1px solid rgba(115, 44, 44, 0.2);
+		color: var(--danger);
 	}
-
-	.inline-form {
-		display: inline;
+	.card {
+		background: var(--surfaceSolid);
+		border-radius: var(--radius-2xl);
+		border: 1px solid var(--border-soft);
+		box-shadow: var(--shadow-sm);
+		margin-bottom: 1rem;
 	}
-
-	.slot-edit-form {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
+	.card-body {
+		padding: 1.5rem;
 	}
-
-	.slot-edit-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
+	.off-state .summary {
+		margin: 0 0 1rem 0;
+		font-size: 1rem;
+		color: var(--text);
 	}
-
-	.slot-edit-actions {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.input-sm {
-		padding: 0.35rem 0.5rem;
-		font-size: 0.8125rem;
-		border: 1px solid var(--border);
-		border-radius: 0.375rem;
-		min-width: 0;
-	}
-
-	.input-full {
-		padding: 0.35rem 0.5rem;
+	.error-message {
+		color: var(--danger);
 		font-size: 0.875rem;
-		border: 1px solid var(--border);
-		border-radius: 0.375rem;
-		width: 100%;
-		max-width: 20rem;
+		margin: 0 0 0.75rem 0;
 	}
-
-	.input-flex {
-		flex: 1;
-		min-width: 6rem;
-		padding: 0.35rem 0.5rem;
-		font-size: 0.8125rem;
-		border: 1px solid var(--border);
-		border-radius: 0.375rem;
-	}
-
-	.add-slot-form {
-		margin-top: 0.75rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid var(--border);
-	}
-
-	.add-slot-row {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.empty {
+	.muted {
+		font-size: 0.875rem;
 		color: var(--muted);
 		margin: 0;
 	}
-
-	.btn {
-		display: inline-block;
-		padding: 0.5rem 1rem;
+	.open-slots-hint {
 		font-size: 0.875rem;
-		font-weight: 500;
-		border-radius: 0.5rem;
-		text-decoration: none;
-		cursor: pointer;
+		color: var(--muted);
+		margin: -0.5rem 0 1rem 0;
+	}
+	.day-sections {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+	.day-section {
+		background: var(--surfaceSolid);
+		border-radius: var(--radius-2xl);
+		border: 1px solid var(--border-soft);
+		box-shadow: var(--shadow-sm);
+		overflow: hidden;
+	}
+	.day-header {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		background: var(--surface2);
+		padding: 0.75rem 1.25rem;
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--text);
+		margin: 0;
+		border-bottom: 1px solid var(--border-soft);
+	}
+	.meal-cards {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 1rem 1.25rem;
+	}
+	.empty-state {
+		text-align: center;
+		padding: 3rem 1.5rem;
+		background: var(--surfaceSolid);
+		border-radius: var(--radius-2xl);
+		border: 1px solid var(--border-soft);
+	}
+	.empty-icon {
+		font-size: 3rem;
+		margin-bottom: 1rem;
+		opacity: 0.8;
+	}
+	.empty-title {
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: var(--text);
+		margin: 0 0 0.5rem 0;
+	}
+	.empty-hint {
+		font-size: 0.9375rem;
+		color: var(--muted);
+		margin: 0 0 1.25rem 0;
+	}
+	@media (max-width: 640px) {
+		.page-header {
+			flex-direction: column;
+		}
+		.header-actions {
+			width: 100%;
+			justify-content: flex-end;
+		}
 	}
 </style>

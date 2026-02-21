@@ -211,6 +211,7 @@ model User {
   invitesSent          Invite[]              @relation("InviteSender")
   roomAssignments      RoomAssignment[]
   mealSlotAssignments  MealSlot[]
+  mealSlotAttendances  MealSlotAttendance[]
   activityParticipants ActivityParticipant[]
   extraSelections      GuestExtraSelection[]
   rsvps                RSVP[]
@@ -328,26 +329,48 @@ model MealPlan {
   trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 }
 
-// Meal Slots
+// Meal Slots (operational meals; appear on itinerary)
 model MealSlot {
   id               String   @id @default(uuid())
   tripId           String
   mealType         String // "breakfast" | "lunch" | "dinner" | "snack"
   date             DateTime
   time             String?
+  title            String?  // e.g. "Taco Night"
   capacityServings Int?
   notes            String?
   menuText         String?
+  tags             String?  // JSON array: ["vegetarian_option", "gluten_free_option"]
   assignedUserId   String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   trip         Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
   assignedUser User? @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  attendance   MealSlotAttendance[]
 
   @@index([tripId])
   @@index([date])
   @@index([assignedUserId])
+}
+
+// Per-guest attendance: opt-out and dietary note for a meal
+model MealSlotAttendance {
+  id           String   @id @default(uuid())
+  slotId       String
+  userId       String
+  optedOut     Boolean  @default(false)
+  optOutReason String?
+  dietaryNote  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  slot MealSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([slotId, userId])
+  @@index([slotId])
+  @@index([userId])
 }
 
 // Activities
