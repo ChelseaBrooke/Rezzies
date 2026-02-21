@@ -83,6 +83,9 @@
 
 	const guestPreviewList = $derived(members.slice(0, 8));
 
+	const hostMember = $derived((trip?.members ?? []).find((m: { role?: string }) => m.role === 'host'));
+	const hostName = $derived(hostMember?.user?.name ?? hostMember?.user?.email ?? 'Host');
+
 	const myAssignment = $derived(user ? roomAssignments.find((a) => a.userId === user.id) : null);
 	const myPaidTotal = $derived(
 		userInvoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0)
@@ -185,7 +188,8 @@
 </script>
 
 {#if trip}
-	<TripHero
+	{#if dashboardMode !== 'vacation'}
+		<TripHero
 			trip={{
 				id: trip.id,
 				name: trip.name,
@@ -210,24 +214,34 @@
 			{mealSlots}
 			selectedMode={dashboardMode}
 		/>
-		{#if dashboardMode === 'vacation'}
-			<VacationModeView
-				tripId={trip.id}
-				isHost={true}
-				trip={{
-					fullAddress: trip.fullAddress,
-					location: trip.location,
-					parkingNotes: trip.parkingNotes,
-					houseRules: trip.houseRules,
-					description: trip.description
-				}}
-				{activities}
-				{mealSlots}
-				roomAssignments={roomAssignments}
-				{rsvps}
-				{members}
-				{myAssignment}
-			/>
+	{/if}
+	{#if dashboardMode === 'vacation'}
+		<VacationModeView
+			tripId={trip.id}
+			isHost={true}
+			trip={{
+				fullAddress: trip.fullAddress,
+				location: trip.location,
+				parkingNotes: trip.parkingNotes,
+				houseRules: trip.houseRules,
+				description: trip.description,
+				listingCoverPhoto: trip.listingCoverPhoto,
+				checkInTime: trip.checkInTime,
+				checkOutTime: trip.checkOutTime
+			}}
+			tripName={trip.name ?? ''}
+			tripLocation={trip.location ?? ''}
+			checkInDate={trip.checkInDate ?? ''}
+			checkOutDate={trip.checkOutDate ?? ''}
+			{hostName}
+			currentUserName={user?.name ?? ''}
+			{activities}
+			{mealSlots}
+			roomAssignments={roomAssignments}
+			{rsvps}
+			{members}
+			{myAssignment}
+		/>
 		{:else if dashboardMode === 'recap'}
 			<RecapModeView
 				tripId={trip.id}

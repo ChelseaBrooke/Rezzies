@@ -1,7 +1,9 @@
 <script lang="ts">
-	import DashboardCard from './DashboardCard.svelte';
+	import { onMount } from 'svelte';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
+	import { getTripGames, GAME_DEFS } from '$lib/stores/tripGames.js';
+	import type { TripGame } from '$lib/stores/tripGames.js';
 
 	interface Activity {
 		id: string;
@@ -35,13 +37,20 @@
 		tripId,
 		isHost = false,
 		trip,
+		tripName = '',
+		tripLocation = '',
+		checkInDate = '',
+		checkOutDate = '',
+		hostName = '',
+		currentUserName = '',
 		activities = [],
 		mealSlots = [],
 		roomAssignments = [],
 		rsvps = [],
 		members = [],
 		myAssignment = null,
-		myAssignments = []
+		myAssignments = [],
+		announcements = []
 	}: {
 		tripId: string;
 		isHost?: boolean;
@@ -51,7 +60,21 @@
 			parkingNotes?: string | null;
 			houseRules?: string | null;
 			description?: string | null;
+			listingCoverPhoto?: string | null;
+			checkInTime?: string | null;
+			checkOutTime?: string | null;
+			wifiName?: string | null;
+			wifiPassword?: string | null;
+			doorCode?: string | null;
+			trashInstructions?: string | null;
 		};
+		announcements?: string[];
+		tripName?: string;
+		tripLocation?: string;
+		checkInDate?: string | Date | null;
+		checkOutDate?: string | Date | null;
+		hostName?: string;
+		currentUserName?: string;
 		activities?: Activity[];
 		mealSlots?: MealSlot[];
 		roomAssignments?: RoomAssignment[];
@@ -59,6 +82,7 @@
 		members?: Array<{ user?: { id: string; name: string | null; avatarUrl?: string | null } | null }>;
 		myAssignment?: RoomAssignment | null;
 		myAssignments?: RoomAssignment[];
+		announcements?: string[];
 	} = $props();
 
 	const todayKey = $derived(new Date().toISOString().slice(0, 10));
@@ -76,23 +100,29 @@
 			})
 	);
 
-	const timeGreeting = $derived.by(() => {
-		const h = new Date().getHours();
-		if (h < 12) return 'Good morning';
-		if (h < 17) return 'Good afternoon';
-		return 'Good evening';
+	const todayItinerary = $derived.by((): Array<{ type: 'activity'; data: Activity } | { type: 'meal'; data: MealSlot }> => {
+		const entries: Array<{ type: 'activity'; data: Activity } | { type: 'meal'; data: MealSlot }> = [
+			...todayActivities.map((a) => ({ type: 'activity' as const, data: a })),
+			...todayMeals.map((m) => ({ type: 'meal' as const, data: m }))
+		];
+		const timeToNum = (t: string | null | undefined) => {
+			if (!t) return 9999;
+			const [h, m] = String(t).slice(0, 5).split(':').map(Number);
+			return (h ?? 0) * 60 + (m ?? 0);
+		};
+		entries.sort((a, b) => {
+			const ta = a.type === 'activity' ? timeToNum(a.data.time) : timeToNum(a.data.time);
+			const tb = b.type === 'activity' ? timeToNum(b.data.time) : timeToNum(b.data.time);
+			return ta - tb;
+		});
+		return entries;
 	});
-
-	const nextItem = $derived(todayActivities[0] ?? null);
-	const nextMeal = $derived(todayMeals[0] ?? null);
 
 	const address = $derived((trip?.fullAddress ?? trip?.location ?? '').trim());
 	const mapsUrl = $derived(
 		address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null
 	);
-
 	const yesRsvps = $derived(rsvps.filter((r) => r.status === 'yes'));
-
 	const mealLabel = (type: string) =>
 		({ breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snacks' }[type] ?? type);
 
@@ -102,939 +132,767 @@
 		return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
 	}
 
-	const myRoomPhoto = $derived.by(() => {
-		for (const a of myAssignments) {
-			const urls = a.room?.photoUrls;
-			if (urls?.length) return urls[0];
-		}
-		if (myAssignment?.room?.photoUrls?.length) return myAssignment.room.photoUrls[0];
-		return null;
+	function formatTodayLong(dateKey: string): string {
+		if (!dateKey) return '';
+		const d = new Date(dateKey + 'T12:00:00');
+		const day = d.getDate();
+		const suffix = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th';
+		const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
+		const month = d.toLocaleDateString('en-US', { month: 'long' });
+		return `${weekday}, ${month} ${day}${suffix}`;
+	}
+	const todayFormatted = $derived(formatTodayLong(todayKey));
+	const displayName = $derived(currentUserName?.trim() || 'there');
+
+	function toDateString(val: string | Date | null | undefined): string {
+		if (val == null || val === '') return '';
+		const d = typeof val === 'string' ? new Date(val) : val;
+		return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+	}
+	function formatDateRange(start: string | Date | null | undefined, end: string | Date | null | undefined): string {
+		const a = toDateString(start);
+		const b = toDateString(end);
+		if (!a && !b) return '';
+		if (!a) return new Date(b).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+		if (!b) return new Date(a).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+		const s = new Date(a);
+		const e = new Date(b);
+		return `${s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} \u2013 ${e.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+	}
+	const tripDateRange = $derived(formatDateRange(checkInDate, checkOutDate));
+	const displayTripName = $derived((tripName || '').trim() || 'This trip');
+	const displayTripLocation = $derived((tripLocation || (trip?.location ?? '')).trim());
+
+	const greetingTime = $derived.by(() => {
+		const h = new Date().getHours();
+		if (h < 12) return { text: 'Good morning', emoji: '\u2600\uFE0F' };
+		if (h < 17) return { text: 'Good afternoon', emoji: '\u2728' };
+		return { text: 'Good evening', emoji: '\uD83C\uDF19' };
 	});
 
-	const hasResources = $derived(!!(trip?.description || trip?.houseRules || trip?.parkingNotes));
+	const wifiName = $derived(trip?.wifiName ?? null);
+	const wifiPassword = $derived(trip?.wifiPassword ?? null);
+	const doorCode = $derived(trip?.doorCode ?? null);
+	const parkingNotes = $derived(trip?.parkingNotes ?? null);
+	const houseRules = $derived(trip?.houseRules ?? null);
+	const trashInstructions = $derived(trip?.trashInstructions ?? null);
+	const hasHouseInfo = $derived(
+		!!(wifiName || wifiPassword || doorCode || parkingNotes || houseRules || trashInstructions)
+	);
+
+	const totalInvited = $derived(members.length);
+	const arrivedCount = $derived(yesRsvps.length);
+	const everyoneArrived = $derived(totalInvited > 0 && arrivedCount >= totalInvited);
+	const whoHereCopy = $derived(
+		everyoneArrived && totalInvited > 0
+			? 'Everyone has arrived \uD83C\uDF89'
+			: totalInvited > 0
+				? `${arrivedCount} of ${totalInvited} guest${totalInvited === 1 ? '' : 's'} here`
+				: ''
+	);
+	const coverPhoto = $derived(trip?.listingCoverPhoto ?? null);
+	const checkInTime = $derived(trip?.checkInTime ?? null);
+	const checkOutTime = $derived(trip?.checkOutTime ?? null);
+
+	// First room photo for current user (my room)
+	const myRoomPhoto = $derived.by(() => {
+		for (const a of myAssignments ?? []) {
+			const url = a.room?.photoUrls?.[0];
+			if (url) return url;
+		}
+		return myAssignment?.room?.photoUrls?.[0] ?? null;
+	});
+	const myRoomName = $derived(myAssignment?.room?.name ?? (myAssignments?.[0]?.room?.name) ?? null);
+	const myBedType = $derived(myAssignment?.bed?.bedType ?? (myAssignments?.[0]?.bed?.bedType) ?? null);
+	const hasMyRoom = $derived(!!(myRoomName || myBedType || myAssignments?.length || myAssignment));
+
+	// Trip games (client-side store) for hero overlay
+	let tripGames = $state<TripGame[]>([]);
+	onMount(() => {
+		tripGames = getTripGames(tripId);
+	});
+	function gameDisplayName(tg: TripGame): string {
+		const def = GAME_DEFS.find((d) => d.id === tg.gameId);
+		return def?.name ?? tg.name ?? tg.gameId;
+	}
 </script>
 
-<div class="vac-wrapper">
-	<!-- Greeting bar -->
-	<div class="vac-greeting">
-		<span class="vac-greeting-sun" aria-hidden="true">
-			<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-		</span>
-		<div class="vac-greeting-text">
-			<h2 class="vac-greeting-heading">{timeGreeting}</h2>
-			<p class="vac-greeting-sub">Here's your day at a glance.</p>
-		</div>
-	</div>
+<!-- ════════════════ TEMPLATE ════════════════ -->
+<div class="v">
+	<!-- 1 ── HERO (full width, compact, arrival energy) -->
+	<header class="v-hero">
+		{#if coverPhoto}
+			<img src={coverPhoto} alt="" class="v-hero-bg" />
+		{:else}
+			<div class="v-hero-bg v-hero-bg--tint" aria-hidden="true"></div>
+		{/if}
+		<div class="v-hero-overlay" aria-hidden="true"></div>
 
-	<div class="vac-layout">
-		<!-- LEFT COLUMN: Today's schedule (overlapping hero like sticky note) -->
-		<div class="vac-col-schedule">
-			<div class="vac-schedule-card">
-				<div class="vac-schedule-header">
-					<span class="vac-schedule-pin" aria-hidden="true">
-						<span class="vac-pin-bg"></span>
-						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
-					</span>
-					<h3 class="vac-schedule-title">Today's schedule</h3>
-					<a href="/trips/{tripId}/itinerary" class="vac-schedule-link">Full itinerary</a>
+		{#if tripGames.length > 0}
+			<a href="/trips/{tripId}/games" class="v-hero-games">
+				<span class="v-hero-games-title">🎲 Trip Games</span>
+				<div class="v-hero-games-chips">
+					{#each tripGames.slice(0, 3) as tg}
+						<span class="v-hero-games-chip">{gameDisplayName(tg)}</span>
+					{/each}
+					{#if tripGames.length > 3}
+						<span class="v-hero-games-chip">+{tripGames.length - 3}</span>
+					{/if}
 				</div>
+				<p class="v-hero-games-lead">You're 2nd place 👀</p>
+				<span class="v-hero-games-cta">Log Progress</span>
+			</a>
+		{/if}
 
-				{#if todayActivities.length === 0 && todayMeals.length === 0}
-					<div class="vac-schedule-empty">
-						<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-						<p>Nothing scheduled today — enjoy the downtime!</p>
-					</div>
-				{:else}
-					<div class="vac-timeline">
-						{#if nextItem || nextMeal}
-							<div class="vac-next-up">
-								<span class="vac-pulse"></span>
-								<span class="vac-next-label">Next up</span>
-								<span class="vac-next-title">{nextItem?.title ?? mealLabel(nextMeal?.mealType ?? '')}</span>
-								{#if (nextItem?.time ?? nextMeal?.time)}
-									<span class="vac-next-time">{String(nextItem?.time ?? nextMeal?.time ?? '').slice(0, 5)}</span>
-								{/if}
+		<div class="v-hero-body">
+			<h1 class="v-hero-title">{displayTripName}</h1>
+			<div class="v-hero-meta">
+				{#if displayTripLocation}<span>{displayTripLocation}</span>{/if}
+				{#if tripDateRange}<span>{tripDateRange}</span>{/if}
+			</div>
+			{#if hostName}<p class="v-hero-host">Hosted by {hostName}</p>{/if}
+			{#if mapsUrl}
+				<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="v-pill v-pill--hero">
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+					Open Directions
+				</a>
+			{/if}
+		</div>
+	</header>
+
+	<!-- Announcement banner -->
+	{#if announcements?.length > 0}
+		<div class="v-announce">
+			<span aria-hidden="true">📢</span>
+			<p>{announcements[0]}</p>
+		</div>
+	{/if}
+
+	<!-- 2 ── MAIN: left grid + right assistant -->
+	<div class="v-main">
+		<!-- LEFT: 2-col grid -->
+		<div class="v-grid">
+			<!-- Combined Trip info + My room (full width, two columns) -->
+			<section class="v-tile v-tile--tripinfo v-tile--combined">
+				<h3 class="v-tile-heading">Trip info</h3>
+				<div class="v-tripinfo-grid">
+					<div class="v-tripinfo-col">
+						{#if (trip?.description ?? '').trim()}
+							<div class="v-tripinfo-block">
+								<span class="v-tripinfo-label">Trip description</span>
+								<p class="v-tripinfo-text">{trip.description}</p>
 							</div>
 						{/if}
-
-						{#each todayActivities as a, i}
-							<div class="vac-tl-item" class:first={i === 0}>
-								<div class="vac-tl-dot activity-dot"></div>
-								<div class="vac-tl-content">
-									<span class="vac-tl-time">{a.time ? String(a.time).slice(0, 5) : '—'}</span>
-									<span class="vac-tl-title">{a.title}</span>
-									{#if a.location}
-										<span class="vac-tl-loc">
-											<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-											{a.location}
-										</span>
-									{/if}
-									{#if a.participants?.length}
-										<div class="vac-tl-avatars">
-											{#each a.participants.slice(0, 5) as p}
-												<span class="vac-mini-avatar" title={p.user?.name ?? ''}>{initials(p.user?.name)}</span>
-											{/each}
-											{#if (a.participants.length) > 5}
-												<span class="vac-mini-avatar vac-mini-more">+{a.participants.length - 5}</span>
-											{/if}
+						<div class="v-tripinfo-block">
+							<span class="v-tripinfo-label">Check-in / Check-out</span>
+							<p class="v-tripinfo-text">
+								Check-in: {checkInTime?.trim() || '\u2014'} &middot; Check-out: {checkOutTime?.trim() || '\u2014'}
+							</p>
+						</div>
+						<div class="v-tripinfo-block">
+							<span class="v-tripinfo-label">Location</span>
+							{#if address}
+								{#if mapsUrl}
+									<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="v-tripinfo-link">{address}</a>
+								{:else}
+									<p class="v-tripinfo-text">{address}</p>
+								{/if}
+							{:else}
+								<p class="v-tripinfo-text v-muted">No address yet</p>
+							{/if}
+						</div>
+					</div>
+					<div class="v-tripinfo-col">
+						<!-- My room (with photo when available) -->
+						<div class="v-tripinfo-block v-tripinfo-room">
+							<span class="v-tripinfo-label">My room</span>
+							{#if isHost}
+								{#if roomAssignments.length > 0}
+									<p class="v-tripinfo-text">{roomAssignments.length} room{roomAssignments.length === 1 ? '' : 's'} assigned</p>
+								{:else}
+									<p class="v-tripinfo-text v-muted">No assignments yet</p>
+								{/if}
+								<a href="/trips/{tripId}/rooms" class="v-pill v-pill--ghost">View rooms</a>
+							{:else if hasMyRoom}
+								<div class="v-myroom">
+									{#if myRoomPhoto}
+										<div class="v-myroom-photo">
+											<img src={myRoomPhoto} alt="" />
+										</div>
+									{:else}
+										<div class="v-myroom-photo v-myroom-photo--placeholder" aria-hidden="true">
+											<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/></svg>
 										</div>
 									{/if}
+									<div class="v-myroom-body">
+										<p class="v-tripinfo-text v-myroom-name">{myRoomName ?? 'Room'}{#if myBedType} <span class="v-badge">{myBedType}</span>{/if}</p>
+										<a href="/trips/{tripId}/rooms" class="v-pill v-pill--ghost">View rooms</a>
+									</div>
 								</div>
-							</div>
-						{/each}
-
-						{#each todayMeals as m}
-							<div class="vac-tl-item">
-								<div class="vac-tl-dot meal-dot"></div>
-								<div class="vac-tl-content">
-									<span class="vac-tl-time">{m.time ? String(m.time).slice(0, 5) : '—'}</span>
-									<span class="vac-tl-title">{mealLabel(m.mealType)}</span>
-									{#if m.menuText}
-										<span class="vac-tl-menu">{m.menuText}</span>
-									{/if}
-									{#if m.assignedUser?.name}
-										<span class="vac-tl-chef">
-											<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21c-5.5 0-10-3.5-10-8V9a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4c0 4.5-4.5 8-10 8z"/></svg>
-											{m.assignedUser.name}
-										</span>
-									{/if}
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
-		</div>
-
-		<!-- RIGHT COLUMN: Room card + Address -->
-		<div class="vac-col-right">
-			<!-- Room & Bed (styled like GuestRsvpSummaryCard with photo header) -->
-			<div class="vac-room-card">
-				<div class="vac-room-head" class:has-photo={!!myRoomPhoto}>
-					{#if myRoomPhoto}
-						<img src={myRoomPhoto} alt="" class="vac-room-img" />
-						<div class="vac-room-shade"></div>
-					{:else}
-						<div class="vac-room-noimg">
-							<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/></svg>
+							{:else}
+								<p class="v-tripinfo-text v-muted">No room assigned yet</p>
+								<a href="/trips/{tripId}/rooms" class="v-pill v-pill--ghost">View rooms</a>
+							{/if}
 						</div>
-					{/if}
-					<span class="vac-room-label">
-						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/></svg>
-						Your room
-					</span>
+						<div class="v-tripinfo-block">
+							<span class="v-tripinfo-label">Parking / transportation</span>
+							<p class="v-tripinfo-text">{(trip?.parkingNotes ?? '').trim() || '\u2014'}</p>
+						</div>
+						<div class="v-tripinfo-block">
+							<span class="v-tripinfo-label">Rules</span>
+							<p class="v-tripinfo-text">{(trip?.houseRules ?? '').trim() || '\u2014'}</p>
+						</div>
+					</div>
 				</div>
-				<div class="vac-room-body">
-					{#if isHost}
-						{#if roomAssignments.length > 0}
-							<ul class="vac-room-list">
-								{#each roomAssignments.slice(0, 6) as a}
-									<li>
-										<span class="vac-room-person">{a.user?.name ?? 'Guest'}</span>
-										<span class="vac-room-detail">{a.room?.name ?? 'Room'}{#if a.bed?.bedType} · {a.bed.bedType}{/if}</span>
-									</li>
-								{/each}
-								{#if roomAssignments.length > 6}
-									<li class="vac-room-more">+{roomAssignments.length - 6} more</li>
-								{/if}
-							</ul>
-						{:else}
-							<p class="vac-empty">No room assignments yet.</p>
-						{/if}
-					{:else}
-						{#if myAssignments?.length > 0}
-							{#each myAssignments as a}
-								<div class="vac-my-room">
-									<span class="vac-my-room-name">{a.room?.name ?? 'Room'}</span>
-									{#if a.bed?.bedType}
-										<span class="vac-my-room-bed">{a.bed.bedType}</span>
+			</section>
+
+			{#if hasHouseInfo}
+				<section class="v-tile v-tile--house">
+					<h3 class="v-tile-heading">House info</h3>
+					{#if wifiName || wifiPassword}
+						<details class="v-acc">
+							<summary><span>📶</span> WiFi</summary>
+							<div class="v-acc-body">
+								{#if wifiName}<p><strong>Network</strong> {wifiName}</p>{/if}
+								{#if wifiPassword}<p><strong>Password</strong> {wifiPassword}</p>{/if}
+							</div>
+						</details>
+					{/if}
+					{#if doorCode}
+						<details class="v-acc">
+							<summary><span>🔑</span> Door code</summary>
+							<div class="v-acc-body"><p>{doorCode}</p></div>
+						</details>
+					{/if}
+					{#if parkingNotes}
+						<details class="v-acc">
+							<summary><span>🅿️</span> Parking</summary>
+							<div class="v-acc-body"><p>{parkingNotes}</p></div>
+						</details>
+					{/if}
+					{#if trashInstructions}
+						<details class="v-acc">
+							<summary><span>🗑️</span> Trash</summary>
+							<div class="v-acc-body"><p>{trashInstructions}</p></div>
+						</details>
+					{/if}
+					{#if houseRules}
+						<details class="v-acc">
+							<summary><span>📋</span> House rules</summary>
+							<div class="v-acc-body"><p>{houseRules}</p></div>
+						</details>
+					{/if}
+				</section>
+			{/if}
+
+			<!-- Games (when trip has add-on games): consider a tile here or a link in the right panel.
+			     Data: getTripGames(tripId) from $lib/stores/tripGames.js - pass as prop tripGames from parent if needed. -->
+
+			<!-- Bottom row: Who's Here (attendees) -->
+			<section class="v-tile v-tile--who">
+				<div class="v-stack">
+					{#each yesRsvps.slice(0, 8) as r, i}
+						{#if r.user?.id}
+							<ProfileTooltip userId={r.user.id}>
+								<button type="button" class="v-stack-avatar" style="z-index:{8 - i}" title={r.user.name ?? ''} onclick={() => openProfileCard(r.user!.id)}>
+									{#if r.user.avatarUrl}
+										<img src={r.user.avatarUrl} alt="" />
+									{:else}
+										<span>{initials(r.user.name)}</span>
 									{/if}
-								</div>
-							{/each}
-						{:else if myAssignment}
-							<div class="vac-my-room">
-								<span class="vac-my-room-name">{myAssignment.room?.name ?? 'Room'}</span>
-								{#if myAssignment.bed?.bedType}
-									<span class="vac-my-room-bed">{myAssignment.bed.bedType}</span>
-								{/if}
-							</div>
+									<i class="v-dot" aria-hidden="true"></i>
+								</button>
+							</ProfileTooltip>
 						{:else}
-							<p class="vac-empty">No room assigned yet.</p>
+							<span class="v-stack-avatar" style="z-index:{8 - i}">
+								<span>{initials(r.user?.name)}</span>
+								<i class="v-dot" aria-hidden="true"></i>
+							</span>
 						{/if}
-					{/if}
-					<a href="/trips/{tripId}/rooms" class="vac-room-cta">View all rooms</a>
+					{/each}
+					{#if yesRsvps.length > 8}<span class="v-stack-avatar v-stack-more">+{yesRsvps.length - 8}</span>{/if}
 				</div>
-			</div>
-
-			<!-- Address & Directions -->
-			<div class="vac-address-card">
-				<div class="vac-address-icon" aria-hidden="true">
-					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-				</div>
-				{#if address}
-					<p class="vac-address-text">{address}</p>
-					{#if mapsUrl}
-						<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="vac-maps-btn">
-							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-							Open in Maps
-						</a>
-					{/if}
+				{#if whoHereCopy}
+					<p class="v-who-copy">{whoHereCopy}</p>
 				{:else}
-					<p class="vac-empty">No address added yet.</p>
+					<p class="v-muted">No one has checked in yet</p>
 				{/if}
-			</div>
+			</section>
 		</div>
 
-		<!-- FULL-WIDTH ROW: Who's here -->
-		<div class="vac-whos-here">
-			<div class="vac-whos-header">
-				<h3 class="vac-whos-title">Who's here</h3>
-				<span class="vac-whos-count">{yesRsvps.length} attending</span>
-			</div>
-			<div class="vac-avatar-row">
-				{#each yesRsvps as r}
-					{#if r.user?.id}
-						<ProfileTooltip userId={r.user.id}>
-							<button type="button" class="vac-avatar" title={r.user.name ?? ''} onclick={() => openProfileCard(r.user!.id)}>
-								{#if r.user.avatarUrl}
-									<img src={r.user.avatarUrl} alt="" class="vac-avatar-img" />
-								{:else}
-									{initials(r.user.name)}
-								{/if}
-								<span class="vac-here-dot"></span>
-							</button>
-						</ProfileTooltip>
+		<!-- RIGHT: Daily Assistant -->
+		<aside class="v-assistant" aria-label="Daily assistant">
+			<div class="v-assistant-inner">
+				<header class="v-greet">
+					<span class="v-greet-emoji" aria-hidden="true">{greetingTime.emoji}</span>
+					<h2 class="v-greet-text">{greetingTime.text}, {displayName}.</h2>
+					<p class="v-greet-date">{todayFormatted}</p>
+				</header>
+
+				<div class="v-weather">
+					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+					<span>&mdash;</span>
+				</div>
+
+				<section class="v-today">
+					<h3 class="v-today-heading">Today</h3>
+					{#if todayItinerary.length === 0}
+						<div class="v-today-empty">
+							<span class="v-today-empty-icon" aria-hidden="true">✨</span>
+							<p>Nothing planned today &mdash; enjoy the downtime.</p>
+						</div>
 					{:else}
-						<span class="vac-avatar" title={r.user?.name ?? 'Guest'}>
-							{initials(r.user?.name)}
-							<span class="vac-here-dot"></span>
-						</span>
+						<ul class="v-today-list">
+							{#each todayItinerary as entry}
+								{#if entry.type === 'activity'}
+									{@const a = entry.data}
+									<li class="v-today-item">
+										<span class="v-today-time">{a.time ? String(a.time).slice(0, 5) : '\u2014'}</span>
+										<div class="v-today-body">
+											<span class="v-today-title">{a.title}</span>
+											{#if a.location}<span class="v-today-sub">{a.location}</span>{/if}
+										</div>
+										<span class="v-tag v-tag--activity">Activity</span>
+									</li>
+								{:else}
+									{@const m = entry.data}
+									<li class="v-today-item">
+										<span class="v-today-time">{m.time ? String(m.time).slice(0, 5) : '\u2014'}</span>
+										<div class="v-today-body">
+											<span class="v-today-title">{mealLabel(m.mealType)}</span>
+											{#if m.menuText}<span class="v-today-sub">{m.menuText}</span>{/if}
+											{#if m.assignedUser?.name}<span class="v-today-sub">Cook: {m.assignedUser.name}</span>{/if}
+										</div>
+										<span class="v-tag v-tag--meal">Meal</span>
+									</li>
+								{/if}
+							{/each}
+						</ul>
 					{/if}
-				{/each}
-				{#if yesRsvps.length === 0}
-					<p class="vac-empty">No one has RSVP'd yet.</p>
-				{/if}
+					<a href="/trips/{tripId}/itinerary" class="v-today-link">View full itinerary</a>
+				</section>
 			</div>
-		</div>
-
-		<!-- BOTTOM ROW: Resources | Weather + Games -->
-		<div class="vac-bottom-left">
-			<div class="vac-resources-card">
-				<div class="vac-res-header">
-					<span class="vac-res-pin" aria-hidden="true">
-						<span class="vac-res-pin-bg"></span>
-						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
-					</span>
-					<h3 class="vac-res-title">House info</h3>
-				</div>
-				{#if hasResources}
-					<div class="vac-res-items">
-						{#if trip?.description}
-							<div class="vac-res-item">
-								<span class="vac-res-icon">
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-								</span>
-								<div>
-									<span class="vac-res-label">Wi-Fi / Info</span>
-									<p class="vac-res-value">{trip.description}</p>
-								</div>
-							</div>
-						{/if}
-						{#if trip?.houseRules}
-							<div class="vac-res-item">
-								<span class="vac-res-icon">
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-								</span>
-								<div>
-									<span class="vac-res-label">House rules</span>
-									<p class="vac-res-value">{trip.houseRules}</p>
-								</div>
-							</div>
-						{/if}
-						{#if trip?.parkingNotes}
-							<div class="vac-res-item">
-								<span class="vac-res-icon">
-									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>
-								</span>
-								<div>
-									<span class="vac-res-label">Parking</span>
-									<p class="vac-res-value">{trip.parkingNotes}</p>
-								</div>
-							</div>
-						{/if}
-					</div>
-				{:else}
-					<p class="vac-empty vac-res-empty">No shared resources added yet.</p>
-				{/if}
-			</div>
-		</div>
-
-		<div class="vac-bottom-right">
-			<!-- Weather -->
-			<DashboardCard title="Weather">
-				<div class="vac-weather-placeholder">
-					<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-					<span>Weather integration coming soon</span>
-				</div>
-			</DashboardCard>
-
-			<!-- Games -->
-			<DashboardCard title="Games" titleHref="/trips/{tripId}/games">
-				<div class="vac-games-placeholder">
-					<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"><rect width="12" height="12" x="2" y="10" rx="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/></svg>
-					<a href="/trips/{tripId}/games" class="vac-games-link">View games & add-ons</a>
-				</div>
-			</DashboardCard>
-		</div>
-
-		<!-- HOST: Announcements (full width, prominent) -->
-		{#if isHost}
-			<div class="vac-announce-row">
-				<div class="vac-announce-card">
-					<div class="vac-announce-header">
-						<span class="vac-announce-icon" aria-hidden="true">
-							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 13v-2z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
-						</span>
-						<h3 class="vac-announce-title">Announcements</h3>
-					</div>
-					<p class="vac-announce-body">Broadcast updates to your group instantly. Coming soon.</p>
-				</div>
-			</div>
-		{/if}
+		</aside>
 	</div>
 </div>
 
+<!-- ════════════════ STYLES ════════════════ -->
 <style>
-	.vac-wrapper {
+	/* ── Shell ── */
+	.v {
+		--v-right: min(380px, 34vw);
+		--v-gap: 1.25rem;
+		--v-radius: 16px;
+		--v-lift: 0 8px 28px rgba(0,0,0,0.07);
+		--v-lift-hover: 0 12px 36px rgba(0,0,0,0.10);
+		padding-top: 3.75rem;
 		position: relative;
 		width: 100%;
-		padding-left: 2.5rem;
 	}
 
-	/* ── Greeting ── */
-	.vac-greeting {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-top: 1.5rem;
-		margin-bottom: 1.5rem;
+	/* ── Hero ── */
+	.v-hero {
 		position: relative;
+		width: 100%;
+		min-height: 160px;
+		border-radius: var(--v-radius);
+		overflow: hidden;
+		margin-bottom: var(--v-gap);
+		box-shadow: 0 6px 24px rgba(0,0,0,0.12);
 	}
-	.vac-greeting-sun {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 44px;
-		height: 44px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #fbbf24, #f59e0b);
-		color: white;
-		flex-shrink: 0;
-		box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);
+	.v-hero-bg {
+		position: absolute; inset: 0;
+		width: 100%; height: 100%;
+		object-fit: cover;
 	}
-	.vac-greeting-heading {
-		margin: 0;
-		font-size: 1.375rem;
-		font-weight: 700;
-		color: var(--text);
-		letter-spacing: -0.02em;
+	.v-hero-bg--tint {
+		background: linear-gradient(135deg, #1a3a4f 0%, #294C60 100%);
 	}
-	.vac-greeting-sub {
-		margin: 0;
-		font-size: 0.875rem;
-		color: var(--muted);
+	.v-hero-overlay {
+		position: absolute; inset: 0;
+		background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.25) 50%, transparent 100%);
+		pointer-events: none;
 	}
 
-	/* ── Layout ── */
-	.vac-layout {
-		display: grid;
-		grid-template-columns: minmax(0, 1.2fr) 1.25rem minmax(0, 1fr);
-		grid-template-rows: auto auto auto auto;
-		gap: 0;
-		row-gap: 1.25rem;
-		position: relative;
-	}
-
-	.vac-col-schedule { grid-column: 1; grid-row: 1; }
-	.vac-col-right { grid-column: 3; grid-row: 1; display: flex; flex-direction: column; gap: 1rem; }
-	.vac-whos-here { grid-column: 1 / 4; grid-row: 2; }
-	.vac-bottom-left { grid-column: 1; grid-row: 3; }
-	.vac-bottom-right { grid-column: 3; grid-row: 3; display: flex; flex-direction: column; gap: 1rem; }
-	.vac-announce-row { grid-column: 1 / 4; grid-row: 4; }
-
-	/* ── Schedule card (like sticky note) ── */
-	.vac-schedule-card {
-		background: linear-gradient(
-			to bottom,
-			rgba(255, 253, 230, 0.68) 0%,
-			rgba(252, 248, 200, 0.85) 45%,
-			rgba(250, 235, 140, 0.97) 100%
-		);
-		backdrop-filter: blur(8px);
-		border-radius: var(--radius-2xl);
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-		padding: 1.25rem 1.25rem 1rem;
-		min-height: 280px;
-	}
-
-	.vac-schedule-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-	}
-
-	.vac-schedule-pin {
-		position: relative;
-		width: 28px;
-		height: 28px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-	.vac-pin-bg {
+	/* Floating Trip Games card (top-right of hero, to the left of the right panel) */
+	.v-hero-games {
 		position: absolute;
-		inset: 0;
-		background: #111827;
-		border-radius: 50%;
-	}
-	.vac-schedule-pin svg {
-		position: relative;
-		z-index: 1;
-		color: rgba(255, 255, 255, 0.95);
-	}
-
-	.vac-schedule-title {
-		margin: 0;
-		font-size: 0.9375rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-
-	.vac-schedule-link {
-		margin-left: auto;
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: var(--primary);
+		top: 2.5rem;
+		right: calc(var(--v-right) + 1rem);
+		width: 280px;
+		padding: 1.25rem 1.5rem;
+		background: rgba(255, 255, 255, 0.32);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
+		border-radius: 20px;
+		box-shadow: 0 12px 48px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.12);
+		border: 1px solid rgba(255, 255, 255, 0.28);
 		text-decoration: none;
-	}
-	.vac-schedule-link:hover { text-decoration: underline; }
-
-	.vac-schedule-empty {
+		color: inherit;
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		padding: 2rem 1rem;
-		text-align: center;
-		color: var(--muted);
-		font-size: 0.875rem;
-	}
-
-	/* ── "Next up" spotlight ── */
-	.vac-next-up {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		background: rgba(191, 78, 48, 0.08);
-		border: 1px solid rgba(191, 78, 48, 0.2);
-		border-radius: var(--radius-lg);
-		padding: 0.625rem 0.875rem;
-		margin-bottom: 0.75rem;
-	}
-	.vac-pulse {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: var(--copper);
-		flex-shrink: 0;
-		animation: vacPulse 2s ease-in-out infinite;
-	}
-	@keyframes vacPulse {
-		0%, 100% { box-shadow: 0 0 0 0 rgba(191, 78, 48, 0.4); }
-		50% { box-shadow: 0 0 0 6px rgba(191, 78, 48, 0); }
-	}
-	.vac-next-label {
-		font-size: 0.6875rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--copper);
-	}
-	.vac-next-title {
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-	.vac-next-time {
-		margin-left: auto;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--muted);
-	}
-
-	/* ── Timeline ── */
-	.vac-timeline {
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-	}
-	.vac-tl-item {
-		display: flex;
 		gap: 0.75rem;
-		padding: 0.5rem 0;
-		position: relative;
+		transition: transform 200ms ease, box-shadow 200ms ease;
+		overflow: hidden;
 	}
-	.vac-tl-item:not(:last-child)::after {
+	.v-hero-games::before {
 		content: '';
 		position: absolute;
-		left: 6px;
-		top: calc(0.5rem + 14px);
-		bottom: -0.5rem;
-		width: 1px;
-		background: rgba(0, 0, 0, 0.12);
+		inset: -20%;
+		border-radius: 20px;
+		background: radial-gradient(ellipse 120% 100% at 50% 50%, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.08) 50%, transparent 75%);
+		pointer-events: none;
+		z-index: -1;
 	}
-	.vac-tl-dot {
-		width: 13px;
-		height: 13px;
-		border-radius: 50%;
-		flex-shrink: 0;
-		margin-top: 2px;
-		border: 2px solid;
+	.v-hero-games:hover {
+		transform: translateY(-3px);
+		box-shadow: 0 16px 56px rgba(0, 0, 0, 0.26), 0 6px 20px rgba(0, 0, 0, 0.14);
 	}
-	.vac-tl-dot.activity-dot {
-		border-color: var(--copper);
-		background: rgba(191, 78, 48, 0.15);
-	}
-	.vac-tl-dot.meal-dot {
-		border-color: #14b8a6;
-		background: rgba(20, 184, 166, 0.15);
-	}
-	.vac-tl-content {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-		min-width: 0;
-	}
-	.vac-tl-time {
+	.v-hero-games-title {
 		font-size: 0.6875rem;
 		font-weight: 600;
 		text-transform: uppercase;
-		letter-spacing: 0.03em;
-		color: var(--muted);
+		letter-spacing: 0.06em;
+		color: rgba(255, 255, 255, 0.72);
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 	}
-	.vac-tl-title {
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-	.vac-tl-loc, .vac-tl-chef {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.25rem;
-		font-size: 0.8125rem;
-		color: var(--muted);
-	}
-	.vac-tl-menu {
-		font-size: 0.8125rem;
-		color: var(--muted);
-		font-style: italic;
-	}
-	.vac-tl-avatars {
-		display: flex;
-		gap: 0.25rem;
-		margin-top: 0.25rem;
-	}
-	.vac-mini-avatar {
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, var(--slate), var(--primary));
-		color: white;
-		font-size: 0.5rem;
-		font-weight: 600;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-	}
-	.vac-mini-more {
-		background: var(--surface2);
-		color: var(--muted);
-		font-size: 0.5625rem;
-	}
-
-	/* ── Room card ── */
-	.vac-room-card {
-		border-radius: var(--radius-2xl);
-		overflow: hidden;
-		background: var(--surfaceSolid);
-		box-shadow: var(--shadow-soft);
-		border: 1px solid var(--border-soft);
-	}
-	.vac-room-head {
-		position: relative;
-		height: 100px;
-		display: flex;
-		align-items: flex-end;
-		padding: 0 0.875rem 0.625rem;
-		overflow: hidden;
-		background: linear-gradient(165deg, #e8e6e3, #d4d1cc);
-	}
-	.vac-room-head.has-photo { background: #e0e0e0; }
-	.vac-room-img {
-		position: absolute;
-		inset: 0;
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.vac-room-shade {
-		position: absolute;
-		inset: 0;
-		background: linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0.1) 45%, transparent 70%);
-	}
-	.vac-room-noimg {
-		position: absolute;
-		inset: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-	.vac-room-label {
-		position: relative;
-		z-index: 1;
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: white;
-		text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-	}
-	.vac-room-head:not(.has-photo) .vac-room-label {
-		color: #5c534a;
-		text-shadow: none;
-	}
-	.vac-room-body {
-		padding: 0.875rem 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-	.vac-room-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-	}
-	.vac-room-list li {
-		display: flex;
-		justify-content: space-between;
-		padding: 0.3rem 0;
-		border-bottom: 1px solid var(--border-soft);
-		font-size: 0.8125rem;
-	}
-	.vac-room-list li:last-child { border-bottom: none; }
-	.vac-room-person { font-weight: 500; color: var(--text); }
-	.vac-room-detail { color: var(--muted); }
-	.vac-room-more { color: var(--muted); font-size: 0.8125rem; font-style: italic; }
-	.vac-my-room {
-		display: flex;
-		flex-direction: column;
-		gap: 0.1rem;
-	}
-	.vac-my-room-name {
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-	.vac-my-room-bed {
-		font-size: 0.8125rem;
-		color: var(--muted);
-	}
-	.vac-room-cta {
-		display: inline-block;
-		margin-top: 0.25rem;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--primary);
-		text-decoration: none;
-	}
-	.vac-room-cta:hover { text-decoration: underline; }
-
-	/* ── Address card ── */
-	.vac-address-card {
-		background: var(--surfaceSolid);
-		border-radius: var(--radius-2xl);
-		box-shadow: var(--shadow-soft);
-		border: 1px solid var(--border-soft);
-		padding: 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-	.vac-address-icon {
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
-		background: rgba(191, 78, 48, 0.1);
-		color: var(--copper);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-	.vac-address-text {
-		margin: 0;
-		font-size: 0.875rem;
-		color: var(--text);
-		line-height: 1.5;
-	}
-	.vac-maps-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.375rem;
-		padding: 0.4rem 0.75rem;
-		border-radius: 9999px;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: white;
-		background: var(--primary);
-		text-decoration: none;
-		align-self: flex-start;
-		transition: background var(--transition-fast), transform var(--transition-fast);
-	}
-	.vac-maps-btn:hover {
-		background: var(--primaryHover);
-		transform: translateY(-1px);
-	}
-
-	/* ── Who's here ── */
-	.vac-whos-here {
-		background: var(--surfaceSolid);
-		border-radius: var(--radius-2xl);
-		box-shadow: var(--shadow-soft);
-		border: 1px solid var(--border-soft);
-		padding: 0.875rem 1.25rem;
-	}
-	.vac-whos-header {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-bottom: 0.75rem;
-	}
-	.vac-whos-title {
-		margin: 0;
-		font-size: 0.9375rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-	.vac-whos-count {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: var(--muted);
-		background: var(--surface2);
-		padding: 0.2rem 0.5rem;
-		border-radius: 9999px;
-	}
-	.vac-avatar-row {
+	.v-hero-games-chips {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.5rem;
+		gap: 0.4rem;
 	}
-	.vac-avatar {
-		width: 38px;
-		height: 38px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, var(--slate), var(--primary));
-		color: white;
-		font-size: 0.6875rem;
-		font-weight: 600;
+	.v-hero-games-chip {
+		display: inline-block;
+		padding: 0.3rem 0.6rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		background: rgba(255, 255, 255, 0.2);
+		color: rgba(255, 255, 255, 0.95);
+		border-radius: 9999px;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+		border: 1px solid rgba(255, 255, 255, 0.15);
+	}
+	.v-hero-games-lead {
+		margin: 0;
+		font-size: 1.25rem;
+		font-weight: 700;
+		line-height: 1.25;
+		color: #fff;
+		text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+		letter-spacing: -0.02em;
+	}
+	.v-hero-games-cta {
 		display: inline-flex;
+		align-self: flex-start;
+		padding: 0.5rem 1rem;
+		font-size: 0.8125rem;
+		font-weight: 700;
+		background: rgba(255, 255, 255, 0.9);
+		color: var(--slate);
+		border-radius: 9999px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+		margin-top: 0.1rem;
+	}
+	.v-hero-body {
+		position: relative;
+		padding: 2.5rem 1.75rem 1.75rem;
+		display: flex; flex-direction: column; gap: 0.25rem;
+	}
+	.v-hero-title {
+		margin: 0;
+		font-size: clamp(1.5rem, 3.5vw, 2rem);
+		font-weight: 800; letter-spacing: -0.03em; line-height: 1.15;
+		color: #fff;
+	}
+	.v-hero-meta {
+		display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem;
+		font-size: 0.9375rem; color: rgba(255,255,255,0.85);
+	}
+	.v-hero-host {
+		margin: 0.25rem 0 0;
+		font-size: 0.8125rem; color: rgba(255,255,255,0.65);
+	}
+	.v-pill--hero {
+		align-self: flex-start;
+		margin-top: 0.75rem;
+		padding: 0.35rem 0.875rem;
+		font-size: 0.8125rem;
+		background: rgba(255,255,255,0.2); backdrop-filter: blur(8px);
+		color: #fff;
+		box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+	}
+	.v-pill--hero:hover { background: rgba(255,255,255,0.3); }
+
+	/* ── Announcement ── */
+	.v-announce {
+		display: flex; align-items: flex-start; gap: 0.75rem;
+		padding: 0.875rem 1.25rem;
+		margin-bottom: var(--v-gap);
+		border-radius: var(--v-radius);
+		background: linear-gradient(135deg, rgba(180,83,9,0.1) 0%, rgba(251,191,36,0.06) 100%);
+		box-shadow: 0 2px 12px rgba(180,83,9,0.08);
+	}
+	.v-announce span { font-size: 1.125rem; flex-shrink: 0; }
+	.v-announce p { margin: 0; font-size: 0.9375rem; font-weight: 500; color: var(--text); line-height: 1.45; }
+
+	/* ── Main layout ── */
+	.v-main {
+		display: block; position: relative; min-height: 0;
+	}
+
+	/* ── Left: 2-col grid ── */
+	.v-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--v-gap);
+		padding-right: 1.5rem;
+		margin-right: var(--v-right);
+	}
+
+	/* ── Shared tile ── */
+	.v-tile {
+		background: var(--surfaceSolid);
+		border-radius: var(--v-radius);
+		padding: 1.25rem;
+		box-shadow: var(--v-lift);
+		transition: transform 200ms ease, box-shadow 200ms ease;
+	}
+	.v-tile:hover { transform: translateY(-2px); box-shadow: var(--v-lift-hover); }
+
+	.v-tile-icon {
+		width: 44px; height: 44px; border-radius: 12px;
+		display: flex; align-items: center; justify-content: center;
+		flex-shrink: 0; margin-bottom: 0.75rem;
+	}
+	.v-tile-icon--teal { background: rgba(13,148,136,0.12); color: #0d9488; }
+	.v-tile-icon--indigo { background: rgba(99,102,241,0.12); color: #6366f1; }
+	.v-tile-text { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--text); line-height: 1.4; }
+	.v-tile-heading { margin: 0 0 0.625rem; font-size: 0.9375rem; font-weight: 700; color: var(--text); }
+
+	/* ── Pill buttons ── */
+	.v-pill {
+		display: inline-flex; align-items: center; gap: 0.4rem;
+		padding: 0.5rem 1rem;
+		font-size: 0.875rem; font-weight: 700;
+		border-radius: 9999px; border: none; cursor: pointer;
+		text-decoration: none; font: inherit;
+		transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+	}
+	.v-pill--maps {
+		color: #fff; background: #0d9488;
+		box-shadow: 0 2px 10px rgba(13,148,136,0.3);
+	}
+	.v-pill--maps:hover { background: #0f766e; transform: translateY(-1px); }
+	.v-pill--ghost {
+		color: var(--slate); background: rgba(41,76,96,0.07);
+	}
+	.v-pill--ghost:hover { background: rgba(41,76,96,0.13); }
+
+	/* ── Muted text ── */
+	.v-muted { margin: 0; font-size: 0.875rem; color: var(--muted); }
+
+	/* ── Who's here: avatar stack ── */
+	.v-tile--who {
+		grid-column: 1 / -1;
+		display: flex; flex-direction: column; gap: 0.5rem;
+	}
+	.v-stack { display: flex; flex-wrap: wrap; }
+	.v-stack-avatar {
+		width: 42px; height: 42px; border-radius: 50%;
+		background: linear-gradient(135deg, var(--slate), var(--primary));
+		color: #fff; font-size: 0.6875rem; font-weight: 600;
+		display: inline-flex; align-items: center; justify-content: center;
+		margin-left: -10px; border: 2.5px solid var(--surfaceSolid);
+		overflow: hidden; position: relative; cursor: pointer;
+		transition: transform 150ms ease;
+	}
+	.v-stack-avatar:first-child { margin-left: 0; }
+	.v-stack-avatar:hover { transform: scale(1.1); z-index: 10 !important; }
+	.v-stack-avatar img { width: 100%; height: 100%; object-fit: cover; }
+	.v-stack-more { background: var(--surface2); color: var(--muted); font-weight: 700; cursor: default; }
+	.v-dot {
+		position: absolute; bottom: 1px; right: 1px;
+		width: 10px; height: 10px; border-radius: 50%;
+		background: #22c55e; border: 2px solid var(--surfaceSolid);
+		font-style: normal;
+	}
+	.v-who-copy { margin: 0; font-size: 0.9375rem; font-weight: 600; color: var(--text); }
+
+	/* ── Room tile ── */
+	.v-tile--room { display: flex; flex-direction: column; gap: 0.5rem; }
+	.v-room-body { display: flex; flex-direction: column; gap: 0; flex: 1; }
+	.v-room-row {
+		display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;
+		padding: 0.4rem 0; font-size: 0.875rem;
+	}
+	.v-room-row + .v-room-row { border-top: 1px solid rgba(0,0,0,0.05); }
+	.v-room-name { font-weight: 600; color: var(--text); }
+	.v-badge {
+		padding: 0.15rem 0.5rem; border-radius: 9999px;
+		background: rgba(99,102,241,0.12); color: #6366f1;
+		font-size: 0.75rem; font-weight: 600;
+	}
+	.v-room-guest { color: var(--muted); margin-left: auto; }
+
+	/* ── House info accordion ── */
+	.v-acc { border-bottom: 1px solid rgba(0,0,0,0.05); }
+	.v-acc:last-child { border-bottom: none; }
+	.v-acc summary {
+		display: flex; align-items: center; gap: 0.5rem;
+		padding: 0.75rem 0; font-size: 0.875rem; font-weight: 600;
+		color: var(--text); cursor: pointer; list-style: none;
+	}
+	.v-acc summary::-webkit-details-marker { display: none; }
+	.v-acc summary span { font-size: 1rem; }
+	.v-acc-body { padding: 0 0 0.75rem 1.5rem; }
+	.v-acc-body p { margin: 0; font-size: 0.875rem; color: var(--muted); line-height: 1.5; }
+
+	/* ── Trip info tile (combined with My room, two columns) ── */
+	.v-tile--tripinfo { display: flex; flex-direction: column; gap: 0.75rem; }
+	.v-tile--combined { grid-column: 1 / -1; }
+	.v-tripinfo-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1.5rem 2rem;
+		align-items: start;
+	}
+	@media (max-width: 640px) {
+		.v-tripinfo-grid { grid-template-columns: 1fr; }
+	}
+	.v-tripinfo-col { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+	.v-tripinfo-block { display: flex; flex-direction: column; gap: 0.2rem; }
+	.v-tripinfo-room .v-myroom {
+		display: flex;
 		align-items: center;
-		justify-content: center;
+		gap: 1rem;
+		margin-top: 0.25rem;
+	}
+	.v-myroom-photo {
+		width: 80px;
+		height: 80px;
+		border-radius: var(--v-radius);
+		background-color: var(--surface2);
 		flex-shrink: 0;
 		overflow: hidden;
-		position: relative;
-		border: none;
-		padding: 0;
-		cursor: pointer;
-		font: inherit;
-		transition: transform var(--transition-fast);
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
-	.vac-avatar:hover { transform: scale(1.08); }
-	.vac-avatar-img {
+	.v-myroom-photo img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 	}
-	.vac-here-dot {
-		position: absolute;
-		bottom: 1px;
-		right: 1px;
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		background: #22c55e;
-		border: 2px solid var(--surfaceSolid);
-	}
-
-	/* ── Resources (bulletin board note) ── */
-	.vac-resources-card {
-		background: linear-gradient(135deg, rgba(219, 234, 254, 0.6) 0%, rgba(191, 219, 254, 0.7) 100%);
-		backdrop-filter: blur(6px);
-		border-radius: var(--radius-2xl);
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-		padding: 1.125rem 1.25rem 1rem;
-	}
-	.vac-res-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 0.75rem;
-	}
-	.vac-res-pin {
-		position: relative;
-		width: 26px;
-		height: 26px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-	.vac-res-pin-bg {
-		position: absolute;
-		inset: 0;
-		background: #1e3a5f;
-		border-radius: 50%;
-	}
-	.vac-res-pin svg {
-		position: relative;
-		z-index: 1;
-		color: rgba(255, 255, 255, 0.95);
-	}
-	.vac-res-title {
-		margin: 0;
-		font-size: 0.9375rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-	.vac-res-items {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-	.vac-res-item {
-		display: flex;
-		gap: 0.625rem;
-		align-items: flex-start;
-	}
-	.vac-res-icon {
-		width: 32px;
-		height: 32px;
-		border-radius: var(--radius-md);
-		background: rgba(255, 255, 255, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-		color: var(--slate);
-	}
-	.vac-res-label {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
+	.v-myroom-photo--placeholder {
 		color: var(--muted);
 	}
-	.vac-res-value {
-		margin: 0.15rem 0 0;
-		font-size: 0.8125rem;
-		color: var(--text);
-		line-height: 1.45;
-	}
-	.vac-res-empty {
-		padding: 1rem 0;
-	}
-
-	/* ── Weather / Games placeholders ── */
-	.vac-weather-placeholder, .vac-games-placeholder {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		padding: 1.5rem 1rem;
-		text-align: center;
-		font-size: 0.8125rem;
+	.v-myroom-body { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+	.v-myroom-name { margin: 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+	.v-tripinfo-label {
+		font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
 		color: var(--muted);
 	}
-	.vac-games-link {
-		color: var(--primary);
-		font-weight: 600;
-		font-size: 0.8125rem;
+	.v-tripinfo-text { margin: 0; font-size: 0.875rem; color: var(--text); line-height: 1.5; }
+	.v-tripinfo-link {
+		font-size: 0.875rem; color: var(--slate); font-weight: 500;
 		text-decoration: none;
 	}
-	.vac-games-link:hover { text-decoration: underline; }
+	.v-tripinfo-link:hover { text-decoration: underline; }
 
-	/* ── Announcements (host) ── */
-	.vac-announce-card {
-		background: linear-gradient(135deg, rgba(191, 78, 48, 0.06) 0%, rgba(191, 78, 48, 0.12) 100%);
-		border: 1px solid rgba(191, 78, 48, 0.2);
-		border-radius: var(--radius-2xl);
-		padding: 1.125rem 1.25rem;
+	/* ── Right: Daily Assistant ── */
+	.v-assistant {
+		position: fixed; top: 0; right: 0; bottom: 0;
+		width: var(--v-right);
+		background: linear-gradient(175deg, #fef6ed 0%, #fdebd6 50%, #fce0c5 100%);
+		border-radius: 20px 0 0 0;
+		box-shadow: -8px 0 40px rgba(0,0,0,0.06);
+		overflow-y: auto; z-index: 1;
 	}
-	.vac-announce-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 0.5rem;
-	}
-	.vac-announce-icon {
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
-		background: var(--copper);
-		color: white;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-	.vac-announce-title {
-		margin: 0;
-		font-size: 0.9375rem;
-		font-weight: 600;
-		color: var(--text);
-	}
-	.vac-announce-body {
-		margin: 0;
-		font-size: 0.875rem;
-		color: var(--muted);
-		line-height: 1.5;
+	.v-assistant-inner {
+		padding: 3.75rem 1.75rem 2rem;
+		display: flex; flex-direction: column; gap: 1.5rem;
+		min-height: 100%;
 	}
 
-	/* ── Shared ── */
-	.vac-empty {
-		color: var(--muted);
-		font-size: 0.8125rem;
-		margin: 0;
+	/* Greeting */
+	.v-greet { margin: 0; }
+	.v-greet-emoji { display: block; font-size: 1.75rem; line-height: 1; margin-bottom: 0.35rem; }
+	.v-greet-text {
+		margin: 0; font-size: 1.5rem; font-weight: 800;
+		letter-spacing: -0.03em; line-height: 1.15; color: rgba(0,0,0,0.88);
 	}
+	.v-greet-date {
+		margin: 0.3rem 0 0; font-size: 0.9375rem;
+		color: rgba(0,0,0,0.5); font-weight: 500;
+	}
+
+	/* Weather */
+	.v-weather {
+		display: flex; align-items: center; gap: 0.5rem;
+		color: rgba(0,0,0,0.5); font-size: 1rem; font-weight: 600;
+	}
+
+	/* Today card */
+	.v-today {
+		background: rgba(255,255,255,0.65); backdrop-filter: blur(6px);
+		border-radius: var(--v-radius);
+		box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+		padding: 1.25rem;
+		max-height: 280px;
+		display: flex; flex-direction: column;
+		margin-bottom: 1rem;
+	}
+	.v-today-heading { margin: 0 0 0.75rem; font-size: 1rem; font-weight: 700; color: var(--text); }
+	.v-today-empty {
+		display: flex; flex-direction: column; align-items: center; justify-content: center;
+		gap: 0.5rem; padding: 1.5rem 0.5rem; text-align: center;
+		min-height: 0;
+	}
+	.v-today-empty-icon { font-size: 2.5rem; opacity: 0.85; }
+	.v-today-empty p { margin: 0; font-size: 0.9375rem; color: var(--muted); line-height: 1.45; }
+	.v-today-list {
+		list-style: none; margin: 0; padding: 0;
+		display: flex; flex-direction: column; gap: 0.5rem;
+		min-height: 0; overflow-y: auto; flex: 1;
+	}
+	.v-today-item {
+		display: grid; grid-template-columns: auto 1fr auto;
+		gap: 0.6rem; align-items: start;
+		padding: 0.625rem 0.75rem;
+		background: rgba(255,255,255,0.75); border-radius: 12px;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+	}
+	.v-today-time { font-size: 0.8125rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+	.v-today-body { min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+	.v-today-title { font-size: 0.9375rem; font-weight: 600; color: var(--text); }
+	.v-today-sub { font-size: 0.8125rem; color: var(--muted); }
+	.v-tag {
+		font-size: 0.6875rem; font-weight: 700; text-transform: uppercase;
+		letter-spacing: 0.04em; padding: 0.15rem 0.45rem; border-radius: 9999px;
+		white-space: nowrap;
+	}
+	.v-tag--activity { background: rgba(41,76,96,0.1); color: var(--slate); }
+	.v-tag--meal { background: rgba(13,148,136,0.1); color: #0d9488; }
+	.v-today-link {
+		display: inline-block; margin-top: 0.75rem;
+		font-size: 0.875rem; font-weight: 600; color: var(--slate);
+		text-decoration: none;
+	}
+	.v-today-link:hover { text-decoration: underline; }
 
 	/* ── Responsive ── */
-	@media (max-width: 1024px) {
-		.vac-wrapper { padding-left: 0; }
-		.vac-greeting { margin-top: 0; }
-		.vac-layout {
-			grid-template-columns: 1fr;
-			grid-template-rows: auto;
+	@media (max-width: 1100px) {
+		.v-grid { grid-template-columns: 1fr; }
+	}
+	@media (max-width: 900px) {
+		.v-main { display: flex; flex-direction: column; }
+		.v-assistant {
+			order: -1; position: static;
+			width: 100%; border-radius: var(--v-radius);
+			margin-bottom: var(--v-gap);
+			box-shadow: var(--v-lift);
 		}
-		.vac-col-schedule { grid-column: 1; grid-row: 1; }
-		.vac-col-right { grid-column: 1; grid-row: 2; }
-		.vac-whos-here { grid-column: 1; grid-row: 3; }
-		.vac-bottom-left { grid-column: 1; grid-row: 4; }
-		.vac-bottom-right { grid-column: 1; grid-row: 5; }
-		.vac-announce-row { grid-column: 1; grid-row: 6; }
+		.v-assistant-inner { padding: 1.5rem; }
+		.v-grid { margin-right: 0; padding-right: 0; }
 	}
 </style>

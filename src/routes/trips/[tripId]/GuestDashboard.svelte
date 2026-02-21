@@ -65,6 +65,9 @@
 
 	const guestPreviewList = $derived(members.slice(0, 8));
 
+	const hostMember = $derived((trip?.members ?? []).find((m: { role?: string }) => m.role === 'host'));
+	const hostName = $derived(hostMember?.user?.name ?? hostMember?.user?.email ?? 'Host');
+
 	const myAssignment = $derived(user ? roomAssignments.find((a) => a.userId === user.id) : null);
 	// Page load includes bed on assignments; use for guest RSVP summary card
 	const myAssignments = $derived(
@@ -150,7 +153,8 @@
 </script>
 
 {#if trip}
-	<TripHero
+	{#if dashboardMode !== 'vacation'}
+		<TripHero
 			trip={{
 				id: trip.id,
 				name: trip.name,
@@ -176,25 +180,35 @@
 			{mealSlots}
 			selectedMode={dashboardMode}
 		/>
-		{#if dashboardMode === 'vacation'}
-			<VacationModeView
-				tripId={trip.id}
-				isHost={false}
-				trip={{
-					fullAddress: trip.fullAddress,
-					location: trip.location,
-					parkingNotes: trip.parkingNotes,
-					houseRules: trip.houseRules,
-					description: trip.description
-				}}
-				{activities}
-				{mealSlots}
-				{roomAssignments}
-				{rsvps}
-				{members}
-				{myAssignment}
-				{myAssignments}
-			/>
+	{/if}
+	{#if dashboardMode === 'vacation'}
+		<VacationModeView
+			tripId={trip.id}
+			isHost={false}
+			trip={{
+				fullAddress: trip.fullAddress,
+				location: trip.location,
+				parkingNotes: trip.parkingNotes,
+				houseRules: trip.houseRules,
+				description: trip.description,
+				listingCoverPhoto: trip.listingCoverPhoto,
+				checkInTime: trip.checkInTime,
+				checkOutTime: trip.checkOutTime
+			}}
+			tripName={trip.name ?? ''}
+			tripLocation={trip.location ?? ''}
+			checkInDate={trip.checkInDate ?? ''}
+			checkOutDate={trip.checkOutDate ?? ''}
+			{hostName}
+			currentUserName={user?.name ?? ''}
+			{activities}
+			{mealSlots}
+			{roomAssignments}
+			{rsvps}
+			{members}
+			{myAssignment}
+			{myAssignments}
+		/>
 		{:else if dashboardMode === 'recap'}
 			<RecapModeView
 				tripId={trip.id}

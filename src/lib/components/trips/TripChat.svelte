@@ -155,8 +155,15 @@
 		return date.toLocaleDateString();
 	}
 
+	function handleOpenRequest() {
+		if (!isOpen) toggleChat();
+	}
+
 	onMount(() => {
 		loadMessages();
+		if (typeof window !== 'undefined') {
+			window.addEventListener('open-trip-chat', handleOpenRequest);
+		}
 		// Poll for new messages every 5 seconds
 		pollInterval = setInterval(() => {
 			if (!isOpen) {
@@ -169,6 +176,9 @@
 	});
 
 	onDestroy(() => {
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('open-trip-chat', handleOpenRequest);
+		}
 		if (pollInterval) {
 			clearInterval(pollInterval);
 		}
