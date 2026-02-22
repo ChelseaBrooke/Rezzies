@@ -229,19 +229,14 @@
 		<div class="v-hero-overlay" aria-hidden="true"></div>
 
 		{#if tripGames.length > 0}
-			<a href="/trips/{tripId}/games" class="v-hero-games">
+			<div class="v-hero-games">
 				<span class="v-hero-games-title">🎲 Trip Games</span>
 				<div class="v-hero-games-chips">
-					{#each tripGames.slice(0, 3) as tg}
-						<span class="v-hero-games-chip">{gameDisplayName(tg)}</span>
+					{#each tripGames as tg}
+						<a href="/trips/{tripId}/games?tab={tg.id}" class="v-hero-games-chip v-hero-games-chip--{tg.gameId}" data-trip-game-id={tg.id}>{gameDisplayName(tg)}</a>
 					{/each}
-					{#if tripGames.length > 3}
-						<span class="v-hero-games-chip">+{tripGames.length - 3}</span>
-					{/if}
 				</div>
-				<p class="v-hero-games-lead">You're 2nd place 👀</p>
-				<span class="v-hero-games-cta">Log Progress</span>
-			</a>
+			</div>
 		{/if}
 
 		<div class="v-hero-body">
@@ -517,8 +512,9 @@
 	/* Floating Trip Games card (top-right of hero, to the left of the right panel) */
 	.v-hero-games {
 		position: absolute;
-		top: 2.5rem;
+		top: 50%;
 		right: calc(var(--v-right) + 1rem);
+		transform: translateY(-50%);
 		width: 280px;
 		padding: 1.25rem 1.5rem;
 		background: rgba(255, 255, 255, 0.32);
@@ -534,6 +530,7 @@
 		gap: 0.75rem;
 		transition: transform 200ms ease, box-shadow 200ms ease;
 		overflow: hidden;
+		z-index: 5;
 	}
 	.v-hero-games::before {
 		content: '';
@@ -545,7 +542,7 @@
 		z-index: -1;
 	}
 	.v-hero-games:hover {
-		transform: translateY(-3px);
+		transform: translateY(calc(-50% - 3px));
 		box-shadow: 0 16px 56px rgba(0, 0, 0, 0.26), 0 6px 20px rgba(0, 0, 0, 0.14);
 	}
 	.v-hero-games-title {
@@ -566,32 +563,28 @@
 		padding: 0.3rem 0.6rem;
 		font-size: 0.8125rem;
 		font-weight: 500;
-		background: rgba(255, 255, 255, 0.2);
-		color: rgba(255, 255, 255, 0.95);
 		border-radius: 9999px;
 		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-		border: 1px solid rgba(255, 255, 255, 0.15);
-	}
-	.v-hero-games-lead {
-		margin: 0;
-		font-size: 1.25rem;
-		font-weight: 700;
-		line-height: 1.25;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		text-decoration: none;
 		color: #fff;
-		text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-		letter-spacing: -0.02em;
+		transition: transform 120ms ease, box-shadow 120ms ease;
 	}
-	.v-hero-games-cta {
-		display: inline-flex;
-		align-self: flex-start;
-		padding: 0.5rem 1rem;
-		font-size: 0.8125rem;
-		font-weight: 700;
-		background: rgba(255, 255, 255, 0.9);
-		color: var(--slate);
-		border-radius: 9999px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-		margin-top: 0.1rem;
+	.v-hero-games-chip:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+	}
+	.v-hero-games-chip--scavenger-bingo {
+		background: rgba(20, 184, 166, 0.75);
+	}
+	.v-hero-games-chip--caption-this {
+		background: rgba(245, 158, 11, 0.8);
+	}
+	.v-hero-games-chip--alphabet-hunt {
+		background: rgba(139, 92, 246, 0.75);
+	}
+	.v-hero-games-chip--daily-trivia {
+		background: rgba(236, 72, 153, 0.75);
 	}
 	.v-hero-body {
 		position: relative;
