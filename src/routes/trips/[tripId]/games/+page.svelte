@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type { GameId, TripGame, TriviaQuestion } from '$lib/stores/tripGames.js';
+	import CaptionThisEmbed from '$lib/components/games/caption-this/CaptionThisEmbed.svelte';
 	import {
 		GAME_DEFS,
 		getTripGames,
@@ -24,7 +25,7 @@
 		getTriviaAnswersForUser
 	} from '$lib/stores/tripGames.js';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form?: unknown } = $props();
 
 	const tripId = $derived(data.trip?.id ?? '');
 	const userId = $derived(data.user?.id ?? '');
@@ -64,6 +65,7 @@
 		if (tripGames.length > 0 && !activeTabId) activeTabId = tripGames[0].id;
 	});
 
+
 	// Modals
 	let addConfirmGame = $state<{ gameId: GameId; name: string } | null>(null);
 	let joinConfirmGame = $state<TripGame | null>(null);
@@ -101,6 +103,142 @@
 		if (game?.gameId !== 'alphabet-hunt' || alphabetProgress >= 26) return;
 		alphabetProgress += 1;
 		setAlphabetProgress(tripId, game.id, userId, alphabetProgress);
+	}
+
+	// Photo capture/upload for games (camera or gallery; mobile-friendly via accept="image/*")
+	type PhotoIntent = 'bingo' | 'alphabet' | 'caption';
+	let photoFileInputRef = $state<HTMLInputElement | null>(null);
+	let photoCameraInputRef = $state<HTMLInputElement | null>(null);
+	let photoIntent = $state<PhotoIntent | null>(null);
+	// For bingo: which square we're adding a photo to (set when user picks Camera or Photos in modal)
+	let pendingBingoSquareIndex = $state<number | null>(null);
+	// Which square's camera icon was clicked (shows "Camera or photos?" modal)
+	let bingoPhotoChoiceModalSquare = $state<number | null>(null);
+
+	const BINGO_PHOTOS_KEY = (tId: string, tgId: string, uId: string) =>
+		`trip-games-bingo-photos-${tId}-${tgId}-${uId}`;
+	function getBingoPhotos(tId: string, tgId: string, uId: string): Record<number, string> {
+		if (typeof window === 'undefined') return {};
+		try {
+			const raw = sessionStorage.getItem(BINGO_PHOTOS_KEY(tId, tgId, uId));
+			const parsed = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+			return Object.fromEntries(
+				Object.entries(parsed).map(([k, v]) => [parseInt(k, 10), v]).filter(([k]) => !Number.isNaN(k))
+			);
+		} catch {
+			return {};
+		}
+	}
+	function setBingoPhoto(tId: string, tgId: string, uId: string, squareIndex: number, dataUrl: string) {
+		if (typeof window === 'undefined') return;
+		const prev = getBingoPhotos(tId, tgId, uId);
+		sessionStorage.setItem(
+			BINGO_PHOTOS_KEY(tId, tgId, uId),
+			JSON.stringify({ ...prev, [squareIndex]: dataUrl })
+		);
+	}
+
+	const ALPHABET_PHOTOS_KEY = (tId: string, tgId: string, uId: string) =>
+		`trip-games-alphabet-photos-${tId}-${tgId}-${uId}`;
+	function getAlphabetPhotos(tId: string, tgId: string, uId: string): Record<number, string> {
+		if (typeof window === 'undefined') return {};
+		try {
+			const raw = sessionStorage.getItem(ALPHABET_PHOTOS_KEY(tId, tgId, uId));
+			const parsed = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+			return Object.fromEntries(
+				Object.entries(parsed).map(([k, v]) => [parseInt(k, 10), v]).filter(([k]) => !Number.isNaN(k))
+			);
+		} catch {
+			return {};
+		}
+	}
+	function setAlphabetPhoto(tId: string, tgId: string, uId: string, letterIndex: number, dataUrl: string) {
+		if (typeof window === 'undefined') return;
+		const prev = getAlphabetPhotos(tId, tgId, uId);
+		sessionStorage.setItem(
+			ALPHABET_PHOTOS_KEY(tId, tgId, uId),
+			JSON.stringify({ ...prev, [letterIndex]: dataUrl })
+		);
+	}
+
+	const CAPTION_PHOTO_KEY = (tId: string, tgId: string, uId: string) =>
+		`trip-games-caption-photo-${tId}-${tgId}-${uId}`;
+	function getCaptionPhoto(tId: string, tgId: string, uId: string): string | null {
+		if (typeof window === 'undefined') return null;
+		return sessionStorage.getItem(CAPTION_PHOTO_KEY(tId, tgId, uId));
+	}
+	function setCaptionPhoto(tId: string, tgId: string, uId: string, dataUrl: string) {
+		if (typeof window === 'undefined') return;
+		sessionStorage.setItem(CAPTION_PHOTO_KEY(tId, tgId, uId), dataUrl);
+	}
+
+	let bingoPhotos = $state<Record<number, string>>({});
+	let alphabetPhotos = $state<Record<number, string>>({});
+	let captionPhoto = $state<string | null>(null);
+
+	$effect(() => {
+		if (!activeTabId || !userId || !tripId) return;
+		const game = tripGames.find((g) => g.id === activeTabId);
+		if (!game) return;
+		bingoPhotos = game.gameId === 'scavenger-bingo' ? getBingoPhotos(tripId, game.id, userId) : {};
+		alphabetPhotos = game.gameId === 'alphabet-hunt' ? getAlphabetPhotos(tripId, game.id, userId) : {};
+		captionPhoto =
+			game.gameId === 'caption-this' ? getCaptionPhoto(tripId, game.id, userId) : null;
+	});
+
+	function triggerPhotoInput(intent: PhotoIntent) {
+		photoIntent = intent;
+		photoFileInputRef?.click();
+	}
+
+	function openBingoPhotoChoice(squareIndex: number) {
+		bingoPhotoChoiceModalSquare = squareIndex;
+	}
+
+	function triggerBingoCamera() {
+		if (bingoPhotoChoiceModalSquare == null) return;
+		pendingBingoSquareIndex = bingoPhotoChoiceModalSquare;
+		bingoPhotoChoiceModalSquare = null;
+		photoIntent = 'bingo';
+		photoCameraInputRef?.click();
+	}
+
+	function triggerBingoGallery() {
+		if (bingoPhotoChoiceModalSquare == null) return;
+		pendingBingoSquareIndex = bingoPhotoChoiceModalSquare;
+		bingoPhotoChoiceModalSquare = null;
+		photoIntent = 'bingo';
+		photoFileInputRef?.click();
+	}
+
+	function handlePhotoSelected(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file || !file.type.startsWith('image/') || !activeTabId || !userId || !tripId) return;
+		const game = tripGames.find((g) => g.id === activeTabId);
+		if (!game) return;
+
+		const reader = new FileReader();
+		reader.onload = () => {
+			const dataUrl = reader.result as string;
+			const intent = photoIntent;
+			const squareIdx = pendingBingoSquareIndex;
+			photoIntent = null;
+			pendingBingoSquareIndex = null;
+
+			if (intent === 'bingo' && squareIdx !== null && game.gameId === 'scavenger-bingo') {
+				setBingoPhoto(tripId, game.id, userId, squareIdx, dataUrl);
+				bingoPhotos = getBingoPhotos(tripId, game.id, userId);
+			} else if (intent === 'alphabet' && game.gameId === 'alphabet-hunt') {
+				setAlphabetPhoto(tripId, game.id, userId, alphabetProgress, dataUrl);
+				alphabetPhotos = getAlphabetPhotos(tripId, game.id, userId);
+			} else if (intent === 'caption' && game.gameId === 'caption-this') {
+				setCaptionPhoto(tripId, game.id, userId, dataUrl);
+				captionPhoto = dataUrl;
+			}
+		};
+		reader.readAsDataURL(file);
 	}
 
 	// Daily Trivia: left = question list (reorderable until someone submits), right = Q&A carousel; submit all at once
@@ -414,33 +552,33 @@
 		}
 	}
 
-	// Scavenger bingo placeholder squares (fake for now - you'll provide the real list)
-	const BINGO_SQUARES = [
-		'Sunset selfie',
-		'Pool float',
-		'Beach towel',
-		'Someone napping',
-		'Local snack',
-		'Palm tree',
-		'Souvenir shop',
-		'Someone dancing',
-		'Hotel key card',
-		'Empty suitcase',
-		'Room key',
-		'View from balcony',
-		'Breakfast buffet',
-		'Beach umbrella',
-		'Flip flops',
-		'Someone snorkeling',
-		'Cocktail with umbrella',
-		'Flight boarding pass',
-		'Sunburn',
-		'Group selfie',
-		'Local wildlife',
-		'Street sign',
-		'Sunrise',
-		'Packed luggage',
-		'Vacation mode'
+	// Scavenger bingo: label + icon per square (could later be loaded from Supabase scavenger_bingo_boards / squares)
+	const BINGO_ITEMS: { label: string; icon: string }[] = [
+		{ label: 'Sunset selfie', icon: '🌅' },
+		{ label: 'Pool float', icon: '🛟' },
+		{ label: 'Beach towel', icon: '🏖️' },
+		{ label: 'Someone napping', icon: '😴' },
+		{ label: 'Local snack', icon: '🥨' },
+		{ label: 'Palm tree', icon: '🌴' },
+		{ label: 'Souvenir shop', icon: '🛍️' },
+		{ label: 'Someone dancing', icon: '💃' },
+		{ label: 'Hotel key card', icon: '🗝️' },
+		{ label: 'Empty suitcase', icon: '🧳' },
+		{ label: 'Room key', icon: '🔑' },
+		{ label: 'View from balcony', icon: '🌆' },
+		{ label: 'Breakfast buffet', icon: '🥐' },
+		{ label: 'Beach umbrella', icon: '⛱️' },
+		{ label: 'Flip flops', icon: '👡' },
+		{ label: 'Someone snorkeling', icon: '🤿' },
+		{ label: 'Cocktail with umbrella', icon: '🍹' },
+		{ label: 'Flight boarding pass', icon: '✈️' },
+		{ label: 'Sunburn', icon: '🦞' },
+		{ label: 'Group selfie', icon: '🤳' },
+		{ label: 'Local wildlife', icon: '🦜' },
+		{ label: 'Street sign', icon: '🪧' },
+		{ label: 'Sunrise', icon: '🌄' },
+		{ label: 'Packed luggage', icon: '🧳' },
+		{ label: 'Vacation mode', icon: '😎' }
 	];
 </script>
 
@@ -493,8 +631,28 @@
 							{@const canView = joinedIds.has(activeGame.id) && understoodIds.has(activeGame.id)}
 							{#if canView}
 								<div class="game-page" role="tabpanel">
-									{#if !(activeGame.gameId === 'daily-trivia' && isTriviaHost && !triviaPublished)}
-										<!-- Leaderboard (placeholder until we have real data) -->
+									<!-- Hidden file inputs: gallery (no capture) and camera (capture) for per-square bingo choice -->
+									<input
+										type="file"
+										accept="image/*"
+										class="photo-input-hidden"
+										aria-hidden="true"
+										tabindex="-1"
+										bind:this={photoFileInputRef}
+										onchange={handlePhotoSelected}
+									/>
+									<input
+										type="file"
+										accept="image/*"
+										capture="environment"
+										class="photo-input-hidden"
+										aria-hidden="true"
+										tabindex="-1"
+										bind:this={photoCameraInputRef}
+										onchange={handlePhotoSelected}
+									/>
+									{#if !(activeGame.gameId === 'daily-trivia' && isTriviaHost && !triviaPublished) && activeGame.gameId !== 'scavenger-bingo' && activeGame.gameId !== 'caption-this'}
+										<!-- Leaderboard (placeholder; bingo/caption have their own layout) -->
 										<div class="game-leaderboard">
 											<h3 class="game-section-title">Leaderboard</h3>
 											<ul class="leaderboard-list">
@@ -506,10 +664,10 @@
 										</div>
 									{/if}
 
-									<!-- Game options + main content (Daily Trivia: left = questions list, right = carousel) -->
-									<div class="game-options-and-content {activeGame.gameId === 'daily-trivia' ? 'trivia-layout' : ''}">
-										<div class="game-options {activeGame.gameId === 'daily-trivia' ? 'trivia-questions-sidebar' : ''}">
-											{#if activeGame.gameId === 'daily-trivia'}
+									<!-- Game options + main content (sidebar only for Daily Trivia; bingo/caption/alphabet full-width) -->
+									<div class="game-options-and-content {activeGame.gameId === 'daily-trivia' ? 'trivia-layout' : ''} {activeGame.gameId !== 'daily-trivia' ? 'game-main-only' : ''}">
+										{#if activeGame.gameId === 'daily-trivia'}
+										<div class="game-options trivia-questions-sidebar">
 												<h3 class="game-section-title">Questions | drag to reorder</h3>
 												{#if triviaQuestions.length > 0}
 													<div class="trivia-q-list">
@@ -543,48 +701,96 @@
 												{#if !isTriviaHost && triviaQuestions.length > 0 && Object.keys(triviaAnswers).length > 0}
 													<p class="game-option-hint trivia-score">You got <strong>{triviaScore}</strong> of <strong>{triviaQuestions.length}</strong> correct.</p>
 												{/if}
-											{:else}
-												<h3 class="game-section-title">What you can do</h3>
-												{#if activeGame.gameId === 'scavenger-bingo'}
-												<button type="button" class="game-action-btn" disabled>Add a photo to a square</button>
-												<p class="game-option-hint">Snap a photo that matches a square, then tap the square to attach it.</p>
-											{:else if activeGame.gameId === 'caption-this'}
-												<button type="button" class="game-action-btn" disabled>Add a photo to start a round</button>
-												<button type="button" class="game-action-btn secondary" disabled>Submit a caption</button>
-												<button type="button" class="game-action-btn secondary" disabled>Vote on captions</button>
-											{:else if activeGame.gameId === 'alphabet-hunt'}
-												{@const nextLetter = alphabetProgress >= 26 ? null : 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[alphabetProgress]}
-												{#if nextLetter}
-													<p class="game-option-hint game-option-next">Next letter: <strong>{nextLetter}</strong></p>
-													<button type="button" class="game-action-btn" disabled>Add a photo for {nextLetter}</button>
-													<button type="button" class="game-action-btn secondary" onclick={advanceAlphabetLetter}>Mark “{nextLetter}” done (demo)</button>
-												{:else}
-													<p class="game-option-hint">You’ve completed A–Z! 🎉</p>
-												{/if}
-												<p class="game-option-hint">You must complete letters in order. No skipping ahead!</p>
-											{/if}
-											{/if}
 										</div>
-
+										{/if}
 										<div class="game-main-content {activeGame.gameId === 'daily-trivia' ? 'trivia-carousel-wrap' : ''}">
 											{#if activeGame.gameId === 'scavenger-bingo'}
-												<h2 class="game-page-title">Your Bingo Board</h2>
-												<p class="game-page-hint">Snap photos that match each square. Get 5 in a row to win!</p>
-												<div class="bingo-grid">
-													{#each BINGO_SQUARES as sq}
-														<div class="bingo-cell">
-															<span class="bingo-label">{sq}</span>
-															<span class="bingo-status">—</span>
+												<div class="bingo-page-wrap">
+														<div class="bingo-board-frame">
+															<div class="bingo-board-inner">
+																<span class="bingo-letter" aria-hidden="true">B</span>
+																<span class="bingo-letter" aria-hidden="true">I</span>
+																<span class="bingo-letter" aria-hidden="true">N</span>
+																<span class="bingo-letter" aria-hidden="true">G</span>
+																<span class="bingo-letter" aria-hidden="true">O</span>
+																{#each BINGO_ITEMS as item, idx}
+																	{@const photo = bingoPhotos[idx]}
+																	<button
+																		type="button"
+																		class="bingo-cell"
+																		class:has-photo={!!photo}
+																		aria-label="Add photo for {item.label}"
+																		onclick={() => openBingoPhotoChoice(idx)}
+																	>
+																		{#if photo}
+																			<img class="bingo-cell-img" src={photo} alt="" />
+																		{:else}
+																			<span class="bingo-item-icon" aria-hidden="true">{item.icon}</span>
+																			<span class="bingo-label">{item.label}</span>
+																		{/if}
+																	</button>
+																{/each}
+															</div>
 														</div>
-													{/each}
+													{#if bingoPhotoChoiceModalSquare !== null}
+															{@const squareItem = BINGO_ITEMS[bingoPhotoChoiceModalSquare]}
+															<div class="photo-modal-backdrop" onclick={() => bingoPhotoChoiceModalSquare = null} role="presentation"></div>
+															<div class="photo-modal" role="dialog" aria-labelledby="photo-modal-title" aria-modal="true">
+																<div class="photo-modal-header">
+																	<h2 id="photo-modal-title">Add a photo</h2>
+																	<p class="photo-modal-subtitle">For this square:</p>
+																	<div class="photo-modal-square-badge">
+																		<span class="photo-modal-square-icon" aria-hidden="true">{squareItem?.icon ?? '?'}</span>
+																		<span class="photo-modal-square-label">{squareItem?.label ?? 'Square'}</span>
+																	</div>
+																</div>
+																<div class="photo-modal-actions">
+																	<button type="button" class="photo-modal-btn photo-modal-btn-camera" onclick={triggerBingoCamera}>
+																		<span class="photo-modal-btn-icon" aria-hidden="true">
+																			<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+																		</span>
+																		<span class="photo-modal-btn-label">Take photo</span>
+																		<span class="photo-modal-btn-hint">Use your camera</span>
+																	</button>
+																	<button type="button" class="photo-modal-btn photo-modal-btn-gallery" onclick={triggerBingoGallery}>
+																		<span class="photo-modal-btn-icon" aria-hidden="true">
+																			<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+																		</span>
+																		<span class="photo-modal-btn-label">Choose from gallery</span>
+																		<span class="photo-modal-btn-hint">Pick an existing photo</span>
+																	</button>
+																</div>
+																<button type="button" class="photo-modal-cancel" onclick={() => bingoPhotoChoiceModalSquare = null}>Cancel</button>
+															</div>
+													{/if}
 												</div>
 											{:else if activeGame.gameId === 'caption-this'}
-												<h2 class="game-page-title">Caption This</h2>
-												<p class="game-page-hint">Upload a photo or wait for one. Submit and vote on captions!</p>
-												<div class="placeholder-game">Photo and caption area (coming soon)</div>
+												<CaptionThisEmbed
+													round={data.captionThis?.round ?? null}
+													leaderboard={data.captionThis?.leaderboard ?? []}
+													currentUserId={data.captionThis?.currentUserId ?? null}
+													tripTimezone={data.captionThis?.tripTimezone ?? 'UTC'}
+													captionMaxLength={data.captionThis?.captionMaxLength ?? 120}
+													eligibleCaptionCount={data.captionThis?.eligibleCaptionCount ?? 0}
+													form={form}
+													activeTabId={activeTabId}
+												/>
 											{:else if activeGame.gameId === 'alphabet-hunt'}
 												<h2 class="game-page-title">Alphabet Hunt</h2>
 												<p class="game-page-hint">Find things A–Z in order. You must complete each letter before the next. Furthest by trip end wins!</p>
+												{#if alphabetProgress < 26}
+													{@const nextLetter = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[alphabetProgress]}
+													<div class="alpha-actions">
+														<button type="button" class="game-action-btn" onclick={() => triggerPhotoInput('alphabet')}>Take photo or choose from gallery for {nextLetter}</button>
+														<button type="button" class="game-action-btn secondary" onclick={advanceAlphabetLetter}>Mark “{nextLetter}” done</button>
+													</div>
+												{/if}
+												{#if alphabetProgress < 26 && alphabetPhotos[alphabetProgress]}
+													<div class="alpha-current-photo-wrap">
+														<p class="game-option-hint">Photo for “{ 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[alphabetProgress] }”:</p>
+														<img class="alpha-current-photo" src={alphabetPhotos[alphabetProgress]} alt="" />
+													</div>
+												{/if}
 												<div class="alpha-track">
 													{#each 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('') as letter, i}
 														{@const done = i < alphabetProgress}
@@ -805,6 +1011,8 @@
 {/if}
 
 <style>
+	@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500;600&display=swap');
+
 	.page {
 		padding: 0;
 		max-width: 90rem;
@@ -1027,6 +1235,9 @@
 		grid-template-columns: minmax(0, 18rem) 1fr;
 		gap: 2rem;
 		align-items: start;
+	}
+	.game-options-and-content.game-main-only {
+		grid-template-columns: 1fr;
 	}
 	@media (max-width: 768px) {
 		.game-options-and-content {
@@ -1462,30 +1673,260 @@
 		opacity: 0.85;
 	}
 
-	.bingo-grid {
+	.photo-input-hidden {
+		position: absolute;
+		width: 0.1px;
+		height: 0.1px;
+		opacity: 0;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		pointer-events: none;
+	}
+
+	.bingo-page-wrap {
+		display: flex;
+		justify-content: center;
+		align-items: flex-start;
+		width: 100%;
+		min-height: min(50vh, 28rem);
+	}
+	.bingo-board-frame {
+		display: inline-block;
+		padding: 2rem 2.75rem;
+		border-radius: 2rem;
+		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+		background:
+			radial-gradient(ellipse 120% 80% at 20% 30%, rgba(255, 182, 193, 0.35) 0%, transparent 50%),
+			radial-gradient(ellipse 100% 100% at 80% 20%, rgba(221, 160, 221, 0.3) 0%, transparent 50%),
+			radial-gradient(ellipse 90% 70% at 50% 80%, rgba(173, 216, 230, 0.35) 0%, transparent 50%),
+			linear-gradient(135deg, rgba(255, 218, 185, 0.25) 0%, rgba(230, 230, 250, 0.3) 50%, rgba(240, 248, 255, 0.25) 100%);
+	}
+	.bingo-board-inner {
 		display: grid;
 		grid-template-columns: repeat(5, 1fr);
 		gap: 0.5rem;
+		width: 100%;
+		max-width: 48rem;
+	}
+	.bingo-letter {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-family: 'Dancing Script', 'Brush Script MT', cursive;
+		font-size: 1.75rem;
+		font-weight: 600;
+		color: var(--text);
+		letter-spacing: 0.02em;
+		padding-bottom: 0.25rem;
 	}
 	.bingo-cell {
 		aspect-ratio: 1;
-		border: 2px solid var(--border);
-		border-radius: var(--radius-md);
-		padding: 0.5rem;
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		border-radius: 0.75rem;
+		padding: 0.4rem;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		text-align: center;
+		background: #fff;
+		position: relative;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+		overflow: hidden;
+		cursor: pointer;
+		transition: border-color 0.15s, box-shadow 0.15s;
+	}
+	.bingo-cell:hover {
+		border-color: var(--primary, #e85d04);
+		box-shadow: 0 0 0 2px rgba(232, 93, 4, 0.2);
+	}
+	.bingo-cell.has-photo .bingo-item-icon,
+	.bingo-cell.has-photo .bingo-label {
+		display: none;
+	}
+	.bingo-cell-img {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		border-radius: calc(0.75rem - 1px);
+	}
+	.bingo-item-icon {
+		font-size: 1.75rem;
+		line-height: 1;
+		margin-bottom: 0.25rem;
+		position: relative;
+		z-index: 1;
+	}
+	.bingo-cell .bingo-label {
+		position: relative;
+		z-index: 1;
+		text-shadow: 0 0 2px var(--surface);
 	}
 	.bingo-label {
-		font-size: 0.7rem;
-		font-weight: 500;
+		font-size: 0.75rem;
+		font-weight: 600;
+		line-height: 1.2;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
 	}
-	.bingo-status {
-		font-size: 0.65rem;
+	/* Photo choice modal (camera vs gallery) – app-style */
+	.photo-modal-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.5);
+		backdrop-filter: blur(4px);
+		z-index: 9998;
+		animation: photo-modal-fade-in 0.2s ease-out;
+	}
+	.photo-modal {
+		position: fixed;
+		left: 50%;
+		bottom: 0;
+		transform: translateX(-50%);
+		right: auto;
+		width: 100%;
+		max-width: 22rem;
+		max-height: 90vh;
+		background: var(--surface);
+		border-radius: 1rem 1rem 0 0;
+		box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+		padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+		z-index: 9999;
+		animation: photo-modal-slide-up 0.25s ease-out;
+	}
+	@media (min-width: 480px) {
+		.photo-modal {
+			bottom: auto;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			border-radius: 1rem;
+			max-height: 85vh;
+			animation: photo-modal-fade-in 0.2s ease-out;
+		}
+	}
+	@keyframes photo-modal-fade-in {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+	@keyframes photo-modal-slide-up {
+		from { transform: translateX(-50%) translateY(100%); }
+		to { transform: translateX(-50%) translateY(0); }
+	}
+	.photo-modal-header {
+		text-align: center;
+		margin-bottom: 1.25rem;
+		padding-bottom: 1rem;
+		border-bottom: 1px solid var(--border);
+	}
+	.photo-modal-header h2 {
+		margin: 0 0 0.25rem 0;
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+	.photo-modal-subtitle {
+		margin: 0 0 0.5rem 0;
+		font-size: 0.8125rem;
 		color: var(--muted);
-		margin-top: 0.25rem;
+	}
+	.photo-modal-square-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.4rem 0.75rem;
+		background: var(--surface2);
+		border-radius: 2rem;
+		border: 1px solid var(--border);
+	}
+	.photo-modal-square-icon {
+		font-size: 1.25rem;
+		line-height: 1;
+	}
+	.photo-modal-square-label {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+	.photo-modal-actions {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+	}
+	.photo-modal-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		width: 100%;
+		padding: 0.9rem 1rem;
+		background: var(--surface2);
+		border: 1.5px solid var(--border);
+		border-radius: 0.75rem;
+		cursor: pointer;
+		transition: background 0.15s, border-color 0.15s;
+		text-align: left;
+		font: inherit;
+		color: var(--text);
+	}
+	.photo-modal-btn:hover {
+		background: var(--surface);
+		border-color: var(--primary, #e85d04);
+	}
+	.photo-modal-btn:active {
+		opacity: 0.9;
+	}
+	.photo-modal-btn-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		width: 2.5rem;
+		height: 2.5rem;
+		background: var(--surface);
+		border-radius: 0.5rem;
+		color: var(--muted);
+	}
+	.photo-modal-btn:hover .photo-modal-btn-icon {
+		color: var(--primary, #e85d04);
+	}
+	.photo-modal-btn-label {
+		display: block;
+		font-size: 0.9375rem;
+		font-weight: 600;
+		margin-bottom: 0.1rem;
+	}
+	.photo-modal-btn-hint {
+		display: block;
+		font-size: 0.75rem;
+		color: var(--muted);
+	}
+	.photo-modal-cancel {
+		display: block;
+		width: 100%;
+		padding: 0.65rem;
+		background: transparent;
+		border: none;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		color: var(--muted);
+		cursor: pointer;
+		transition: color 0.15s;
+	}
+	.photo-modal-cancel:hover {
+		color: var(--text);
+	}
+	.alpha-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+	}
+	.alpha-actions .game-action-btn,
+	.alpha-actions .game-action-btn.secondary {
+		margin-bottom: 0;
 	}
 	.alpha-track {
 		display: flex;
@@ -1528,6 +1969,47 @@
 		border-radius: var(--radius-md);
 		color: var(--muted);
 		font-size: 0.875rem;
+	}
+	.caption-page-layout {
+		display: grid;
+		grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+		gap: 1.5rem;
+		align-items: start;
+		margin-top: 1rem;
+		width: 100%;
+	}
+	@media (max-width: 640px) {
+		.caption-page-layout {
+			grid-template-columns: 1fr;
+		}
+	}
+	.caption-leaderboard-col {
+		min-width: 0;
+	}
+	.caption-photo-col {
+		min-width: 0;
+	}
+	.caption-photo-wrap {
+		margin-top: 0;
+	}
+	.caption-photo-img {
+		width: 100%;
+		max-width: 24rem;
+		height: auto;
+		border-radius: var(--radius-md);
+		display: block;
+		margin: 0 0 0.75rem 0;
+	}
+	.alpha-current-photo-wrap {
+		margin-bottom: 1rem;
+	}
+	.alpha-current-photo {
+		width: 100%;
+		max-width: 12rem;
+		height: auto;
+		border-radius: var(--radius-md);
+		display: block;
+		margin-top: 0.25rem;
 	}
 
 	.modal-backdrop {

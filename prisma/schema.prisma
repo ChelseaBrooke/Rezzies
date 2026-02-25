@@ -71,6 +71,8 @@ model Trip {
   chatMessages         ChatMessage[]
   tripActivities       TripActivity[]
   polls                Poll[]
+  captionThisRounds    CaptionThisRound[]
+  captionThisScores   CaptionThisScore[]
 
   @@index([inviteCode])
   @@index([isPublished])
@@ -222,6 +224,10 @@ model User {
   chatMessages         ChatMessage[]
   pollsCreated         Poll[]
   pollVotes            PollVote[]
+  captionThisRoundsAsSubmitter CaptionThisRound[]  @relation("PhotoSubmitter")
+  captionThisCaptions  CaptionThisCaption[]
+  captionThisVotes     CaptionThisVote[]
+  captionThisScores    CaptionThisScore[]
   directMessagesSent   DirectMessage[] @relation("DirectMessageSender")
   directMessagesReceived DirectMessage[] @relation("DirectMessageRecipient")
 
@@ -669,4 +675,74 @@ model TripActivity {
 
   @@index([tripId])
   @@index([tripId, createdAt])
+}
+
+// ---- Caption This game ----
+// Phase: WAITING_FOR_PHOTO | CAPTION_SUBMISSION | VOTING | RESULTS
+model CaptionThisRound {
+  id                    String   @id @default(uuid())
+  tripId                String
+  dayKey                String   // YYYY-MM-DD in trip timezone
+  phase                 String   // WAITING_FOR_PHOTO | CAPTION_SUBMISSION | VOTING | RESULTS
+  photoUrl              String?  @db.Text
+  photoSubmitterUserId  String?
+  tripTimezone          String   @default("UTC")
+  endsAtMidnightTs      DateTime? // midnight in trip TZ for hard stop
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  trip     Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  photoSubmitter User? @relation("PhotoSubmitter", fields: [photoSubmitterUserId], references: [id], onDelete: SetNull)
+  captions CaptionThisCaption[]
+  votes    CaptionThisVote[]
+
+  @@index([tripId])
+  @@index([tripId, phase])
+  @@index([dayKey])
+}
+
+model CaptionThisCaption {
+  id        String   @id @default(uuid())
+  roundId   String
+  userId    String
+  text      String   @db.VarChar(120)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  round CaptionThisRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  votes CaptionThisVote[]
+
+  @@unique([roundId, userId])
+  @@index([roundId])
+}
+
+model CaptionThisVote {
+  id           String   @id @default(uuid())
+  roundId      String
+  voterUserId  String
+  captionId    String
+  createdAt    DateTime @default(now())
+
+  round   CaptionThisRound   @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  caption CaptionThisCaption @relation(fields: [captionId], references: [id], onDelete: Cascade)
+  voter   User               @relation(fields: [voterUserId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, voterUserId])
+  @@index([roundId])
+  @@index([captionId])
+}
+
+model CaptionThisScore {
+  id         String   @id @default(uuid())
+  tripId     String
+  userId     String
+  pointsTotal Int     @default(0)
+  updatedAt  DateTime @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, userId])
+  @@index([tripId])
 }
