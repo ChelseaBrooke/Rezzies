@@ -5,11 +5,6 @@
 	import CaptionThisEmbed from '$lib/components/games/caption-this/CaptionThisEmbed.svelte';
 	import {
 		GAME_DEFS,
-		getTripGames,
-		addTripGame,
-		removeTripGame,
-		getJoinedGames,
-		joinGame,
 		getUnderstoodGames,
 		markUnderstood,
 		purgeRemovedGamesDataIfTripEnded,
@@ -33,19 +28,16 @@
 	const tabParam = $derived(data.tabParam ?? null);
 	const checkOutDate = $derived(data.trip?.checkOutDate ?? null);
 
-	// Reactive state - re-read from sessionStorage when component mounts or when we trigger refresh
-	let tripGames = $state<TripGame[]>([]);
-	let joinedIds = $state<Set<string>>(new Set());
+	// Trip games from server (shared for all trip members); understood state per user in sessionStorage
+	const tripGames = $derived((data.tripGames ?? []) as TripGame[]);
 	let understoodIds = $state<Set<string>>(new Set());
 
-	function refresh() {
-		tripGames = getTripGames(tripId);
-		joinedIds = getJoinedGames(tripId, userId);
+	function refreshUnderstood() {
 		understoodIds = getUnderstoodGames(tripId, userId);
 	}
 
 	$effect(() => {
-		if (tripId && userId) refresh();
+		if (tripId && userId) refreshUnderstood();
 	});
 
 	// When trip has ended, purge sessionStorage for any games that were removed from this trip
@@ -65,10 +57,16 @@
 		if (tripGames.length > 0 && !activeTabId) activeTabId = tripGames[0].id;
 	});
 
+	// After add-game redirect (?tab=newId), show instructions for that game if not yet understood
+	$effect(() => {
+		if (!tabParam || !tripGames.length || instructionsGame) return;
+		const match = tripGames.find((g) => g.id === tabParam);
+		if (match && !understoodIds.has(match.id)) instructionsGame = match;
+	});
+
 
 	// Modals
 	let addConfirmGame = $state<{ gameId: GameId; name: string } | null>(null);
-	let joinConfirmGame = $state<TripGame | null>(null);
 	let instructionsGame = $state<TripGame | null>(null);
 
 	// Carousel / active tab
@@ -453,17 +451,6 @@
 		triviaDraggedIndex = null;
 	}
 
-	const unjoinedGames = $derived(tripGames.filter((g) => !joinedIds.has(g.id)));
-	const unjoinedByOthers = $derived(unjoinedGames.filter((g) => g.addedByUserId !== userId));
-
-	// When user lands on page with unjoined games (added by others), prompt to join the first one
-	let hasShownJoinPrompt = $state(false);
-	$effect(() => {
-		if (hasShownJoinPrompt || !unjoinedByOthers.length || joinConfirmGame || instructionsGame) return;
-		joinConfirmGame = unjoinedByOthers[0] ?? null;
-		hasShownJoinPrompt = true;
-	});
-
 	function getGameDef(gameId: GameId) {
 		return GAME_DEFS.find((d) => d.id === gameId) ?? GAME_DEFS[0];
 	}
@@ -473,43 +460,14 @@
 		addConfirmGame = { gameId, name: def.name };
 	}
 
-	function confirmAddGame() {
-		if (!addConfirmGame || !userId) return;
-		const def = getGameDef(addConfirmGame.gameId);
-		const added = addTripGame(tripId, {
-			gameId: addConfirmGame.gameId,
-			name: def.name,
-			addedByUserId: userId
-		});
-		joinGame(tripId, userId, added.id); // adder auto-joins
-		refresh();
-		addConfirmGame = null;
-		setActiveTabAndUrl(added.id);
-	}
-
 	function cancelAddGame() {
 		addConfirmGame = null;
-	}
-
-	function confirmJoinGameAction() {
-		const g = joinConfirmGame;
-		if (!g) return;
-		joinGame(tripId, userId, g.id);
-		refresh();
-		joinConfirmGame = null;
-		activeTabId = g.id;
-		if (tripId) goto(`/trips/${tripId}/games?tab=${g.id}`, { replaceState: true });
-		instructionsGame = g;
-	}
-
-	function cancelJoinGame() {
-		joinConfirmGame = null;
 	}
 
 	function confirmUnderstand() {
 		if (!instructionsGame) return;
 		markUnderstood(tripId, userId, instructionsGame.id);
-		refresh();
+		refreshUnderstood();
 		instructionsGame = null;
 	}
 
@@ -519,10 +477,6 @@
 	}
 
 	function handleTabClick(tg: TripGame) {
-		if (!joinedIds.has(tg.id)) {
-			joinConfirmGame = tg;
-			return;
-		}
 		if (!understoodIds.has(tg.id)) {
 			instructionsGame = tg;
 			return;
@@ -537,19 +491,19 @@
 		setTimeout(() => document.getElementById('game-viewer')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
 	}
 
+	let pendingRemoveId = $state<string | null>(null);
+	let removeFormRef = $state<HTMLFormElement | null>(null);
+
 	function handleRemoveGame(e: Event, tg: TripGame) {
 		e.stopPropagation();
 		if (!canRemoveGames) return;
 		const message = `Remove ${tg.name} from the trip? Game data will be permanently deleted after the trip ends. If you remove it by accident, you can add the game again before the trip is over.`;
-		if (confirm(message)) {
-			removeTripGame(tripId, tg.id);
-			refresh();
-			const next = getTripGames(tripId)[0];
-			if (activeTabId === tg.id) {
-				activeTabId = next?.id ?? null;
-				if (tripId) goto(next ? `/trips/${tripId}/games?tab=${next.id}` : `/trips/${tripId}/games`, { replaceState: true });
-			}
-		}
+		if (!confirm(message)) return;
+		pendingRemoveId = tg.id;
+		setTimeout(() => {
+			removeFormRef?.requestSubmit();
+			pendingRemoveId = null;
+		}, 0);
 	}
 
 	// Scavenger bingo: label + icon per square (could later be loaded from Supabase scavenger_bingo_boards / squares)
@@ -586,7 +540,7 @@
 	<!-- Game selection grid (available to add) -->
 	<section class="section">
 		<h2 class="section-title">Add a game</h2>
-		<p class="section-subtitle">Click a game to add it to the trip. All attendees will be notified.</p>
+		<p class="section-subtitle">Click a game to add it to the trip. Everyone on the trip will see it when they open Games.</p>
 		<div class="games-grid">
 			{#each GAME_DEFS as def}
 				{@const tripGame = tripGames.find((g) => g.gameId === def.id)}
@@ -628,9 +582,9 @@
 					{#if activeTabId}
 						{@const activeGame = tripGames.find((g) => g.id === activeTabId)}
 						{#if activeGame}
-							{@const canView = joinedIds.has(activeGame.id) && understoodIds.has(activeGame.id)}
+							{@const canView = understoodIds.has(activeGame.id)}
 							{#if canView}
-								<div class="game-page" role="tabpanel">
+								<div class="game-page" class:caption-this-game={activeGame.gameId === 'caption-this'} role="tabpanel">
 									<!-- Hidden file inputs: gallery (no capture) and camera (capture) for per-square bingo choice -->
 									<input
 										type="file"
@@ -768,6 +722,7 @@
 												<CaptionThisEmbed
 													round={data.captionThis?.round ?? null}
 													leaderboard={data.captionThis?.leaderboard ?? []}
+													pastRounds={data.captionThis?.pastRounds ?? []}
 													currentUserId={data.captionThis?.currentUserId ?? null}
 													tripTimezone={data.captionThis?.tripTimezone ?? 'UTC'}
 													captionMaxLength={data.captionThis?.captionMaxLength ?? 120}
@@ -943,7 +898,7 @@
 									</div>
 								</div>
 							{:else}
-								<div class="game-viewer-empty">Join this game or view instructions to play.</div>
+								<div class="game-viewer-empty">Click "Got it, let's play!" in the instructions above to start.</div>
 							{/if}
 						{/if}
 					{:else}
@@ -962,30 +917,25 @@
 		<h2 id="add-modal-title">Add {addConfirmGame.name}?</h2>
 		{#if addConfirmGame.gameId === 'daily-trivia'}
 			<p class="modal-host-agreement">As the person who adds this game, you'll be the <strong>host</strong>. You'll add a list of multiple-choice questions for guests to answer each day. Do you agree to host?</p>
-			<div class="modal-actions">
-				<button type="button" class="btn-secondary" onclick={cancelAddGame}>Cancel</button>
-				<button type="button" class="btn-primary" onclick={confirmAddGame}>I'll host & add game</button>
-			</div>
+			<form method="POST" action="?/addTripGame" class="modal-form">
+				<input type="hidden" name="gameId" value={addConfirmGame?.gameId ?? ''} />
+				<input type="hidden" name="name" value={addConfirmGame?.name ?? ''} />
+				<div class="modal-actions">
+					<button type="button" class="btn-secondary" onclick={cancelAddGame}>Cancel</button>
+					<button type="submit" class="btn-primary">I'll host & add game</button>
+				</div>
+			</form>
 		{:else}
-			<p>This will alert all attendees that a game has been added to the trip.</p>
-			<div class="modal-actions">
-				<button type="button" class="btn-secondary" onclick={cancelAddGame}>Cancel</button>
-				<button type="button" class="btn-primary" onclick={confirmAddGame}>Add game</button>
-			</div>
+			<p>This game will be added for everyone on the trip. Others will see it as soon as they open Games.</p>
+			<form method="POST" action="?/addTripGame" class="modal-form">
+				<input type="hidden" name="gameId" value={addConfirmGame?.gameId ?? ''} />
+				<input type="hidden" name="name" value={addConfirmGame?.name ?? ''} />
+				<div class="modal-actions">
+					<button type="button" class="btn-secondary" onclick={cancelAddGame}>Cancel</button>
+					<button type="submit" class="btn-primary">Add game</button>
+				</div>
+			</form>
 		{/if}
-	</div>
-{/if}
-
-<!-- Join game confirmation -->
-{#if joinConfirmGame}
-	<div class="modal-backdrop" role="presentation" onclick={cancelJoinGame}></div>
-	<div class="modal" role="dialog" aria-labelledby="join-modal-title">
-		<h2 id="join-modal-title">Join trip game: {joinConfirmGame.name}?</h2>
-		<p>Do you want to join this game?</p>
-		<div class="modal-actions">
-			<button type="button" class="btn-secondary" onclick={cancelJoinGame}>Not now</button>
-			<button type="button" class="btn-primary" onclick={confirmJoinGameAction}>Yes, join</button>
-		</div>
 	</div>
 {/if}
 
@@ -1010,8 +960,15 @@
 	</div>
 {/if}
 
+<!-- Hidden form for remove-game (submitted programmatically after confirm) -->
+<form method="POST" action="?/removeTripGame" bind:this={removeFormRef} class="hidden">
+	<input type="hidden" name="tripGameId" value={pendingRemoveId ?? ''} />
+</form>
+
 <style>
 	@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500;600&display=swap');
+	.modal-form .modal-actions { margin-bottom: 0; }
+	form.hidden { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
 
 	.page {
 		padding: 0;
@@ -1158,10 +1115,34 @@
 		overflow: hidden;
 	}
 
+	/* Caption This: game content meets viewer edges so the box appears to spill into the section */
+	.game-page.caption-this-game .game-options-and-content {
+		margin-left: -1.5rem;
+		margin-right: -1.5rem;
+		margin-bottom: -1.5rem;
+	}
+	.game-page.caption-this-game .game-main-content {
+		padding: 0;
+	}
+	.game-page.caption-this-game :global(.caption-this-embed) {
+		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+		background: var(--surface);
+		padding: 1rem 1.5rem 1.5rem 1.5rem;
+	}
+
 	.game-viewer-pages {
 		min-height: min(60vh, 32rem);
 		padding: 1.5rem 1.5rem;
 		width: 100%;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.game-viewer-pages .game-page {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.game-page {

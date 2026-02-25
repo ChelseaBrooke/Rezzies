@@ -154,10 +154,12 @@ export async function submitCaption(
 		create: { roundId, userId, text: trimmed },
 		update: { text: trimmed, updatedAt: new Date() }
 	});
+	// Advance to VOTING if everyone who can submit has submitted (so next load shows vote UI for everyone)
+	await advancePhaseIfReady(roundId);
 	return { ok: true };
 }
 
-/** Submit vote (1 per user per round; cannot vote for own caption). */
+/** Submit vote (1 per user per round; cannot vote for own caption). Photo submitter may vote during CAPTION_SUBMISSION once there is at least one caption. */
 export async function submitVote(
 	roundId: string,
 	voterUserId: string,
@@ -168,7 +170,12 @@ export async function submitVote(
 		where: { id: roundId },
 		include: { captions: true, votes: true }
 	});
-	if (!round || round.tripId !== tripId || round.phase !== 'VOTING')
+	if (!round || round.tripId !== tripId)
+		return { ok: false, error: 'Round not found' };
+	const allowedPhase =
+		round.phase === 'VOTING' ||
+		(round.phase === 'CAPTION_SUBMISSION' && round.photoSubmitterUserId === voterUserId && round.captions.length > 0);
+	if (!allowedPhase)
 		return { ok: false, error: 'Round not found or not in voting' };
 	const caption = round.captions.find((c) => c.id === captionId);
 	if (!caption) return { ok: false, error: 'Caption not found' };
@@ -287,6 +294,65 @@ export async function advancePhaseIfReady(roundId: string): Promise<boolean> {
 		}
 	}
 	return false;
+}
+
+export type PastRoundSummary = {
+	id: string;
+	dayKey: string;
+	photoUrl: string | null;
+	captions: {
+		id: string;
+		text: string;
+		userId: string;
+		voteCount: number;
+		userName: string | null;
+		userAvatarUrl: string | null;
+	}[];
+};
+
+/** Past completed rounds (RESULTS) for the trip, for "past photos" gallery. Newest first. */
+export async function getPastRounds(
+	tripId: string,
+	limit: number = 20
+): Promise<PastRoundSummary[]> {
+	const rounds = await prisma.captionThisRound.findMany({
+		where: { tripId, phase: 'RESULTS' },
+		orderBy: { createdAt: 'desc' },
+		take: limit,
+		include: {
+			captions: {
+				select: {
+					id: true,
+					text: true,
+					userId: true,
+					user: { select: { name: true, avatarUrl: true } }
+				}
+			},
+			votes: { select: { captionId: true } }
+		}
+	});
+	const result: PastRoundSummary[] = [];
+	for (const r of rounds) {
+		const voteCountByCaption = new Map<string, number>();
+		for (const v of r.votes) {
+			voteCountByCaption.set(v.captionId, (voteCountByCaption.get(v.captionId) ?? 0) + 1);
+		}
+		const captions = r.captions.map((c) => ({
+			id: c.id,
+			text: c.text,
+			userId: c.userId,
+			voteCount: voteCountByCaption.get(c.id) ?? 0,
+			userName: c.user.name ?? null,
+			userAvatarUrl: c.user.avatarUrl ?? null
+		}));
+		result.push({
+			id: r.id,
+			dayKey: r.dayKey,
+			photoUrl: r.photoUrl,
+			captions
+		});
+	}
+	return result;
 }
 
 /** Leaderboard: trip members with total points, sorted by points desc. */

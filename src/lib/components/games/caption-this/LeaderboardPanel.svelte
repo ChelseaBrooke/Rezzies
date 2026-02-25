@@ -50,6 +50,10 @@
 		border-radius: 12px;
 		padding: 1rem;
 		border: 1px solid var(--border, #e5e5e5);
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
 	}
 	.panel-toggle {
 		display: flex;
@@ -87,6 +91,9 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
+		flex: 1;
+		min-height: 0;
+		overflow: auto;
 	}
 	.leaderboard-row {
 		display: grid;

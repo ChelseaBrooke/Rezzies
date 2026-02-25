@@ -1,13 +1,23 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { enhance } from '$app/forms';
 	import LeaderboardPanel from '$lib/components/games/caption-this/LeaderboardPanel.svelte';
 	import PhotoSubmitBox from '$lib/components/games/caption-this/PhotoSubmitBox.svelte';
-	import CaptionWall from '$lib/components/games/caption-this/CaptionWall.svelte';
-	import CaptionInput from '$lib/components/games/caption-this/CaptionInput.svelte';
-	import VotingGrid from '$lib/components/games/caption-this/VotingGrid.svelte';
 	import ResultsPanel from '$lib/components/games/caption-this/ResultsPanel.svelte';
-	import { getMsUntilMidnight, formatCountdown } from '$lib/utils/caption-this.js';
 
+	type PastRoundSummary = {
+		id: string;
+		dayKey: string;
+		photoUrl: string | null;
+		captions: {
+			id: string;
+			text: string;
+			userId: string;
+			voteCount: number;
+			userName: string | null;
+			userAvatarUrl: string | null;
+		}[];
+	};
 	type Round = {
 		id: string;
 		phase: string;
@@ -22,6 +32,7 @@
 	type Props = {
 		round: Round | null;
 		leaderboard: LeaderboardRow[];
+		pastRounds?: PastRoundSummary[];
 		currentUserId: string | null;
 		tripTimezone: string;
 		captionMaxLength: number;
@@ -29,7 +40,17 @@
 		form?: unknown;
 		activeTabId?: string | null;
 	};
-	let { round, leaderboard = [], currentUserId = null, tripTimezone = 'UTC', captionMaxLength = 120, eligibleCaptionCount = 0, form, activeTabId = null }: Props = $props();
+	let {
+		round,
+		leaderboard = [],
+		pastRounds = [],
+		currentUserId = null,
+		tripTimezone = 'UTC',
+		captionMaxLength = 120,
+		eligibleCaptionCount = 0,
+		form,
+		activeTabId = null
+	}: Props = $props();
 
 	const phase = $derived(round?.phase ?? null);
 	const roundId = $derived(round?.id ?? '');
@@ -41,6 +62,12 @@
 	const anonymousCaptions = $derived(
 		round?.captions?.map((c) => ({ id: c.id, text: c.text, voteCount: c.voteCount })) ?? []
 	);
+	const leftSlots = $derived(anonymousCaptions.filter((_, i) => i % 2 === 0));
+	const rightSlots = $derived(anonymousCaptions.filter((_, i) => i % 2 === 1));
+	const canVoteForCaption = $derived(
+		(phase === 'VOTING' || (phase === 'CAPTION_SUBMISSION' && isPhotoSubmitter)) && myVoteCaptionId == null
+	);
+
 	const myCaptionIds = $derived(
 		new Set(round?.captions?.filter((c) => c.userId === currentUserId).map((c) => c.id) ?? [])
 	);
@@ -61,21 +88,20 @@
 		return round?.captions?.filter((c) => (c.voteCount ?? 0) === thisRoundTopVotes).length ?? 0;
 	});
 
-	let countdownMs = $state(0);
 	let collapsedLeaderboard = $state(false);
 	let endRoundConfirm = $state(false);
+	let selectedPastRoundId = $state<string | null>(null);
+	let overlayCaptionText = $state('');
+	let overlaySubmitting = $state(false);
 
-	$effect(() => {
-		if (phase === 'RESULTS' || !dayKey || !tripTimezone) {
-			countdownMs = 0;
-			return;
-		}
-		const update = () => {
-			countdownMs = getMsUntilMidnight(tripTimezone, dayKey);
-		};
-		update();
-		const interval = setInterval(update, 1000);
-		return () => clearInterval(interval);
+	const selectedPastRound = $derived(
+		selectedPastRoundId ? pastRounds.find((r) => r.id === selectedPastRoundId) ?? null : null
+	);
+	const selectedPastWinner = $derived.by(() => {
+		if (!selectedPastRound?.captions?.length) return null;
+		const maxVotes = Math.max(...selectedPastRound.captions.map((c) => c.voteCount));
+		if (maxVotes === 0) return null;
+		return selectedPastRound.captions.find((c) => c.voteCount === maxVotes) ?? null;
 	});
 
 	$effect(() => {
@@ -84,7 +110,12 @@
 		return () => clearInterval(t);
 	});
 
-	const countdownLabel = $derived(countdownMs > 0 ? formatCountdown(countdownMs) : '');
+	// Refetch periodically during caption/voting so e.g. photo submitter sees VOTING after guest submits
+	$effect(() => {
+		if (phase !== 'CAPTION_SUBMISSION' && phase !== 'VOTING') return;
+		const t = setInterval(() => invalidateAll(), 4000);
+		return () => clearInterval(t);
+	});
 
 	const actionError = $derived(
 		form &&
@@ -98,11 +129,38 @@
 			? String((form.data as { error?: string }).error)
 			: null
 	);
+
+	function handleOverlayCaptionSubmit() {
+		return async ({
+			result,
+			update
+		}: {
+			result: { type: string };
+			update: () => Promise<void>;
+		}) => {
+			overlaySubmitting = true;
+			await update();
+			overlaySubmitting = false;
+			if (result.type === 'success' || result.type === 'redirect') {
+				overlayCaptionText = '';
+				await invalidateAll();
+			}
+		};
+	}
+
+	function submitOverlayOnEnter(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			const form = (e.target as HTMLElement).closest('form');
+			if (form && overlayCaptionText.trim()) form.requestSubmit();
+		}
+	}
 </script>
 
 <div class="caption-this-embed">
-	<div class="layout">
-		<aside class="aside" class:collapsed={collapsedLeaderboard}>
+	<!-- Top: Leaderboard (left) + Past photos (right) -->
+	<div class="top-bar">
+		<div class="leaderboard-wrap">
 			<LeaderboardPanel
 				leaderboard={leaderboard}
 				currentUserId={currentUserId}
@@ -110,116 +168,417 @@
 				thisRoundTiedCount={thisRoundTiedCount}
 				bind:collapsed={collapsedLeaderboard}
 			/>
-		</aside>
-		<main class="main">
-			<header class="header">
-				<h2 class="title">Caption This</h2>
-				<div class="header-meta">
-					{#if phase}
-						<span class="phase-pill" data-phase={phase}>{phase.replace(/_/g, ' ')}</span>
-					{/if}
-					{#if countdownLabel}
-						<span class="countdown">Ends at midnight: {countdownLabel}</span>
+		</div>
+		{#if pastRounds.length > 0}
+			<div class="past-photos">
+				<span class="past-photos-label">Past photos</span>
+				<div class="past-photos-grid">
+					{#each pastRounds as pr}
+						<button
+							type="button"
+							class="past-photo-thumb"
+							class:selected={selectedPastRoundId === pr.id}
+							onclick={() => selectedPastRoundId = selectedPastRoundId === pr.id ? null : pr.id}
+							title={pr.dayKey}
+						>
+							{#if pr.photoUrl}
+								<img src={pr.photoUrl} alt="" />
+							{:else}
+								<span class="past-photo-placeholder">No photo</span>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+	</div>
+
+	{#if actionError}
+		<div class="toast error" role="alert">{actionError}</div>
+	{/if}
+
+	{#if !round && !selectedPastRound}
+		<p class="empty">No active round. Refresh the page.</p>
+	{:else if selectedPastRound}
+		<!-- Static view of a past round: photo + winner on photo with crown + captions with avatars -->
+		<div class="past-round-view">
+			<button type="button" class="back-to-current" onclick={() => (selectedPastRoundId = null)}>
+				← Back to current
+			</button>
+			<div class="past-round-layout">
+				<div class="past-captions-list">
+					<h3 class="past-captions-title">Captions</h3>
+					<ul class="past-captions-ul" role="list">
+						{#each selectedPastRound.captions as c}
+							<li class="past-caption-row">
+								<span class="past-caption-avatar">
+									{#if c.userAvatarUrl}
+										<img src={c.userAvatarUrl} alt="" />
+									{:else}
+										<span class="past-caption-initial">{ (c.userName ?? '?').charAt(0).toUpperCase() }</span>
+									{/if}
+								</span>
+								<span class="past-caption-text">"{c.text}"</span>
+								{#if c.voteCount > 0}
+									<span class="past-caption-votes">{c.voteCount} vote{c.voteCount !== 1 ? 's' : ''}</span>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				</div>
+				<div class="past-photo-wrap">
+					{#if selectedPastRound.photoUrl}
+						<div class="polaroid past-polaroid">
+							<div class="polaroid-inner">
+								<img src={selectedPastRound.photoUrl} alt="Past round photo" class="photo-img" />
+							</div>
+							{#if selectedPastWinner}
+								<div class="winner-on-photo">
+									<span class="winner-crown" aria-hidden="true">👑</span>
+									<p class="winner-text">"{selectedPastWinner.text}"</p>
+								</div>
+							{/if}
+						</div>
+					{:else}
+						<p class="no-photo">No photo for this round.</p>
 					{/if}
 				</div>
-			</header>
+			</div>
+		</div>
+	{:else}
+		<!-- Current round: left slots | photo | right slots -->
+		<header class="header">
+			<h2 class="title">Caption This</h2>
+			<div class="header-meta">
+				{#if phase}
+					<span class="phase-pill" data-phase={phase}>{phase.replace(/_/g, ' ')}</span>
+				{/if}
+			</div>
+		</header>
 
-			{#if actionError}
-				<div class="toast error" role="alert">{actionError}</div>
-			{/if}
-
-			{#if !round}
-				<p class="empty">No active round. Refresh the page.</p>
-			{:else}
-				<div class="game-area">
-					<div class="photo-section">
-						<PhotoSubmitBox
-							photoUrl={photoUrl}
-							roundId={roundId}
-							disabled={phase !== 'WAITING_FOR_PHOTO'}
-							activeTabId={activeTabId}
-						/>
-					</div>
-
-					{#if phase === 'CAPTION_SUBMISSION'}
-						<section class="section">
-							<h3 class="section-title">Captions</h3>
-							<CaptionInput
-								roundId={roundId}
-								maxLength={captionMaxLength}
-								existingText={myCaptionText}
-								submitted={submittedCaption}
-								isPhotoSubmitter={isPhotoSubmitter}
-								activeTabId={activeTabId}
-							/>
-							<CaptionWall
-								captions={anonymousCaptions}
-								phase="CAPTION_SUBMISSION"
-								expectedCount={eligibleCaptionCount}
-							/>
-						</section>
-					{:else if phase === 'VOTING'}
-						<section class="section">
-							<h3 class="section-title">Vote for a caption</h3>
-							<VotingGrid
-								captions={anonymousCaptions}
-								roundId={roundId}
-								myVoteCaptionId={myVoteCaptionId}
-								myCaptionIds={myCaptionIds}
-								voteError={actionError}
-								activeTabId={activeTabId}
-							/>
-						</section>
-					{:else if phase === 'RESULTS'}
-						<ResultsPanel captions={anonymousCaptions} isPhotoSubmitter={isPhotoSubmitter} activeTabId={activeTabId} />
+		<div class="game-area three-col">
+			<div class="slots slots-left">
+				{#each leftSlots as c}
+					{@const canVoteThis = canVoteForCaption && !myCaptionIds.has(c.id)}
+					{#if canVoteThis}
+						<form method="POST" action="?/submitVote" class="slot-vote-form" use:enhance={() => async ({ result, update }) => { await update(); if (result.type === 'success' || result.type === 'redirect') await invalidateAll(); }}>
+							<input type="hidden" name="roundId" value={roundId} />
+							<input type="hidden" name="captionId" value={c.id} />
+							{#if activeTabId}<input type="hidden" name="activeTab" value={activeTabId} />{/if}
+							<button type="submit" class="slot-card slot-card-vote">"{c.text}"</button>
+						</form>
+					{:else}
+						<div class="slot-card" class:slot-voted={myVoteCaptionId === c.id}>"{c.text}"</div>
 					{/if}
+				{/each}
+			</div>
 
-					{#if (phase === 'CAPTION_SUBMISSION' || phase === 'VOTING') && isPhotoSubmitter}
-						<div class="end-round-wrap">
-							{#if endRoundConfirm}
-								<span class="end-round-confirm">
-									End round now?
-									<form method="POST" action="?/endRoundNow" class="inline-form">
-										<input type="hidden" name="roundId" value={roundId} />
-										{#if activeTabId}
-											<input type="hidden" name="activeTab" value={activeTabId} />
-										{/if}
-										<button type="submit" class="btn-danger">Yes, end round</button>
-									</form>
-									<button type="button" class="btn-ghost" onclick={() => (endRoundConfirm = false)}>Cancel</button>
-								</span>
-							{:else}
-								<button type="button" class="btn-ghost end-round-btn" onclick={() => (endRoundConfirm = true)}>
-									End round now
-								</button>
-							{/if}
+			<div class="photo-section">
+				<div class="photo-wrap">
+					<PhotoSubmitBox
+						photoUrl={photoUrl}
+						roundId={roundId}
+						disabled={phase !== 'WAITING_FOR_PHOTO'}
+						activeTabId={activeTabId}
+					/>
+					{#if phase === 'CAPTION_SUBMISSION' && photoUrl && !isPhotoSubmitter && !submittedCaption}
+						<div class="overlay-caption">
+							<form
+								method="POST"
+								action="?/submitCaption"
+								class="overlay-form"
+								use:enhance={handleOverlayCaptionSubmit}
+							>
+								<input type="hidden" name="roundId" value={roundId} />
+								{#if activeTabId}
+									<input type="hidden" name="activeTab" value={activeTabId} />
+								{/if}
+								<input
+									type="text"
+									name="text"
+									class="overlay-input"
+									placeholder="Write a caption… (Enter to submit)"
+									maxlength={captionMaxLength}
+									bind:value={overlayCaptionText}
+									onkeydown={submitOverlayOnEnter}
+									disabled={overlaySubmitting}
+								/>
+							</form>
 						</div>
 					{/if}
 				</div>
-			{/if}
-		</main>
-	</div>
+			</div>
+
+			<div class="slots slots-right">
+				{#each rightSlots as c}
+					{@const canVoteThis = canVoteForCaption && !myCaptionIds.has(c.id)}
+					{#if canVoteThis}
+						<form method="POST" action="?/submitVote" class="slot-vote-form" use:enhance={() => async ({ result, update }) => { await update(); if (result.type === 'success' || result.type === 'redirect') await invalidateAll(); }}>
+							<input type="hidden" name="roundId" value={roundId} />
+							<input type="hidden" name="captionId" value={c.id} />
+							{#if activeTabId}<input type="hidden" name="activeTab" value={activeTabId} />{/if}
+							<button type="submit" class="slot-card slot-card-vote">"{c.text}"</button>
+						</form>
+					{:else}
+						<div class="slot-card" class:slot-voted={myVoteCaptionId === c.id}>"{c.text}"</div>
+					{/if}
+				{/each}
+			</div>
+		</div>
+
+		{#if phase === 'RESULTS'}
+			<ResultsPanel
+				captions={anonymousCaptions}
+				isPhotoSubmitter={isPhotoSubmitter}
+				activeTabId={activeTabId}
+			/>
+		{/if}
+
+		{#if (phase === 'CAPTION_SUBMISSION' || phase === 'VOTING') && isPhotoSubmitter}
+			<div class="end-round-wrap">
+				{#if endRoundConfirm}
+					<span class="end-round-confirm">
+						End round now?
+						<form method="POST" action="?/endRoundNow" class="inline-form">
+							<input type="hidden" name="roundId" value={roundId} />
+							{#if activeTabId}
+								<input type="hidden" name="activeTab" value={activeTabId} />
+							{/if}
+							<button type="submit" class="btn-danger">Yes, end round</button>
+						</form>
+						<button type="button" class="btn-ghost" onclick={() => (endRoundConfirm = false)}>Cancel</button>
+					</span>
+				{:else}
+					<button type="button" class="btn-ghost end-round-btn" onclick={() => (endRoundConfirm = true)}>
+						End round now
+					</button>
+				{/if}
+			</div>
+		{/if}
+	{/if}
 </div>
 
 <style>
 	.caption-this-embed {
 		width: 100%;
+		min-height: 100%;
+		display: flex;
+		flex-direction: column;
 	}
-	.layout {
-		display: grid;
+	.top-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
 		gap: 1rem;
+		margin-bottom: 1rem;
 	}
-	@media (min-width: 768px) {
-		.layout {
-			grid-template-columns: 260px 1fr;
+	.leaderboard-wrap {
+		flex: 1;
+		min-width: 200px;
+	}
+	.past-photos {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.past-photos-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--muted, #666);
+	}
+	.past-photos-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+	.past-photo-thumb {
+		width: 56px;
+		height: 56px;
+		border-radius: 8px;
+		overflow: hidden;
+		border: 2px solid var(--border, #e5e5e5);
+		background: var(--surface2, #f0f0f0);
+		padding: 0;
+		cursor: pointer;
+		transition: border-color 0.2s, box-shadow 0.2s;
+	}
+	.past-photo-thumb:hover {
+		border-color: var(--primary, #e85d04);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	}
+	.past-photo-thumb.selected {
+		border-color: var(--primary, #e85d04);
+		box-shadow: 0 0 0 2px rgba(232, 93, 4, 0.3);
+	}
+	.past-photo-thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.past-photo-placeholder {
+		font-size: 0.65rem;
+		color: var(--muted, #999);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
+	}
+	.toast.error {
+		padding: 0.6rem 0.875rem;
+		border-radius: 8px;
+		margin-bottom: 0.75rem;
+		font-size: 0.875rem;
+		background: rgba(200, 0, 0, 0.1);
+		color: var(--error, #c00);
+	}
+	.empty {
+		font-size: 0.9375rem;
+		color: var(--muted, #666);
+		margin: 0;
+	}
+
+	/* Past round view */
+	.past-round-view {
+		margin-top: 0.5rem;
+	}
+	.back-to-current {
+		padding: 0.35rem 0.75rem;
+		font-size: 0.8125rem;
+		background: var(--surface2, #f0f0f0);
+		border: 1px solid var(--border, #ddd);
+		border-radius: 6px;
+		cursor: pointer;
+		margin-bottom: 1rem;
+		color: var(--text, #1a1a1a);
+	}
+	.back-to-current:hover {
+		background: var(--border, #e5e5e5);
+	}
+	.past-round-layout {
+		display: grid;
+		gap: 1.5rem;
+		grid-template-columns: 1fr minmax(280px, 400px);
+		align-items: start;
+	}
+	@media (max-width: 640px) {
+		.past-round-layout {
+			grid-template-columns: 1fr;
 		}
 	}
-	.aside {
-		position: relative;
+	.past-captions-list {
+		background: var(--surface2, #f5f5f5);
+		border-radius: 12px;
+		padding: 1rem;
+		border: 1px solid var(--border, #e5e5e5);
 	}
-	.main {
+	.past-captions-title {
+		margin: 0 0 0.75rem 0;
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: var(--text, #1a1a1a);
+	}
+	.past-captions-ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.past-caption-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem 0;
+		border-bottom: 1px solid var(--border, #eee);
+		font-size: 0.875rem;
+	}
+	.past-caption-row:last-child {
+		border-bottom: none;
+	}
+	.past-caption-avatar {
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		overflow: hidden;
+		background: var(--surface, #ddd);
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.past-caption-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.past-caption-initial {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text, #1a1a1a);
+	}
+	.past-caption-text {
+		flex: 1;
 		min-width: 0;
+		color: var(--text, #1a1a1a);
 	}
+	.past-caption-votes {
+		font-size: 0.75rem;
+		color: var(--muted, #666);
+		flex-shrink: 0;
+	}
+	.past-photo-wrap {
+		display: flex;
+		justify-content: center;
+	}
+	.past-polaroid {
+		position: relative;
+		display: inline-block;
+		padding: 0.75rem 0.75rem 2.5rem 0.75rem;
+		background: #fff;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+		border-radius: 2px;
+		max-width: 100%;
+	}
+	.past-polaroid .polaroid-inner {
+		overflow: hidden;
+		border-radius: 1px;
+		line-height: 0;
+	}
+	.past-polaroid .photo-img {
+		width: 100%;
+		height: auto;
+		max-height: 50vh;
+		object-fit: contain;
+		display: block;
+	}
+	.winner-on-photo {
+		position: absolute;
+		bottom: 0.5rem;
+		left: 0.75rem;
+		right: 0.75rem;
+		background: rgba(0, 0, 0, 0.75);
+		color: #fff;
+		padding: 0.5rem 0.75rem;
+		border-radius: 8px;
+		text-align: center;
+	}
+	.winner-crown {
+		display: block;
+		font-size: 1.25rem;
+		margin-bottom: 0.25rem;
+	}
+	.winner-text {
+		margin: 0;
+		font-size: 0.8125rem;
+		line-height: 1.3;
+	}
+	.no-photo {
+		font-size: 0.9375rem;
+		color: var(--muted, #666);
+		margin: 0;
+	}
+
+	/* Current round */
 	.header {
 		margin-bottom: 1rem;
 	}
@@ -246,35 +605,96 @@
 		background: var(--surface2, #eee);
 		color: var(--text, #1a1a1a);
 	}
-	.countdown {
-		font-size: 0.8125rem;
-		color: var(--muted, #666);
+	.game-area.three-col {
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
+		gap: 1rem;
+		align-items: start;
+		margin-bottom: 1rem;
 	}
-	.toast {
-		padding: 0.6rem 0.875rem;
-		border-radius: 8px;
-		margin-bottom: 0.75rem;
-		font-size: 0.875rem;
+	@media (max-width: 768px) {
+		.game-area.three-col {
+			grid-template-columns: 1fr;
+		}
+		.game-area.three-col .photo-section {
+			order: -1;
+		}
 	}
-	.toast.error {
-		background: rgba(200, 0, 0, 0.1);
-		color: var(--error, #c00);
-	}
-	.empty {
-		font-size: 0.9375rem;
-		color: var(--muted, #666);
-		margin: 0;
-	}
-	.game-area {
+	.slots {
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
+		gap: 0.5rem;
+		min-height: 120px;
+	}
+	.slot-vote-form {
+		width: 100%;
+		margin: 0;
+	}
+	.slot-card {
+		background: var(--surface, #fff);
+		border: 1px solid var(--border, #e5e5e5);
+		border-radius: 10px;
+		padding: 0.625rem 0.875rem;
+		font-size: 0.875rem;
+		line-height: 1.35;
+		color: var(--text, #1a1a1a);
+	}
+	.slot-card-vote {
+		width: 100%;
+		display: block;
+		text-align: left;
+		background: var(--surface, #fff);
+		border: 1px solid var(--border, #e5e5e5);
+		border-radius: 10px;
+		padding: 0.625rem 0.875rem;
+		font-size: 0.875rem;
+		line-height: 1.35;
+		color: var(--text, #1a1a1a);
+		cursor: pointer;
+		transition: border-color 0.2s, background 0.2s;
+	}
+	.slot-card-vote:hover {
+		border-color: var(--primary, #48bb78);
+		background: rgba(72, 187, 120, 0.06);
+	}
+	.slot-card.slot-voted {
+		border-color: var(--success, #16a34a);
+		background: rgba(22, 163, 74, 0.06);
 	}
 	.photo-section {
-		width: 100%;
+		display: flex;
+		justify-content: center;
 	}
-	.section {
-		margin-top: 0.5rem;
+	.photo-wrap {
+		position: relative;
+		display: inline-block;
+	}
+	.overlay-caption {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		background: rgba(0, 0, 0, 0.4);
+		border-radius: 2px;
+		padding: 1rem 1rem 1.5rem 1rem;
+	}
+	.overlay-form {
+		width: 100%;
+		max-width: 320px;
+	}
+	.overlay-input {
+		width: 100%;
+		padding: 0.75rem 1rem;
+		font-size: 0.9375rem;
+		border: 2px solid #fff;
+		border-radius: 8px;
+		background: #fff;
+		color: var(--text, #1a1a1a);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	}
+	.overlay-input::placeholder {
+		color: var(--muted, #888);
 	}
 	.section-title {
 		margin: 0 0 0.5rem 0;
@@ -314,9 +734,6 @@
 		border: 1px solid var(--border, #ccc);
 		border-radius: 6px;
 		cursor: pointer;
-		color: var(--muted, #666);
-	}
-	.end-round-btn {
 		color: var(--muted, #666);
 	}
 </style>

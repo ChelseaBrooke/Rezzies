@@ -83,6 +83,7 @@
 		myAssignment?: RoomAssignment | null;
 		myAssignments?: RoomAssignment[];
 		announcements?: string[];
+		tripGames?: TripGame[];
 	} = $props();
 
 	const todayKey = $derived(new Date().toISOString().slice(0, 10));
@@ -206,11 +207,13 @@
 	const myBedType = $derived(myAssignment?.bed?.bedType ?? (myAssignments?.[0]?.bed?.bedType) ?? null);
 	const hasMyRoom = $derived(!!(myRoomName || myBedType || myAssignments?.length || myAssignment));
 
-	// Trip games (client-side store) for hero overlay
-	let tripGames = $state<TripGame[]>([]);
+	// Trip games: use server data when passed, else fall back to client store (e.g. legacy)
+	const tripGamesProp = $derived(tripGames ?? []);
+	let tripGamesLocal = $state<TripGame[]>([]);
 	onMount(() => {
-		tripGames = getTripGames(tripId);
+		if (tripGamesProp.length === 0) tripGamesLocal = getTripGames(tripId);
 	});
+	const tripGamesList = $derived(tripGamesProp.length > 0 ? tripGamesProp : tripGamesLocal);
 	function gameDisplayName(tg: TripGame): string {
 		const def = GAME_DEFS.find((d) => d.id === tg.gameId);
 		return def?.name ?? tg.name ?? tg.gameId;
@@ -228,11 +231,11 @@
 		{/if}
 		<div class="v-hero-overlay" aria-hidden="true"></div>
 
-		{#if tripGames.length > 0}
+		{#if tripGamesList.length > 0}
 			<div class="v-hero-games">
 				<span class="v-hero-games-title">🎲 Trip Games</span>
 				<div class="v-hero-games-chips">
-					{#each tripGames as tg}
+					{#each tripGamesList as tg}
 						<a href="/trips/{tripId}/games?tab={tg.id}" class="v-hero-games-chip v-hero-games-chip--{tg.gameId}" data-trip-game-id={tg.id}>{gameDisplayName(tg)}</a>
 					{/each}
 				</div>

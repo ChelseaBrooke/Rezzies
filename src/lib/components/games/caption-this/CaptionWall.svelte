@@ -8,56 +8,76 @@
 	let { captions = [], phase, expectedCount = 0 }: Props = $props();
 </script>
 
-<div class="caption-wall">
-	{#each captions as c}
-		<div class="caption-card">
-			<p class="caption-text">"{c.text}"</p>
-		</div>
-	{/each}
-	{#if phase === 'CAPTION_SUBMISSION' && expectedCount > captions.length}
-		{#each Array(Math.max(0, expectedCount - captions.length)) as _}
-			<div class="caption-card placeholder">
-				<span class="placeholder-text">Waiting for others…</span>
-			</div>
-		{/each}
+<div class="caption-wall-wrap">
+	{#if phase === 'CAPTION_SUBMISSION' && expectedCount > 0}
+		<p class="caption-count">
+			{captions.length} of {expectedCount} caption{captions.length !== 1 ? 's' : ''} in
+			{#if captions.length < expectedCount}
+				— more can still submit
+			{/if}
+		</p>
 	{/if}
+	<ul class="caption-list" role="list">
+		{#each captions as c}
+			<li class="caption-option">
+				<span class="option-dot" aria-hidden="true"></span>
+				<p class="caption-text">"{c.text}"</p>
+			</li>
+		{/each}
+	</ul>
 </div>
 
 <style>
-	.caption-wall {
-		display: grid;
-		grid-template-columns: repeat(1, 1fr);
-		gap: 0.75rem;
+	.caption-wall-wrap {
 		margin-top: 1rem;
 	}
-	@media (min-width: 640px) {
-		.caption-wall {
-			grid-template-columns: repeat(2, 1fr);
-		}
+	.caption-count {
+		font-size: 0.8125rem;
+		color: var(--muted, #666);
+		margin: 0 0 0.5rem 0;
 	}
-	@media (min-width: 900px) {
-		.caption-wall {
-			grid-template-columns: repeat(3, 1fr);
-		}
+	.caption-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
 	}
-	.caption-card {
+	.caption-option {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+		padding: 0.75rem 1rem;
 		background: var(--surface, #fff);
 		border: 1px solid var(--border, #e5e5e5);
 		border-radius: 10px;
-		padding: 0.875rem 1rem;
+		border-left: 3px solid transparent;
+		transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
 	}
-	.caption-card.placeholder {
-		background: var(--surface2, #f9f9f9);
-		border-style: dashed;
+	.caption-option:hover {
+		background: rgba(147, 112, 219, 0.08);
+		border-left-color: #9370db;
+		box-shadow: 0 2px 8px rgba(147, 112, 219, 0.12);
+	}
+	.option-dot {
+		flex-shrink: 0;
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: var(--border, #e0e0e0);
+		margin-top: 0.35rem;
+		transition: background 0.2s, transform 0.2s;
+	}
+	.caption-option:hover .option-dot {
+		background: #9370db;
+		transform: scale(1.15);
 	}
 	.caption-text {
 		margin: 0;
 		font-size: 0.9375rem;
 		line-height: 1.4;
 		color: var(--text, #1a1a1a);
-	}
-	.placeholder-text {
-		font-size: 0.8125rem;
-		color: var(--muted, #666);
+		min-width: 0;
 	}
 </style>

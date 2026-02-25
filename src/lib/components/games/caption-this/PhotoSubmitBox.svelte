@@ -67,8 +67,10 @@
 />
 
 {#if photoUrl}
-	<div class="photo-container">
-		<img src={photoUrl} alt="Round photo" class="photo-img" />
+	<div class="polaroid">
+		<div class="polaroid-inner">
+			<img src={photoUrl} alt="Round photo" class="photo-img" />
+		</div>
 	</div>
 {:else}
 	<button
@@ -105,12 +107,20 @@
 		opacity: 0;
 		overflow: hidden;
 	}
-	.photo-container {
-		width: 100%;
-		border-radius: 12px;
+	.polaroid {
+		display: inline-block;
+		padding: 0.75rem 0.75rem 2.5rem 0.75rem;
+		background: #fff;
+		box-shadow:
+			0 2px 8px rgba(0, 0, 0, 0.08),
+			0 8px 24px rgba(0, 0, 0, 0.06);
+		border-radius: 2px;
+		max-width: 100%;
+	}
+	.polaroid-inner {
 		overflow: hidden;
-		background: var(--surface2, #f5f5f5);
-		border: 1px solid var(--border, #e5e5e5);
+		border-radius: 1px;
+		line-height: 0;
 	}
 	.photo-img {
 		width: 100%;
@@ -118,6 +128,7 @@
 		display: block;
 		max-height: 40vh;
 		object-fit: contain;
+		vertical-align: middle;
 	}
 	.empty-state {
 		display: flex;

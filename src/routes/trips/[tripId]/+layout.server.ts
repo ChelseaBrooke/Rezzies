@@ -78,6 +78,18 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 
 	const allTrips = tripsResult.allTrips.map((m) => m.trip);
 
+	const tripGamesRows = await prisma.tripGame.findMany({
+		where: { tripId },
+		orderBy: { createdAt: 'asc' }
+	});
+	const tripGames = tripGamesRows.map((g) => ({
+		id: g.id,
+		gameId: g.gameId,
+		name: g.name,
+		addedByUserId: g.addedByUserId,
+		addedAt: g.createdAt.toISOString()
+	}));
+
 	// When user is invited but hasn't accepted, get the invite token for the "Accept invite" link
 	let pendingInviteToken: string | null = null;
 	if (membership?.inviteStatus === 'invited') {
@@ -120,6 +132,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		canChat: userRsvp?.status === 'yes' || membership?.role === 'host',
 		pendingInviteToken,
 		committedFundsFromYesRsvps: committedFunds,
-		pollsBadgeCount
+		pollsBadgeCount,
+		tripGames
 	};
 };

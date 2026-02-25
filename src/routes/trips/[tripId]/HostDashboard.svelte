@@ -219,6 +219,7 @@
 		<VacationModeView
 			tripId={trip.id}
 			isHost={true}
+			tripGames={data.tripGames ?? []}
 			trip={{
 				fullAddress: trip.fullAddress,
 				location: trip.location,

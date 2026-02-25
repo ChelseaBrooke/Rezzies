@@ -73,6 +73,7 @@ model Trip {
   polls                Poll[]
   captionThisRounds    CaptionThisRound[]
   captionThisScores   CaptionThisScore[]
+  tripGames           TripGame[]
 
   @@index([inviteCode])
   @@index([isPublished])
@@ -228,10 +229,27 @@ model User {
   captionThisCaptions  CaptionThisCaption[]
   captionThisVotes     CaptionThisVote[]
   captionThisScores    CaptionThisScore[]
+  tripGamesAdded      TripGame[]  @relation("TripGameAddedBy")
   directMessagesSent   DirectMessage[] @relation("DirectMessageSender")
   directMessagesReceived DirectMessage[] @relation("DirectMessageRecipient")
 
   @@index([email])
+}
+
+// Trip games (add-on games for a trip) — shared for all trip members
+model TripGame {
+  id             String   @id @default(uuid())
+  tripId         String
+  gameId         String   // scavenger-bingo | caption-this | alphabet-hunt | daily-trivia
+  name           String
+  addedByUserId  String
+  createdAt      DateTime @default(now())
+
+  trip    Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  addedBy User @relation("TripGameAddedBy", fields: [addedByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, gameId])
+  @@index([tripId])
 }
 
 // User Sessions

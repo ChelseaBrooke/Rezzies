@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+
 	type Props = {
 		roundId: string;
 		maxLength: number;
@@ -16,6 +19,28 @@
 	$effect(() => {
 		if (existingText != null) text = existingText;
 	});
+
+	function handleCaptionSubmit() {
+		return async ({
+			result,
+			update
+		}: {
+			result: { type: string; data?: Record<string, unknown> };
+			update: () => Promise<void>;
+		}) => {
+			submitting = true;
+			await update();
+			submitting = false;
+			if (result.type === 'success' || result.type === 'redirect') {
+				await invalidateAll();
+			}
+			if (result.type === 'failure' && result.data && typeof result.data === 'object' && 'error' in result.data) {
+				error = String((result.data as { error?: string }).error);
+			} else {
+				error = null;
+			}
+		};
+	}
 </script>
 
 {#if isPhotoSubmitter}
@@ -23,7 +48,7 @@
 {:else if submitted}
 	<p class="submitted-badge">Submitted</p>
 {:else}
-	<form method="POST" action="?/submitCaption" class="caption-form" onsubmit={() => { submitting = true; }}>
+	<form method="POST" action="?/submitCaption" class="caption-form" use:enhance={handleCaptionSubmit}>
 		<input type="hidden" name="roundId" value={roundId} />
 		{#if activeTabId}
 			<input type="hidden" name="activeTab" value={activeTabId} />
