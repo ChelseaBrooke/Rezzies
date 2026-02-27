@@ -6,9 +6,16 @@ import { prisma } from '$lib/server/prisma.js';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 
+// Map ActivityParticipant.status storage values → display values
+function toRsvpStatus(dbStatus: string): 'going' | 'maybe' | 'skip' {
+	if (dbStatus === 'in' || dbStatus === 'going') return 'going';
+	if (dbStatus === 'maybe') return 'maybe';
+	return 'skip';
+}
+
 export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 	const user = await getSessionUser(cookies);
-	
+
 	if (!user) {
 		throw redirect(303, `/login?redirect=/trips/${params.tripId}/itinerary`);
 	}
@@ -16,44 +23,31 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 	const tripId = params.tripId;
 	const parentData = await parent();
 
-	// Check if user is a member
 	const member = await isTripMember(tripId, user.id);
 	if (!member) {
 		throw error(403, 'You do not have access to this trip');
 	}
 
-	// Get trip with itinerary and meals data
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
 		include: {
 			mealPlan: true,
 			members: {
 				include: {
-					user: {
-						select: {
-							id: true,
-							name: true,
-							email: true
-						}
-					}
+					user: { select: { id: true, name: true, email: true } }
 				}
 			},
 			rsvps: {
 				include: {
-					user: {
-						select: {
-							id: true,
-							name: true
-						}
-					}
+					user: { select: { id: true, name: true } }
 				}
 			},
 			mealSlots: {
 				include: {
-					assignedUser: {
-						select: {
-							id: true,
-							name: true
+					assignedUser: { select: { id: true, name: true } },
+					attendance: {
+						include: {
+							user: { select: { id: true, name: true } }
 						}
 					}
 				},
@@ -63,25 +57,16 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 				include: {
 					participants: {
 						include: {
-							user: {
-								select: {
-									id: true,
-									name: true
-								}
-							}
+							user: { select: { id: true, name: true } }
 						}
 					}
 				},
-				orderBy: {
-					date: 'asc'
-				}
+				orderBy: { date: 'asc' }
 			}
 		}
 	});
 
-	if (!trip) {
-		throw error(404, 'Trip not found');
-	}
+	if (!trip) throw error(404, 'Trip not found');
 
 	const members =
 		trip.members?.map((m) => ({
@@ -91,47 +76,49 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		})) ?? [];
 
 	// Group events by date
-	const eventsByDate: Record<string, any[]> = {};
+	const eventsByDate: Record<string, unknown[]> = {};
 
-	// Add arrivals/departures from RSVPs
-	trip.rsvps.forEach(rsvp => {
+	// Arrivals/departures
+	trip.rsvps.forEach((rsvp) => {
 		if (rsvp.arrivalDatetime) {
 			const date = rsvp.arrivalDatetime.toISOString().split('T')[0];
 			if (!eventsByDate[date]) eventsByDate[date] = [];
-			eventsByDate[date].push({
-				type: 'arrival',
-				user: rsvp.user,
-				time: rsvp.arrivalDatetime
-			});
+			eventsByDate[date].push({ type: 'arrival', user: rsvp.user, time: rsvp.arrivalDatetime });
 		}
 		if (rsvp.departureDatetime) {
 			const date = rsvp.departureDatetime.toISOString().split('T')[0];
 			if (!eventsByDate[date]) eventsByDate[date] = [];
-			eventsByDate[date].push({
-				type: 'departure',
-				user: rsvp.user,
-				time: rsvp.departureDatetime
-			});
+			eventsByDate[date].push({ type: 'departure', user: rsvp.user, time: rsvp.departureDatetime });
 		}
 	});
 
-	// Add meal slots
-	trip.mealSlots.forEach(slot => {
+	// Meal slots — full attendance included
+	trip.mealSlots.forEach((slot) => {
 		const date = slot.date.toISOString().split('T')[0];
 		if (!eventsByDate[date]) eventsByDate[date] = [];
 		eventsByDate[date].push({
 			type: 'meal',
 			slotId: slot.id,
 			mealType: slot.mealType,
+			title: slot.title,
 			time: slot.time,
-			assignedUser: slot.assignedUser,
+			notes: slot.notes,
 			menuText: slot.menuText,
-			notes: slot.notes
+			assignedUser: slot.assignedUser,
+			// attendance: all trip members mapped to optedOut boolean
+			attendance: slot.attendance.map((a) => ({
+				userId: a.user.id,
+				userName: a.user.name ?? 'Guest',
+				optedOut: a.optedOut,
+				dietaryNote: a.dietaryNote
+			})),
+			// currentUserOptedOut derived server-side for convenience
+			currentUserOptedOut: slot.attendance.find((a) => a.userId === user.id)?.optedOut ?? false
 		});
 	});
 
-	// Add activities
-	trip.activities.forEach(activity => {
+	// Activities — full participant RSVP included
+	trip.activities.forEach((activity) => {
 		const date = activity.date.toISOString().split('T')[0];
 		if (!eventsByDate[date]) eventsByDate[date] = [];
 		eventsByDate[date].push({
@@ -140,44 +127,55 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 			title: activity.title,
 			time: activity.time,
 			location: activity.location,
-			participants: activity.participants.map((p) => p.user),
-			pricePerPerson: activity.pricePerPerson
+			notes: activity.notes,
+			pricePerPerson: activity.pricePerPerson,
+			totalCostToSplit: activity.totalCostToSplit,
+			status: activity.status,
+			// Full participant list with display-friendly rsvpStatus
+			participants: activity.participants.map((p) => ({
+				id: p.user.id,
+				name: p.user.name ?? 'Guest',
+				rsvpStatus: toRsvpStatus(p.status)
+			})),
+			// Quick access to current user's RSVP
+			currentUserRsvp: toRsvpStatus(
+				activity.participants.find((p) => p.userId === user.id)?.status ?? 'skip'
+			)
 		});
 	});
 
 	// Sort events within each date
 	const toSortKey = (ev: { time?: string | Date | null; type: string }) => {
 		if (ev.time instanceof Date) return ev.time.getTime();
-		if (typeof ev.time === 'string' && /^\d{1,2}:\d{2}/.test(ev.time)) return new Date(`1970-01-01T${ev.time}`).getTime();
+		if (typeof ev.time === 'string' && /^\d{1,2}:\d{2}/.test(ev.time))
+			return new Date(`1970-01-01T${ev.time}`).getTime();
 		return 0;
 	};
 	Object.keys(eventsByDate).forEach((date) => {
-		eventsByDate[date].sort((a, b) => {
-			const diff = toSortKey(a) - toSortKey(b);
+		(eventsByDate[date] as { type: string; time?: unknown }[]).sort((a, b) => {
+			const diff =
+				toSortKey(a as { time?: string | Date | null; type: string }) -
+				toSortKey(b as { time?: string | Date | null; type: string });
 			if (diff !== 0) return diff;
 			const order: Record<string, number> = { arrival: 0, meal: 1, activity: 2, departure: 3 };
 			return (order[a.type] ?? 4) - (order[b.type] ?? 4);
 		});
 	});
 
-	// Trip days only (check-in through check-out)
+	// Trip days
 	const tripDays: string[] = [];
 	if (trip.checkInDate && trip.checkOutDate) {
-		const start = new Date(trip.checkInDate);
 		const end = new Date(trip.checkOutDate);
-		for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+		for (const d = new Date(trip.checkInDate); d <= end; d.setDate(d.getDate() + 1)) {
 			tripDays.push(d.toISOString().split('T')[0]);
 		}
 	}
 
-	// People who RSVP'd yes (for drag-to-assign)
+	// Going users (for drag-to-assign + sidebar)
 	const goingUsers =
 		trip.rsvps
 			?.filter((r) => r.status === 'yes')
-			.map((r) => ({
-				id: r.user?.id,
-				name: r.user?.name ?? 'Guest'
-			}))
+			.map((r) => ({ id: r.user?.id, name: r.user?.name ?? 'Guest' }))
 			.filter((u) => u.id) ?? [];
 
 	return {
@@ -193,7 +191,74 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 	};
 };
 
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
+
 export const actions: Actions = {
+	// ── RSVP ──────────────────────────────────────────────────────────────
+
+	/** Set the current user's RSVP for an activity (going / maybe / skip). */
+	setActivityRsvp: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) return { setActivityRsvpError: 'Not a trip member.' };
+
+		const fd = await request.formData();
+		const activityId = fd.get('activityId') as string;
+		const display = fd.get('status') as string; // "going" | "maybe" | "skip"
+
+		if (!activityId) return { setActivityRsvpError: 'Activity ID required.' };
+
+		const activity = await prisma.activity.findFirst({ where: { id: activityId, tripId } });
+		if (!activity) return { setActivityRsvpError: 'Activity not found.' };
+
+		// Map display value → storage value
+		const dbStatus = display === 'going' ? 'in' : display === 'maybe' ? 'maybe' : 'out';
+
+		if (dbStatus === 'out') {
+			// "Skip" = delete participant record so they're not counted
+			await prisma.activityParticipant.deleteMany({
+				where: { activityId, userId: user.id }
+			});
+		} else {
+			await prisma.activityParticipant.upsert({
+				where: { activityId_userId: { activityId, userId: user.id } },
+				create: { activityId, userId: user.id, status: dbStatus },
+				update: { status: dbStatus }
+			});
+		}
+		return { setActivityRsvpSuccess: true };
+	},
+
+	/** Opt in or out of a meal slot. */
+	setMealAttendance: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) return { setMealAttendanceError: 'Not a trip member.' };
+
+		const fd = await request.formData();
+		const slotId = fd.get('slotId') as string;
+		const optedOut = fd.get('optedOut') === 'true';
+
+		if (!slotId) return { setMealAttendanceError: 'Slot ID required.' };
+		const slot = await prisma.mealSlot.findFirst({ where: { id: slotId, tripId } });
+		if (!slot) return { setMealAttendanceError: 'Meal slot not found.' };
+
+		await prisma.mealSlotAttendance.upsert({
+			where: { slotId_userId: { slotId, userId: user.id } },
+			create: { slotId, userId: user.id, optedOut },
+			update: { optedOut }
+		});
+		return { setMealAttendanceSuccess: true };
+	},
+
+	// ── Meal slot management ───────────────────────────────────────────────
+
 	setMealPlanEnabled: async ({ request, params, cookies }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
@@ -227,9 +292,7 @@ export const actions: Actions = {
 		if (!MEAL_TYPES.includes(mealType as (typeof MEAL_TYPES)[number])) {
 			return { createMealSlotError: 'Invalid meal type.' };
 		}
-		await prisma.mealSlot.create({
-			data: { tripId, mealType, date, time, menuText, notes }
-		});
+		await prisma.mealSlot.create({ data: { tripId, mealType, date, time, menuText, notes } });
 		return { createMealSlotSuccess: true };
 	},
 
@@ -252,7 +315,9 @@ export const actions: Actions = {
 		const data: Record<string, unknown> = {};
 		if (isHost) {
 			if (dateStr) data.date = new Date(dateStr);
-			data.mealType = MEAL_TYPES.includes(mealType as (typeof MEAL_TYPES)[number]) ? mealType : slot.mealType;
+			data.mealType = MEAL_TYPES.includes(mealType as (typeof MEAL_TYPES)[number])
+				? mealType
+				: slot.mealType;
 			data.time = time;
 			data.menuText = menuText;
 			data.notes = notes;
@@ -293,16 +358,11 @@ export const actions: Actions = {
 		if (!trip?.checkInDate || !trip?.checkOutDate) {
 			return { generateSlotsError: 'Trip dates are required.' };
 		}
-		const start = new Date(trip.checkInDate);
 		const end = new Date(trip.checkOutDate);
 		const toCreate: { tripId: string; mealType: string; date: Date }[] = [];
-		for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+		for (const d = new Date(trip.checkInDate); d < end; d.setDate(d.getDate() + 1)) {
 			for (const mealType of ['breakfast', 'lunch', 'dinner'] as const) {
-				toCreate.push({
-					tripId,
-					mealType,
-					date: new Date(d)
-				});
+				toCreate.push({ tripId, mealType, date: new Date(d) });
 			}
 		}
 		await prisma.mealSlot.createMany({ data: toCreate });
@@ -325,6 +385,8 @@ export const actions: Actions = {
 		});
 		return { assignMealMakerSuccess: true };
 	},
+
+	// ── Activity management ────────────────────────────────────────────────
 
 	addActivityParticipant: async ({ request, params, cookies }) => {
 		const user = await getSessionUser(cookies);
@@ -351,10 +413,9 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const activityId = formData.get('activityId') as string;
 		const userId = formData.get('userId') as string;
-		if (!activityId || !userId) return { removeActivityParticipantError: 'Activity and user required.' };
-		await prisma.activityParticipant.deleteMany({
-			where: { activityId, userId }
-		});
+		if (!activityId || !userId)
+			return { removeActivityParticipantError: 'Activity and user required.' };
+		await prisma.activityParticipant.deleteMany({ where: { activityId, userId } });
 		return { removeActivityParticipantSuccess: true };
 	},
 
@@ -371,10 +432,7 @@ export const actions: Actions = {
 		if (!slotId || !dateStr) return { moveMealSlotError: 'Slot and date required.' };
 		const slot = await prisma.mealSlot.findFirst({ where: { id: slotId, tripId } });
 		if (!slot) return { moveMealSlotError: 'Slot not found.' };
-		await prisma.mealSlot.update({
-			where: { id: slotId },
-			data: { date: new Date(dateStr), time }
-		});
+		await prisma.mealSlot.update({ where: { id: slotId }, data: { date: new Date(dateStr), time } });
 		return { moveMealSlotSuccess: true };
 	},
 

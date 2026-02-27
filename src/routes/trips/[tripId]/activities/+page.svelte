@@ -28,11 +28,19 @@
 	// Expanded card state
 	let expandedId = $state<string | null>(null);
 
+	// Half-hour time slots for the time picker (12-hour AM/PM format)
+	const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+		const h24 = Math.floor((i * 30) / 60);
+		const mins = (i * 30) % 60;
+		const ampm = h24 < 12 ? 'AM' : 'PM';
+		const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
+		return `${h12}:${String(mins).padStart(2, '0')} ${ampm}`;
+	});
+
 	// Add-to-trip modal: selected discover result and form state
 	let addModalResult = $state<Record<string, unknown> | null>(null);
 	let addModalDate = $state('');
-	let addModalTime = $state('');
-	let addModalAdditionType = $state<'tentative' | 'planned'>('planned');
+	let addModalTime = $state('9:00 AM');
 	let addModalTotalCost = $state('');
 	let addModalSubmitting = $state(false);
 
@@ -81,8 +89,7 @@
 		const opts = tripDateOptions;
 		const firstDay = opts[0]?.value ?? '';
 		addModalDate = eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate) ? eventDate : firstDay;
-		addModalTime = '';
-		addModalAdditionType = 'planned';
+		addModalTime = '9:00 AM';
 		addModalTotalCost = '';
 	}
 	function closeAddModal() {
@@ -625,23 +632,14 @@
 						{/each}
 					</select>
 
-					<label class="add-modal-label">Time <span class="muted">(optional)</span></label>
-					<input type="text" name="time" class="add-modal-input" bind:value={addModalTime} placeholder="e.g. 2:00 PM" />
+					<label class="add-modal-label">Time</label>
+					<select name="time" class="add-modal-select" bind:value={addModalTime} required>
+						{#each TIME_OPTIONS as t}
+							<option value={t}>{t}</option>
+						{/each}
+					</select>
 
-					<fieldset class="add-modal-fieldset">
-						<legend class="add-modal-label">Add to itinerary</legend>
-						<label class="add-modal-radio">
-							<input type="radio" name="additionType" value="tentative" bind:group={addModalAdditionType} />
-							<span>As tentative</span>
-						</label>
-						<p class="add-modal-hint">Others can add it to their schedules; someone can lock it as planned when there’s enough interest.</p>
-						<label class="add-modal-radio">
-							<input type="radio" name="additionType" value="planned" bind:group={addModalAdditionType} />
-							<span>As planned</span>
-						</label>
-						<p class="add-modal-hint">Add it directly to the trip itinerary.</p>
-					</fieldset>
-
+					<input type="hidden" name="additionType" value="planned" />
 					<label class="add-modal-label">Total cost to split <span class="muted">(optional)</span></label>
 					<p class="add-modal-hint">If this activity has a cost, enter the total amount. It will be split evenly among everyone who adds it to their itinerary.</p>
 					<input type="number" name="totalCostToSplit" class="add-modal-input" bind:value={addModalTotalCost} placeholder="0" min="0" step="0.01" />
@@ -650,7 +648,7 @@
 
 					<div class="add-modal-actions">
 						<button type="button" class="btn btn-secondary" onclick={closeAddModal}>Cancel</button>
-						<button type="submit" class="btn btn-add-to-trip" disabled={addModalSubmitting || !addModalDate}>
+						<button type="submit" class="btn btn-add-to-trip" disabled={addModalSubmitting || !addModalDate || !addModalTime}>
 							{addModalSubmitting ? 'Adding…' : 'Add to trip'}
 						</button>
 					</div>
