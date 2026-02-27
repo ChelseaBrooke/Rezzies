@@ -132,42 +132,42 @@ function calculatePerRoomPrice(
 }
 
 /**
- * Per Person: Total cost divided by total capacity, flat rate
+ * Per Person: Total cost divided by expected people count (or room capacity as fallback), flat rate.
+ * Uses trip.expectedPeopleCount first, then falls back to sum of room maxOccupancy.
  */
 function calculatePerPersonPrice(
-	trip: { totalCost: number; rooms: Array<{ maxOccupancy: number | null }> },
+	trip: { totalCost: number; expectedPeopleCount?: number | null; rooms: Array<{ maxOccupancy: number | null }> },
 	numberOfGuests: number,
 	totalNights: number
 ): PriceCalculationResult {
-	// Calculate total capacity
-	const totalCapacity = trip.rooms.reduce((sum, room) => {
-		return sum + (room.maxOccupancy || 1);
-	}, 0);
+	// Prefer the host-configured expected people count over room capacity sum.
+	const totalCapacity =
+		trip.expectedPeopleCount ??
+		(trip.rooms.reduce((sum, room) => sum + (room.maxOccupancy || 2), 0) || 1);
 
 	const costPerPerson = trip.totalCost / totalCapacity;
 	const totalPrice = costPerPerson * numberOfGuests;
-	const nightlyRate = totalPrice / totalNights; // For display purposes
+	const nightlyRate = totalPrice / totalNights;
 
 	return {
-		nights: totalNights, // Full trip duration
+		nights: totalNights,
 		nightlyRate: Number(nightlyRate.toFixed(2)),
 		totalPrice: Number(totalPrice.toFixed(2))
 	};
 }
 
 /**
- * Per Person Per Night: Total cost divided by total capacity and nights
+ * Per Person Per Night: Total cost divided by expected people count (or room capacity) and nights.
  */
 function calculatePerPersonPerNightPrice(
-	trip: { totalCost: number; rooms: Array<{ maxOccupancy: number | null }> },
+	trip: { totalCost: number; expectedPeopleCount?: number | null; rooms: Array<{ maxOccupancy: number | null }> },
 	numberOfGuests: number,
 	nights: number,
 	totalNights: number
 ): PriceCalculationResult {
-	// Calculate total capacity
-	const totalCapacity = trip.rooms.reduce((sum, room) => {
-		return sum + (room.maxOccupancy || 1);
-	}, 0);
+	const totalCapacity =
+		trip.expectedPeopleCount ??
+		(trip.rooms.reduce((sum, room) => sum + (room.maxOccupancy || 2), 0) || 1);
 
 	const costPerPersonPerNight = trip.totalCost / totalNights / totalCapacity;
 	const nightlyRate = costPerPersonPerNight * numberOfGuests;

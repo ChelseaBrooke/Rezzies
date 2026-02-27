@@ -86,37 +86,47 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		return json({ error: 'Please add at least one photo (cover or room photo)' }, 400);
 	}
 
-	let inviteCode = generateInviteCode();
-	let existing = await prisma.trip.findUnique({ where: { inviteCode } });
-	while (existing) {
-		inviteCode = generateInviteCode();
-		existing = await prisma.trip.findUnique({ where: { inviteCode } });
+	// Generate a unique invite code, retrying on the rare P2002 unique-constraint collision
+	// instead of a pre-check loop (which has a TOCTOU race between check and insert).
+	async function createTripWithUniqueCode(retries = 5): Promise<Awaited<ReturnType<typeof prisma.trip.create>>> {
+		for (let attempt = 0; attempt < retries; attempt++) {
+			const inviteCode = generateInviteCode();
+			try {
+				return await prisma.trip.create({
+					data: {
+						name,
+						description: description || null,
+						listingUrl,
+						listingTitle: null,
+						listingCoverPhoto: coverPhoto || null,
+						checkInDate,
+						checkOutDate,
+						rsvpByDate,
+						totalCost,
+						pricingModel,
+						inviteCode,
+						isPublished: true,
+						expectedPeopleCount: expectedGuestCount,
+						maxGuests: maxOccupancy,
+						allowPartialStays: partialStayAllowed,
+						timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+						location: propertyAddress || null,
+						fullAddress: propertyAddress || null,
+						locationCity: locationCity || null
+					}
+				});
+			} catch (err: unknown) {
+				const isUniqueConflict =
+					typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002';
+				if (!isUniqueConflict || attempt === retries - 1) throw err;
+				// Unique conflict on inviteCode — try a new one.
+			}
+		}
+		throw new Error('Failed to generate a unique invite code after retries');
 	}
 
 	try {
-		const trip = await prisma.trip.create({
-			data: {
-				name,
-				description: description || null,
-				listingUrl,
-				listingTitle: null,
-				listingCoverPhoto: coverPhoto || null,
-				checkInDate,
-				checkOutDate,
-				rsvpByDate,
-				totalCost,
-				pricingModel,
-				inviteCode,
-				isPublished: true,
-				expectedPeopleCount: expectedGuestCount,
-				maxGuests: maxOccupancy,
-				allowPartialStays: partialStayAllowed,
-				timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-				location: propertyAddress || null,
-				fullAddress: propertyAddress || null,
-				locationCity: locationCity || null
-			}
-		});
+		const trip = await createTripWithUniqueCode();
 
 		// Host as TripMember (User, not AdminUser)
 		await prisma.tripMember.create({

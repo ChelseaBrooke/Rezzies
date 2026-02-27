@@ -112,51 +112,105 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 			}
 		});
 
-		// Replace rooms: remove dependent records that reference rooms (no FK cascade), then delete rooms
-		const existingRoomIds = await prisma.room.findMany({ where: { tripId }, select: { id: true } }).then((r) => r.map((x) => x.id));
-		if (existingRoomIds.length > 0) {
-			await prisma.reservation.deleteMany({ where: { tripId } });
-			await prisma.guestSubmission.deleteMany({ where: { roomId: { in: existingRoomIds } } });
-		}
-		await prisma.room.deleteMany({ where: { tripId } });
+		// Fetch the existing trip so we can do a structural diff before touching rooms.
+		const existingTrip = await prisma.trip.findUnique({
+			where: { id: tripId },
+			include: {
+				rooms: { include: { beds: { select: { id: true, bedType: true } } } }
+			}
+		});
 
-		for (const room of rooms) {
-			const roomName = typeof room.name === 'string' ? room.name : 'Room';
-			const roomPhotos = Array.isArray(room.photos) ? room.photos : [];
-			const roomBeds = Array.isArray(room.beds) ? room.beds : [];
-			const maxOccupancyRoom =
-				typeof room.maxOccupants === 'number' ? room.maxOccupants : null;
+		// Determine whether the room/bed structure has actually changed.
+		// A "structural change" means the room names or bed types differ between the
+		// current state and the submitted payload — only in that case do we rebuild rooms.
+		// Metadata-only edits (name, dates, cost, pricing model) leave rooms intact.
+		const existingRoomSignature = (existingTrip?.rooms ?? [])
+			.map((r) => `${r.name}:${r.beds.map((b) => b.bedType).sort().join(',')}`)
+			.sort()
+			.join('|');
+		const incomingRoomSignature = rooms
+			.map(
+				(r: { name?: string; beds?: Array<{ bedType?: string }> }) =>
+					`${r.name ?? ''}:${(r.beds ?? []).map((b: { bedType?: string }) => b.bedType ?? 'other').sort().join(',')}`
+			)
+			.sort()
+			.join('|');
 
-			const createdRoom = await prisma.room.create({
-				data: {
-					tripId,
-					name: roomName,
-					description:
-						typeof room.notes === 'string' && room.notes
-							? room.notes
-							: typeof room.customRoomDescription === 'string' && room.customRoomDescription
-								? room.customRoomDescription
-								: null,
-					baseRateModifier: 1.0,
-					photoUrls: roomPhotos.length > 0 ? roomPhotos : [],
-					maxOccupancy: maxOccupancyRoom
+		if (existingRoomSignature !== incomingRoomSignature) {
+			// Room structure changed — rebuild rooms but preserve trip-level data (RSVPs, members).
+			// Reservations and room assignments reference specific room/bed IDs so we must clear them,
+			// but RSVP records (yes/no answers) are kept — guests can re-pick rooms.
+			const existingRoomIds = (existingTrip?.rooms ?? []).map((r) => r.id);
+			if (existingRoomIds.length > 0) {
+				// Clear room-specific foreign-key records before deleting rooms.
+				await prisma.roomAssignment.deleteMany({ where: { tripId } });
+				await prisma.reservation.deleteMany({ where: { tripId } });
+				await prisma.guestSubmission.deleteMany({ where: { roomId: { in: existingRoomIds } } });
+			}
+			await prisma.room.deleteMany({ where: { tripId } });
+
+			for (const room of rooms) {
+				const roomName = typeof room.name === 'string' ? room.name : 'Room';
+				const roomPhotos = Array.isArray(room.photos) ? room.photos : [];
+				const roomBeds = Array.isArray(room.beds) ? room.beds : [];
+				const maxOccupancyRoom =
+					typeof room.maxOccupants === 'number' ? room.maxOccupants : null;
+
+				const createdRoom = await prisma.room.create({
+					data: {
+						tripId,
+						name: roomName,
+						description:
+							typeof room.notes === 'string' && room.notes
+								? room.notes
+								: typeof room.customRoomDescription === 'string' && room.customRoomDescription
+									? room.customRoomDescription
+									: null,
+						baseRateModifier: 1.0,
+						photoUrls: roomPhotos.length > 0 ? roomPhotos : [],
+						maxOccupancy: maxOccupancyRoom
+					}
+				});
+
+				for (const bed of roomBeds) {
+					const bedType = typeof bed.bedType === 'string' ? bed.bedType : 'other';
+					const count = typeof bed.count === 'number' && bed.count > 0 ? bed.count : 1;
+					for (let i = 0; i < count; i++) {
+						await prisma.bed.create({
+							data: {
+								roomId: createdRoom.id,
+								bedType: bedType.toLowerCase(),
+								capacity: 1,
+								capacitySlots: 1,
+								isAvailable: true
+							}
+						});
+					}
 				}
-			});
-
-			for (const bed of roomBeds) {
-				const bedType = typeof bed.bedType === 'string' ? bed.bedType : 'other';
-				const count = typeof bed.count === 'number' && bed.count > 0 ? bed.count : 1;
-				for (let i = 0; i < count; i++) {
-					await prisma.bed.create({
-						data: {
-							roomId: createdRoom.id,
-							bedType: bedType.toLowerCase(),
-							capacity: 1,
-							capacitySlots: 1,
-							isAvailable: true
-						}
-					});
-				}
+			}
+		} else {
+			// Room structure unchanged — only update metadata (name, photos, maxOccupancy) on existing rooms.
+			for (const room of rooms) {
+				const existingRoom = (existingTrip?.rooms ?? []).find(
+					(r) => r.name === (room.name ?? '')
+				);
+				if (!existingRoom) continue;
+				const roomPhotos = Array.isArray(room.photos) ? room.photos : [];
+				const maxOccupancyRoom =
+					typeof room.maxOccupants === 'number' ? room.maxOccupants : null;
+				await prisma.room.update({
+					where: { id: existingRoom.id },
+					data: {
+						description:
+							typeof room.notes === 'string' && room.notes
+								? room.notes
+								: typeof room.customRoomDescription === 'string' && room.customRoomDescription
+									? room.customRoomDescription
+									: undefined,
+						photoUrls: roomPhotos.length > 0 ? roomPhotos : undefined,
+						maxOccupancy: maxOccupancyRoom ?? undefined
+					}
+				});
 			}
 		}
 

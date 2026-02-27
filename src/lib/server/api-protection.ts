@@ -9,10 +9,7 @@ if (!INTERNAL_API_KEY) {
 
 export function verifyInternalApiKey(event: RequestEvent): boolean {
 	if (!INTERNAL_API_KEY) {
-		// In development, allow if key is not set (but warn)
-		if (process.env.NODE_ENV === 'development') {
-			return true;
-		}
+		// Key is required in all environments. Never bypass silently.
 		return false;
 	}
 

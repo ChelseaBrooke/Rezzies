@@ -1,12 +1,12 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
-import { getSessionUser } from '$lib/server/session.js';
 import { getUserTripMembership, getUserTrips } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 import { computeCommittedFundsFromYesRsvps } from '$lib/server/pricing-canonical.js';
 
-export const load: LayoutServerLoad = async ({ params, cookies }) => {
-	const user = await getSessionUser(cookies);
+export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
+	// Re-use the user attached by hooks.server.ts — avoids a second DB session lookup.
+	const user = locals.user;
 
 	if (!user) {
 		throw redirect(303, `/login?redirect=/trips/${params.tripId}`);
@@ -20,8 +20,17 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		throw error(403, 'You do not have access to this trip');
 	}
 
-	// First visit: if user was "invited" (hadn't visited trip page yet), mark as "accepted"
+	// When user is in "invited" state, fetch the pending invite token BEFORE
+	// upgrading the status so the "Accept invite" link can still be shown.
+	let pendingInviteToken: string | null = null;
 	if (membership?.inviteStatus === 'invited') {
+		const pendingInvite = await prisma.invite.findFirst({
+			where: { tripId, recipientUserId: user.id, status: 'sent' },
+			select: { token: true }
+		});
+		pendingInviteToken = pendingInvite?.token ?? null;
+
+		// Mark as accepted now that the user has visited the trip page.
 		await prisma.tripMember.update({
 			where: { tripId_userId: { tripId, userId: user.id } },
 			data: { inviteStatus: 'accepted' }
@@ -64,7 +73,7 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 			}
 		}),
 		Promise.resolve(membership),
-		getUserTrips(user.id, { skipBackfill: true }),
+		getUserTrips(user.id),
 		prisma.rSVP.findUnique({
 			where: { tripId_userId: { tripId, userId: user.id } }
 		}),
@@ -89,20 +98,6 @@ export const load: LayoutServerLoad = async ({ params, cookies }) => {
 		addedByUserId: g.addedByUserId,
 		addedAt: g.createdAt.toISOString()
 	}));
-
-	// When user is invited but hasn't accepted, get the invite token for the "Accept invite" link
-	let pendingInviteToken: string | null = null;
-	if (membership?.inviteStatus === 'invited') {
-		const pendingInvite = await prisma.invite.findFirst({
-			where: {
-				tripId,
-				recipientUserId: user.id,
-				status: 'sent'
-			},
-			select: { token: true }
-		});
-		pendingInviteToken = pendingInvite?.token ?? null;
-	}
 
 	// committedFunds already resolved from the parallel Promise.all above
 

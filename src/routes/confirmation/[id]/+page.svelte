@@ -2,6 +2,14 @@
 	import type { PageData } from './$types';
 
 	let { data } = $props();
+
+	// Build sign-up URL pre-filling the guest email so the conversion is frictionless.
+	const signupUrl = $derived(
+		`/signup?email=${encodeURIComponent(data.confirmation.email)}`
+	);
+	const tripDashboardUrl = $derived(
+		data.confirmation.tripId ? `/trips/${data.confirmation.tripId}` : '/trips'
+	);
 </script>
 
 <div class="confirmation-page">
@@ -73,6 +81,17 @@
 			<p>
 				A confirmation email has been sent to <strong>{data.confirmation.email}</strong>.
 			</p>
+		</div>
+
+		<div class="cta-section">
+			{#if data.confirmation.tripId}
+				<a href={tripDashboardUrl} class="btn-cta btn-primary-cta">
+					View Trip Dashboard
+				</a>
+			{/if}
+			<a href={signupUrl} class="btn-cta btn-secondary-cta">
+				Create a Divvi account to track your reservation
+			</a>
 		</div>
 	</div>
 </div>
@@ -186,6 +205,42 @@
 
 	.message strong {
 		color: #2c3e50;
+	}
+
+	.cta-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-top: 2rem;
+		align-items: center;
+	}
+
+	.btn-cta {
+		display: inline-block;
+		padding: 0.875rem 2rem;
+		border-radius: 8px;
+		font-size: 1rem;
+		font-weight: 600;
+		text-decoration: none;
+		text-align: center;
+		transition: opacity 0.2s;
+		width: 100%;
+		max-width: 400px;
+	}
+
+	.btn-cta:hover {
+		opacity: 0.9;
+	}
+
+	.btn-primary-cta {
+		background: #27ae60;
+		color: white;
+	}
+
+	.btn-secondary-cta {
+		background: #f0f4f8;
+		color: #2c3e50;
+		border: 1px solid #ddd;
 	}
 </style>
 

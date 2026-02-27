@@ -48,33 +48,33 @@ export async function isTripMember(tripId: string, userId: string): Promise<bool
 	return membership != null && ACTIVE_INVITE_STATUSES.includes(membership.inviteStatus);
 }
 
-export async function getUserTrips(
-	userId: string,
-	{ skipBackfill = false }: { skipBackfill?: boolean } = {}
-) {
+/**
+ * Backfill TripMember rows for a user who has Reservations by email but no membership.
+ * Call this explicitly from a one-time migration or a post-login hook — NOT on every page load.
+ */
+export async function backfillTripMembershipsForUser(userId: string): Promise<void> {
+	const user = await prisma.user.findUnique({
+		where: { id: userId },
+		select: { email: true }
+	});
+	if (!user?.email) return;
+
+	const reservationsByEmail = await prisma.reservation.findMany({
+		where: { email: { equals: user.email, mode: 'insensitive' } },
+		select: { tripId: true },
+		distinct: ['tripId']
+	});
+	for (const { tripId } of reservationsByEmail) {
+		await prisma.tripMember.upsert({
+			where: { tripId_userId: { tripId, userId } },
+			create: { tripId, userId, role: 'guest', inviteStatus: 'accepted' },
+			update: {}
+		});
+	}
+}
+
+export async function getUserTrips(userId: string) {
 	try {
-		// Backfill TripMember for any trip where this user has a Reservation (same email) but no membership.
-		// Skipped when called from within the trip layout (every navigation) — only needed on the trips list page.
-		if (!skipBackfill) {
-			const user = await prisma.user.findUnique({
-				where: { id: userId },
-				select: { email: true }
-			});
-			if (user?.email) {
-				const reservationsByEmail = await prisma.reservation.findMany({
-					where: { email: { equals: user.email, mode: 'insensitive' } },
-					select: { tripId: true },
-					distinct: ['tripId']
-				});
-				for (const { tripId } of reservationsByEmail) {
-					await prisma.tripMember.upsert({
-						where: { tripId_userId: { tripId, userId } },
-						create: { tripId, userId, role: 'guest', inviteStatus: 'accepted' },
-						update: {}
-					});
-				}
-			}
-		}
 
 		// Only select fields needed by the trips list page and sidebar — avoids loading
 		// rooms/beds/members for every trip the user has ever joined.

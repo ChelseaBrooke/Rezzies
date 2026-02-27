@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { z } from 'zod';
+import { prisma } from '$lib/server/prisma.js';
 import { calculateReservationPrice } from '$lib/server/pricing-canonical.js';
 import { createSuccessResponse, createErrorResponse } from '$lib/server/validation.js';
 
@@ -29,7 +30,30 @@ export const POST: RequestHandler = async (event) => {
 		}
 
 		const { tripId, roomId, bedId, numberOfSlots, checkInDate, checkOutDate } = validationResult.data;
-		
+
+		// Verify the trip exists and the request is allowed:
+		// Either the trip is published (public pricing) OR the requesting user is a member.
+		const user = event.locals.user;
+		const trip = await prisma.trip.findUnique({
+			where: { id: tripId },
+			select: { isPublished: true }
+		});
+		if (!trip) {
+			return json(createErrorResponse('NOT_FOUND', 'Trip not found'), { status: 404 });
+		}
+		if (!trip.isPublished) {
+			if (!user) {
+				return json(createErrorResponse('UNAUTHORIZED', 'Authentication required'), { status: 401 });
+			}
+			const membership = await prisma.tripMember.findUnique({
+				where: { tripId_userId: { tripId, userId: user.id } },
+				select: { id: true }
+			});
+			if (!membership) {
+				return json(createErrorResponse('FORBIDDEN', 'Access denied'), { status: 403 });
+			}
+		}
+
 		const result = await calculateReservationPrice({
 			tripId,
 			roomId,

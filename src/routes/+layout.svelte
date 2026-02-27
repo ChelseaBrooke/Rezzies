@@ -7,6 +7,24 @@
 	import { page } from '$app/stores';
 
 	let { children, data } = $props();
+
+	/**
+	 * Derive nav visibility from URL patterns instead of a manually maintained allowlist.
+	 *   - Trip portal (/trips/[id]/...) has its own sidebar nav — no top navbar.
+	 *   - Trip creation wizard (/trips/new/step/...) is full-screen — no top navbar.
+	 *   - Auth/marketing pages (/, /login, /signup, etc.) have their own nav via MarketingShell.
+	 *   - Everything else (404, /settings, /messages, /qc, ...) should show the top navbar.
+	 *
+	 * The key insight: we should SHOW the nav by default and HIDE it on specific pattern matches,
+	 * rather than maintaining a manually-grown allowlist.
+	 */
+	const isTripPortal = $derived(/^\/trips\/[^/]+/.test($page.url.pathname));
+	const isWizardStep = $derived($page.url.pathname.startsWith('/trips/new/step'));
+	const isMarketingOrAuth = $derived(
+		/^\/(login|signup|our-services|find-vacation|sitemap)?$/.test($page.url.pathname) ||
+		$page.url.pathname === '/trips'
+	);
+	const showNav = $derived(!isTripPortal && !isWizardStep && !isMarketingOrAuth);
 </script>
 
 <svelte:head>
@@ -14,7 +32,7 @@
 	<title>Divvi - Fair Room & Cost Splitting for Group Vacations</title>
 </svelte:head>
 
-{#if $page.url.pathname !== '/' && $page.url.pathname !== '/login' && $page.url.pathname !== '/signup' && $page.url.pathname !== '/our-services' && $page.url.pathname !== '/find-vacation' && $page.url.pathname !== '/trips' && $page.url.pathname !== '/sitemap' && !$page.url.pathname.startsWith('/trips/new/step') && !$page.url.pathname.match(/^\/trips\/[^\/]+/)}
+{#if showNav}
 	<Navigation user={data?.user} />
 {/if}
 
@@ -22,8 +40,8 @@
 <EditProfileModal />
 
 <main
-	class:no-padding={$page.url.pathname.startsWith('/trips/new/step')}
-	class:trip-portal-root={$page.url.pathname.match(/^\/trips\/[^\/]+/)}
+	class:no-padding={isWizardStep}
+	class:trip-portal-root={isTripPortal}
 >
 	{#if children != null && typeof children === 'function'}
 		{@render children()}

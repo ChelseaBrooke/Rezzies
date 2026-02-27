@@ -173,7 +173,7 @@ export interface TripDraft {
 	taxes: string;
 	refundableDeposit: string;
 	customLineItems: Array<{ label: string; amount: string }>;
-	pricingModel: 'per-person' | 'per-room' | 'per-bed' | 'hybrid';
+	pricingModel: 'per-person' | 'per-person-per-night' | 'per-room' | 'per-bed' | 'hybrid';
 	pricingType: 'per-night' | 'flat';
 	partialStayAllowed: boolean;
 	prorationRule: string;
@@ -360,7 +360,13 @@ export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
 		bathrooms: Math.max(1, draftRooms.length),
 		rooms: draftRooms,
 		partialStayAllowed: trip.allowPartialStays ?? false,
-		pricingModel: (trip.pricingModel === 'per_room' ? 'per-room' : trip.pricingModel === 'per_bed' ? 'per-bed' : trip.pricingModel === 'per_person' || trip.pricingModel === 'per_person_per_night' ? 'per-person' : 'per-person') as TripDraft['pricingModel'],
+		pricingModel: (() => {
+			const m = (trip.pricingModel ?? '').toLowerCase();
+			if (m === 'per_room' || m === 'per-room') return 'per-room';
+			if (m === 'per_bed' || m === 'per-bed') return 'per-bed';
+			if (m === 'per_person_per_night' || m === 'per-person-per-night' || m === 'per-night') return 'per-person-per-night';
+			return 'per-person';
+		})() as TripDraft['pricingModel'],
 		meals: getDefaultMealsConfig(),
 		activities: getDefaultActivitiesConfig()
 	};

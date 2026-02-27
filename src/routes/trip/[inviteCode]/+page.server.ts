@@ -30,29 +30,22 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		throw redirect(303, '/');
 	}
 
-	// If user is logged in, add them as a trip member (guest) if not already, then send to trip dashboard
 	const user = await getSessionUser(cookies);
+
 	if (user) {
 		const existing = await prisma.tripMember.findUnique({
-			where: {
-				tripId_userId: { tripId: trip.id, userId: user.id }
-			}
+			where: { tripId_userId: { tripId: trip.id, userId: user.id } }
 		});
+		// Already a member — go straight to the trip dashboard.
 		if (existing) {
 			throw redirect(303, `/trips/${trip.id}`);
 		}
-		await prisma.tripMember.create({
-			data: {
-				tripId: trip.id,
-				userId: user.id,
-				role: 'guest',
-				inviteStatus: 'accepted'
-			}
-		});
-		throw redirect(303, `/trips/${trip.id}`);
+		// Logged in but not yet a member: show a join-confirmation page.
+		// The actual TripMember row is created by the ?/join action below.
+		return { trip, reservations: [], user, requiresJoinConfirmation: true };
 	}
 
-	// Not logged in: show reservation/landing page
+	// Not logged in: show the public reservation form.
 	const reservations = await prisma.reservation.findMany({
 		where: { tripId: trip.id },
 		select: {
@@ -65,11 +58,37 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 
 	return {
 		trip,
-		reservations
+		reservations,
+		user: null,
+		requiresJoinConfirmation: false
 	};
 };
 
 export const actions: Actions = {
+	/** Logged-in user explicitly confirms they want to join the trip. */
+	join: async ({ cookies, params }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) {
+			throw redirect(303, `/login?redirect=/trip/${params.inviteCode}`);
+		}
+
+		const trip = await prisma.trip.findUnique({
+			where: { inviteCode: params.inviteCode }
+		});
+		if (!trip || !trip.isPublished) {
+			return fail(404, { error: 'Trip not found or not available' });
+		}
+
+		// Upsert so double-submits are idempotent.
+		await prisma.tripMember.upsert({
+			where: { tripId_userId: { tripId: trip.id, userId: user.id } },
+			create: { tripId: trip.id, userId: user.id, role: 'guest', inviteStatus: 'accepted' },
+			update: {}
+		});
+
+		throw redirect(303, `/trips/${trip.id}`);
+	},
+
 	reserve: async ({ request, params }) => {
 		try {
 			const formData = await request.formData();

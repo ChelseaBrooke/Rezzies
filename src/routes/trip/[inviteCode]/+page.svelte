@@ -4,6 +4,9 @@
 
 	let { data, form } = $props();
 
+	/** Normalize DB pricing model to lowercase for all comparisons */
+	const pricingModel = $derived(data.trip.pricingModel?.toLowerCase() ?? '');
+
 	let formData = {
 		name: '',
 		email: '',
@@ -82,7 +85,7 @@
 			return;
 		}
 
-		if (data.trip.pricingModel !== 'PER_ROOM' && !formData.bedId) {
+		if (pricingModel !== 'per_room' && !formData.bedId) {
 			cancel();
 			error = 'Please select a bed';
 			return;
@@ -126,6 +129,17 @@
 			</p>
 		</header>
 
+		{#if data.requiresJoinConfirmation}
+			<!-- Logged-in user must explicitly confirm before being added to the trip -->
+			<div class="join-confirmation">
+				<p>You've been invited to join <strong>{data.trip.name}</strong>. Would you like to accept?</p>
+				<form method="POST" action="?/join" use:enhance>
+					<button type="submit" class="btn-primary">Accept &amp; Go to Trip</button>
+					<a href="/trips" class="btn-secondary">Decline</a>
+				</form>
+			</div>
+		{:else}
+
 		{#if error}
 			<div class="error-message">{error}</div>
 		{/if}
@@ -156,19 +170,19 @@
 						placeholder="john@example.com"
 					/>
 				</div>
-				{#if data.trip.pricingModel === 'per_person' || data.trip.pricingModel === 'per_person_per_night'}
-					<div class="form-group">
-						<label for="numberOfGuests">Number of Guests *</label>
-						<input
-							type="number"
-							id="numberOfGuests"
-							name="numberOfGuests"
-							bind:value={formData.numberOfGuests}
-							min="1"
-							required
-						/>
-					</div>
-				{/if}
+			{#if pricingModel === 'per_person' || pricingModel === 'per_person_per_night'}
+				<div class="form-group">
+					<label for="numberOfGuests">Number of Guests *</label>
+					<input
+						type="number"
+						id="numberOfGuests"
+						name="numberOfGuests"
+						bind:value={formData.numberOfGuests}
+						min="1"
+						required
+					/>
+				</div>
+			{/if}
 			</section>
 
 			<!-- Dates -->
@@ -225,11 +239,11 @@
 				</div>
 			</section>
 
-			<!-- Bed Selection (if not PER_ROOM pricing) -->
-			{#if selectedRoom && data.trip.pricingModel !== 'PER_ROOM'}
-				<section class="form-section">
-					<h2>Select Bed</h2>
-					{#if data.trip.pricingModel === 'per_bed' || data.trip.pricingModel === 'PER_BED'}
+		<!-- Bed Selection (if not PER_ROOM pricing) -->
+		{#if selectedRoom && pricingModel !== 'per_room'}
+			<section class="form-section">
+				<h2>Select Bed</h2>
+				{#if pricingModel === 'per_bed'}
 						<p class="per-bed-note">In per-bed pricing, everyone pays based on the bed they choose. Larger beds cost a bit more than smaller beds, and beds in private rooms cost a bit more than beds in shared rooms. The total trip cost is split proportionally across everyone attending, and prices can go down as more people RSVP until the deadline.</p>
 					{/if}
 					<div class="bed-list">
@@ -277,13 +291,14 @@
 				<input type="hidden" name="bedId" value={formData.bedId} />
 			{/if}
 
-			<!-- Submit -->
-			<div class="form-actions">
-				<button type="submit" class="btn-primary" disabled={isSubmitting || !priceCalculation}>
-					{isSubmitting ? 'Submitting...' : 'Reserve'}
-				</button>
-			</div>
-		</form>
+		<!-- Submit -->
+		<div class="form-actions">
+			<button type="submit" class="btn-primary" disabled={isSubmitting || !priceCalculation}>
+				{isSubmitting ? 'Submitting...' : 'Reserve'}
+			</button>
+		</div>
+	</form>
+	{/if}
 	</div>
 </div>
 
@@ -520,5 +535,41 @@
 	.btn-primary:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
+	}
+
+	.join-confirmation {
+		text-align: center;
+		padding: 3rem 1rem;
+	}
+
+	.join-confirmation p {
+		font-size: 1.15rem;
+		color: #34495e;
+		margin-bottom: 1.5rem;
+	}
+
+	.join-confirmation form {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+	}
+
+	.btn-secondary {
+		background: transparent;
+		color: #7f8c8d;
+		border: 1px solid #ddd;
+		padding: 1rem 2.5rem;
+		font-size: 1.1rem;
+		border-radius: 8px;
+		cursor: pointer;
+		text-decoration: none;
+		display: inline-flex;
+		align-items: center;
+		font-weight: 500;
+	}
+
+	.btn-secondary:hover {
+		background: #f5f5f5;
 	}
 </style>

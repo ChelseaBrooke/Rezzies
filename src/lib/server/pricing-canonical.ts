@@ -525,58 +525,90 @@ export async function computePerBedPricingAtHeadcount(
  * For yes users with no room assignment (e.g. PER_PERSON before room pick), uses first room and 1 slot.
  */
 export async function computeCommittedFundsFromYesRsvps(tripId: string): Promise<number> {
+	// Fetch the trip ONCE with all data needed for price calculation across all yes-RSVPs.
+	// This avoids the N+1 pattern of calling calculateReservationPrice (which re-fetches
+	// the trip each time) in a loop over every assignment.
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
 		include: {
 			rooms: { include: { beds: true } },
-			rsvps: { where: { status: 'yes' }, select: { userId: true } },
+			rsvps: { where: { status: 'yes' }, select: { userId: true, adultsCount: true } },
 			roomAssignments: true
 		}
 	});
 	if (!trip?.rsvps?.length) return 0;
+
 	const yesUserIds = new Set(trip.rsvps.map((r) => r.userId));
 	const assignmentsByUser = new Map<string, typeof trip.roomAssignments>();
 	for (const a of trip.roomAssignments) {
 		if (!yesUserIds.has(a.userId)) continue;
-		let list = assignmentsByUser.get(a.userId);
-		if (!list) {
-			list = [];
-			assignmentsByUser.set(a.userId, list);
-		}
-		list.push(a);
+		if (!assignmentsByUser.has(a.userId)) assignmentsByUser.set(a.userId, []);
+		assignmentsByUser.get(a.userId)!.push(a);
 	}
-	const firstRoom = trip.rooms?.[0];
-	const firstRoomId = firstRoom?.id ?? 0;
+
+	const firstRoomId = trip.rooms?.[0]?.id ?? 0;
+	const bedWeights = parseBedWeights(trip.bedWeights);
+	const pricingModel = (trip.pricingModel || 'per_person').toLowerCase();
+	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
+	const yesRsvpGuests = trip.rsvps.reduce((s, r) => s + (r.adultsCount ?? 1), 0);
+	const { minExpectedGuests } = getPerBedRangeGuestCounts(trip);
+	const effectiveGuests = Math.max(minExpectedGuests, yesRsvpGuests);
+	const inv = computePerBedInventoryWeights(trip, bedWeights);
+	const effectiveWeight = effectiveGuests * inv.avgW;
+	const nightCost = totalNights > 0 ? trip.totalCost / totalNights : trip.totalCost;
+
 	let total = 0;
+
 	for (const userId of yesUserIds) {
 		const assignments = assignmentsByUser.get(userId);
+
 		if (assignments?.length) {
 			for (const a of assignments) {
 				const start = a.startDate ?? trip.checkInDate;
 				const end = a.endDate ?? trip.checkOutDate;
-				const res = await calculateReservationPrice({
-					tripId,
-					roomId: a.roomId,
-					bedId: a.bedId ?? undefined,
-					numberOfSlots: a.partySize ?? 1,
-					checkInDate: start,
-					checkOutDate: end
-				});
-				total += res.totalPrice;
+				const stayNights = calculateNights(start, end);
+				const stayFactor = totalNights > 0 ? stayNights / totalNights : 1;
+				const slots = a.partySize ?? 1;
+				const room = trip.rooms.find((r) => r.id === a.roomId);
+				if (!room) continue;
+
+				let price = 0;
+				if (pricingModel === 'per_bed') {
+					const bed = a.bedId ? room.beds.find((b) => b.id === a.bedId) : room.beds[0];
+					if (bed) {
+						const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
+						price =
+							effectiveWeight > 0
+								? nightCost * (spotWeight / effectiveWeight) * stayNights * slots
+								: 0;
+					}
+				} else if (pricingModel === 'per_person') {
+					const totalCapacity =
+						trip.expectedPeopleCount ??
+						(trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 2), 0) || 1);
+					price = (trip.totalCost / totalCapacity) * slots * stayFactor;
+				} else if (pricingModel === 'per_person_per_night') {
+					const totalCapacity =
+						trip.expectedPeopleCount ??
+						(trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 2), 0) || 1);
+					price = (trip.totalCost / totalNights / totalCapacity) * slots * stayNights;
+				} else {
+					// per_room or fallback: privacy-weighted share
+					const privacyFactor = getRoomEffectivePrivacy(room.beds);
+					price = (trip.totalCost / totalNights) * privacyFactor * stayFactor * slots;
+				}
+				total += price;
 			}
-		} else if (firstRoomId && trip.checkInDate && trip.checkOutDate) {
-			// Yes but no assignment (e.g. PER_PERSON): count as 1 person at current rate
-			const res = await calculateReservationPrice({
-				tripId,
-				roomId: firstRoomId,
-				bedId: undefined,
-				numberOfSlots: 1,
-				checkInDate: trip.checkInDate,
-				checkOutDate: trip.checkOutDate
-			});
-			total += res.totalPrice;
+		} else if (firstRoomId) {
+			// Yes RSVP but no room assignment (e.g. PER_PERSON before room pick):
+			// count as 1 person at the average per-person rate.
+		const totalCapacity =
+			trip.expectedPeopleCount ??
+			(trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 2), 0) || 1);
+		total += trip.totalCost / totalCapacity;
 		}
 	}
+
 	return Math.round(total * 100) / 100;
 }
 

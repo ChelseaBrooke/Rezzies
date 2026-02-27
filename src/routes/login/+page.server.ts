@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { verifyUser } from '$lib/server/user-auth.js';
 import { createSession } from '$lib/server/session.js';
+import { backfillTripMembershipsForUser } from '$lib/server/trip-access.js';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -55,8 +56,19 @@ export const actions: Actions = {
 			// Create session
 			await createSession(cookies, user.id);
 
-			// Redirect to trips page or return URL
-			const redirectTo = url.searchParams.get('redirect') || '/trips';
+			// Backfill TripMember rows for any pre-existing reservations matching this email.
+			// Fire-and-forget: don't block the login response if this fails.
+			backfillTripMembershipsForUser(user.id).catch((err) =>
+				console.error('[backfill memberships]', err)
+			);
+
+			// Redirect to trips page or return URL — validate it is a safe relative path
+			// to prevent open-redirect attacks (e.g. ?redirect=https://evil.com)
+			const raw = url.searchParams.get('redirect') ?? '';
+			const redirectTo =
+				raw.startsWith('/') && !raw.startsWith('//') && !raw.includes(':')
+					? raw
+					: '/trips';
 			throw redirect(303, redirectTo);
 		} catch (error) {
 			// Re-throw redirects (they're special errors in SvelteKit)

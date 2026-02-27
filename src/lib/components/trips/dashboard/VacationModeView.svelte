@@ -50,7 +50,8 @@
 		members = [],
 		myAssignment = null,
 		myAssignments = [],
-		announcements = []
+		announcements = [],
+		tripGames = []
 	}: {
 		tripId: string;
 		isHost?: boolean;
@@ -82,7 +83,6 @@
 		members?: Array<{ user?: { id: string; name: string | null; avatarUrl?: string | null } | null }>;
 		myAssignment?: RoomAssignment | null;
 		myAssignments?: RoomAssignment[];
-		announcements?: string[];
 		tripGames?: TripGame[];
 	} = $props();
 

@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { setContext } from 'svelte';
 	import { page } from '$app/stores';
+	import { afterNavigate } from '$app/navigation';
 	import divviLogo from '$lib/assets/images/divvi logo.png';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
@@ -91,6 +92,14 @@
 		{ href: `/trips/${tripId}/files`, label: 'Files', icon: 'files' }
 	];
 	const navItems = $derived(showGuestsTab ? allNavItems : allNavItems.filter((item) => item.icon !== 'guests'));
+
+	let mainContentEl = $state<HTMLElement | null>(null);
+
+	// Reset the custom scroll container to the top on every client-side navigation.
+	// SvelteKit's built-in scroll restoration only handles window scroll, not this div.
+	afterNavigate(() => {
+		mainContentEl?.scrollTo({ top: 0, behavior: 'instant' });
+	});
 </script>
 
 <div class="app-shell">
@@ -147,7 +156,7 @@
 			{/if}
 		</div>
 	</aside>
-	<main class="main-content">
+	<main class="main-content" bind:this={mainContentEl}>
 		<div class="top-actions">
 			{#if showModePillOnDashboard}
 				<div class="top-actions-spacer" aria-hidden="true"></div>
