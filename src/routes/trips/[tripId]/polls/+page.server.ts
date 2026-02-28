@@ -9,6 +9,37 @@ import { getStatusDisplay, getTimeLabel } from '$lib/components/trips/polls/util
 const POLL_CATEGORIES = ['Scheduling', 'Meals', 'Activities', 'Rooms/Beds', 'Other'];
 const VALID_SORTS = ['recent', 'ending_soon', 'most_votes', 'newest', 'oldest'];
 
+/** After a poll is closed: if it was an activity poll from Discover and "Add to itinerary" won, create the activity. */
+async function maybeCreateActivityFromClosedPoll(
+	poll: { id: string; tripId: string; title: string; description?: string | null; category: string; createdById: string; options: { id: string; label: string }[]; votes: { optionId: string }[] } & { activityDate?: Date | null; activityTime?: string | null; activityLocation?: string | null }
+): Promise<void> {
+	const p = poll;
+	if (p.category !== 'Activities' || p.activityDate == null) return;
+	const addOption = p.options.find((o) => o.label === 'Add to itinerary');
+	const skipOption = p.options.find((o) => o.label === 'Skip');
+	if (!addOption || !skipOption) return;
+	const addVotes = p.votes.filter((v) => v.optionId === addOption.id).length;
+	const skipVotes = p.votes.filter((v) => v.optionId === skipOption.id).length;
+	if (addVotes < skipVotes || addVotes === 0) return;
+	const activityTitle = p.title.startsWith('Activity: ')
+		? p.title.slice('Activity: '.length).trim()
+		: p.title;
+	const activity = await prisma.activity.create({
+		data: {
+			tripId: p.tripId,
+			title: activityTitle,
+			date: p.activityDate,
+			time: p.activityTime ?? null,
+			location: p.activityLocation ?? null,
+			notes: p.description ?? null,
+			status: 'planned'
+		}
+	});
+	await prisma.activityParticipant.create({
+		data: { activityId: activity.id, userId: p.createdById, status: 'in' }
+	});
+}
+
 export const load: PageServerLoad = async ({ parent, params, url, cookies }) => {
 	const parentData = await parent();
 	const user = parentData.user;
@@ -25,6 +56,17 @@ export const load: PageServerLoad = async ({ parent, params, url, cookies }) => 
 
 	let polls: any[] = [];
 	try {
+		// Auto-close expired polls and add activity to itinerary when "Add to itinerary" won
+		const now = new Date();
+		const expired = await prisma.poll.findMany({
+			where: { tripId, status: 'open', endAt: { lt: now } },
+			include: { options: true, votes: true }
+		});
+		for (const poll of expired) {
+			await prisma.poll.update({ where: { id: poll.id }, data: { status: 'closed' } });
+			await maybeCreateActivityFromClosedPoll(poll as any);
+		}
+
 		const where: any = { tripId };
 		// Drafts: only host or creator sees them
 		const isHost = await isTripHostOrCoHost(tripId, user.id);
@@ -60,7 +102,8 @@ export const load: PageServerLoad = async ({ parent, params, url, cookies }) => 
 			include: {
 				createdBy: { select: { id: true, name: true, avatarUrl: true } },
 				options: { orderBy: { sortOrder: 'asc' } },
-				votes: { select: { optionId: true, userId: true } }
+				votes: { select: { optionId: true, userId: true } },
+				watchers: { select: { userId: true } }
 			}
 		});
 
@@ -84,6 +127,7 @@ export const load: PageServerLoad = async ({ parent, params, url, cookies }) => 
 				status: poll.status,
 				statusDisplay,
 				showResultsLive: poll.showResultsLive ?? true,
+				allowAnonymous: (poll as any).allowAnonymous ?? false,
 				startAt: poll.startAt,
 				endAt: poll.endAt,
 				createdAt: poll.createdAt,
@@ -99,7 +143,9 @@ export const load: PageServerLoad = async ({ parent, params, url, cookies }) => 
 				totalVotes: poll.votes.length,
 				userVoted: userVotes.length > 0,
 				userOptionIds,
-				timeLabel
+				timeLabel,
+				userWatching: (poll as any).watchers?.some((w: any) => w.userId === user.id) ?? false,
+				watcherCount: (poll as any).watchers?.length ?? 0
 			};
 		});
 
@@ -235,6 +281,9 @@ export const actions: Actions = {
 		const cat = POLL_CATEGORIES.includes(data.category) ? data.category : 'Other';
 		const pType = data.pollType === 'multi' ? 'multi' : 'single';
 
+		const allowAnonRaw = formData.get('allowAnonymous');
+		const allowAnonymous = allowAnonRaw === '1' || allowAnonRaw === 'on' || allowAnonRaw === 'true';
+
 		const now = new Date();
 		const endAt = new Date(now.getTime() + data.durationHours * 60 * 60 * 1000);
 		const startAt = now;
@@ -249,12 +298,13 @@ export const actions: Actions = {
 				pollType: pType,
 				status: 'open',
 				showResultsLive: data.showResultsLive ?? true,
+				allowAnonymous,
 				startAt,
 				endAt,
 				options: {
 					create: options.map((label, i) => ({ label, sortOrder: i }))
 				}
-			}
+			} as any
 		});
 
 		return { createSuccess: true };
@@ -316,7 +366,10 @@ export const actions: Actions = {
 		const pollId = formData.get('pollId') as string;
 		if (!pollId) return fail(400, { closeError: 'Missing poll' });
 
-		const poll = await prisma.poll.findFirst({ where: { id: pollId, tripId } });
+		const poll = await prisma.poll.findFirst({
+			where: { id: pollId, tripId },
+			include: { options: true, votes: true }
+		});
 		if (!poll) return fail(404, { closeError: 'Poll not found' });
 
 		const canManage = await isTripHostOrCoHost(tripId, user.id);
@@ -325,7 +378,33 @@ export const actions: Actions = {
 		}
 
 		await prisma.poll.update({ where: { id: pollId }, data: { status: 'closed' } });
+		await maybeCreateActivityFromClosedPoll(poll as any);
+
 		return { closeSuccess: true };
+	},
+
+	watch: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+
+		const tripId = params.tripId;
+		if (!(await isTripMember(tripId, user.id))) throw error(403, 'Must be a trip member');
+
+		const formData = await request.formData();
+		const pollId = formData.get('pollId') as string;
+		if (!pollId) return fail(400, { watchError: 'Missing poll' });
+
+		const existing = await (prisma as any).pollWatcher.findUnique({
+			where: { pollId_userId: { pollId, userId: user.id } }
+		});
+
+		if (existing) {
+			await (prisma as any).pollWatcher.delete({ where: { id: existing.id } });
+			return { watchSuccess: true, watching: false };
+		} else {
+			await (prisma as any).pollWatcher.create({ data: { pollId, userId: user.id } });
+			return { watchSuccess: true, watching: true };
+		}
 	},
 
 	nudge: async ({ request, params, cookies }) => {

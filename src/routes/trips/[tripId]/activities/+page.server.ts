@@ -1,4 +1,4 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripMember, isTripHost } from '$lib/server/trip-access.js';
@@ -80,29 +80,37 @@ export const actions: Actions = {
 
 		const time = (formData.get('time') as string)?.trim() || null;
 		const additionType = (formData.get('additionType') as string) || 'planned';
-	if (additionType === 'poll') {
+		if (additionType === 'poll') {
 			const now = new Date();
 			const endAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-			await prisma.poll.create({
-				data: {
-					tripId,
-					createdById: user.id,
-					title: `Activity: ${title}`,
-					description: notes || undefined,
-					category: 'Activities',
-					pollType: 'single',
-					status: 'open',
-					showResultsLive: true,
-					startAt: now,
-					endAt,
-					options: {
-						create: [
-							{ label: 'Add to itinerary', sortOrder: 0 },
-							{ label: 'Skip', sortOrder: 1 }
-						]
+			try {
+				await (prisma.poll.create as any)({
+					data: {
+						tripId,
+						createdById: user.id,
+						title: `Activity: ${title}`,
+						description: notes || undefined,
+						category: 'Activities',
+						pollType: 'single',
+						status: 'open',
+						showResultsLive: true,
+						startAt: now,
+						endAt,
+						activityDate: activityDate,
+						activityTime: time || null,
+						activityLocation: location || null,
+						options: {
+							create: [
+								{ label: 'Add to itinerary', sortOrder: 0 },
+								{ label: 'Skip', sortOrder: 1 }
+							]
+						}
 					}
-				}
-			});
+				});
+			} catch (e) {
+				console.error('Poll create error:', e);
+				return fail(500, { addDiscoveredActivityError: 'Could not create poll. Please try again.' });
+			}
 			return { addDiscoveredActivitySuccess: true, pollCreated: true };
 		}
 

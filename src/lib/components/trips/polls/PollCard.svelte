@@ -5,182 +5,239 @@
 	interface Props {
 		poll: PollWithMeta;
 		onClick?: () => void;
+		onWatch?: (pollId: string) => void;
 	}
 
-	let { poll, onClick }: Props = $props();
+	let { poll, onClick, onWatch }: Props = $props();
 
-	function truncate(str: string | null | undefined, maxLen: number): string {
-		if (!str) return '';
-		return str.length <= maxLen ? str : str.slice(0, maxLen) + '…';
-	}
-
-	const statusClass = $derived({
-		open: poll.statusDisplay === 'open',
-		'closing-soon': poll.statusDisplay === 'closing_soon',
-		closed: poll.statusDisplay === 'closed',
-		draft: poll.statusDisplay === 'draft',
-		canceled: poll.statusDisplay === 'canceled'
-	});
-
-	const isActive = $derived(poll.statusDisplay === 'open' || poll.statusDisplay === 'closing_soon');
-	const needsVote = $derived(isActive && !poll.userVoted);
-	const voted = $derived(isActive && poll.userVoted);
-
-	const icon = $derived(CATEGORY_ICONS[poll.category] ?? '📋');
+	const isActive   = $derived(poll.statusDisplay === 'open' || poll.statusDisplay === 'closing_soon');
+	const needsVote  = $derived(isActive && !poll.userVoted);
+	const voted      = $derived(isActive && poll.userVoted);
+	const isDraft    = $derived(poll.statusDisplay === 'draft');
+	const icon       = $derived(CATEGORY_ICONS[poll.category] ?? '📋');
 </script>
 
 <article
 	class="poll-card"
-	class:clickable={!!onClick}
 	class:needs-vote={needsVote}
 	class:voted={voted}
+	class:draft={isDraft}
+	class:closing-soon={poll.statusDisplay === 'closing_soon'}
 	role={onClick ? 'button' : 'article'}
 	tabindex={onClick ? 0 : undefined}
 	onclick={onClick}
 	onkeydown={(e) => {
-		if (onClick && (e.key === 'Enter' || e.key === ' ')) {
-			e.preventDefault();
-			onClick();
-		}
+		if (onClick && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(); }
 	}}
 >
-	<div class="card-top">
-		<div class="category-row">
-			<span class="category-icon" aria-hidden="true">{icon}</span>
-			<span class="category-name">{poll.category}</span>
-		</div>
-		<span
-			class="status-pill {Object.entries(statusClass)
-				.filter(([, v]) => v)
-				.map(([k]) => k)
-				.join(' ')}"
-			data-status={poll.statusDisplay}
-		>
-			{#if poll.statusDisplay === 'closing_soon'}
-				Closing soon
-			{:else if poll.statusDisplay === 'open'}
-				Open
-			{:else if poll.statusDisplay === 'closed'}
-				Closed
-			{:else if poll.statusDisplay === 'draft'}
-				Draft
-			{:else if poll.statusDisplay === 'canceled'}
-				Canceled
-			{:else}
-				{poll.status}
-			{/if}
-		</span>
-	</div>
-
-	<h2 class="poll-title">{poll.title}</h2>
-	{#if poll.description}
-		<p class="poll-description">{truncate(poll.description, 120)}</p>
+	<!-- Notification indicator for polls needing attention -->
+	{#if needsVote}
+		<span class="notify-dot" aria-label="Needs your vote"></span>
 	{/if}
 
-	<div class="card-footer">
-		<span class="time-label">{poll.timeLabel}</span>
-		<span class="vote-count">{poll.totalVotes} {poll.totalVotes === 1 ? 'vote' : 'votes'}</span>
+	<!-- Meta row -->
+	<div class="meta-row">
+		<span class="category-tag">
+			<span aria-hidden="true">{icon}</span>
+			{poll.category}
+		</span>
+		<div class="meta-right">
+			{#if poll.allowAnonymous}
+				<span class="meta-pill anon-pill">🔒 Anon</span>
+			{/if}
+			{#if poll.showResultsLive && isActive}
+				<span class="meta-pill live-pill">
+					<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/></svg>
+					Live
+				</span>
+			{/if}
+			{#if poll.statusDisplay === 'closing_soon'}
+				<span class="meta-pill warn-pill">⚡ Soon</span>
+			{:else if isDraft}
+				<span class="meta-pill draft-pill">Draft</span>
+			{/if}
+			<span class="time-chip">{poll.timeLabel}</span>
+		</div>
+	</div>
+
+	<!-- Title -->
+	<h3 class="poll-title">{poll.title}</h3>
+
+	<!-- Description -->
+	{#if poll.description}
+		<p class="poll-desc">{poll.description}</p>
+	{/if}
+
+	<!-- Footer -->
+	<div class="card-foot">
+		<span class="foot-stat">
+			<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+				<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+				<path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+			</svg>
+			{poll.totalVotes} {poll.totalVotes === 1 ? 'vote' : 'votes'}
+		</span>
+		<span class="foot-stat">
+			{poll.options.length} options
+		</span>
+
+		<div class="foot-right">
+			{#if voted}
+				<span class="voted-chip">
+					<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+					Voted
+				</span>
+			{/if}
+			{#if onWatch && isActive}
+				<button
+					type="button"
+					class="btn-watch"
+					class:watching={poll.userWatching}
+					title={poll.userWatching ? 'Stop watching' : 'Remind me when this closes'}
+					onclick={(e) => { e.stopPropagation(); onWatch(poll.id); }}
+					aria-label={poll.userWatching ? 'Stop watching poll' : 'Watch poll'}
+				>
+					{#if poll.userWatching}
+						<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+					{:else}
+						<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+					{/if}
+				</button>
+			{/if}
+		</div>
 	</div>
 </article>
 
 <style>
 	.poll-card {
-		background: var(--surfaceSolid, #fff);
-		border-radius: var(--radius-2xl, 14px);
-		border: 1px solid var(--border-soft, rgba(17, 24, 39, 0.06));
-		box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
-		padding: 1.25rem 1.5rem;
-		transition: box-shadow 0.2s ease, transform 0.2s ease;
+		position: relative;
+		border-radius: 12px;
+		border: 1px solid #edf0f3;
+		background: white;
+		padding: .95rem 1.1rem .8rem;
+		margin-bottom: .55rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
-	}
-	.poll-card.clickable {
+		gap: .42rem;
 		cursor: pointer;
+		transition: box-shadow .15s, transform .15s, background .15s;
+		user-select: none;
+		box-shadow: 0 2px 10px rgba(0,0,0,.07), 0 0 0 1px rgba(0,0,0,.03);
 	}
-	.poll-card.clickable:hover {
-		box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.06));
-		transform: translateY(-2px);
+	.poll-card:last-child { margin-bottom: 0; }
+	.poll-card:hover {
+		box-shadow: 0 6px 20px rgba(0,0,0,.1), 0 0 0 1px rgba(0,0,0,.04);
+		transform: translateY(-1px);
 	}
-	.poll-card.clickable:focus-visible {
+	.poll-card:focus-visible {
 		outline: none;
-		box-shadow: 0 0 0 3px var(--focusRing);
+		box-shadow: 0 0 0 3px rgba(232,93,38,.25);
 	}
-	/* Gmail-like: unvoted = white/bold, voted = gray/muted */
-	.poll-card.needs-vote {
-		background: var(--surfaceSolid, #fff);
+
+	/* ── Status via visual weight, not bars ── */
+	.voted {
+		background: #f8fafc;
+		border-color: #f0f2f5;
+		box-shadow: none;
 	}
-	.poll-card.needs-vote .poll-title {
-		font-weight: 700;
-		color: var(--text);
+	.voted:hover {
+		box-shadow: 0 3px 12px rgba(0,0,0,.06);
 	}
-	.poll-card.voted {
-		background: var(--surface2, #f3f4f6);
+	.closing-soon {
+		background: #fffaf7;
 	}
-	.poll-card.voted .poll-title {
-		font-weight: 500;
-		color: var(--muted);
+	.draft {
+		background: #fafaff;
+		border-color: #edeeff;
+		box-shadow: none;
 	}
-	.card-top {
+
+	/* ── Notification dot for unvoted polls ── */
+	.notify-dot {
+		position: absolute;
+		top: 11px;
+		right: 11px;
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: #E85D26;
+		box-shadow: 0 0 0 2px white;
+	}
+	.notify-dot::after {
+		content: '';
+		position: absolute;
+		inset: -3px;
+		border-radius: 50%;
+		border: 1.5px solid #E85D26;
+		opacity: 0;
+		animation: pulse-ring 2s ease-out infinite;
+	}
+	@keyframes pulse-ring {
+		0%   { transform: scale(1); opacity: .65; }
+		100% { transform: scale(2.2); opacity: 0; }
+	}
+
+	/* ── Meta row ── */
+	.meta-row {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 0.75rem;
+		gap: .5rem;
 	}
-	.category-row {
+	.category-tag {
 		display: flex;
 		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.8125rem;
-		color: var(--muted);
-	}
-	.category-icon {
-		font-size: 1rem;
-	}
-	.category-name {
+		gap: .3rem;
+		font-size: .73rem;
 		font-weight: 500;
+		color: #94a3b8;
 	}
-	.status-pill {
-		padding: 0.2rem 0.5rem;
-		border-radius: 9999px;
-		font-weight: 600;
-		font-size: 0.75rem;
+	.meta-right {
+		display: flex;
+		align-items: center;
+		gap: .35rem;
 		flex-shrink: 0;
 	}
-	.status-pill.open {
-		background: rgba(34, 197, 94, 0.15);
-		color: #15803d;
+	.meta-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: .2rem;
+		padding: .13rem .45rem;
+		border-radius: 5px;
+		font-size: .65rem;
+		font-weight: 600;
+		letter-spacing: .02em;
 	}
-	.status-pill.closing-soon {
-		background: rgba(245, 158, 11, 0.2);
-		color: #b45309;
+	.anon-pill  { background: rgba(99,102,241,.09); color: #6366f1; }
+	.live-pill  { background: rgba(16,185,129,.09); color: #059669; }
+	.warn-pill  { background: rgba(245,158,11,.12); color: #b45309; }
+	.draft-pill { background: rgba(99,102,241,.1);  color: #4f46e5; }
+	.time-chip {
+		font-size: .71rem;
+		font-weight: 500;
+		color: #94a3b8;
 	}
-	.status-pill.closed {
-		background: var(--border-soft);
-		color: var(--muted);
-	}
-	.status-pill.draft {
-		background: rgba(99, 102, 241, 0.15);
-		color: #4f46e5;
-	}
-	.status-pill.canceled {
-		background: rgba(185, 28, 28, 0.1);
-		color: var(--danger);
-	}
+
+	/* ── Title ── */
 	.poll-title {
-		font-size: 1.125rem;
+		font-size: .9875rem;
 		font-weight: 700;
+		color: #1e293b;
 		margin: 0;
-		color: var(--text);
 		line-height: 1.35;
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
+		/* needs-vote gets full visual weight — voted titles are muted */
 	}
-	.poll-description {
-		font-size: 0.875rem;
-		color: var(--muted);
+	.voted .poll-title { color: #94a3b8; font-weight: 500; }
+	.draft .poll-title { color: #64748b; }
+
+	/* ── Description ── */
+	.poll-desc {
+		font-size: .8125rem;
+		color: #64748b;
 		margin: 0;
 		line-height: 1.45;
 		display: -webkit-box;
@@ -188,20 +245,54 @@
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}
-	.card-footer {
+	.voted .poll-desc { color: #94a3b8; }
+
+	/* ── Footer ── */
+	.card-foot {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 0.75rem;
-		font-size: 0.8125rem;
-		color: var(--muted);
-		margin-top: auto;
-		padding-top: 0.5rem;
-		border-top: 1px solid var(--border-soft);
+		gap: .65rem;
+		margin-top: .1rem;
+		padding-top: .5rem;
+		border-top: 1px solid #f0f2f5;
 	}
-	.time-label {
-	}
-	.vote-count {
+	.foot-stat {
+		display: flex;
+		align-items: center;
+		gap: .25rem;
+		font-size: .72rem;
+		color: #94a3b8;
 		font-weight: 500;
 	}
+	.foot-right {
+		display: flex;
+		align-items: center;
+		gap: .4rem;
+		margin-left: auto;
+	}
+	.voted-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: .25rem;
+		padding: .13rem .45rem;
+		background: rgba(16,185,129,.1);
+		color: #047857;
+		border-radius: 5px;
+		font-size: .67rem;
+		font-weight: 700;
+	}
+	.btn-watch {
+		display: inline-flex;
+		align-items: center;
+		padding: .25rem .35rem;
+		border-radius: 6px;
+		border: 1.5px solid transparent;
+		background: none;
+		color: #cbd5e1;
+		cursor: pointer;
+		transition: all .15s;
+		line-height: 1;
+	}
+	.btn-watch:hover { color: #E85D26; border-color: rgba(232,93,38,.2); background: rgba(232,93,38,.05); }
+	.btn-watch.watching { color: #E85D26; border-color: rgba(232,93,38,.25); background: rgba(232,93,38,.07); }
 </style>

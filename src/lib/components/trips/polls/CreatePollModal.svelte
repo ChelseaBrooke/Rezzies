@@ -46,6 +46,7 @@
 	let options = $state<string[]>(['', '']);
 	let durationHours = $state(48);
 	let showResultsLive = $state(true);
+	let allowAnonymous = $state(false);
 	let submitting = $state(false);
 
 	$effect(() => {
@@ -57,6 +58,7 @@
 			options = ['', ''];
 			durationHours = 48;
 			showResultsLive = true;
+			allowAnonymous = false;
 		}
 	});
 
@@ -191,6 +193,14 @@
 						<label class="checkbox-label">
 							<input type="checkbox" name="showResultsLive" value="1" bind:checked={showResultsLive} />
 							Show results live (guests see counts as they vote)
+						</label>
+					</div>
+					<div class="form-group checkbox-group">
+						<label class="checkbox-label">
+							<input type="checkbox" name="allowAnonymous" value="1" bind:checked={allowAnonymous} />
+							<span>
+								Anonymous voting — votes are tracked (one per person) but individual choices are hidden from everyone
+							</span>
 						</label>
 					</div>
 					<div class="form-actions">

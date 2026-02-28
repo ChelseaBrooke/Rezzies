@@ -8,7 +8,15 @@
 		open: boolean;
 		members: MealGuest[];
 		tripDays: { value: string; label: string }[];
-		prefill?: { date: string; mealType?: string; time?: string } | null;
+		prefill?: {
+			slotId?: string;
+			date: string;
+			mealType?: string;
+			time?: string;
+			notes?: string;
+			option?: string;
+			assignedUserId?: string;
+		} | null;
 		formAction?: string;
 		onClose: () => void;
 		onSuccess: () => void;
@@ -52,12 +60,17 @@
 			date     = prefill.date;
 			time     = prefill.time ?? '';
 			mealType = prefill.mealType ?? 'dinner';
+			option   = (prefill.option as MealOption) ?? 'cooking';
+			cookId   = prefill.assignedUserId ?? '';
+			notes    = prefill.notes ?? '';
 		} else if (open && tripDays.length) {
-			date = tripDays[0].value;
-			time = '';
+			date     = tripDays[0].value;
+			time     = '';
 			mealType = 'dinner';
+			option   = 'cooking';
+			cookId   = '';
+			notes    = '';
 		}
-		if (open) { option = 'cooking'; cookId = ''; notes = ''; }
 	});
 
 	// Build the title that gets stored based on the selected option + cook
@@ -83,7 +96,7 @@
 		<div class="modal">
 			<div class="modal-header">
 				<h2 id="add-meal-title">
-					Add {MEAL_TYPE_LABELS[mealType] ?? 'Meal'}
+					{prefill?.slotId ? 'Edit' : 'Add'} {MEAL_TYPE_LABELS[mealType] ?? 'Meal'}
 				</h2>
 				<button type="button" class="modal-close" onclick={onClose} aria-label="Close">×</button>
 			</div>
@@ -102,10 +115,11 @@
 				class="modal-form"
 			>
 				<!-- Hidden fields -->
+				{#if prefill?.slotId}<input type="hidden" name="slotId" value={prefill.slotId} />{/if}
 				<input type="hidden" name="mealType" value={mealType} />
 				<input type="hidden" name="date"     value={date} />
 				<input type="hidden" name="title"    value={generatedTitle} />
-				{#if cookId}<input type="hidden" name="assignedUserId" value={cookId} />{/if}
+				<input type="hidden" name="assignedUserId" value={cookId} />
 
 				<!-- Date + time row -->
 				<div class="field-row">
@@ -169,9 +183,9 @@
 
 				<div class="modal-actions">
 					<button type="button" class="btn btn-secondary" onclick={onClose}>Cancel</button>
-					<button type="submit" class="btn btn-primary" disabled={submitting || !date}>
-						{submitting ? 'Adding…' : 'Add meal'}
-					</button>
+				<button type="submit" class="btn btn-primary" disabled={submitting || !date}>
+					{submitting ? (prefill?.slotId ? 'Saving…' : 'Adding…') : (prefill?.slotId ? 'Save changes' : 'Add meal')}
+				</button>
 				</div>
 			</form>
 		</div>

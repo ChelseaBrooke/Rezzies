@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { PollWithMeta } from './types.js';
 	import { CATEGORY_ICONS } from './types.js';
-	import PollResultsPie from './PollResultsPie.svelte';
 
 	interface Props {
 		poll: PollWithMeta;
@@ -18,15 +17,20 @@
 			.filter(Boolean) as string[]
 	);
 
-	const totalVotes = poll.totalVotes ?? 0;
-	const winner = $derived(
-		poll.options.length > 0
-			? poll.options.reduce((a, b) => ((b.voteCount ?? 0) >= (a.voteCount ?? 0) ? b : a))
-			: null
+	const totalVotes = $derived(poll.totalVotes ?? 0);
+
+	// Sort options by vote count descending for display
+	const sortedOptions = $derived(
+		[...poll.options].sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0))
 	);
-	const winnerPercentage = $derived(
-		winner && totalVotes > 0 ? Math.round(((winner.voteCount ?? 0) / totalVotes) * 100) : 0
-	);
+
+	const winner = $derived(sortedOptions[0] ?? null);
+
+	function pct(voteCount: number): number {
+		return totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+	}
+
+	const isCanceled = $derived(poll.statusDisplay === 'canceled');
 </script>
 
 <article
@@ -36,189 +40,245 @@
 	tabindex={onClick ? 0 : undefined}
 	onclick={onClick}
 	onkeydown={(e) => {
-		if (onClick && (e.key === 'Enter' || e.key === ' ')) {
-			e.preventDefault();
-			onClick();
-		}
+		if (onClick && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(); }
 	}}
 >
-	<div class="card-top">
-		<div class="category-row">
-			<span class="category-icon" aria-hidden="true">{icon}</span>
-			<span class="category-name">{poll.category}</span>
-		</div>
-		<span class="status-pill closed">{poll.statusDisplay === 'canceled' ? 'Canceled' : 'Closed'}</span>
-	</div>
-
-	<h2 class="poll-title">{poll.title}</h2>
-	{#if poll.description}
-		<p class="poll-description">{poll.description}</p>
-	{/if}
-
-	<div class="winner-block">
-		<p class="winner-line">
-			<span class="winner-label">Winner:</span>
-			{#if winner}
-				<span class="winner-value">{winner.label}</span>
-				<span class="winner-pct">({winnerPercentage}%)</span>
-			{:else}
-				<span class="winner-muted">No votes</span>
-			{/if}
-		</p>
-	</div>
-
-	<div class="results-area">
-		<PollResultsPie
-			options={poll.options}
-			totalVotes={poll.totalVotes}
-			userOptionIds={poll.userOptionIds}
-			size={100}
-		/>
-	</div>
-
-	<div class="card-footer">
-		<span class="time-label">
-			Your vote: {userAnswerLabels.length > 0 ? userAnswerLabels.join(', ') : '—'}
+	<!-- Meta row -->
+	<div class="meta-row">
+		<span class="category-tag">
+			<span aria-hidden="true">{icon}</span>
+			{poll.category}
 		</span>
-		<span class="vote-count">{poll.totalVotes} {poll.totalVotes === 1 ? 'vote' : 'votes'}</span>
+		<div class="meta-right">
+			{#if poll.allowAnonymous}
+				<span class="meta-pill anon-pill">🔒 Anon</span>
+			{/if}
+			<span class="status-chip" class:canceled={isCanceled}>
+				{isCanceled ? 'Canceled' : 'Closed'}
+			</span>
+		</div>
 	</div>
+
+	<!-- Title -->
+	<h3 class="poll-title">{poll.title}</h3>
+
+		<!-- Results bars (top options, max 4) -->
+		{#if totalVotes > 0}
+			<div class="results">
+				{#each sortedOptions.slice(0, 4) as opt, i (opt.id)}
+					{@const p = pct(opt.voteCount ?? 0)}
+					{@const isWinner = i === 0}
+					{@const isUserPick = poll.userOptionIds.includes(opt.id)}
+					<div class="result-row" class:is-winner={isWinner} class:is-user-pick={isUserPick}>
+						<span class="result-label">
+							{#if isWinner}🏆{/if}
+							{opt.label}
+						</span>
+						<div class="bar-wrap">
+							<div class="bar" class:bar-winner={isWinner} class:bar-user={isUserPick && !isWinner} style="width:{p}%"></div>
+						</div>
+						<span class="result-pct">{p}%</span>
+					</div>
+				{/each}
+				{#if sortedOptions.length > 4}
+					<p class="more-options">+{sortedOptions.length - 4} more · click to see all</p>
+				{/if}
+			</div>
+		{:else}
+			<p class="no-votes">No votes were cast</p>
+		{/if}
+
+		<!-- Footer -->
+		<div class="card-foot">
+			{#if userAnswerLabels.length > 0}
+				<span class="your-vote">
+					<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+					Your vote: {userAnswerLabels.join(', ')}
+				</span>
+			{:else}
+				<span class="no-vote">Didn't vote</span>
+			{/if}
+			<span class="total-votes">{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</span>
+		</div>
 </article>
 
 <style>
 	.closed-card {
-		background: var(--surfaceSolid, #fff);
-		border-radius: var(--radius-2xl, 14px);
-		border: 1px solid var(--border-soft, rgba(17, 24, 39, 0.06));
-		box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
-		padding: 1.25rem 1.5rem;
-		transition: box-shadow 0.2s ease, transform 0.2s ease;
+		border-radius: 12px;
+		border: 1px solid #f0f2f5;
+		background: #f8fafc;
+		padding: .9rem 1.1rem .75rem;
+		margin-bottom: .55rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: .42rem;
+		transition: box-shadow .15s, transform .15s;
+		user-select: none;
 		min-width: 0;
 	}
-	.closed-card.clickable {
-		cursor: pointer;
-	}
+	.closed-card:last-child { margin-bottom: 0; }
+	.closed-card.clickable { cursor: pointer; }
 	.closed-card.clickable:hover {
-		box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.06));
-		transform: translateY(-2px);
+		box-shadow: 0 3px 12px rgba(0,0,0,.07);
+		transform: translateY(-1px);
 	}
-	.card-top {
+	.closed-card:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 3px rgba(232,93,38,.2);
+	}
+
+	/* Meta */
+	.meta-row {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 0.75rem;
-		flex-shrink: 0;
+		gap: .5rem;
 	}
-	.category-row {
+	.meta-right {
 		display: flex;
 		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.8125rem;
-		color: var(--muted);
-		min-width: 0;
-	}
-	.category-icon {
+		gap: .35rem;
 		flex-shrink: 0;
-		font-size: 1rem;
 	}
-	.category-name {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.status-pill.closed {
-		background: var(--border-soft);
-		color: var(--muted);
-		padding: 0.2rem 0.5rem;
-		border-radius: 9999px;
+	.meta-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: .2rem;
+		padding: .13rem .45rem;
+		border-radius: 5px;
+		font-size: .65rem;
 		font-weight: 600;
-		font-size: 0.75rem;
-		flex-shrink: 0;
 	}
-	.poll-title {
-		font-size: 1.125rem;
-		font-weight: 700;
-		margin: 0;
-		color: var(--text);
-		line-height: 1.35;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
-		word-break: break-word;
-	}
-	.poll-description {
-		font-size: 0.875rem;
-		color: var(--muted);
-		margin: 0;
-		line-height: 1.45;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
-		word-break: break-word;
-	}
-	.winner-block {
-		padding: 0.75rem 1rem;
-		background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.04));
-		border-radius: var(--radius-lg);
-		border: 1px solid rgba(34, 197, 94, 0.2);
-		margin: 0.25rem 0;
-	}
-	.winner-line {
-		font-size: 0.9375rem;
-		color: var(--text);
-		margin: 0;
+	.anon-pill { background: rgba(99,102,241,.09); color: #6366f1; }
+	.category-tag {
 		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.35rem;
-	}
-	.winner-label {
-		font-weight: 700;
-		color: var(--text);
-	}
-	.winner-value {
-		font-weight: 600;
-		color: var(--text);
-	}
-	.winner-pct {
-		color: var(--muted);
-		font-size: 0.8125rem;
+		align-items: center;
+		gap: .3rem;
+		font-size: .73rem;
 		font-weight: 500;
+		color: #94a3b8;
 	}
-	.winner-muted {
-		color: var(--muted);
+	.status-chip {
+		padding: .13rem .5rem;
+		border-radius: 5px;
+		font-size: .65rem;
+		font-weight: 700;
+		background: #e2e8f0;
+		color: #64748b;
+		flex-shrink: 0;
+	}
+	.status-chip.canceled {
+		background: rgba(239,68,68,.1);
+		color: #b91c1c;
+	}
+
+	/* Title */
+	.poll-title {
+		font-size: 1rem;
+		font-weight: 700;
+		color: #475569;
+		margin: 0;
+		line-height: 1.35;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	/* Results bars */
+	.results {
+		display: flex;
+		flex-direction: column;
+		gap: .35rem;
+		margin-top: .1rem;
+	}
+	.result-row {
+		display: grid;
+		grid-template-columns: 1fr auto auto;
+		align-items: center;
+		gap: .5rem;
+	}
+	.result-label {
+		font-size: .78rem;
+		color: #64748b;
+		font-weight: 500;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		display: flex;
+		align-items: center;
+		gap: .25rem;
+	}
+	.result-row.is-winner .result-label { color: #1e293b; font-weight: 700; }
+	.result-row.is-user-pick .result-label { color: #E85D26; }
+	.bar-wrap {
+		width: 80px;
+		height: 6px;
+		background: #e2e8f0;
+		border-radius: 3px;
+		overflow: hidden;
+		flex-shrink: 0;
+	}
+	.bar {
+		height: 100%;
+		background: #cbd5e1;
+		border-radius: 3px;
+		transition: width .3s ease;
+	}
+	.bar-winner { background: #001B2E; }
+	.bar-user   { background: #E85D26; }
+	.result-pct {
+		font-size: .73rem;
+		font-weight: 600;
+		color: #94a3b8;
+		width: 2.5rem;
+		text-align: right;
+		flex-shrink: 0;
+	}
+	.result-row.is-winner .result-pct { color: #475569; }
+	.more-options {
+		font-size: .72rem;
+		color: #94a3b8;
+		margin: .1rem 0 0;
 		font-style: italic;
 	}
-	.results-area {
-		margin: 0.25rem 0;
-		min-width: 0;
+	.no-votes {
+		font-size: .8rem;
+		color: #94a3b8;
+		margin: .1rem 0;
+		font-style: italic;
 	}
-	.card-footer {
+
+	/* Footer */
+	.card-foot {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 0.75rem;
-		font-size: 0.8125rem;
-		color: var(--muted);
-		margin-top: auto;
-		padding-top: 0.75rem;
-		border-top: 1px solid var(--border-soft);
-		flex-shrink: 0;
+		gap: .75rem;
+		padding-top: .5rem;
+		border-top: 1px solid #e2e8f0;
+		margin-top: .1rem;
 	}
-	.time-label,
-	.vote-count {
+	.your-vote {
+		display: flex;
+		align-items: center;
+		gap: .3rem;
+		font-size: .73rem;
+		color: #10b981;
+		font-weight: 600;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.vote-count {
+	.no-vote {
+		font-size: .73rem;
+		color: #94a3b8;
+		font-style: italic;
+	}
+	.total-votes {
+		font-size: .73rem;
 		font-weight: 500;
+		color: #94a3b8;
 		flex-shrink: 0;
 	}
 </style>

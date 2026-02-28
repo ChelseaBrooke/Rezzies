@@ -353,7 +353,7 @@ export const actions: Actions = {
 		const mealType = (formData.get('mealType') as string) || slot.mealType;
 		const dateStr = formData.get('date') as string;
 		const time = (formData.get('time') as string)?.trim() || null;
-		const menuText = (formData.get('menuText') as string)?.trim() || null;
+		const title = (formData.get('title') as string)?.trim() || null;
 		const notes = (formData.get('notes') as string)?.trim() || null;
 		const assignedUserId = formData.get('assignedUserId') as string | null;
 		const data: Record<string, unknown> = {};
@@ -363,7 +363,7 @@ export const actions: Actions = {
 				? mealType
 				: slot.mealType;
 			data.time = time;
-			data.menuText = menuText;
+			data.title = title;
 			data.notes = notes;
 		}
 		if (assignedUserId !== undefined) {
@@ -535,5 +535,35 @@ export const actions: Actions = {
 		});
 
 		return { createActivitySuccess: true };
+	},
+
+	updateActivity: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) return { updateActivityError: 'Not a trip member.' };
+
+		const fd = await request.formData();
+		const activityId = (fd.get('activityId') as string)?.trim();
+		if (!activityId) return { updateActivityError: 'Activity ID required.' };
+
+		const activity = await prisma.activity.findFirst({ where: { id: activityId, tripId } });
+		if (!activity) return { updateActivityError: 'Activity not found.' };
+
+		const title = (fd.get('title') as string)?.trim();
+		const dateStr = fd.get('date') as string;
+		const time = (fd.get('time') as string)?.trim() || null;
+		const location = (fd.get('location') as string)?.trim() || null;
+		const notes = (fd.get('notes') as string)?.trim() || null;
+
+		if (!title) return { updateActivityError: 'Activity name is required.' };
+
+		await prisma.activity.update({
+			where: { id: activityId },
+			data: { title, ...(dateStr ? { date: new Date(dateStr) } : {}), time, location, notes }
+		});
+
+		return { updateActivitySuccess: true };
 	}
 };

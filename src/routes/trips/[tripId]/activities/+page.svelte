@@ -43,6 +43,7 @@
 	let addModalTime = $state('9:00 AM');
 
 	let addModalSubmitting = $state(false);
+	let pollFormSubmittingId = $state<string | null>(null);
 
 	// Carousel state: tracks current photo index per result id
 	let carouselIndex = $state<Record<string, number>>({});
@@ -252,6 +253,22 @@
 			update: (opts?: { reset?: boolean }) => Promise<void>;
 		}) => {
 			await update();
+		};
+	}
+
+	/** Enhance for "Propose as poll" form: show loading and scroll to top so toast is visible. */
+	function handlePollSubmit(resultId: string) {
+		return () => {
+			pollFormSubmittingId = resultId;
+			return async ({
+				update
+			}: {
+				update: (opts?: { reset?: boolean }) => Promise<void>;
+			}) => {
+				pollFormSubmittingId = null;
+				await update();
+				window.scrollTo({ top: 0, behavior: 'smooth' });
+			};
 		};
 	}
 
@@ -539,13 +556,15 @@
 								{:else}
 									<button type="button" class="btn btn-add-to-trip btn-sm" onclick={() => openAddModal(result)}>Add to trip</button>
 								{/if}
-								<form method="POST" action="?/addDiscoveredActivity" use:enhance={handleResult()} class="action-link-form">
+								<form method="POST" action="?/addDiscoveredActivity" use:enhance={() => handlePollSubmit(result.id)} class="action-link-form">
 									<input type="hidden" name="title" value={result.name ?? ''} />
 									<input type="hidden" name="location" value={result.address ?? ''} />
 									<input type="hidden" name="notes" value={buildDiscoverNotes(result)} />
 									<input type="hidden" name="additionType" value="poll" />
 									<input type="hidden" name="date" value={tripDateOptions[0]?.value ?? ''} />
-									<button type="submit" class="btn btn-poll btn-sm">Propose as poll</button>
+									<button type="submit" class="btn btn-poll btn-sm" disabled={pollFormSubmittingId !== null}>
+										{pollFormSubmittingId === result.id ? 'Creating…' : 'Propose as poll'}
+									</button>
 								</form>
 							</div>
 							<div class="action-links">

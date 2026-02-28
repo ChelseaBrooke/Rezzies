@@ -41,6 +41,9 @@ export interface PollWithMeta {
 	userOptionIds: string[];
 	/** Humanized: "Ends in 2d" or "Closed 3d ago" */
 	timeLabel: string;
+	allowAnonymous: boolean;
+	userWatching: boolean;
+	watcherCount: number;
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {

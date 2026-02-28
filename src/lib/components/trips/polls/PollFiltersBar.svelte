@@ -10,7 +10,6 @@
 		sort: PollSort;
 		onSortChange: (s: PollSort) => void;
 		onAddNewPoll: () => void;
-		/** Host/co-host sees Add New Poll */
 		canCreate: boolean;
 	}
 
@@ -24,76 +23,53 @@
 		onAddNewPoll,
 		canCreate = false
 	}: Props = $props();
-
-	const currentSortLabel = $derived(SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Most Recent');
 </script>
 
 <div class="filters-bar">
-	<div class="search-sort-row">
+	<!-- Top row: search + sort -->
+	<div class="top-row">
 		<div class="search-wrap">
-			<svg
-				class="search-icon"
-				xmlns="http://www.w3.org/2000/svg"
-				width="18"
-				height="18"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-				aria-hidden="true"
-			>
-				<circle cx="11" cy="11" r="8" />
-				<path d="M21 21l-4.35-4.35" />
+			<svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+				stroke="currentColor" stroke-width="2" aria-hidden="true">
+				<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
 			</svg>
 			<input
 				type="search"
 				class="search-input"
-				placeholder="Search poll title or keywords…"
+				placeholder="Search polls…"
 				value={searchQuery}
 				oninput={(e) => onSearchChange((e.target as HTMLInputElement).value)}
 				aria-label="Search polls"
 			/>
 		</div>
-		<div class="right-actions">
+		<div class="right-controls">
+			<select
+				class="sort-select"
+				value={sort}
+				onchange={(e) => onSortChange((e.target as HTMLSelectElement).value as PollSort)}
+				aria-label="Sort polls"
+			>
+				{#each SORT_OPTIONS as opt}
+					<option value={opt.value}>{opt.label}</option>
+				{/each}
+			</select>
 			{#if canCreate}
 				<button type="button" class="btn-add-poll" onclick={onAddNewPoll}>
-					<svg
-						class="plus-icon"
-						xmlns="http://www.w3.org/2000/svg"
-						width="18"
-						height="18"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						aria-hidden="true"
-					>
-						<line x1="12" y1="5" x2="12" y2="19" />
-						<line x1="5" y1="12" x2="19" y2="12" />
+					<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+						<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
 					</svg>
-					Add New Poll
+					New Poll
 				</button>
 			{/if}
-			<div class="sort-dropdown-wrap">
-				<select
-					class="sort-select"
-					value={sort}
-					onchange={(e) => onSortChange((e.target as HTMLSelectElement).value as PollSort)}
-					aria-label="Sort polls"
-				>
-					{#each SORT_OPTIONS as opt}
-						<option value={opt.value}>{opt.label}</option>
-					{/each}
-				</select>
-			</div>
 		</div>
 	</div>
 
+	<!-- Category pills -->
 	<nav class="category-pills" aria-label="Filter by category">
 		{#each POLL_CATEGORIES as cat}
 			<button
 				type="button"
-				class="category-pill"
+				class="cat-pill"
 				class:active={category === cat}
 				onclick={() => onCategoryChange(cat)}
 			>
@@ -107,138 +83,112 @@
 	.filters-bar {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
-		margin-bottom: 1.5rem;
+		gap: .75rem;
 	}
-	.search-sort-row {
+
+	/* ── Top row ── */
+	.top-row {
 		display: flex;
 		align-items: center;
-		gap: 1rem;
+		gap: .75rem;
 		flex-wrap: wrap;
 	}
 	.search-wrap {
 		flex: 1;
-		min-width: 200px;
+		min-width: 180px;
 		position: relative;
 	}
 	.search-icon {
 		position: absolute;
-		left: 1rem;
+		left: .75rem;
 		top: 50%;
 		transform: translateY(-50%);
-		color: var(--muted);
+		color: #94a3b8;
 		pointer-events: none;
 	}
 	.search-input {
 		width: 100%;
-		padding: 0.625rem 1rem 0.625rem 2.75rem;
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--border-strong);
-		font-size: 0.9375rem;
-		background: var(--surfaceSolid);
-		color: var(--text);
+		padding: .5rem .75rem .5rem 2.25rem;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		font-size: .875rem;
+		background: white;
+		color: #1e293b;
+		box-sizing: border-box;
 	}
 	.search-input:focus {
 		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px var(--focusRing);
+		border-color: #E85D26;
+		box-shadow: 0 0 0 3px rgba(232,93,38,.1);
 	}
-	.search-input::placeholder {
-		color: var(--muted);
-	}
-	.right-actions {
+	.search-input::placeholder { color: #94a3b8; }
+
+	.right-controls {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		gap: .5rem;
 		flex-shrink: 0;
 	}
+	.sort-select {
+		padding: .5rem 2rem .5rem .75rem;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		font-size: .8125rem;
+		background: white;
+		color: #475569;
+		cursor: pointer;
+		appearance: none;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right .6rem center;
+	}
+	.sort-select:focus { outline: none; border-color: #E85D26; }
+
 	.btn-add-poll {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.625rem 1.25rem;
-		background: var(--primary);
+		gap: .35rem;
+		padding: .5rem 1rem;
+		background: #E85D26;
 		color: white;
 		border: none;
-		border-radius: var(--radius-lg);
-		font-size: 0.9375rem;
+		border-radius: 8px;
+		font-size: .8125rem;
 		font-weight: 600;
 		cursor: pointer;
-		transition: background var(--transition-fast), transform var(--transition-fast);
 		white-space: nowrap;
+		transition: background .12s;
 	}
-	.btn-add-poll:hover {
-		background: var(--primaryHover);
-		transform: translateY(-1px);
-	}
-	.btn-add-poll:focus-visible {
-		outline: none;
-		box-shadow: 0 0 0 3px var(--focusRing);
-	}
-	.plus-icon {
-		flex-shrink: 0;
-	}
-	.sort-dropdown-wrap {
-		position: relative;
-	}
-	.sort-select {
-		padding: 0.625rem 2rem 0.625rem 1rem;
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--border-strong);
-		font-size: 0.9375rem;
-		background: var(--surfaceSolid);
-		color: var(--text);
-		cursor: pointer;
-		appearance: none;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-		background-repeat: no-repeat;
-		background-position: right 0.75rem center;
-		padding-right: 2rem;
-		min-width: 10rem;
-	}
-	.sort-select:focus {
-		outline: none;
-		border-color: var(--primary);
-	}
+	.btn-add-poll:hover { background: #d04e1f; }
+
+	/* ── Category pills ── */
 	.category-pills {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.5rem;
+		gap: .4rem;
 	}
-	.category-pill {
-		padding: 0.5rem 1rem;
-		border-radius: 9999px;
-		font-size: 0.875rem;
+	.cat-pill {
+		padding: .3rem .8rem;
+		border-radius: 999px;
+		font-size: .78rem;
 		font-weight: 500;
-		border: 1px solid var(--border-soft);
-		background: var(--surface2, #f1f5f9);
-		color: var(--muted);
+		border: 1px solid #e2e8f0;
+		background: white;
+		color: #64748b;
 		cursor: pointer;
-		transition: all var(--transition-fast);
+		transition: all .12s;
 	}
-	.category-pill:hover {
-		background: var(--surface);
-		color: var(--text);
-	}
-	.category-pill.active {
-		background: var(--primary);
+	.cat-pill:hover { background: #f1f5f9; color: #1e293b; }
+	.cat-pill.active {
+		background: #001B2E;
 		color: white;
-		border-color: var(--primary);
+		border-color: #001B2E;
+		font-weight: 600;
 	}
-	.category-pill:focus-visible {
-		outline: none;
-		box-shadow: 0 0 0 2px var(--focusRing);
-	}
-	@media (max-width: 640px) {
-		.search-sort-row {
-			flex-direction: column;
-			align-items: stretch;
-		}
-		.search-wrap {
-			min-width: unset;
-		}
-		.right-actions {
-			justify-content: flex-end;
-		}
+	.cat-pill:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(232,93,38,.35); }
+
+	@media (max-width: 600px) {
+		.top-row { flex-direction: column; align-items: stretch; }
+		.right-controls { justify-content: flex-end; }
 	}
 </style>

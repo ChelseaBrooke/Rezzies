@@ -96,13 +96,33 @@
 
 	let showAddActivity = $state(false);
 	let addActivitySubmitting = $state(false);
+	let editActivityId  = $state<string | null>(null);
+	let editActivityTitle    = $state('');
+	let editActivityDate     = $state('');
+	let editActivityTime     = $state('9:00 AM');
+	let editActivityLocation = $state('');
+	let editActivityNotes    = $state('');
 
-	function openAddActivity() { showAddActivity = true; }
-	function closeAddActivity() { showAddActivity = false; }
+	function openAddActivity() {
+		editActivityId = null;
+		showAddActivity = true;
+	}
+	function closeAddActivity() {
+		showAddActivity = false;
+		editActivityId = null;
+	}
 
 	// ── Add Meal modal (triggered from placeholders) ────────────────────────
 	let showAddMeal = $state(false);
-	let addMealPrefill = $state<{ date: string; mealType: string; time: string } | null>(null);
+	let addMealPrefill = $state<{
+		slotId?: string;
+		date: string;
+		mealType: string;
+		time: string;
+		notes?: string;
+		option?: string;
+		assignedUserId?: string;
+	} | null>(null);
 
 	function openAddMeal(date: string, mealType: string, defaultTime: string) {
 		addMealPrefill = { date, mealType, time: defaultTime };
@@ -111,6 +131,38 @@
 	function closeAddMeal() {
 		showAddMeal = false;
 		addMealPrefill = null;
+	}
+
+	// ── Edit handlers (called from drawer Edit button) ──────────────────────
+	function handleEditEvent() {
+		if (!drawerEvent) return;
+		const ev = drawerEvent;
+		drawerEvent = null;
+		if (ev.type === 'meal') {
+			const title = ev.title ?? '';
+			let option = 'cooking';
+			if (title === 'Ordering In') option = 'ordering-in';
+			else if (title.startsWith('Going out')) option = 'going-out';
+			else if (title === 'Fend for yourself') option = 'fend-for-yourself';
+			addMealPrefill = {
+				slotId: ev.id,
+				date: ev.date,
+				mealType: ev.mealType ?? 'dinner',
+				time: ev.time ?? '',
+				notes: ev.notes ?? '',
+				option,
+				assignedUserId: ev.assignedUser?.id ?? ''
+			};
+			showAddMeal = true;
+		} else {
+			editActivityId       = ev.id;
+			editActivityTitle    = ev.title ?? '';
+			editActivityDate     = ev.date;
+			editActivityTime     = ev.time ?? '9:00 AM';
+			editActivityLocation = ev.location ?? '';
+			editActivityNotes    = ev.notes ?? '';
+			showAddActivity = true;
+		}
 	}
 
 	// ── Filters ────────────────────────────────────────────────────────────
@@ -179,7 +231,7 @@
 
 	// ── Time slots (left axis) ─────────────────────────────────────────────
 	const timeSlots = $derived(
-		Array.from({ length: HOUR_END - HOUR_START }, (_, i) => {
+		Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => {
 			const h = HOUR_START + i;
 			return h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`;
 		})
@@ -758,12 +810,12 @@
 											<span class="evt-time" style="color:{style.subColor}">{formatMinutes(parseTimeToMinutes(ev.time as string))}</span>
 										{/if}
 
-										<!-- Meal: assigned cook -->
-										{#if isMeal && (ev.assignedUser as { name: string } | null)}
-											<span class="evt-sub" style="color:{style.subColor}">
-												🍳 {(ev.assignedUser as { name: string }).name}
-											</span>
-										{/if}
+									<!-- Meal: assigned cook (pinned bottom-right) -->
+									{#if isMeal && (ev.assignedUser as { name: string } | null)}
+										<span class="evt-chef" style="color:{style.subColor}">
+											🍳 {(ev.assignedUser as { name: string }).name}
+										</span>
+									{/if}
 
 									<!-- Activity: going count indicator -->
 									{#if !isMeal && gCount > 0}
@@ -822,15 +874,15 @@
 		role="presentation"
 		onclick={(e) => e.target === e.currentTarget && closeAddActivity()}
 	>
-		<div class="modal-box" role="dialog" aria-modal="true" aria-label="Add custom activity">
+		<div class="modal-box" role="dialog" aria-modal="true" aria-label="{editActivityId ? 'Edit' : 'Add'} activity">
 			<div class="modal-header">
-				<h2 class="modal-title">Add Custom Activity</h2>
+				<h2 class="modal-title">{editActivityId ? 'Edit Activity' : 'Add Custom Activity'}</h2>
 				<button class="modal-close" onclick={closeAddActivity} aria-label="Close">✕</button>
 			</div>
 
 			<form
 				method="POST"
-				action="?/createActivity"
+				action={editActivityId ? '?/updateActivity' : '?/createActivity'}
 				use:enhance={() => {
 					addActivitySubmitting = true;
 					return async ({ result, update }) => {
@@ -841,13 +893,18 @@
 				}}
 				class="modal-form"
 			>
+				{#if editActivityId}
+					<input type="hidden" name="activityId" value={editActivityId} />
+				{/if}
+
 				<label class="modal-label">Activity name <span class="req">*</span></label>
-				<input class="modal-input" type="text" name="title" required placeholder="e.g. Morning hike" />
+				<input class="modal-input" type="text" name="title" required placeholder="e.g. Morning hike"
+					value={editActivityId ? editActivityTitle : ''} />
 
 				<label class="modal-label">Day <span class="req">*</span></label>
 				<select class="modal-select" name="date" required>
 					{#each tripDays as day}
-						<option value={day}>
+						<option value={day} selected={editActivityId ? day === editActivityDate : false}>
 							{new Date(day + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
 						</option>
 					{/each}
@@ -856,20 +913,24 @@
 				<label class="modal-label">Time <span class="req">*</span></label>
 				<select class="modal-select" name="time" required>
 					{#each TIME_OPTIONS as t}
-						<option value={t} selected={t === '9:00 AM'}>{t}</option>
+						<option value={t} selected={editActivityId ? t === editActivityTime : t === '9:00 AM'}>{t}</option>
 					{/each}
 				</select>
 
 				<label class="modal-label">Location <span class="modal-optional">(optional)</span></label>
-				<input class="modal-input" type="text" name="location" placeholder="e.g. Trailhead parking lot" />
+				<input class="modal-input" type="text" name="location" placeholder="e.g. Trailhead parking lot"
+					value={editActivityId ? editActivityLocation : ''} />
 
 				<label class="modal-label">Notes <span class="modal-optional">(optional)</span></label>
-				<textarea class="modal-textarea" name="notes" rows="2" placeholder="Any details…"></textarea>
+				<textarea class="modal-textarea" name="notes" rows="2" placeholder="Any details…"
+					>{editActivityId ? editActivityNotes : ''}</textarea>
 
 				<div class="modal-actions">
 					<button type="button" class="modal-btn-cancel" onclick={closeAddActivity}>Cancel</button>
 					<button type="submit" class="modal-btn-submit" disabled={addActivitySubmitting}>
-						{addActivitySubmitting ? 'Adding…' : 'Add to itinerary'}
+						{addActivitySubmitting
+							? (editActivityId ? 'Saving…' : 'Adding…')
+							: (editActivityId ? 'Save changes' : 'Add to itinerary')}
 					</button>
 				</div>
 			</form>
@@ -877,14 +938,14 @@
 	</div>
 {/if}
 
-<!-- Add Meal Modal (from placeholder click) -->
-{#if mealPlanOn}
+<!-- Add / Edit Meal Modal -->
+{#if mealPlanOn || addMealPrefill?.slotId}
 	<AddMealModal
 		open={showAddMeal}
 		members={mealModalMembers}
 		tripDays={mealModalDays}
 		prefill={addMealPrefill}
-		formAction="?/createMealSlot"
+		formAction={addMealPrefill?.slotId ? '?/updateMealSlot' : '?/createMealSlot'}
 		onClose={closeAddMeal}
 		onSuccess={async () => { await invalidateAll(); }}
 	/>
@@ -899,6 +960,7 @@
 		tripId={data.trip.id}
 		onClose={() => (drawerEvent = null)}
 		onLocalRsvpUpdate={handleLocalRsvpUpdate}
+		onEdit={handleEditEvent}
 	/>
 {/if}
 
@@ -960,7 +1022,20 @@
 	}
 	.cal-day.empty { visibility: hidden; }
 	.cal-day.trip-day { background: rgba(41,76,96,.12); color: #294C60; font-weight: 600; }
-	.cal-day.today   { background: #001B2E; color: white; font-weight: 700; }
+	.cal-day.today   {
+		color: #E85D26; font-weight: 700;
+		position: relative;
+	}
+	.cal-day.today::after {
+		content: '';
+		position: absolute;
+		bottom: 1px;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 4px; height: 4px;
+		border-radius: 50%;
+		background: #E85D26;
+	}
 
 	.sidebar-section { display: flex; flex-direction: column; gap: .5rem; }
 	.sidebar-section-header {
@@ -1038,13 +1113,9 @@
 		position: sticky; top: 0; z-index: 2; height: var(--hdr-h); box-sizing: border-box;
 	}
 	.day-num { font-size: 1.25rem; font-weight: 800; color: #1e293b; line-height: 1; }
-	.day-num.today-num {
-		width: 34px; height: 34px; border-radius: 50%;
-		background: #001B2E; color: white;
-		display: flex; align-items: center; justify-content: center;
-	}
+	.day-num.today-num { color: #E85D26; }
 	.day-name { font-size: .65rem; font-weight: 600; letter-spacing: .06em; color: #94a3b8; text-transform: uppercase; }
-	.grid-day-header.today .day-name { color: #f97316; }
+	.grid-day-header.today .day-name { color: #E85D26; }
 	.grid-time-label {
 		padding: 0 .75rem; font-size: .68rem; font-weight: 500; color: #94a3b8;
 		display: flex; align-items: flex-start; padding-top: 6px;
@@ -1105,6 +1176,11 @@
 	}
 	.evt-time { font-size: .68rem; font-weight: 500; opacity: .85; }
 	.evt-sub  { font-size: .68rem; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.evt-chef {
+		position: absolute; bottom: .3rem; right: .45rem;
+		font-size: .62rem; opacity: .8; white-space: nowrap;
+		max-width: 60%; overflow: hidden; text-overflow: ellipsis;
+	}
 	.evt-rsvp-pill {
 		font-size: .65rem; font-weight: 700; opacity: .9; white-space: nowrap;
 		display: flex; gap: .25rem; align-items: center;
@@ -1120,6 +1196,7 @@
 	}
 	.event-block.not-going .evt-time,
 	.event-block.not-going .evt-sub,
+	.event-block.not-going .evt-chef,
 	.event-block.not-going .evt-rsvp-pill {
 		color: #94a3b8 !important;
 	}
@@ -1194,7 +1271,7 @@
 		position: fixed; inset: 0;
 		background: rgba(0,0,0,.45);
 		display: flex; align-items: center; justify-content: center;
-		z-index: 1000;
+		z-index: 1100;
 	}
 	.modal-box {
 		background: white;

@@ -58,7 +58,8 @@
 		isHost,
 		tripId,
 		onClose,
-		onLocalRsvpUpdate
+		onLocalRsvpUpdate,
+		onEdit
 	}: {
 		event: DrawerEvent;
 		currentUserId: string;
@@ -66,6 +67,7 @@
 		tripId: string;
 		onClose: () => void;
 		onLocalRsvpUpdate: (eventId: string, newStatus: RsvpStatus | 'meal-in' | 'meal-out') => void;
+		onEdit?: () => void;
 	} = $props();
 
 	// ── Derived state ──────────────────────────────────────────────────────
@@ -509,9 +511,15 @@
 </div>
 
 	<!-- Footer actions (host only) -->
-	{#if isHost && isActivity}
+	{#if isHost && onEdit}
 		<div class="drawer-footer">
-			<a href="/trips/{tripId}/activities" class="footer-edit-btn">Edit activity</a>
+			<button class="footer-edit-btn" onclick={onEdit}>
+				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+					<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+					<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+				</svg>
+				Edit {isActivity ? 'activity' : 'meal'}
+			</button>
 		</div>
 	{/if}
 </aside>
@@ -522,7 +530,7 @@
 		position: fixed;
 		inset: 0;
 		background: rgba(0, 27, 46, 0.18);
-		z-index: 100;
+		z-index: 1050;
 		backdrop-filter: blur(1px);
 	}
 
@@ -535,7 +543,7 @@
 		width: 360px;
 		max-width: 100vw;
 		background: white;
-		z-index: 101;
+		z-index: 1051;
 		display: flex;
 		flex-direction: column;
 		box-shadow: -8px 0 40px rgba(0, 27, 46, 0.12);
@@ -779,6 +787,7 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		gap: 0.4rem;
 		width: 100%;
 		padding: 0.625rem;
 		border-radius: 10px;
@@ -788,6 +797,7 @@
 		font-weight: 600;
 		color: #374151;
 		text-decoration: none;
+		cursor: pointer;
 		transition: background 0.15s, border-color 0.15s;
 	}
 	.footer-edit-btn:hover { background: #f8fafc; border-color: #cbd5e1; }

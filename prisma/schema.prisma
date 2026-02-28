@@ -226,6 +226,7 @@ model User {
   chatMessages         ChatMessage[]
   pollsCreated         Poll[]
   pollVotes            PollVote[]
+  pollWatchers         PollWatcher[]
   captionThisRoundsAsSubmitter CaptionThisRound[]  @relation("PhotoSubmitter")
   captionThisCaptions  CaptionThisCaption[]
   captionThisVotes     CaptionThisVote[]
@@ -641,6 +642,10 @@ model Poll {
   pollType         String    @default("single") // single | multi | datetime
   status           String    @default("draft") // draft | open | closed | canceled
   showResultsLive  Boolean   @default(true)
+  allowAnonymous   Boolean   @default(false)
+  activityDate     DateTime?  // snapshot when created from Discover Activities
+  activityTime     String?
+  activityLocation String?
   startAt          DateTime?
   endAt            DateTime?
   createdAt        DateTime  @default(now())
@@ -650,6 +655,7 @@ model Poll {
   createdBy User       @relation(fields: [createdById], references: [id], onDelete: Cascade)
   options  PollOption[]
   votes    PollVote[]
+  watchers PollWatcher[]
 
   @@index([tripId])
   @@index([tripId, status])
@@ -680,6 +686,20 @@ model PollVote {
   user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([pollId, userId, optionId])
+  @@index([pollId])
+  @@index([userId])
+}
+
+model PollWatcher {
+  id        String   @id @default(uuid())
+  pollId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
   @@index([pollId])
   @@index([userId])
 }

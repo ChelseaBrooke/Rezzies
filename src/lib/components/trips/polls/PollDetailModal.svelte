@@ -2,30 +2,32 @@
 	import type { PollWithMeta } from './types.js';
 	import PollResultsBar from './PollResultsBar.svelte';
 
-	interface Props {
-		open: boolean;
-		poll: PollWithMeta | null;
-		onClose: () => void;
-		onVote: (optionIds: string[]) => void;
-		onNudge?: () => void;
-		onClosePoll?: () => void;
-		/** Host can nudge, close poll */
-		canManage: boolean;
-		submitting?: boolean;
-		voteError?: string | null;
-	}
+interface Props {
+	open: boolean;
+	poll: PollWithMeta | null;
+	onClose: () => void;
+	onVote: (optionIds: string[]) => void;
+	onNudge?: () => void;
+	onClosePoll?: () => void;
+	onWatch?: (pollId: string) => void;
+	/** Host can nudge, close poll */
+	canManage: boolean;
+	submitting?: boolean;
+	voteError?: string | null;
+}
 
-	let {
-		open,
-		poll,
-		onClose,
-		onVote,
-		onNudge,
-		onClosePoll,
-		canManage = false,
-		submitting = false,
-		voteError = null
-	}: Props = $props();
+let {
+	open,
+	poll,
+	onClose,
+	onVote,
+	onNudge,
+	onClosePoll,
+	onWatch,
+	canManage = false,
+	submitting = false,
+	voteError = null
+}: Props = $props();
 
 	$effect(() => {
 		if (!open) return;
@@ -38,21 +40,27 @@
 
 	// For single choice: one optionId; for multi: array
 	let selectedIds = $state<string[]>([]);
+	let isChangingVote = $state(false);
+
+	const isActive = $derived(
+		poll?.statusDisplay === 'open' || poll?.statusDisplay === 'closing_soon'
+	);
 
 	$effect(() => {
 		if (open && poll) {
 			selectedIds = poll.userOptionIds ? [...poll.userOptionIds] : [];
+			isChangingVote = false;
 		}
 	});
 
 	const canVote = $derived(
-		poll && (poll.statusDisplay === 'open' || poll.statusDisplay === 'closing_soon') && !poll.userVoted
+		poll && isActive && (!poll.userVoted || isChangingVote)
 	);
 	const showResults = $derived(
 		poll &&
 			(poll.statusDisplay === 'closed' ||
 				poll.statusDisplay === 'canceled' ||
-				(poll.showResultsLive && poll.userVoted))
+				(poll.showResultsLive && poll.userVoted && !isChangingVote))
 	);
 
 	function toggleOption(optionId: string) {
@@ -84,7 +92,26 @@
 		<div class="modal" onclick={(e) => e.stopPropagation()}>
 			<div class="modal-header">
 				<h2 id="poll-detail-title" class="modal-title">{poll.title}</h2>
-				<button type="button" class="modal-close" onclick={onClose} aria-label="Close">×</button>
+				<div class="header-actions">
+					{#if onWatch && isActive}
+						<button
+							type="button"
+							class="btn-watch"
+							class:watching={poll.userWatching}
+							onclick={() => onWatch?.(poll.id)}
+							title={poll.userWatching ? 'Stop watching this poll' : 'Get reminded when this poll closes'}
+						>
+							{#if poll.userWatching}
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+								Watching
+							{:else}
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+								Remind me
+							{/if}
+						</button>
+					{/if}
+					<button type="button" class="modal-close" onclick={onClose} aria-label="Close">×</button>
+				</div>
 			</div>
 			<div class="modal-body">
 				<div class="poll-meta-row">
@@ -97,6 +124,9 @@
 						</span>
 					{/if}
 					<span class="time-badge">{poll.timeLabel}</span>
+					{#if poll.allowAnonymous}
+						<span class="anon-badge">🔒 Anonymous</span>
+					{/if}
 				</div>
 				{#if poll.description}
 					<p class="poll-description">{poll.description}</p>
@@ -104,6 +134,9 @@
 
 				{#if canVote}
 					<div class="vote-section">
+						{#if isChangingVote}
+							<p class="change-vote-notice">Changing your vote — select a new option below.</p>
+						{/if}
 						<p class="section-label">Select your {poll.pollType === 'single' ? 'answer' : 'answers'}</p>
 						{#if voteError}
 							<p class="form-error" role="alert">{voteError}</p>
@@ -132,24 +165,36 @@
 								</label>
 							{/each}
 						</div>
-						<button
-							type="button"
-							class="btn-submit-vote"
-							onclick={submitVote}
-							disabled={submitting || selectedIds.length === 0}
-						>
-							{submitting ? 'Submitting…' : 'Submit vote'}
-						</button>
+						<div class="vote-actions">
+							<button
+								type="button"
+								class="btn-submit-vote"
+								onclick={submitVote}
+								disabled={submitting || selectedIds.length === 0}
+							>
+								{submitting ? 'Submitting…' : isChangingVote ? 'Save new vote' : 'Submit vote'}
+							</button>
+							{#if isChangingVote}
+								<button type="button" class="btn-cancel-change" onclick={() => { isChangingVote = false; selectedIds = poll?.userOptionIds ? [...poll.userOptionIds] : []; }}>
+									Cancel
+								</button>
+							{/if}
+						</div>
 					</div>
 				{:else if showResults}
 					<div class="results-section">
-						<p class="section-label">Results</p>
+						<p class="section-label">Results {poll.allowAnonymous ? '(votes are anonymous)' : ''}</p>
 						<PollResultsBar
 							options={poll.options}
 							totalVotes={poll.totalVotes}
 							userOptionIds={poll.userOptionIds}
 						/>
 					</div>
+					{#if poll.userVoted && isActive}
+						<button type="button" class="btn-change-vote" onclick={() => (isChangingVote = true)}>
+							✏️ Change my vote
+						</button>
+					{/if}
 				{:else if poll.statusDisplay === 'draft'}
 					<p class="muted">This poll is a draft. Only the host can open it.</p>
 				{/if}
@@ -200,9 +245,33 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		gap: .75rem;
 		padding: 1rem 1.25rem;
 		border-bottom: 1px solid var(--border-soft);
 	}
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: .5rem;
+		flex-shrink: 0;
+	}
+	.btn-watch {
+		display: inline-flex;
+		align-items: center;
+		gap: .35rem;
+		padding: .35rem .75rem;
+		border-radius: 8px;
+		border: 1.5px solid #e2e8f0;
+		background: white;
+		font-size: .8rem;
+		font-weight: 500;
+		color: #64748b;
+		cursor: pointer;
+		transition: all .15s;
+		white-space: nowrap;
+	}
+	.btn-watch:hover { border-color: #E85D26; color: #E85D26; }
+	.btn-watch.watching { border-color: #E85D26; background: rgba(232,93,38,.06); color: #E85D26; font-weight: 600; }
 	.modal-title {
 		margin: 0;
 		font-size: 1.25rem;
@@ -299,6 +368,11 @@
 		font-size: 0.9375rem;
 		color: var(--text);
 	}
+	.vote-actions {
+		display: flex;
+		align-items: center;
+		gap: .75rem;
+	}
 	.btn-submit-vote {
 		padding: 0.625rem 1.25rem;
 		background: var(--primary);
@@ -314,6 +388,46 @@
 	.btn-submit-vote:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
+	}
+	.btn-cancel-change {
+		padding: .625rem 1rem;
+		background: none;
+		border: 1px solid var(--border-soft);
+		border-radius: var(--radius-md);
+		font-size: .875rem;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.btn-cancel-change:hover { color: var(--text); border-color: var(--border-strong); }
+	.btn-change-vote {
+		display: block;
+		margin-top: .75rem;
+		padding: .4rem .75rem;
+		background: none;
+		border: 1px solid var(--border-soft);
+		border-radius: 8px;
+		font-size: .8125rem;
+		color: #64748b;
+		cursor: pointer;
+		transition: all .15s;
+	}
+	.btn-change-vote:hover { border-color: var(--primary); color: var(--primary); }
+	.change-vote-notice {
+		font-size: .8125rem;
+		color: #64748b;
+		background: #f8fafc;
+		border: 1px solid #e2e8f0;
+		border-radius: 8px;
+		padding: .5rem .75rem;
+		margin: 0 0 .75rem;
+	}
+	.anon-badge {
+		padding: .2rem .5rem;
+		border-radius: 6px;
+		font-size: .75rem;
+		font-weight: 500;
+		background: rgba(99,102,241,.1);
+		color: #6366f1;
 	}
 	.results-section {
 		margin-top: 0.5rem;
