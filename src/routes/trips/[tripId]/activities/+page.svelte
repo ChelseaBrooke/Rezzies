@@ -44,6 +44,7 @@
 
 	let addModalSubmitting = $state(false);
 	let pollFormSubmittingId = $state<string | null>(null);
+	let showPollCreatedModal = $state(false);
 
 	// Carousel state: tracks current photo index per result id
 	let carouselIndex = $state<Record<string, number>>({});
@@ -256,21 +257,11 @@
 		};
 	}
 
-	/** Enhance for "Propose as poll" form: show loading and scroll to top so toast is visible. */
-	function handlePollSubmit(resultId: string) {
-		return () => {
-			pollFormSubmittingId = resultId;
-			return async ({
-				update
-			}: {
-				update: (opts?: { reset?: boolean }) => Promise<void>;
-			}) => {
-				pollFormSubmittingId = null;
-				await update();
-				window.scrollTo({ top: 0, behavior: 'smooth' });
-			};
-		};
-	}
+	$effect(() => {
+		if (form?.addDiscoveredActivitySuccess && form?.pollCreated) {
+			showPollCreatedModal = true;
+		}
+	});
 
 	function buildDiscoverNotes(result: Record<string, unknown>): string {
 		const parts: string[] = [];
@@ -556,14 +547,26 @@
 								{:else}
 									<button type="button" class="btn btn-add-to-trip btn-sm" onclick={() => openAddModal(result)}>Add to trip</button>
 								{/if}
-								<form method="POST" action="?/addDiscoveredActivity" use:enhance={() => handlePollSubmit(result.id)} class="action-link-form">
+								<form
+									method="POST"
+									action="?/addDiscoveredActivity"
+									use:enhance={() => {
+										pollFormSubmittingId = result.id ?? result.name ?? 'poll';
+										return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+											pollFormSubmittingId = null;
+											await update();
+											window.scrollTo({ top: 0, behavior: 'smooth' });
+										};
+									}}
+									class="action-link-form"
+								>
 									<input type="hidden" name="title" value={result.name ?? ''} />
 									<input type="hidden" name="location" value={result.address ?? ''} />
 									<input type="hidden" name="notes" value={buildDiscoverNotes(result)} />
 									<input type="hidden" name="additionType" value="poll" />
 									<input type="hidden" name="date" value={tripDateOptions[0]?.value ?? ''} />
 									<button type="submit" class="btn btn-poll btn-sm" disabled={pollFormSubmittingId !== null}>
-										{pollFormSubmittingId === result.id ? 'Creating…' : 'Propose as poll'}
+										{pollFormSubmittingId === (result.id ?? result.name ?? 'poll') ? 'Creating…' : 'Propose as poll'}
 									</button>
 								</form>
 							</div>
@@ -668,6 +671,23 @@
 						</button>
 					</div>
 				</form>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Poll created success modal -->
+	{#if showPollCreatedModal}
+		<div class="poll-created-backdrop" role="dialog" aria-modal="true" aria-labelledby="poll-created-title">
+			<div class="poll-created-modal">
+				<div class="poll-created-icon" aria-hidden="true">🗳️</div>
+				<h2 id="poll-created-title" class="poll-created-title">Poll created!</h2>
+				<p class="poll-created-message">
+					Your group can vote on the Polls page. If &quot;Add to itinerary&quot; wins when the poll closes, the activity will be added automatically.
+				</p>
+				<div class="poll-created-actions">
+					<a href="/trips/{trip?.id}/polls" class="btn btn-primary">Go to Polls</a>
+					<button type="button" class="btn btn-secondary" onclick={() => (showPollCreatedModal = false)}>Close</button>
+				</div>
 			</div>
 		</div>
 	{/if}
@@ -1368,6 +1388,49 @@
 		justify-content: flex-end;
 		gap: 0.75rem;
 		margin-top: 0.5rem;
+	}
+
+	/* Poll created success modal */
+	.poll-created-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.45);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1100;
+		padding: 1rem;
+	}
+	.poll-created-modal {
+		background: var(--surfaceSolid);
+		border-radius: var(--radius-xl);
+		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+		max-width: 380px;
+		width: 100%;
+		padding: 1.75rem 1.5rem;
+		text-align: center;
+	}
+	.poll-created-icon {
+		font-size: 2.5rem;
+		margin-bottom: 0.75rem;
+	}
+	.poll-created-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: var(--text);
+		margin: 0 0 0.5rem;
+	}
+	.poll-created-message {
+		font-size: 0.9375rem;
+		color: var(--muted);
+		line-height: 1.5;
+		margin: 0 0 1.5rem;
+	}
+	.poll-created-actions {
+		display: flex;
+		justify-content: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
 	}
 
 	/* Loading */
