@@ -36,6 +36,8 @@
 	let addManualOpen = $state(false);
 	let addManualName = $state('');
 	let addManualEmail = $state('');
+	let addManualDietary = $state('');
+	let addManualAllergies = $state('');
 	let addManualError = $state('');
 	let filterRsvp = $state<'all' | 'yes' | 'no' | 'no-response' | 'reconfirm'>('all');
 	let filterAssignment = $state<'all' | 'assigned' | 'unassigned'>('all');
@@ -166,12 +168,16 @@
 		addManualOpen = true;
 		addManualName = '';
 		addManualEmail = '';
+		addManualDietary = '';
+		addManualAllergies = '';
 		addManualError = '';
 	}
 	function closeAddManual() {
 		addManualOpen = false;
 		addManualName = '';
 		addManualEmail = '';
+		addManualDietary = '';
+		addManualAllergies = '';
 		addManualError = '';
 	}
 	function handleInviteSubmit() {
@@ -847,16 +853,24 @@
 				<label for="add-manual-name">Name *</label>
 				<input id="add-manual-name" type="text" name="name" bind:value={addManualName} placeholder="e.g. Jane Smith" required />
 			</div>
-			<div class="form-group">
-				<label for="add-manual-email">Email (optional)</label>
-				<input id="add-manual-email" type="email" name="email" bind:value={addManualEmail} placeholder="If they have an account, add them by email" />
-			</div>
-			<div class="modal-actions">
-				<button type="button" class="btn-secondary" onclick={closeAddManual}>Cancel</button>
-				<button type="submit" class="btn-primary">Add guest</button>
-			</div>
-		</form>
-	</div>
+		<div class="form-group">
+			<label for="add-manual-email">Email (optional)</label>
+			<input id="add-manual-email" type="email" name="email" bind:value={addManualEmail} placeholder="If they have an account, add them by email" />
+		</div>
+		<div class="form-group">
+			<label for="add-manual-dietary">Dietary restrictions <span class="label-optional">(optional)</span></label>
+			<input id="add-manual-dietary" type="text" name="dietaryRestrictions" bind:value={addManualDietary} placeholder="e.g. vegetarian, gluten-free" />
+		</div>
+		<div class="form-group">
+			<label for="add-manual-allergies">Allergies <span class="label-optional">(optional)</span></label>
+			<input id="add-manual-allergies" type="text" name="allergies" bind:value={addManualAllergies} placeholder="e.g. peanuts, shellfish" />
+		</div>
+		<div class="modal-actions">
+			<button type="button" class="btn-secondary" onclick={closeAddManual}>Cancel</button>
+			<button type="submit" class="btn-primary">Add guest</button>
+		</div>
+	</form>
+</div>
 {/if}
 
 <GuestEditModal

@@ -74,6 +74,7 @@ model Trip {
   captionThisRounds    CaptionThisRound[]
   captionThisScores   CaptionThisScore[]
   tripGames           TripGame[]
+  files               TripFile[]
 
   @@index([inviteCode])
   @@index([isPublished])
@@ -232,6 +233,7 @@ model User {
   tripGamesAdded      TripGame[]  @relation("TripGameAddedBy")
   directMessagesSent   DirectMessage[] @relation("DirectMessageSender")
   directMessagesReceived DirectMessage[] @relation("DirectMessageRecipient")
+  uploadedFiles       TripFile[]
 
   @@index([email])
 }
@@ -360,7 +362,7 @@ model MealSlot {
   mealType         String // "breakfast" | "lunch" | "dinner" | "snack"
   date             DateTime
   time             String?
-  title            String?  // e.g. "Taco Night"
+  title            String?  // e.g. "Breakfast, Taco Night"
   capacityServings Int?
   notes            String?
   menuText         String?
@@ -372,6 +374,7 @@ model MealSlot {
   trip         Trip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
   assignedUser User? @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
   attendance   MealSlotAttendance[]
+  files        TripFile[]
 
   @@index([tripId])
   @@index([date])
@@ -749,6 +752,28 @@ model CaptionThisVote {
   @@unique([roundId, voterUserId])
   @@index([roundId])
   @@index([captionId])
+}
+
+// Generic trip file/attachment store
+model TripFile {
+  id          String   @id @default(uuid())
+  tripId      String
+  uploadedById String
+  name        String   // original file name
+  url         String   // path served by static files or external URL
+  mimeType    String?
+  sizeBytes   Int?
+  category    String?  // e.g. "receipt", "photo", "document"
+  mealSlotId  String?  // linked meal slot if this is a receipt
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  uploadedBy  User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  mealSlot    MealSlot? @relation(fields: [mealSlotId], references: [id], onDelete: SetNull)
+
+  @@index([tripId])
+  @@index([mealSlotId])
 }
 
 model CaptionThisScore {

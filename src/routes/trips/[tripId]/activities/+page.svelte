@@ -41,7 +41,7 @@
 	let addModalResult = $state<Record<string, unknown> | null>(null);
 	let addModalDate = $state('');
 	let addModalTime = $state('9:00 AM');
-	let addModalTotalCost = $state('');
+
 	let addModalSubmitting = $state(false);
 
 	// Carousel state: tracks current photo index per result id
@@ -90,7 +90,6 @@
 		const firstDay = opts[0]?.value ?? '';
 		addModalDate = eventDate && /^\d{4}-\d{2}-\d{2}$/.test(eventDate) ? eventDate : firstDay;
 		addModalTime = '9:00 AM';
-		addModalTotalCost = '';
 	}
 	function closeAddModal() {
 		addModalResult = null;
@@ -640,9 +639,6 @@
 					</select>
 
 					<input type="hidden" name="additionType" value="planned" />
-					<label class="add-modal-label">Total cost to split <span class="muted">(optional)</span></label>
-					<p class="add-modal-hint">If this activity has a cost, enter the total amount. It will be split evenly among everyone who adds it to their itinerary.</p>
-					<input type="number" name="totalCostToSplit" class="add-modal-input" bind:value={addModalTotalCost} placeholder="0" min="0" step="0.01" />
 
 					<p class="add-modal-note">Adding an activity to your itinerary does not book or reserve anything with the provider. Tickets and bookings still need to be made through the activity provider’s website.</p>
 
@@ -666,16 +662,11 @@
 					<div class="saved-card">
 						<div class="saved-header">
 							<h3>{activity.title}</h3>
-							<div class="saved-header-badges">
-								{#if activity.status === 'tentative'}
-									<span class="saved-badge tentative">Tentative</span>
-								{/if}
-								{#if activity.totalCostToSplit != null && activity.totalCostToSplit > 0}
-									<span class="saved-price">Split ${activity.totalCostToSplit.toFixed(2)} among participants</span>
-								{:else if activity.pricePerPerson > 0}
-									<span class="saved-price">${activity.pricePerPerson}/person</span>
-								{/if}
-							</div>
+						<div class="saved-header-badges">
+							{#if activity.status === 'tentative'}
+								<span class="saved-badge tentative">Tentative</span>
+							{/if}
+						</div>
 						</div>
 						<div class="saved-meta">
 							{#if activity.date}

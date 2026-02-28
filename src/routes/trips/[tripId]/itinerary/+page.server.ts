@@ -7,9 +7,8 @@ import { prisma } from '$lib/server/prisma.js';
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 
 // Map ActivityParticipant.status storage values → display values
-function toRsvpStatus(dbStatus: string): 'going' | 'maybe' | 'skip' {
+function toRsvpStatus(dbStatus: string): 'going' | 'skip' {
 	if (dbStatus === 'in' || dbStatus === 'going') return 'going';
-	if (dbStatus === 'maybe') return 'maybe';
 	return 'skip';
 }
 
@@ -26,6 +25,39 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 	const member = await isTripMember(tripId, user.id);
 	if (!member) {
 		throw error(403, 'You do not have access to this trip');
+	}
+
+	// Build a dietary lookup: prefer GuestProfile (trip-scoped), fall back to User.dietaryTags/allergiesTags
+	// First get all trip member user IDs so we know who to fetch User data for
+	const tripMembers = await prisma.tripMember.findMany({
+		where: { tripId },
+		select: { userId: true, user: { select: { id: true, name: true, dietaryTags: true, allergiesTags: true } } }
+	});
+
+	// Seed from User-level dietary fields
+	const dietaryByUser: Record<string, { dietaryRestrictions: string | null; allergies: string | null; name: string }> = {};
+	for (const m of tripMembers) {
+		if (m.user && (m.user.dietaryTags || m.user.allergiesTags)) {
+			dietaryByUser[m.user.id] = {
+				name: m.user.name ?? 'Guest',
+				dietaryRestrictions: m.user.dietaryTags ?? null,
+				allergies: m.user.allergiesTags ?? null
+			};
+		}
+	}
+
+	// Override / merge with GuestProfile (trip-scoped) — takes priority
+	const guestProfiles = await prisma.guestProfile.findMany({
+		where: { tripId },
+		select: { userId: true, dietaryRestrictions: true, allergies: true }
+	});
+	for (const gp of guestProfiles) {
+		const existing = dietaryByUser[gp.userId];
+		dietaryByUser[gp.userId] = {
+			name: existing?.name ?? 'Guest',
+			dietaryRestrictions: gp.dietaryRestrictions ?? existing?.dietaryRestrictions ?? null,
+			allergies: gp.allergies ?? existing?.allergies ?? null
+		};
 	}
 
 	const trip = await prisma.trip.findUnique({
@@ -105,15 +137,26 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 			notes: slot.notes,
 			menuText: slot.menuText,
 			assignedUser: slot.assignedUser,
-			// attendance: all trip members mapped to optedOut boolean
-			attendance: slot.attendance.map((a) => ({
-				userId: a.user.id,
-				userName: a.user.name ?? 'Guest',
-				optedOut: a.optedOut,
-				dietaryNote: a.dietaryNote
-			})),
-			// currentUserOptedOut derived server-side for convenience
-			currentUserOptedOut: slot.attendance.find((a) => a.userId === user.id)?.optedOut ?? false
+		// attendance: all trip members mapped to optedOut boolean
+		attendance: slot.attendance.map((a) => ({
+			userId: a.user.id,
+			userName: a.user.name ?? 'Guest',
+			optedOut: a.optedOut,
+			dietaryNote: a.dietaryNote,
+			dietaryRestrictions: dietaryByUser[a.user.id]?.dietaryRestrictions ?? null,
+			allergies: dietaryByUser[a.user.id]?.allergies ?? null
+		})),
+		// currentUserOptedOut derived server-side for convenience
+		currentUserOptedOut: slot.attendance.find((a) => a.userId === user.id)?.optedOut ?? false,
+		// Dietary notes for all trip members who have any dietary info
+		guestDietaryNotes: Object.entries(dietaryByUser)
+			.filter(([, d]) => d.dietaryRestrictions || d.allergies)
+			.map(([uid, d]) => ({
+				userId: uid,
+				userName: d.name,
+				dietaryRestrictions: d.dietaryRestrictions,
+				allergies: d.allergies
+			}))
 		});
 	});
 
@@ -128,8 +171,6 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 			time: activity.time,
 			location: activity.location,
 			notes: activity.notes,
-			pricePerPerson: activity.pricePerPerson,
-			totalCostToSplit: activity.totalCostToSplit,
 			status: activity.status,
 			// Full participant list with display-friendly rsvpStatus
 			participants: activity.participants.map((p) => ({
@@ -208,7 +249,7 @@ export const actions: Actions = {
 
 		const fd = await request.formData();
 		const activityId = fd.get('activityId') as string;
-		const display = fd.get('status') as string; // "going" | "maybe" | "skip"
+		const display = fd.get('status') as string; // "going" | "skip"
 
 		if (!activityId) return { setActivityRsvpError: 'Activity ID required.' };
 
@@ -216,7 +257,7 @@ export const actions: Actions = {
 		if (!activity) return { setActivityRsvpError: 'Activity not found.' };
 
 		// Map display value → storage value
-		const dbStatus = display === 'going' ? 'in' : display === 'maybe' ? 'maybe' : 'out';
+		const dbStatus = display === 'going' ? 'in' : 'out';
 
 		if (dbStatus === 'out') {
 			// "Skip" = delete participant record so they're not counted
@@ -287,12 +328,15 @@ export const actions: Actions = {
 		if (!dateStr) return { createMealSlotError: 'Date is required.' };
 		const date = new Date(dateStr);
 		const time = (formData.get('time') as string)?.trim() || null;
-		const menuText = (formData.get('menuText') as string)?.trim() || null;
+		const title = (formData.get('title') as string)?.trim() || null;
 		const notes = (formData.get('notes') as string)?.trim() || null;
+		const assignedUserId = (formData.get('assignedUserId') as string)?.trim() || null;
 		if (!MEAL_TYPES.includes(mealType as (typeof MEAL_TYPES)[number])) {
 			return { createMealSlotError: 'Invalid meal type.' };
 		}
-		await prisma.mealSlot.create({ data: { tripId, mealType, date, time, menuText, notes } });
+		await prisma.mealSlot.create({
+			data: { tripId, mealType, date, time, title, notes, assignedUserId: assignedUserId || null }
+		});
 		return { createMealSlotSuccess: true };
 	},
 
@@ -454,5 +498,42 @@ export const actions: Actions = {
 			data: { date: new Date(dateStr), time }
 		});
 		return { moveActivitySuccess: true };
+	},
+
+	createActivity: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) return { createActivityError: 'Not a trip member.' };
+
+		const fd = await request.formData();
+		const title = (fd.get('title') as string)?.trim();
+		const dateStr = fd.get('date') as string;
+		const time = (fd.get('time') as string)?.trim() || null;
+		const location = (fd.get('location') as string)?.trim() || null;
+		const notes = (fd.get('notes') as string)?.trim() || null;
+
+		if (!title) return { createActivityError: 'Activity name is required.' };
+		if (!dateStr) return { createActivityError: 'Date is required.' };
+
+		const activity = await prisma.activity.create({
+			data: {
+				tripId,
+				title,
+				date: new Date(dateStr),
+				time,
+				location,
+				notes,
+				status: 'planned'
+			}
+		});
+
+		// Auto-enroll creator as "going"
+		await prisma.activityParticipant.create({
+			data: { activityId: activity.id, userId: user.id, status: 'in' }
+		});
+
+		return { createActivitySuccess: true };
 	}
 };

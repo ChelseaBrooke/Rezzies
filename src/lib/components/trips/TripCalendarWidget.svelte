@@ -165,6 +165,17 @@
 
 	function formatTime(t: string | null | undefined): string {
 		if (!t) return '';
+		// Handle "HH:MM" (24-hr) and "H:MM AM/PM" (12-hr already)
+		const m24 = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+		if (m24) {
+			let h = +m24[1];
+			const min = m24[2];
+			const ap = h < 12 ? 'AM' : 'PM';
+			if (h === 0) h = 12;
+			else if (h > 12) h -= 12;
+			return `${h}:${min} ${ap}`;
+		}
+		// Already 12-hr — return as-is
 		return t;
 	}
 
@@ -213,7 +224,7 @@
 				{/if}
 				<div class="day-detail-ctas">
 					<a href={tripId ? `/trips/${tripId}/activities` : '#'} class="day-detail-cta">Add activity</a>
-					<a href={tripId ? `/trips/${tripId}/meals` : '#'} class="day-detail-cta">Add meal</a>
+					<a href={tripId ? `/trips/${tripId}/itinerary` : '#'} class="day-detail-cta">Itinerary</a>
 				</div>
 			</div>
 		{:else if sidebarMonth}

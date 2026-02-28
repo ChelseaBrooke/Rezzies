@@ -34,6 +34,23 @@
 	let adultsCount = $state(data.currentRsvp?.adultsCount ?? 1);
 	let kidsCount = $state(data.currentRsvp?.kidsCount ?? 0);
 	let petsCount = $state(data.currentRsvp?.petsCount ?? 0);
+
+	// ── Dietary info ────────────────────────────────────────────────────────
+	let myDietary = $state(data.currentProfile?.dietaryRestrictions ?? '');
+	let myAllergies = $state(data.currentProfile?.allergies ?? '');
+
+	type PlusOneInfo = { name: string; dietary: string; allergies: string };
+	let plusOnes = $state<PlusOneInfo[]>([]);
+
+	// Keep plusOnes array in sync with adultsCount
+	$effect(() => {
+		const extra = Math.max(0, adultsCount - 1);
+		if (plusOnes.length < extra) {
+			while (plusOnes.length < extra) plusOnes = [...plusOnes, { name: '', dietary: '', allergies: '' }];
+		} else if (plusOnes.length > extra) {
+			plusOnes = plusOnes.slice(0, extra);
+		}
+	});
 	function tripDateKey(d: Date | string | null | undefined): string {
 		if (d == null) return '';
 		return new Date(d).toISOString().slice(0, 10);
@@ -325,9 +342,50 @@
 				</form>
 			</section>
 
-			{#if isYes}
-			<section class="card-section room-section">
-				<h2 class="section-title">Choose your room</h2>
+		{#if isYes}
+		<section class="card-section dietary-section">
+			<h2 class="section-title">Dietary info</h2>
+			<p class="dietary-intro">This helps us plan meals for everyone. Any info you share is visible to the host.</p>
+			<form method="POST" action="?/updateDietary" use:enhance>
+				<div class="dietary-self">
+					<p class="dietary-person-label">Your info</p>
+					<div class="dietary-row">
+						<div class="form-group">
+							<label class="form-label" for="myDietary">Dietary restrictions</label>
+							<input id="myDietary" type="text" name="dietaryRestrictions" bind:value={myDietary} placeholder="e.g. vegetarian, vegan, halal…" />
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="myAllergies">Allergies</label>
+							<input id="myAllergies" type="text" name="allergies" bind:value={myAllergies} placeholder="e.g. peanuts, shellfish, dairy…" />
+						</div>
+					</div>
+				</div>
+				{#each plusOnes as po, i}
+					<div class="dietary-plusone">
+						<p class="dietary-person-label">Guest {i + 1}</p>
+						<div class="dietary-row dietary-row-3">
+							<div class="form-group">
+								<label class="form-label">Name <span class="label-opt">(optional)</span></label>
+								<input type="text" name="plusOneName_{i}" bind:value={po.name} placeholder="e.g. Alex" />
+							</div>
+							<div class="form-group">
+								<label class="form-label">Dietary restrictions</label>
+								<input type="text" name="plusOneDietary_{i}" bind:value={po.dietary} placeholder="e.g. vegan" />
+							</div>
+							<div class="form-group">
+								<label class="form-label">Allergies</label>
+								<input type="text" name="plusOneAllergies_{i}" bind:value={po.allergies} placeholder="e.g. nuts" />
+							</div>
+						</div>
+					</div>
+				{/each}
+				<input type="hidden" name="plusOneCount" value={plusOnes.length} />
+				<button type="submit" class="btn btn-secondary dietary-save">Save dietary info</button>
+			</form>
+		</section>
+
+		<section class="card-section room-section">
+			<h2 class="section-title">Choose your room</h2>
 					{#if form?.claimBedsError && !form.claimBedsError.includes('You need at least')}
 						<div class="error-message" class:conflict={form?.bedClaimConflict}>
 							{form.claimBedsError}
@@ -857,6 +915,15 @@
 	}
 	.reconfirm-deadline { font-size: 0.9rem; color: #92400e; }
 	.reconfirm-hint { display: block; margin-top: 0.5rem; font-size: 0.9rem; }
+	.dietary-section { margin-top: var(--spacing-xl); padding-top: var(--spacing-lg); border-top: 1px solid rgba(180, 160, 140, 0.3); }
+	.dietary-intro { font-size: .875rem; color: #78716c; margin: 0 0 1rem; }
+	.dietary-self, .dietary-plusone { margin-bottom: 1.25rem; }
+	.dietary-person-label { font-size: .8rem; font-weight: 700; color: #57534e; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 .5rem; }
+	.dietary-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+	.dietary-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+	@media (max-width: 600px) { .dietary-row, .dietary-row-3 { grid-template-columns: 1fr; } }
+	.label-opt { font-weight: 400; color: #a8a29e; }
+	.dietary-save { margin-top: .5rem; }
 	.room-section { margin-top: var(--spacing-xl); padding-top: var(--spacing-lg); border-top: 1px solid rgba(180, 160, 140, 0.3); }
 	.room-section-footer { margin-top: var(--spacing-lg); }
 

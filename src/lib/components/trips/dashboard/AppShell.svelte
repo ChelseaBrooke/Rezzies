@@ -85,7 +85,6 @@
 		{ href: `/trips/${tripId}/guests`, label: 'Guests', icon: 'guests' },
 		{ href: `/trips/${tripId}/rooms`, label: 'Rooms', icon: 'rooms' },
 		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary', icon: 'itinerary' },
-		{ href: `/trips/${tripId}/meals`, label: 'Meals', icon: 'meals' },
 		{ href: `/trips/${tripId}/activities`, label: 'Activities', icon: 'activities' },
 		{ href: `/trips/${tripId}/polls`, label: 'Polls', icon: 'polls' },
 		{ href: `/trips/${tripId}/games`, label: 'Games', icon: 'games' },

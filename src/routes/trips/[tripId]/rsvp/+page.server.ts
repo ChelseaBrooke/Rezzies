@@ -278,6 +278,44 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	updateDietary: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) throw error(403, 'You must be a member of this trip');
+
+		const fd = await request.formData();
+		const dietaryRestrictions = (fd.get('dietaryRestrictions') as string)?.trim() || null;
+		const allergies = (fd.get('allergies') as string)?.trim() || null;
+
+		// Save user's own dietary info to GuestProfile
+		await prisma.guestProfile.upsert({
+			where: { tripId_userId: { tripId, userId: user.id } },
+			create: { tripId, userId: user.id, dietaryRestrictions, allergies },
+			update: { dietaryRestrictions, allergies }
+		});
+
+		// Collect plus-one dietary info and persist in RSVP notes (YES RSVPs only)
+		const plusOneCount = parseInt((fd.get('plusOneCount') as string) ?? '0', 10) || 0;
+		if (plusOneCount > 0) {
+			const plusOnes = Array.from({ length: plusOneCount }, (_, i) => ({
+				name: (fd.get(`plusOneName_${i}`) as string)?.trim() || null,
+				dietary: (fd.get(`plusOneDietary_${i}`) as string)?.trim() || null,
+				allergies: (fd.get(`plusOneAllergies_${i}`) as string)?.trim() || null
+			})).filter(p => p.name || p.dietary || p.allergies);
+
+			if (plusOnes.length > 0) {
+				await prisma.rSVP.updateMany({
+					where: { tripId, userId: user.id, status: 'yes' },
+					data: { notes: JSON.stringify({ plusOneDietaryProfiles: plusOnes }) }
+				});
+			}
+		}
+
+		return { updateDietarySuccess: true };
+	},
+
 	updateProfile: async ({ request, params, cookies }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');

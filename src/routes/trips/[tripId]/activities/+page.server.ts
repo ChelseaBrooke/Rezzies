@@ -80,13 +80,7 @@ export const actions: Actions = {
 
 		const time = (formData.get('time') as string)?.trim() || null;
 		const additionType = (formData.get('additionType') as string) || 'planned';
-		const totalCostRaw = (formData.get('totalCostToSplit') as string)?.trim();
-		const totalCostToSplit =
-			totalCostRaw && !Number.isNaN(parseFloat(totalCostRaw)) && parseFloat(totalCostRaw) >= 0
-				? parseFloat(totalCostRaw)
-				: null;
-
-		if (additionType === 'poll') {
+	if (additionType === 'poll') {
 			const now = new Date();
 			const endAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 			await prisma.poll.create({
@@ -120,10 +114,8 @@ export const actions: Actions = {
 				date: activityDate,
 				time,
 				location,
-				notes: notes || undefined,
-				pricePerPerson: totalCostToSplit != null && totalCostToSplit > 0 ? totalCostToSplit : 0,
-				totalCostToSplit: totalCostToSplit ?? undefined,
-				status
+			notes: notes || undefined,
+			status
 			}
 		});
 		await prisma.activityParticipant.create({

@@ -637,6 +637,8 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const name = (formData.get('name') as string)?.trim() ?? '';
 		const emailRaw = (formData.get('email') as string)?.trim() ?? '';
+		const dietaryRestrictions = (formData.get('dietaryRestrictions') as string)?.trim() || null;
+		const allergies = (formData.get('allergies') as string)?.trim() || null;
 
 		if (!name) return fail(400, { addManualGuestError: 'Name is required' });
 
@@ -683,6 +685,15 @@ export const actions: Actions = {
 			userId = newUser.id;
 			await prisma.tripMember.create({
 				data: { tripId, userId: newUser.id, role: 'guest', inviteStatus: 'accepted' }
+			});
+		}
+
+		// Save dietary info to GuestProfile if provided
+		if (dietaryRestrictions || allergies) {
+			await prisma.guestProfile.upsert({
+				where: { tripId_userId: { tripId, userId } },
+				create: { tripId, userId, dietaryRestrictions, allergies },
+				update: { dietaryRestrictions, allergies }
 			});
 		}
 

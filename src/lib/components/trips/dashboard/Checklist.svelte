@@ -50,7 +50,7 @@
 		items.push({
 			key: 'host_add_meals',
 			label: 'Add 1+ meals for your trip',
-			href: `/trips/${tripId}/meals`,
+			href: `/trips/${tripId}/itinerary`,
 			isComplete: mealsTotal >= 1
 		});
 
@@ -103,7 +103,7 @@
 		items.push({
 			key: 'guest_add_meals',
 			label: 'Add 1+ meals for your trip',
-			href: `/trips/${tripId}/meals`,
+			href: `/trips/${tripId}/itinerary`,
 			isComplete: mealsContributed >= 1
 		});
 

@@ -12,12 +12,11 @@
 	import EventDetailsDrawer, {
 		type DrawerEvent
 	} from '$lib/components/itinerary/EventDetailsDrawer.svelte';
+	import AddMealModal from '$lib/components/trips/meals/AddMealModal.svelte';
 
 	let { data }: { data: PageData } = $props();
 
 	// ── Grid constants ─────────────────────────────────────────────────────
-	const HOUR_START = 6;
-	const HOUR_END = 23;
 	const SLOT_HEIGHT = 60; // px per hour
 	const HEADER_HEIGHT = 58; // day-header row px
 	const TIME_COL_WIDTH = 64; // left time gutter px
@@ -25,17 +24,138 @@
 	const DEFAULT_DURATION_ACTIVITY = 90; // minutes
 	const MIN_DURATION = 30;
 
+
 	// ── Server data refs ───────────────────────────────────────────────────
-	const tripDays = $derived(data.tripDays ?? []);
-	const goingUsers = $derived(data.goingUsers ?? []);
+	const tripDays    = $derived(data.tripDays ?? []);
+	const goingUsers  = $derived(data.goingUsers ?? []);
+	const mealPlanOn  = $derived((data.mealPlan as { enabled: boolean } | null)?.enabled === true);
+
+	// Set of "date|mealType" keys for existing meal slots (used by placeholders)
+	// data.mealSlots is a flat array from the server
+	const existingMealKeys = $derived.by(() => {
+		const keys = new Set<string>();
+		const slots = (data.mealSlots ?? []) as Array<{ date: Date | string; mealType: string }>;
+		for (const s of slots) {
+			const dateStr = s.date instanceof Date
+				? s.date.toISOString().slice(0, 10)
+				: String(s.date).slice(0, 10);
+			keys.add(`${dateStr}|${s.mealType}`);
+		}
+		return keys;
+	});
+
+	// Members list for the AddMealModal cook picker
+	const mealModalMembers = $derived(
+		(data.members ?? data.goingUsers ?? []) as Array<{ id: string; name: string }>
+	);
+
+	// tripDays formatted for the modal date selector
+	const mealModalDays = $derived(
+		tripDays.map((d: string) => ({
+			value: d,
+			label: new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+		}))
+	);
+
+	// ── Dynamic visible hour range ─────────────────────────────────────────
+	// Always shows at least 9am–5pm; expands to include the earliest/latest
+	// event across all trip days.
+	const hourRange = $derived.by(() => {
+		let minMin = 9 * 60;
+		let maxMin = 17 * 60;
+		for (const date of tripDays) {
+			const raw = (data.eventsByDate?.[date] ?? []) as Record<string, unknown>[];
+			for (const ev of raw) {
+				if (ev.type !== 'meal' && ev.type !== 'activity') continue;
+				const isMeal = ev.type === 'meal';
+				const startMin = parseTimeToMinutes(
+					ev.time as string | null,
+					isMeal ? (ev.mealType as string) : undefined
+				);
+				const dur = isMeal ? DEFAULT_DURATION_MEAL : DEFAULT_DURATION_ACTIVITY;
+				minMin = Math.min(minMin, startMin);
+				maxMin = Math.max(maxMin, startMin + dur);
+			}
+		}
+		return {
+			start: Math.max(0,  Math.min(Math.floor(minMin / 60), 9)),
+			end:   Math.min(24, Math.max(Math.ceil(maxMin  / 60), 17))
+		};
+	});
+	const HOUR_START = $derived(hourRange.start);
+	const HOUR_END   = $derived(hourRange.end);
+
+	// ── Add Custom Activity modal ──────────────────────────────────────────
+	const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+		const h24 = Math.floor((i * 30) / 60);
+		const mins = (i * 30) % 60;
+		const ampm = h24 < 12 ? 'AM' : 'PM';
+		const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
+		return `${h12}:${String(mins).padStart(2, '0')} ${ampm}`;
+	});
+
+	let showAddActivity = $state(false);
+	let addActivitySubmitting = $state(false);
+
+	function openAddActivity() { showAddActivity = true; }
+	function closeAddActivity() { showAddActivity = false; }
+
+	// ── Add Meal modal (triggered from placeholders) ────────────────────────
+	let showAddMeal = $state(false);
+	let addMealPrefill = $state<{ date: string; mealType: string; time: string } | null>(null);
+
+	function openAddMeal(date: string, mealType: string, defaultTime: string) {
+		addMealPrefill = { date, mealType, time: defaultTime };
+		showAddMeal = true;
+	}
+	function closeAddMeal() {
+		showAddMeal = false;
+		addMealPrefill = null;
+	}
+
+	// ── Filters ────────────────────────────────────────────────────────────
+	let filterType    = $state<'all' | 'meal' | 'activity'>('all');
+	let hideSkipping  = $state(false);
+
+	function eventMatchesFilters(ev: Record<string, unknown>): boolean {
+		if (filterType !== 'all' && ev.type !== filterType) return false;
+		if (hideSkipping) {
+			if (ev.type === 'activity' && ev.currentUserRsvp === 'skip') return false;
+			if (ev.type === 'meal'     && ev.currentUserOptedOut === true) return false;
+		}
+		return true;
+	}
 
 	// ── Mini-calendar derived state ────────────────────────────────────────
 	const todayKey = $derived(new Date().toISOString().slice(0, 10));
-	const calendarMonth = $derived.by(() => {
-		if (!tripDays.length) return { year: new Date().getFullYear(), month: new Date().getMonth() };
-		const d = new Date(tripDays[0] + 'T12:00:00');
-		return { year: d.getFullYear(), month: d.getMonth() };
+
+	// All unique months spanned by the trip, in order
+	const tripMonths = $derived.by(() => {
+		if (!tripDays.length) return [{ year: new Date().getFullYear(), month: new Date().getMonth() }];
+		const seen = new Set<string>();
+		const months: { year: number; month: number }[] = [];
+		for (const day of tripDays) {
+			const d = new Date(day + 'T12:00:00');
+			const key = `${d.getFullYear()}-${d.getMonth()}`;
+			if (!seen.has(key)) {
+				seen.add(key);
+				months.push({ year: d.getFullYear(), month: d.getMonth() });
+			}
+		}
+		return months;
 	});
+
+	// Which month the mini-cal is showing (index into tripMonths)
+	let calMonthOffset = $state(0);
+
+	const calendarMonth = $derived(
+		tripMonths[calMonthOffset] ?? tripMonths[0] ?? { year: new Date().getFullYear(), month: new Date().getMonth() }
+	);
+	const canGoPrev = $derived(calMonthOffset > 0);
+	const canGoNext = $derived(calMonthOffset < tripMonths.length - 1);
+	function prevCalMonth() { if (canGoPrev) calMonthOffset--; }
+	function nextCalMonth() { if (canGoNext) calMonthOffset++; }
+
 	const calendarDays = $derived.by(() => {
 		const { year, month } = calendarMonth;
 		const first = new Date(year, month, 1);
@@ -79,8 +199,8 @@
 	type EventOverride = {
 		date?: string;
 		time?: string | null;
-		participants?: { id: string; name: string; rsvpStatus: 'going' | 'maybe' | 'skip' }[];
-		currentUserRsvp?: 'going' | 'maybe' | 'skip';
+		participants?: { id: string; name: string; rsvpStatus: 'going' | 'skip' }[];
+		currentUserRsvp?: 'going' | 'skip';
 		currentUserOptedOut?: boolean;
 	};
 	let overrides = $state<Record<string, EventOverride>>({});
@@ -108,7 +228,9 @@
 
 		for (const date of tripDays) {
 			const raw = (data.eventsByDate?.[date] ?? []) as Record<string, unknown>[];
-			const calEvents = raw.filter((e) => e.type === 'meal' || e.type === 'activity');
+			const calEvents = raw
+				.filter((e) => e.type === 'meal' || e.type === 'activity')
+				.filter(eventMatchesFilters);
 
 			const layoutInputs = calEvents.map((ev) => {
 				const m = mergedEvent(ev);
@@ -168,23 +290,22 @@
 			menuText: ev.menuText as string | null,
 			notes: ev.notes as string | null,
 			location: ev.location as string | null,
-			pricePerPerson: ev.pricePerPerson as number | undefined,
-			totalCostToSplit: ev.totalCostToSplit as number | null | undefined,
 			assignedUser: ev.assignedUser as { id: string; name: string } | null | undefined,
 			participants: ev.participants as DrawerEvent['participants'],
-			currentUserRsvp: ev.currentUserRsvp as 'going' | 'maybe' | 'skip' | undefined,
+			currentUserRsvp: ev.currentUserRsvp as 'going' | 'skip' | undefined,
 			attendance: ev.attendance as DrawerEvent['attendance'],
-			currentUserOptedOut: ev.currentUserOptedOut as boolean | undefined
+			currentUserOptedOut: ev.currentUserOptedOut as boolean | undefined,
+			guestDietaryNotes: ev.guestDietaryNotes as DrawerEvent['guestDietaryNotes']
 		};
 		// Attach the resolved date from the current rendering
 		if (!drawerEvent.date) drawerEvent.date = '';
 	}
 
-	function handleLocalRsvpUpdate(eventId: string, status: 'going' | 'maybe' | 'skip' | 'meal-in' | 'meal-out') {
+	function handleLocalRsvpUpdate(eventId: string, status: 'going' | 'skip' | 'meal-in' | 'meal-out') {
 		if (!drawerEvent || drawerEvent.id !== eventId) return;
 
 		if (drawerEvent.type === 'activity') {
-			const rsvp = status as 'going' | 'maybe' | 'skip';
+			const rsvp = status as 'going' | 'skip';
 			// Update participants list optimistically
 			const existing = drawerEvent.participants ?? [];
 			const userId = data.user.id;
@@ -344,30 +465,17 @@
 		subColor: string;
 	};
 	const EVENT_STYLES: Record<string, EventType> = {
-		'meal-breakfast': {
-			bg: 'rgba(249,115,22,.10)', border: '#f97316',
-			titleColor: '#9a3412', subColor: '#c2410c'
-		},
-		'meal-lunch': {
-			bg: 'rgba(245,158,11,.10)', border: '#d97706',
-			titleColor: '#78350f', subColor: '#92400e'
-		},
-		'meal-dinner': {
-			bg: 'rgba(41,76,96,.10)', border: '#294C60',
-			titleColor: '#001B2E', subColor: '#294C60'
-		},
-		'meal-snack': {
-			bg: 'rgba(253,186,116,.20)', border: '#fb923c',
-			titleColor: '#9a3412', subColor: '#c2410c'
+		meal: {
+			bg: 'rgba(232,93,38,.12)', border: '#E85D26',
+			titleColor: '#7c2d12', subColor: '#c2410c'
 		},
 		activity: {
-			bg: 'rgba(0,27,46,.07)', border: '#001B2E',
-			titleColor: '#001B2E', subColor: '#294C60'
+			bg: 'rgba(74,167,91,.13)', border: '#3a9e53',
+			titleColor: '#14532d', subColor: '#166534'
 		}
 	};
 	function evStyle(ev: Record<string, unknown>): EventType {
-		if (ev.type === 'meal') return EVENT_STYLES[`meal-${ev.mealType}`] ?? EVENT_STYLES['meal-dinner'];
-		return EVENT_STYLES.activity;
+		return ev.type === 'meal' ? EVENT_STYLES.meal : EVENT_STYLES.activity;
 	}
 
 	// ── Assign-meal / add-participant (existing drag-person flow) ─────────
@@ -425,10 +533,6 @@
 		const p = ev.participants as { rsvpStatus: string }[] | undefined;
 		return p?.filter((x) => x.rsvpStatus === 'going').length ?? 0;
 	}
-	function maybeCount(ev: Record<string, unknown>): number {
-		const p = ev.participants as { rsvpStatus: string }[] | undefined;
-		return p?.filter((x) => x.rsvpStatus === 'maybe').length ?? 0;
-	}
 </script>
 
 <div class="itinerary-page">
@@ -444,9 +548,19 @@
 				<div class="mini-calendar">
 					<div class="mini-cal-header">
 						<span class="mini-cal-month">{monthLabel}</span>
-						<div class="mini-cal-nav" aria-hidden="true">
-							<span class="mini-cal-arrow">‹</span>
-							<span class="mini-cal-arrow">›</span>
+						<div class="mini-cal-nav">
+							<button
+								class="mini-cal-arrow"
+								onclick={prevCalMonth}
+								disabled={!canGoPrev}
+								aria-label="Previous month"
+							>‹</button>
+							<button
+								class="mini-cal-arrow"
+								onclick={nextCalMonth}
+								disabled={!canGoNext}
+								aria-label="Next month"
+							>›</button>
 						</div>
 					</div>
 					<div class="mini-cal-grid">
@@ -461,40 +575,14 @@
 					</div>
 				</div>
 
-				<!-- Attending -->
-				<div class="sidebar-section">
-					<div class="sidebar-section-header">
-						<span class="sidebar-section-title">Attending</span>
-					</div>
-					{#if goingUsers.length === 0}
-						<p class="sidebar-empty">No RSVPs yet</p>
-					{:else}
-						<ul class="going-list">
-							{#each goingUsers as person (person.id)}
-								<li
-									class="going-chip"
-									draggable="true"
-									ondragstart={(e) => handlePersonDragStart(e, { type: 'person', id: person.id!, name: person.name })}
-									title="Drag to assign to event"
-								>
-									<span class="going-avatar">{person.name.charAt(0).toUpperCase()}</span>
-									<span class="going-name">{person.name}</span>
-								</li>
-							{/each}
-						</ul>
-					{/if}
-				</div>
-
 				<!-- Legend -->
 				<div class="sidebar-section">
 					<div class="sidebar-section-header">
 						<span class="sidebar-section-title">Key</span>
 					</div>
 					<ul class="legend-list">
-						<li class="legend-item"><span class="legend-dot" style="background:#f97316"></span>Breakfast</li>
-						<li class="legend-item"><span class="legend-dot" style="background:#d97706"></span>Lunch</li>
-						<li class="legend-item"><span class="legend-dot" style="background:#294C60"></span>Dinner</li>
-						<li class="legend-item"><span class="legend-dot" style="background:#001B2E"></span>Activity</li>
+					<li class="legend-item"><span class="legend-dot" style="background:#E85D26"></span>Meal</li>
+					<li class="legend-item"><span class="legend-dot" style="background:#3a9e53"></span>Activity</li>
 					</ul>
 				</div>
 			</aside>
@@ -509,11 +597,20 @@
 							–
 							{new Date(tripDays[tripDays.length - 1] + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
 						</h2>
+						<label class="skip-toggle">
+							<span class="skip-toggle-track" class:on={hideSkipping}>
+								<input
+									type="checkbox"
+									bind:checked={hideSkipping}
+									aria-label="Hide events I'm skipping"
+								/>
+								<span class="skip-toggle-thumb"></span>
+							</span>
+							<span class="skip-toggle-label">Hide events I'm skipping</span>
+						</label>
 					</div>
-					<div class="schedule-header-right">
-						<span class="view-badge">Week</span>
-						<a href="/trips/{data.trip.id}/meals" class="btn-add">+ Add meal</a>
-						<a href="/trips/{data.trip.id}/activities" class="btn-add">+ Add activity</a>
+				<div class="schedule-header-right">
+						<button class="btn-add-activity" onclick={openAddActivity}>+ Custom Activity</button>
 					</div>
 				</div>
 
@@ -547,7 +644,8 @@
 							{/each}
 						</div>
 
-						<!-- "Now" line -->
+
+					<!-- "Now" line -->
 						{#if nowTopPx !== null}
 							{@const nowDayIdx = tripDays.indexOf(todayKey)}
 							{#if nowDayIdx >= 0}
@@ -579,29 +677,59 @@
 							</div>
 						{/if}
 
+						<!-- Meal placeholders (only when meal planning is on) -->
+						{#if mealPlanOn && data.isHost}
+							{#each [
+								{ mealType: 'breakfast', defaultMin: 9 * 60,  defaultTime: '9:00 AM',  label: '🍳 Breakfast' },
+								{ mealType: 'lunch',     defaultMin: 13 * 60, defaultTime: '1:00 PM',  label: '🥗 Lunch' },
+								{ mealType: 'dinner',    defaultMin: 17 * 60, defaultTime: '5:00 PM',  label: '🍽 Dinner' }
+							] as slot}
+								{#each tripDays as date, colIdx}
+									{@const key = `${date}|${slot.mealType}`}
+									{@const topPx = HEADER_HEIGHT + ((slot.defaultMin - HOUR_START * 60) / 60) * SLOT_HEIGHT}
+									{#if !existingMealKeys.has(key)}
+										<button
+											class="meal-placeholder"
+											style="
+												top:{topPx}px;
+												left:calc({TIME_COL_WIDTH}px + {colIdx} * ((100% - {TIME_COL_WIDTH}px) / {tripDays.length}) + 4px);
+												width:calc((100% - {TIME_COL_WIDTH}px) / {tripDays.length} - 8px);
+											"
+											onclick={() => openAddMeal(date, slot.mealType, slot.defaultTime)}
+											title="Add {slot.mealType}"
+										>
+											<span class="placeholder-label">{slot.label} not set</span>
+										</button>
+									{/if}
+								{/each}
+							{/each}
+						{/if}
+
 						<!-- Events layer -->
 						<div class="schedule-events-layer">
 							{#each tripDays as date, colIdx}
 								{@const dayEvents = positionedByDate[date] ?? []}
 								{#each dayEvents as { ev, col, totalCols, topPx, heightPx }}
-									{@const isMeal = ev.type === 'meal'}
-									{@const evId = (ev.activityId ?? ev.slotId) as string}
-									{@const style = evStyle(ev)}
-									{@const isDragging = dragState?.eventId === evId}
-									{@const gCount = goingCount(ev)}
-									{@const mCount = maybeCount(ev)}
+								{@const isMeal = ev.type === 'meal'}
+								{@const evId = (ev.activityId ?? ev.slotId) as string}
+								{@const style = evStyle(ev)}
+								{@const isDragging = dragState?.eventId === evId}
+								{@const gCount = goingCount(ev)}
+								{@const isNotGoing = isMeal
+									? ev.currentUserOptedOut === true
+									: ev.currentUserRsvp === 'skip'}
 
-									<!-- Event card -->
-									<div
-										class="event-block"
-										class:is-dragging={isDragging}
+								<!-- Event card -->
+								<div
+									class="event-block"
+									class:is-dragging={isDragging}
+									class:not-going={isNotGoing}
 										style="
 											top:{topPx}px;
 											height:{heightPx}px;
 											left:calc({colIdx} * (100% / {tripDays.length}) + {(col / totalCols) * 100}% / {tripDays.length} + 4px);
 											width:calc((100% / {tripDays.length}) / {totalCols} - 8px);
-											background:{style.bg};
-											border-left:3px solid {style.border};
+										background:{style.bg};
 										"
 										onpointerdown={(e) => onEventPointerDown(e, ev, topPx, date)}
 										onclick={(e) => {
@@ -627,7 +755,7 @@
 
 										<!-- Time -->
 										{#if ev.time}
-											<span class="evt-time" style="color:{style.subColor}">{ev.time}</span>
+											<span class="evt-time" style="color:{style.subColor}">{formatMinutes(parseTimeToMinutes(ev.time as string))}</span>
 										{/if}
 
 										<!-- Meal: assigned cook -->
@@ -637,13 +765,10 @@
 											</span>
 										{/if}
 
-										<!-- Activity: going/maybe indicators -->
-										{#if !isMeal && (gCount > 0 || mCount > 0)}
-											<span class="evt-rsvp-pill" style="color:{style.subColor}">
-												{#if gCount > 0}✓{gCount}{/if}
-												{#if mCount > 0}<span class="maybe-pill"> ?{mCount}</span>{/if}
-											</span>
-										{/if}
+									<!-- Activity: going count indicator -->
+									{#if !isMeal && gCount > 0}
+										<span class="evt-rsvp-pill" style="color:{style.subColor}">✓{gCount}</span>
+									{/if}
 
 										<!-- Drag hint for host -->
 										{#if data.isHost}
@@ -666,36 +791,104 @@
 					</div>
 				</div>
 
-				<!-- Footer -->
+					<!-- Footer -->
 				<div class="schedule-footer">
-					<div class="footer-left">
-						<div class="footer-avatars">
-							{#each goingUsers.slice(0, 5) as person (person.id)}
-								<span class="footer-avatar" title={person.name}>{initial(person.name)}</span>
-							{/each}
-							{#if goingUsers.length > 5}
-								<span class="footer-avatar footer-avatar-more">+{goingUsers.length - 5}</span>
-							{/if}
-						</div>
-						{#if goingUsers.length > 0}
-							<a href="/trips/{data.trip.id}/guests" class="footer-view-all">View All Guests</a>
-						{/if}
-					</div>
-					<div class="footer-right">
-						<a href="/trips/{data.trip.id}/meals" class="footer-btn">
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v21M3 9h18M3 15h18"/></svg>
-							Meals
-						</a>
-						<a href="/trips/{data.trip.id}/activities" class="footer-btn">
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
-							Activities
-						</a>
-					</div>
+					<button
+						class="footer-btn"
+						class:footer-btn-active={filterType === 'meal'}
+						onclick={() => (filterType = filterType === 'meal' ? 'all' : 'meal')}
+					>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v21M3 9h18M3 15h18"/></svg>
+						Meals
+					</button>
+					<button
+						class="footer-btn"
+						class:footer-btn-active={filterType === 'activity'}
+						onclick={() => (filterType = filterType === 'activity' ? 'all' : 'activity')}
+					>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
+						Activities
+					</button>
 				</div>
 			</div>
 		</div>
 	{/if}
 </div>
+
+<!-- Add Custom Activity Modal -->
+{#if showAddActivity}
+	<div
+		class="modal-backdrop"
+		role="presentation"
+		onclick={(e) => e.target === e.currentTarget && closeAddActivity()}
+	>
+		<div class="modal-box" role="dialog" aria-modal="true" aria-label="Add custom activity">
+			<div class="modal-header">
+				<h2 class="modal-title">Add Custom Activity</h2>
+				<button class="modal-close" onclick={closeAddActivity} aria-label="Close">✕</button>
+			</div>
+
+			<form
+				method="POST"
+				action="?/createActivity"
+				use:enhance={() => {
+					addActivitySubmitting = true;
+					return async ({ result, update }) => {
+						await update();
+						addActivitySubmitting = false;
+						if (result.type === 'success') closeAddActivity();
+					};
+				}}
+				class="modal-form"
+			>
+				<label class="modal-label">Activity name <span class="req">*</span></label>
+				<input class="modal-input" type="text" name="title" required placeholder="e.g. Morning hike" />
+
+				<label class="modal-label">Day <span class="req">*</span></label>
+				<select class="modal-select" name="date" required>
+					{#each tripDays as day}
+						<option value={day}>
+							{new Date(day + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+						</option>
+					{/each}
+				</select>
+
+				<label class="modal-label">Time <span class="req">*</span></label>
+				<select class="modal-select" name="time" required>
+					{#each TIME_OPTIONS as t}
+						<option value={t} selected={t === '9:00 AM'}>{t}</option>
+					{/each}
+				</select>
+
+				<label class="modal-label">Location <span class="modal-optional">(optional)</span></label>
+				<input class="modal-input" type="text" name="location" placeholder="e.g. Trailhead parking lot" />
+
+				<label class="modal-label">Notes <span class="modal-optional">(optional)</span></label>
+				<textarea class="modal-textarea" name="notes" rows="2" placeholder="Any details…"></textarea>
+
+				<div class="modal-actions">
+					<button type="button" class="modal-btn-cancel" onclick={closeAddActivity}>Cancel</button>
+					<button type="submit" class="modal-btn-submit" disabled={addActivitySubmitting}>
+						{addActivitySubmitting ? 'Adding…' : 'Add to itinerary'}
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- Add Meal Modal (from placeholder click) -->
+{#if mealPlanOn}
+	<AddMealModal
+		open={showAddMeal}
+		members={mealModalMembers}
+		tripDays={mealModalDays}
+		prefill={addMealPrefill}
+		formAction="?/createMealSlot"
+		onClose={closeAddMeal}
+		onSuccess={async () => { await invalidateAll(); }}
+	/>
+{/if}
 
 <!-- Event Details Drawer -->
 {#if drawerEvent}
@@ -714,6 +907,7 @@
 	.itinerary-page {
 		padding: 3rem 0 2rem;
 	}
+
 	.empty-state {
 		text-align: center;
 		padding: 3rem 1.5rem;
@@ -753,8 +947,11 @@
 	.mini-cal-arrow {
 		width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
 		border-radius: 6px; font-size: 1rem; color: #64748b; cursor: pointer;
+		background: none; border: none; padding: 0; line-height: 1;
+		transition: background .12s, opacity .12s;
 	}
-	.mini-cal-arrow:hover { background: #e2e8f0; }
+	.mini-cal-arrow:hover:not(:disabled) { background: #e2e8f0; }
+	.mini-cal-arrow:disabled { opacity: .25; cursor: default; }
 	.mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; font-size: .7rem; }
 	.cal-dow { text-align: center; color: #94a3b8; font-weight: 600; padding-bottom: .35rem; }
 	.cal-day {
@@ -775,20 +972,6 @@
 	}
 	.sidebar-empty { font-size: .8rem; color: #94a3b8; margin: 0; }
 
-	.going-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .375rem; }
-	.going-chip {
-		display: flex; align-items: center; gap: .5rem; padding: .375rem .6rem;
-		background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
-		cursor: grab; transition: box-shadow .15s;
-	}
-	.going-chip:hover { background: #f1f5f9; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
-	.going-avatar {
-		width: 24px; height: 24px; border-radius: 50%;
-		background: linear-gradient(135deg, #294C60, #001B2E);
-		color: white; font-size: .65rem; font-weight: 700;
-		display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-	}
-	.going-name { font-size: .8125rem; color: #374151; font-weight: 500; }
 
 	.legend-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
 	.legend-item { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #475569; }
@@ -799,31 +982,38 @@
 		flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 1.5rem 1.5rem 0;
 	}
 	.schedule-header {
-		display: flex; align-items: center; justify-content: space-between;
-		gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 1.25rem;
 	}
-	.schedule-header-left { display: flex; align-items: center; gap: .75rem; }
+	.schedule-header-left { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; justify-content: center; }
 	.schedule-date-range {
 		font-size: clamp(1.125rem, 2vw, 1.5rem); font-weight: 800; color: #1e293b;
 		letter-spacing: -.02em; margin: 0;
 	}
-	.schedule-header-right { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-	.view-badge {
-		padding: .35rem .875rem; background: #f1f5f9; border-radius: 8px;
-		font-size: .8125rem; font-weight: 600; color: #475569;
+	.schedule-header-right { display: flex; align-items: center; gap: .75rem; justify-content: flex-end; }
+	/* ── Add Activity button ── */
+	.btn-add-activity {
+		padding: .42rem 1rem;
+		background: #E85D26;
+		color: white;
+		border: none;
+		border-radius: 9px;
+		font-size: .8rem;
+		font-weight: 700;
+		cursor: pointer;
+		white-space: nowrap;
+		transition: background .12s;
 	}
-	.btn-add {
-		padding: .5rem 1rem; background: #f97316; color: white; border-radius: 10px;
-		font-size: .8125rem; font-weight: 600; text-decoration: none;
-		display: inline-flex; align-items: center; gap: .25rem;
-		transition: background .15s, transform .1s; white-space: nowrap;
-	}
-	.btn-add:hover { background: #ea580c; transform: translateY(-1px); }
+	.btn-add-activity:hover { background: #cf4f1f; }
+
 
 	/* ── Grid wrapper ── */
 	.schedule-grid-wrapper {
 		flex: 1; overflow-x: auto; overflow-y: auto;
-		max-height: calc(100vh - 260px);
+		max-height: calc(100vh - 320px);
 		border-radius: 12px; border: 1px solid #f0f2f5; background: white;
 		position: relative;
 		touch-action: pan-y; /* allow vertical scroll, intercept horizontal for drag */
@@ -919,7 +1109,20 @@
 		font-size: .65rem; font-weight: 700; opacity: .9; white-space: nowrap;
 		display: flex; gap: .25rem; align-items: center;
 	}
-	.maybe-pill { opacity: .7; }
+	/* ── Not going (skipping / opted out) ── */
+	.event-block.not-going {
+		background: #f1f5f9 !important;
+		opacity: .75;
+	}
+	.event-block.not-going .evt-title {
+		color: #94a3b8 !important;
+		font-style: italic;
+	}
+	.event-block.not-going .evt-time,
+	.event-block.not-going .evt-sub,
+	.event-block.not-going .evt-rsvp-pill {
+		color: #94a3b8 !important;
+	}
 
 	/* Drag handle (subtle dots in top-right, host only) */
 	.drag-handle {
@@ -936,30 +1139,136 @@
 
 	/* ── Footer ── */
 	.schedule-footer {
-		padding: .875rem 0; border-top: 1px solid #f0f2f5;
-		display: flex; align-items: center; justify-content: space-between; margin-top: .5rem;
+		padding: .875rem 0;
+		border-top: 1px solid #f0f2f5;
+		display: flex;
+		align-items: center;
+		gap: .5rem;
+		justify-content: flex-end;
+		margin-top: .5rem;
 	}
-	.footer-left { display: flex; align-items: center; gap: .75rem; }
-	.footer-avatars { display: flex; align-items: center; }
-	.footer-avatar {
-		width: 34px; height: 34px; border-radius: 50%;
-		background: linear-gradient(135deg, #294C60, #001B2E);
-		color: white; font-size: .75rem; font-weight: 700;
-		display: flex; align-items: center; justify-content: center;
-		border: 2.5px solid white; margin-left: -8px;
-	}
-	.footer-avatar:first-child { margin-left: 0; }
-	.footer-avatar-more { background: #e2e8f0; color: #64748b; font-size: .7rem; }
-	.footer-view-all {
-		font-size: .8125rem; font-weight: 600; color: #294C60; text-decoration: none; margin-left: .5rem;
-	}
-	.footer-view-all:hover { text-decoration: underline; }
-	.footer-right { display: flex; align-items: center; gap: .5rem; }
 	.footer-btn {
 		display: inline-flex; align-items: center; gap: .375rem;
 		padding: .5rem 1rem; border-radius: 10px; border: 1.5px solid #e2e8f0;
 		font-size: .8125rem; font-weight: 600; color: #374151;
-		text-decoration: none; background: white; transition: background .15s, border-color .15s;
+		background: white; cursor: pointer; transition: background .15s, border-color .15s, color .15s;
 	}
 	.footer-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+	.footer-btn.footer-btn-active {
+		background: #001B2E; border-color: #001B2E; color: white;
+	}
+	.footer-btn.footer-btn-active:hover { background: #0f2d45; border-color: #0f2d45; }
+
+	/* ── Hide-skipping toggle ── */
+	.skip-toggle {
+		display: flex; align-items: center; gap: .45rem;
+		cursor: pointer; user-select: none;
+	}
+	.skip-toggle-track {
+		position: relative;
+		display: inline-block;
+		width: 32px; height: 18px;
+		border-radius: 9px;
+		background: #cbd5e1;
+		transition: background .2s;
+		flex-shrink: 0;
+	}
+	.skip-toggle-track.on { background: #E85D26; }
+	.skip-toggle-track input {
+		position: absolute; opacity: 0; width: 0; height: 0;
+	}
+	.skip-toggle-thumb {
+		position: absolute;
+		top: 2px; left: 2px;
+		width: 14px; height: 14px;
+		border-radius: 50%;
+		background: white;
+		box-shadow: 0 1px 3px rgba(0,0,0,.2);
+		transition: transform .2s;
+	}
+	.skip-toggle-track.on .skip-toggle-thumb { transform: translateX(14px); }
+	.skip-toggle-label { font-size: .75rem; font-weight: 500; color: #64748b; white-space: nowrap; }
+
+	/* ── Add Custom Activity Modal ── */
+	.modal-backdrop {
+		position: fixed; inset: 0;
+		background: rgba(0,0,0,.45);
+		display: flex; align-items: center; justify-content: center;
+		z-index: 1000;
+	}
+	.modal-box {
+		background: white;
+		border-radius: 16px;
+		width: min(480px, calc(100vw - 2rem));
+		padding: 1.5rem;
+		box-shadow: 0 20px 60px rgba(0,0,0,.18);
+		display: flex; flex-direction: column; gap: 1rem;
+	}
+	.modal-header { display: flex; justify-content: space-between; align-items: center; }
+	.modal-title { font-size: 1.1rem; font-weight: 700; color: #001B2E; margin: 0; }
+	.modal-close {
+		background: none; border: none; cursor: pointer;
+		color: #94a3b8; font-size: 1.1rem; line-height: 1;
+		padding: .2rem .4rem; border-radius: 6px;
+	}
+	.modal-close:hover { background: #f1f5f9; color: #1e293b; }
+	.modal-form { display: flex; flex-direction: column; gap: .65rem; }
+	.modal-label { font-size: .8rem; font-weight: 600; color: #374151; }
+	.req { color: #E85D26; }
+	.modal-optional { font-weight: 400; color: #94a3b8; }
+	.modal-input, .modal-select, .modal-textarea {
+		width: 100%; box-sizing: border-box;
+		padding: .55rem .75rem;
+		border: 1.5px solid #e2e8f0;
+		border-radius: 9px;
+		font-size: .875rem; color: #1e293b;
+		outline: none; transition: border-color .15s;
+		font-family: inherit;
+		background: white;
+	}
+	.modal-input:focus, .modal-select:focus, .modal-textarea:focus {
+		border-color: #E85D26;
+	}
+	.modal-textarea { resize: vertical; }
+	.modal-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .25rem; }
+	.modal-btn-cancel {
+		padding: .5rem 1.1rem;
+		border: 1.5px solid #e2e8f0; border-radius: 9px;
+		background: white; color: #64748b;
+		font-size: .85rem; font-weight: 600; cursor: pointer;
+	}
+	.modal-btn-cancel:hover { background: #f8fafc; }
+	.modal-btn-submit {
+		padding: .5rem 1.25rem;
+		background: #E85D26; color: white;
+		border: none; border-radius: 9px;
+		font-size: .85rem; font-weight: 700; cursor: pointer;
+		transition: background .12s;
+	}
+	.modal-btn-submit:hover:not(:disabled) { background: #cf4f1f; }
+	.modal-btn-submit:disabled { opacity: .6; cursor: not-allowed; }
+
+	/* ── Meal placeholders ── */
+	.meal-placeholder {
+		position: absolute;
+		height: 52px;
+		border: 1.5px dashed #9ca3af;
+		border-radius: 8px;
+		background: rgba(0,0,0,.02);
+		display: flex; align-items: center; justify-content: center;
+		cursor: pointer;
+		transition: background .12s, border-color .12s;
+		z-index: 1;
+	}
+	.meal-placeholder:hover {
+		background: rgba(232,93,38,.06);
+		border-color: #E85D26;
+	}
+	.placeholder-label {
+		font-size: .75rem; font-weight: 500;
+		color: #9ca3af;
+		pointer-events: none;
+	}
+	.meal-placeholder:hover .placeholder-label { color: #E85D26; }
+
 </style>

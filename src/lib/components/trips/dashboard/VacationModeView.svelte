@@ -145,6 +145,20 @@
 	const todayFormatted = $derived(formatTodayLong(todayKey));
 	const displayName = $derived(currentUserName?.trim() || 'there');
 
+	function formatTime12(t: string | null | undefined): string {
+		if (!t) return '—';
+		const m24 = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+		if (m24) {
+			let h = +m24[1];
+			const min = m24[2];
+			const ap = h < 12 ? 'AM' : 'PM';
+			if (h === 0) h = 12;
+			else if (h > 12) h -= 12;
+			return `${h}:${min} ${ap}`;
+		}
+		return t; // already formatted
+	}
+
 	function toDateString(val: string | Date | null | undefined): string {
 		if (val == null || val === '') return '';
 		const d = typeof val === 'string' ? new Date(val) : val;
@@ -445,7 +459,7 @@
 								{#if entry.type === 'activity'}
 									{@const a = entry.data}
 									<li class="v-today-item">
-										<span class="v-today-time">{a.time ? String(a.time).slice(0, 5) : '\u2014'}</span>
+										<span class="v-today-time">{formatTime12(a.time)}</span>
 										<div class="v-today-body">
 											<span class="v-today-title">{a.title}</span>
 											{#if a.location}<span class="v-today-sub">{a.location}</span>{/if}
@@ -455,7 +469,7 @@
 								{:else}
 									{@const m = entry.data}
 									<li class="v-today-item">
-										<span class="v-today-time">{m.time ? String(m.time).slice(0, 5) : '\u2014'}</span>
+										<span class="v-today-time">{formatTime12(m.time)}</span>
 										<div class="v-today-body">
 											<span class="v-today-title">{mealLabel(m.mealType)}</span>
 											{#if m.menuText}<span class="v-today-sub">{m.menuText}</span>{/if}

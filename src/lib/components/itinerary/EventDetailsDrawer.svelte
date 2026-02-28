@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { formatMinutes } from '$lib/itinerary/overlap.js';
+	import { invalidateAll } from '$app/navigation';
 
 	// ── Types ──────────────────────────────────────────────────────────────
 
-	type RsvpStatus = 'going' | 'maybe' | 'skip';
+	type RsvpStatus = 'going' | 'skip';
 
 	type DrawerParticipant = {
 		id: string;
@@ -16,6 +17,15 @@
 		userName: string;
 		optedOut: boolean;
 		dietaryNote?: string | null;
+		dietaryRestrictions?: string | null;
+		allergies?: string | null;
+	};
+
+	type GuestDietaryNote = {
+		userId: string;
+		userName: string;
+		dietaryRestrictions?: string | null;
+		allergies?: string | null;
 	};
 
 	export type DrawerEvent = {
@@ -29,8 +39,6 @@
 		// Activity
 		title?: string | null;
 		location?: string | null;
-		pricePerPerson?: number;
-		totalCostToSplit?: number | null;
 		participants?: DrawerParticipant[];
 		currentUserRsvp?: RsvpStatus;
 		// Meal
@@ -39,6 +47,7 @@
 		assignedUser?: { id: string; name: string } | null;
 		attendance?: DrawerAttendance[];
 		currentUserOptedOut?: boolean;
+		guestDietaryNotes?: GuestDietaryNote[];
 	};
 
 	// ── Props ──────────────────────────────────────────────────────────────
@@ -67,9 +76,6 @@
 	// Activity attendee groups
 	const going = $derived(
 		(event.participants ?? []).filter((p) => p.rsvpStatus === 'going')
-	);
-	const maybe = $derived(
-		(event.participants ?? []).filter((p) => p.rsvpStatus === 'maybe')
 	);
 	const skipping = $derived(
 		(event.participants ?? []).filter((p) => p.rsvpStatus === 'skip')
@@ -109,6 +115,44 @@
 				(event.mealType ?? 'meal').slice(1) +
 				(event.title ? ` – ${event.title}` : '')
 	);
+
+	// ── Receipt upload ─────────────────────────────────────────────────────
+
+	type ReceiptFile = { id: string; name: string; url: string; mimeType?: string | null };
+	let receipts      = $state<ReceiptFile[]>([]);
+	let receiptLoading = $state(false);
+	let receiptError   = $state<string | null>(null);
+	let receiptInput: HTMLInputElement | null = $state(null);
+
+	// Load existing receipts when a meal drawer opens
+	$effect(() => {
+		if (!isMeal || !event.id) { receipts = []; return; }
+		fetch(`/api/trips/${tripId}/files?mealSlotId=${event.id}`)
+			.then(r => r.json())
+			.then(({ files }) => { if (files) receipts = files; });
+	});
+
+	async function handleReceiptUpload(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		receiptLoading = true;
+		receiptError = null;
+		const fd = new FormData();
+		fd.append('file', file);
+		fd.append('category', 'receipt');
+		fd.append('mealSlotId', event.id);
+		const res = await fetch(`/api/trips/${tripId}/files`, { method: 'POST', body: fd });
+		const data = await res.json();
+		receiptLoading = false;
+		if (!res.ok) { receiptError = data.error ?? 'Upload failed'; return; }
+		receipts = [data.file, ...receipts];
+		input.value = '';
+		// Refresh files page data so it appears there too
+		await invalidateAll();
+	}
+
+	function isPdf(f: ReceiptFile) { return f.mimeType === 'application/pdf'; }
 
 	// ── Helpers ────────────────────────────────────────────────────────────
 
@@ -165,12 +209,7 @@
 
 	// ── Meal type badge colors ─────────────────────────────────────────────
 
-	const mealBadgeStyle: Record<string, string> = {
-		breakfast: 'background:rgba(249,115,22,.12);color:#9a3412;border-color:#f97316',
-		lunch: 'background:rgba(245,158,11,.12);color:#78350f;border-color:#d97706',
-		dinner: 'background:rgba(41,76,96,.12);color:#001B2E;border-color:#294C60',
-		snack: 'background:rgba(253,186,116,.22);color:#9a3412;border-color:#fb923c'
-	};
+	const mealBadgeStyle = 'background:rgba(232,93,38,.12);color:#7c2d12;border-color:#E85D26';
 </script>
 
 <!-- Backdrop (click outside to close) -->
@@ -189,7 +228,7 @@
 			{#if isMeal && event.mealType}
 				<span
 					class="type-badge"
-					style={mealBadgeStyle[event.mealType] ?? mealBadgeStyle.dinner}
+					style={mealBadgeStyle}
 				>
 					{event.mealType.charAt(0).toUpperCase() + event.mealType.slice(1)}
 				</span>
@@ -257,20 +296,6 @@
 			</div>
 		{/if}
 
-		<!-- Cost (activity only) -->
-		{#if isActivity && event.pricePerPerson && event.pricePerPerson > 0}
-			<div class="detail-row">
-				<span class="detail-icon">
-					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-				</span>
-				<div class="detail-content">
-					<span class="detail-primary">${event.pricePerPerson.toFixed(2)} / person</span>
-					{#if event.totalCostToSplit}
-						<span class="detail-secondary">Total: ${event.totalCostToSplit.toFixed(2)} split evenly</span>
-					{/if}
-				</div>
-			</div>
-		{/if}
 
 		<!-- Notes (activity) -->
 		{#if isActivity && event.notes}
@@ -300,16 +325,7 @@
 						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
 						Going
 					</button>
-					<button
-						class="rsvp-btn maybe"
-						class:active={event.currentUserRsvp === 'maybe'}
-						onclick={() => setActivityRsvp('maybe')}
-						disabled={rsvpPending}
-					>
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-						Maybe
-					</button>
-					<button
+				<button
 						class="rsvp-btn skip"
 						class:active={event.currentUserRsvp === 'skip'}
 						onclick={() => setActivityRsvp('skip')}
@@ -367,22 +383,7 @@
 					</ul>
 				</div>
 			{/if}
-			{#if maybe.length > 0}
-				<div class="attendee-section">
-					<p class="section-label maybe-label">
-						<span class="label-dot maybe-dot"></span>Maybe · {maybe.length}
-					</p>
-					<ul class="attendee-list">
-						{#each maybe as person (person.id)}
-							<li class="attendee-row">
-								<span class="attendee-avatar maybe-avatar">{initial(person.name)}</span>
-								<span class="attendee-name">{person.name}{person.id === currentUserId ? ' (you)' : ''}</span>
-							</li>
-						{/each}
-					</ul>
-				</div>
-			{/if}
-			{#if skipping.length > 0}
+		{#if skipping.length > 0}
 				<div class="attendee-section">
 					<p class="section-label skip-label">
 						<span class="label-dot skip-dot"></span>Skipping · {skipping.length}
@@ -397,7 +398,7 @@
 					</ul>
 				</div>
 			{/if}
-			{#if going.length === 0 && maybe.length === 0 && skipping.length === 0}
+			{#if going.length === 0 && skipping.length === 0}
 				<p class="no-attendees">No RSVPs yet — be the first!</p>
 			{/if}
 		{/if}
@@ -422,33 +423,95 @@
 					</ul>
 				</div>
 			{/if}
-			{#if mealOptedOut.length > 0}
-				<div class="attendee-section">
-					<p class="section-label skip-label">
-						<span class="label-dot skip-dot"></span>Skipping · {mealOptedOut.length}
-					</p>
-					<ul class="attendee-list">
-						{#each mealOptedOut as a (a.userId)}
-							<li class="attendee-row">
-								<span class="attendee-avatar skip-avatar">{initial(a.userName)}</span>
-								<span class="attendee-name">{a.userName}</span>
-							</li>
-						{/each}
-					</ul>
-				</div>
-			{/if}
+		{#if mealOptedOut.length > 0}
+			<div class="attendee-section">
+				<p class="section-label skip-label">
+					<span class="label-dot skip-dot"></span>Skipping · {mealOptedOut.length}
+				</p>
+				<ul class="attendee-list">
+					{#each mealOptedOut as a (a.userId)}
+						<li class="attendee-row">
+							<span class="attendee-avatar skip-avatar">{initial(a.userName)}</span>
+							<span class="attendee-name">{a.userName}</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
 		{/if}
 
-	</div>
+		<!-- ── Receipt upload (meals only) ── -->
+		<div class="drawer-divider"></div>
+		<div class="receipt-section">
+			<div class="receipt-header">
+				<p class="section-label">🧾 Receipts</p>
+				<label class="btn-upload-receipt" title="Upload receipt">
+					{#if receiptLoading}
+						<span class="upload-spinner"></span>
+					{:else}
+						+ Upload
+					{/if}
+					<input
+						type="file"
+						accept=".pdf,.jpg,.jpeg,.png,.webp,.heic"
+						bind:this={receiptInput}
+						onchange={handleReceiptUpload}
+						disabled={receiptLoading}
+						style="display:none"
+					/>
+				</label>
+			</div>
+			{#if receiptError}
+				<p class="receipt-error">{receiptError}</p>
+			{/if}
+			{#if receipts.length === 0 && !receiptLoading}
+				<p class="receipt-empty">No receipts yet. Upload one to save it to Files.</p>
+			{/if}
+			{#if receipts.length > 0}
+				<ul class="receipt-list">
+					{#each receipts as f (f.id)}
+						<li class="receipt-row">
+							<span class="receipt-icon">{isPdf(f) ? '📄' : '🖼'}</span>
+							<a class="receipt-name" href={f.url} target="_blank" rel="noopener noreferrer">{f.name}</a>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
+
+		<!-- ── Dietary notes from guest profiles ── -->
+		{@const dietaryNotes = (event.guestDietaryNotes ?? []).filter(d => d.dietaryRestrictions || d.allergies)}
+		{#if dietaryNotes.length > 0}
+			<div class="drawer-divider"></div>
+			<div class="dietary-section">
+				<p class="section-label dietary-label">
+					<span class="dietary-icon">🥗</span> Dietary notes · {dietaryNotes.length}
+				</p>
+				<ul class="dietary-list">
+					{#each dietaryNotes as d (d.userId)}
+						<li class="dietary-row">
+							<span class="attendee-avatar dietary-avatar">{initial(d.userName)}</span>
+							<div class="dietary-info">
+								<span class="dietary-name">{d.userName}{d.userId === currentUserId ? ' (you)' : ''}</span>
+								{#if d.dietaryRestrictions}
+									<span class="dietary-detail">{d.dietaryRestrictions}</span>
+								{/if}
+								{#if d.allergies}
+									<span class="dietary-detail dietary-allergy">⚠ {d.allergies}</span>
+								{/if}
+							</div>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+	{/if}
+
+</div>
 
 	<!-- Footer actions (host only) -->
-	{#if isHost}
+	{#if isHost && isActivity}
 		<div class="drawer-footer">
-			{#if isActivity}
-				<a href="/trips/{tripId}/activities" class="footer-edit-btn">Edit activity</a>
-			{:else}
-				<a href="/trips/{tripId}/meals" class="footer-edit-btn">Edit meal</a>
-			{/if}
+			<a href="/trips/{tripId}/activities" class="footer-edit-btn">Edit activity</a>
 		</div>
 	{/if}
 </aside>
@@ -536,9 +599,9 @@
 		width: fit-content;
 	}
 	.activity-badge {
-		background: rgba(0, 27, 46, 0.07);
-		color: #001B2E;
-		border-color: #001B2E;
+		background: rgba(74, 167, 91, 0.13);
+		color: #14532d;
+		border-color: #3a9e53;
 	}
 
 	/* ── Body ── */
@@ -629,10 +692,8 @@
 	}
 	.rsvp-btn:disabled { opacity: 0.6; cursor: default; }
 	.rsvp-btn.going.active  { background: rgba(16,185,129,.1);  border-color: #10b981; color: #065f46; }
-	.rsvp-btn.maybe.active  { background: rgba(245,158,11,.1);  border-color: #d97706; color: #78350f; }
 	.rsvp-btn.skip.active   { background: rgba(239,68,68,.08);  border-color: #f87171; color: #991b1b; }
 	.rsvp-btn.going:hover:not(.active):not(:disabled) { background: rgba(16,185,129,.06); }
-	.rsvp-btn.maybe:hover:not(.active):not(:disabled) { background: rgba(245,158,11,.06); }
 	.rsvp-btn.skip:hover:not(.active):not(:disabled)  { background: rgba(239,68,68,.06); }
 
 	/* ── Attendee sections ── */
@@ -646,10 +707,8 @@
 		flex-shrink: 0;
 	}
 	.going-dot  { background: #10b981; }
-	.maybe-dot  { background: #d97706; }
 	.skip-dot   { background: #94a3b8; }
 	.going-label { color: #065f46; }
-	.maybe-label { color: #78350f; }
 	.skip-label  { color: #64748b; }
 
 	.attendee-list {
@@ -681,7 +740,6 @@
 	.attendee-avatar.is-me {
 		background: linear-gradient(135deg, #f97316, #ea580c);
 	}
-	.attendee-avatar.maybe-avatar { background: linear-gradient(135deg, #d97706, #92400e); }
 	.attendee-avatar.skip-avatar  { background: #cbd5e1; color: #64748b; }
 	.attendee-name {
 		font-size: 0.875rem;
@@ -699,6 +757,17 @@
 		margin: 0;
 		font-style: italic;
 	}
+	/* ── Dietary section ── */
+	.dietary-section { margin-top: .25rem; }
+	.dietary-label { display: flex; align-items: center; gap: .4rem; color: #166534; font-size: .8rem; font-weight: 600; margin-bottom: .5rem; }
+	.dietary-icon { font-size: .9rem; }
+	.dietary-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+	.dietary-row { display: flex; align-items: flex-start; gap: .6rem; }
+	.dietary-avatar { background: linear-gradient(135deg, #3a9e53, #14532d); }
+	.dietary-info { display: flex; flex-direction: column; gap: .15rem; }
+	.dietary-name { font-size: .875rem; font-weight: 600; color: #1e293b; }
+	.dietary-detail { font-size: .8rem; color: #475569; }
+	.dietary-allergy { color: #b45309; font-weight: 500; }
 
 	/* ── Footer ── */
 	.drawer-footer {
@@ -722,6 +791,39 @@
 		transition: background 0.15s, border-color 0.15s;
 	}
 	.footer-edit-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+
+	/* ── Receipt section ── */
+	.receipt-section { padding: 0 1.25rem; }
+	.receipt-header {
+		display: flex; justify-content: space-between; align-items: center;
+		margin-bottom: .5rem;
+	}
+	.btn-upload-receipt {
+		display: inline-flex; align-items: center; gap: .3rem;
+		font-size: .8rem; font-weight: 600;
+		padding: .3rem .75rem;
+		background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px;
+		color: #E85D26; cursor: pointer;
+		transition: border-color .12s, background .12s;
+		white-space: nowrap;
+	}
+	.btn-upload-receipt:hover { border-color: #E85D26; background: rgba(232,93,38,.05); }
+	.receipt-empty { font-size: .8rem; color: #94a3b8; margin: 0; }
+	.receipt-error { font-size: .8rem; color: #ef4444; margin: 0 0 .35rem; }
+	.receipt-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .35rem; }
+	.receipt-row { display: flex; align-items: center; gap: .5rem; }
+	.receipt-icon { font-size: 1rem; flex-shrink: 0; }
+	.receipt-name {
+		font-size: .85rem; color: #3b5170;
+		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+	}
+	.receipt-name:hover { text-decoration: underline; }
+	.upload-spinner {
+		display: inline-block; width: 12px; height: 12px;
+		border: 2px solid #E85D26; border-top-color: transparent;
+		border-radius: 50%; animation: spin .6s linear infinite;
+	}
+	@keyframes spin { to { transform: rotate(360deg); } }
 
 	/* ── Mobile: bottom sheet ── */
 	@media (max-width: 640px) {
