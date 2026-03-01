@@ -36,6 +36,10 @@
 			return { line: bedLabel ? `${roomName} – ${bedLabel}` : roomName };
 		})
 	);
+
+	const roomPhoto = $derived(
+		myAssignments.find((a) => a.room?.photoUrls && a.room.photoUrls.length > 0)?.room?.photoUrls?.[0] ?? null
+	);
 </script>
 
 <div class="rsvp-card">
@@ -48,9 +52,6 @@
 				</svg>
 			</span>
 			<span class="status-text">You're going!</span>
-			{#if daysUntil !== null}
-				<span class="status-days">{daysUntil}d away</span>
-			{/if}
 		</div>
 	{:else if hasDeclined}
 		<div class="status-banner declined">
@@ -83,14 +84,21 @@
 			<p class="nudge-text">Changed your mind? Update your RSVP.</p>
 			<a href={rsvpEditHref} class="cta-btn cta-ghost">Update RSVP</a>
 		{:else}
-			<!-- Accepted: show details -->
+			<!-- Accepted: room photo -->
+			{#if roomPhoto}
+				<div class="room-photo-wrap">
+					<img src={roomPhoto} alt="Your room" class="room-photo" />
+				</div>
+			{/if}
+
+			<!-- Accepted: details -->
 			{#if userReservationPrice != null}
 				<div class="detail-block">
-					<span class="detail-label">Price estimate</span>
+					<span class="detail-label">Current Price Estimate</span>
 					<div class="detail-price-row">
 						<span class="detail-price">${userReservationPrice.toFixed(2)}</span>
-						<span class="detail-note">may change</span>
 					</div>
+					<span class="detail-note">Subject to change based on headcount</span>
 				</div>
 			{/if}
 
@@ -124,7 +132,9 @@
 				</div>
 			{/if}
 
-			<a href={rsvpEditHref} class="cta-btn cta-ghost">Edit my RSVP</a>
+			<div class="edit-rsvp-anchor">
+				<a href={rsvpEditHref} class="cta-btn cta-ghost cta-small">Edit my RSVP</a>
+			</div>
 		{/if}
 	</div>
 </div>
@@ -134,6 +144,7 @@
 		display: flex;
 		flex-direction: column;
 		min-width: 0;
+		flex: 1;
 	}
 
 	/* ── Status row ── same neutral base, copper accent for active state ── */
@@ -205,6 +216,28 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.875rem;
+		flex: 1;
+	}
+
+	/* ── Room photo ── */
+	.room-photo-wrap {
+		width: 100%;
+		border-radius: var(--radius-md, 8px);
+		overflow: hidden;
+		flex-shrink: 0;
+	}
+
+	.room-photo {
+		width: 100%;
+		height: 90px;
+		object-fit: cover;
+		display: block;
+	}
+
+	/* ── Edit RSVP anchored to bottom ── */
+	.edit-rsvp-anchor {
+		margin-top: auto;
+		padding-top: 0.5rem;
 	}
 
 	.nudge-text {
@@ -218,6 +251,8 @@
 	.detail-block {
 		display: flex;
 		flex-direction: column;
+		align-items: center;
+		text-align: center;
 		gap: 0.2rem;
 		padding-bottom: 0.75rem;
 		border-bottom: 1px solid var(--border-soft, rgba(0,0,0,0.06));
@@ -239,6 +274,7 @@
 	.detail-price-row {
 		display: flex;
 		align-items: baseline;
+		justify-content: center;
 		gap: 0.4rem;
 	}
 
@@ -250,13 +286,15 @@
 	}
 
 	.detail-note {
-		font-size: 0.75rem;
+		font-size: 0.6875rem;
 		color: var(--muted);
+		line-height: 1.4;
 	}
 
 	.detail-values {
 		display: flex;
 		flex-direction: column;
+		align-items: center;
 		gap: 0.15rem;
 	}
 
@@ -322,5 +360,12 @@
 	.cta-ghost:hover {
 		background: rgba(0, 0, 0, 0.04);
 		border-color: var(--muted);
+	}
+
+	.cta-small {
+		padding: 0.4rem 0.75rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		margin-top: 0;
 	}
 </style>

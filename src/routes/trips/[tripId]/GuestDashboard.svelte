@@ -274,6 +274,10 @@
 				houseRules: trip?.houseRules
 			}}
 			tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
+		recentActivities={activities.map(a => ({ title: a.title, createdAt: String(a.createdAt) }))}
+		recentMealSlots={mealSlots.map(m => ({ mealType: m.mealType, title: m.title ?? null, createdAt: String(m.createdAt) }))}
+		recentGames={data.tripGames ?? []}
+		recentPolls={data.recentPolls ?? []}
 		/>
 		{/if}
 {/if}

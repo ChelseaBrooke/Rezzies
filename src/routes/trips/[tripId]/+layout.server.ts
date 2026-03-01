@@ -87,10 +87,24 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 
 	const allTrips = tripsResult.allTrips.map((m) => m.trip);
 
-	const tripGamesRows = await prisma.tripGame.findMany({
-		where: { tripId },
-		orderBy: { createdAt: 'asc' }
-	});
+	const [tripGamesRows, recentPolls] = await Promise.all([
+		prisma.tripGame.findMany({
+			where: { tripId },
+			orderBy: { createdAt: 'asc' }
+		}),
+		prisma.poll.findMany({
+			where: { tripId },
+			orderBy: { createdAt: 'desc' },
+			take: 30,
+			select: {
+				id: true,
+				title: true,
+				createdAt: true,
+				createdById: true,
+				createdBy: { select: { id: true, name: true } }
+			}
+		})
+	]);
 	const tripGames = tripGamesRows.map((g) => ({
 		id: g.id,
 		gameId: g.gameId,
@@ -128,6 +142,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 		pendingInviteToken,
 		committedFundsFromYesRsvps: committedFunds,
 		pollsBadgeCount,
-		tripGames
+		tripGames,
+		recentPolls
 	};
 };

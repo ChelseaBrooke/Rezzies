@@ -298,6 +298,8 @@
 		flex-direction: column;
 		min-width: 0;
 		flex: 1;
+		min-height: 0;
+		overflow: hidden;
 	}
 
 	/* ── Header: matches DashboardCard .card-header exactly, no background ── */
@@ -366,6 +368,8 @@
 		flex-direction: column;
 		gap: 0;
 		flex: 1;
+		min-height: 0;
+		overflow: hidden;
 		justify-content: space-between;
 	}
 
@@ -383,8 +387,10 @@
 	.tic-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 1.25rem 1.25rem;
+		gap: 0.75rem 1.25rem;
 		flex: 1;
+		min-height: 0;
+		overflow: hidden;
 		align-content: space-evenly;
 	}
 
@@ -429,8 +435,16 @@
 		font-size: 0.8125rem;
 		color: var(--text, #111827);
 		line-height: 1.5;
-		white-space: pre-wrap;
-		word-break: break-word;
+		overflow-wrap: break-word;
+		overflow: hidden;
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+	}
+
+	/* Description capped tighter so it doesn't balloon the card */
+	.tic-desc-row .tic-field-value {
+		-webkit-line-clamp: 2;
 	}
 
 	.tic-field-value.empty {
@@ -479,6 +493,11 @@
 
 	/* ── Address link ── */
 	.tic-address-link {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		display: block;
+		max-width: 100%;
 		display: inline-flex;
 		align-items: flex-start;
 		gap: 0.25rem;
