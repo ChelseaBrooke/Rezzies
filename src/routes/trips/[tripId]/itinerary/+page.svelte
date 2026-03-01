@@ -649,6 +649,13 @@
 							–
 							{new Date(tripDays[tripDays.length - 1] + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
 						</h2>
+						{#if (data.trip?.checkInTime ?? '').trim() || (data.trip?.checkOutTime ?? '').trim()}
+							<p class="schedule-check-times">
+								<span class="schedule-check-in">Check-in {(data.trip?.checkInTime ?? '').trim() || '—'}</span>
+								<span class="schedule-check-sep"> · </span>
+								<span class="schedule-check-out">Check-out {(data.trip?.checkOutTime ?? '').trim() || '—'}</span>
+							</p>
+						{/if}
 						<label class="skip-toggle">
 							<span class="skip-toggle-track" class:on={hideSkipping}>
 								<input
@@ -1069,6 +1076,13 @@
 		font-size: clamp(1.125rem, 2vw, 1.5rem); font-weight: 700; color: var(--text);
 		letter-spacing: -.02em; margin: 0;
 	}
+	.schedule-check-times {
+		margin: 0;
+		font-size: 0.875rem;
+		color: var(--muted);
+		font-weight: 500;
+	}
+	.schedule-check-sep { color: var(--border); }
 	.schedule-header-right { display: flex; align-items: center; gap: .75rem; justify-content: flex-end; }
 	/* ── Add Activity button ── */
 	.btn-add-activity {

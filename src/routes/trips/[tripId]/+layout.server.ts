@@ -53,7 +53,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 				},
 				invoices: true,
 				reservations: true,
-				rsvps: { include: { user: { select: { id: true, name: true } } } },
+				rsvps: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
 				roomAssignments: {
 					include: {
 						room: { select: { id: true, name: true, photoUrls: true } },

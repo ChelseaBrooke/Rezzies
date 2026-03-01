@@ -202,6 +202,7 @@
 			checkOutDate={trip.checkOutDate ?? ''}
 			{hostName}
 			currentUserName={user?.name ?? ''}
+			userRsvp={userRsvp ? { adultsCount: userRsvp.adultsCount, kidsCount: userRsvp.kidsCount } : null}
 			{activities}
 			{mealSlots}
 			{roomAssignments}
