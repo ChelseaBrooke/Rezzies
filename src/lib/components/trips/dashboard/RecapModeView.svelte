@@ -45,7 +45,7 @@
 		activities?: Activity[];
 		mealSlots?: MealSlot[];
 		members?: Array<{ user?: { id: string; name: string | null; avatarUrl?: string | null } | null }>;
-		userInvoices?: Array<{ status: string; totalAmount: number }>;
+		userInvoices?: Array<{ status: string; totalAmount: number; breakdownJson?: string | null }>;
 		totalCost?: number;
 		rsvps?: Array<{ status: string; user?: { id: string; name: string | null; avatarUrl?: string | null } | null }>;
 	} = $props();
@@ -59,8 +59,23 @@
 	const finalAttendees = $derived(rsvps.filter((r) => r.status === 'yes'));
 	const activitiesCount = $derived(activities.length);
 	const mealsCookedCount = $derived(mealSlots.filter((m) => m.assignedUserId).length);
-	const myPaid = $derived(userInvoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0));
-	const myOwed = $derived(userInvoices.filter((i) => i.status === 'due').reduce((s, i) => s + i.totalAmount, 0));
+	// One invoice per guest — totalAmount is the single cost, status is host's payment receipt note
+	const myInvoice = $derived(userInvoices[0] ?? null);
+	const myCost = $derived(myInvoice?.totalAmount ?? null);
+	const isPaid = $derived(myInvoice?.status === 'paid');
+
+	interface InvoiceBreakdown {
+		rooms: { roomName: string; bedType?: string; amount: number; nights: number }[];
+		meals?: { label: string; amount: number; partySize: number; perPerson: number }[];
+		activities: { activityName: string; amount: number }[];
+		extras: { label: string; amount: number; quantity: number }[];
+		total: number;
+	}
+	const breakdown = $derived.by((): InvoiceBreakdown | null => {
+		if (!myInvoice?.breakdownJson) return null;
+		try { return JSON.parse(myInvoice.breakdownJson) as InvoiceBreakdown; }
+		catch { return null; }
+	});
 	const coverPhoto = $derived(trip?.listingCoverPhoto ?? null);
 	const tripLocation = $derived((trip?.location ?? '').trim());
 	const displayTripName = $derived((trip?.name ?? '').trim() || 'Trip Recap');
@@ -352,26 +367,86 @@
 			<div class="r-card-head">
 				<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v.5"/><path d="M12 6v.5"/></svg>
 				<h3>Cost summary</h3>
-			</div>
-			<div class="r-receipt">
-				<div class="r-receipt-row">
-					<span>You owed</span>
-					<span class="r-receipt-val">{myOwed > 0 ? `$${myOwed.toFixed(2)}` : '—'}</span>
-				</div>
-				<div class="r-receipt-line"></div>
-				<div class="r-receipt-row">
-					<span>You paid</span>
-					<span class="r-receipt-val r-receipt-paid">{myPaid > 0 ? `$${myPaid.toFixed(2)}` : '—'}</span>
-				</div>
-				{#if isHost && totalCost > 0}
-					<div class="r-receipt-line r-receipt-line--thick"></div>
-					<div class="r-receipt-row r-receipt-row--total">
-						<span>Total trip cost</span>
-						<span class="r-receipt-val">${totalCost.toFixed(2)}</span>
-					</div>
+				{#if myCost !== null}
+					{#if isPaid}
+						<span class="r-cost-badge r-cost-badge--paid" style="margin-left:auto">
+							<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+							Paid
+						</span>
+					{:else}
+						<span class="r-cost-badge r-cost-badge--unpaid" style="margin-left:auto">Unpaid</span>
+					{/if}
 				{/if}
 			</div>
-			<a href="/trips/{tripId}/guests" class="r-card-link">Full payment details →</a>
+
+			{#if myCost !== null}
+				{#if breakdown}
+					<ul class="r-breakdown">
+						<!-- Rooms -->
+						{#each breakdown.rooms as room}
+							<li class="r-breakdown-item">
+								<div class="r-breakdown-left">
+									<span class="r-breakdown-name">{room.roomName}{room.bedType ? ` – ${room.bedType}` : ''}</span>
+									<span class="r-breakdown-sub">{room.nights} night{room.nights === 1 ? '' : 's'}</span>
+								</div>
+								<span class="r-breakdown-amt">${room.amount.toFixed(2)}</span>
+							</li>
+						{/each}
+						<!-- Meal sharing / food fund -->
+						{#each breakdown.meals ?? [] as meal}
+							<li class="r-breakdown-item r-breakdown-item--meal">
+								<div class="r-breakdown-left">
+									<span class="r-breakdown-name">🍽 {meal.label}</span>
+									<span class="r-breakdown-sub">${meal.perPerson.toFixed(2)} × {meal.partySize} guest{meal.partySize === 1 ? '' : 's'}</span>
+								</div>
+								<span class="r-breakdown-amt">${meal.amount.toFixed(2)}</span>
+							</li>
+						{/each}
+						<!-- Activities -->
+						{#each breakdown.activities as act}
+							{#if act.amount > 0}
+								<li class="r-breakdown-item">
+									<div class="r-breakdown-left">
+										<span class="r-breakdown-name">{act.activityName}</span>
+										<span class="r-breakdown-sub">activity fee</span>
+									</div>
+									<span class="r-breakdown-amt">${act.amount.toFixed(2)}</span>
+								</li>
+							{/if}
+						{/each}
+						<!-- Extras -->
+						{#each breakdown.extras as extra}
+							<li class="r-breakdown-item">
+								<div class="r-breakdown-left">
+									<span class="r-breakdown-name">{extra.label}</span>
+									{#if extra.quantity > 1}<span class="r-breakdown-sub">×{extra.quantity}</span>{/if}
+								</div>
+								<span class="r-breakdown-amt">${extra.amount.toFixed(2)}</span>
+							</li>
+						{/each}
+					</ul>
+					<div class="r-breakdown-total">
+						<span>Your total</span>
+						<span>${myCost.toFixed(2)}</span>
+					</div>
+				{:else}
+					<!-- No breakdown JSON — just show the total -->
+					<div class="r-cost-main">
+						<span class="r-cost-amount">${myCost.toFixed(2)}</span>
+						<span class="r-cost-label">your trip cost</span>
+					</div>
+				{/if}
+			{:else}
+				<p class="r-empty">No cost on record.</p>
+			{/if}
+
+			{#if isHost && totalCost > 0}
+				<div class="r-receipt-row r-receipt-row--total">
+					<span>Total trip cost</span>
+					<span class="r-receipt-val">${totalCost.toFixed(2)}</span>
+				</div>
+			{/if}
+			<a href="/trips/{tripId}/guests" class="r-card-link">View all payments →</a>
 		</section>
 
 		<!-- ACTIVITIES (left half) -->
@@ -721,20 +796,61 @@
 		overflow: hidden; text-overflow: ellipsis; max-width: 56px;
 	}
 
-	/* ── Receipt ── */
-	.r-receipt { display: flex; flex-direction: column; gap: 0; flex: 1; }
+	/* ── Cost card ── */
+	.r-cost-badge {
+		display: inline-flex; align-items: center; gap: 0.3rem;
+		font-size: 0.6875rem; font-weight: 700;
+		padding: 0.2rem 0.55rem; border-radius: 9999px; flex-shrink: 0;
+	}
+	.r-cost-badge--paid { background: rgba(34,197,94,0.12); color: #16a34a; }
+	.r-cost-badge--unpaid { background: rgba(239,68,68,0.1); color: #dc2626; }
+
+	/* Fallback (no breakdown JSON) */
+	.r-cost-main {
+		display: flex; flex-direction: column; align-items: center;
+		gap: 0.15rem; padding: 0.5rem 0;
+	}
+	.r-cost-amount {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 2rem; font-weight: 800; line-height: 1;
+		letter-spacing: -0.04em; color: var(--warm);
+	}
+	.r-cost-label {
+		font-size: 0.6875rem; font-weight: 700;
+		text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+	}
+
+	/* Itemized breakdown */
+	.r-breakdown {
+		list-style: none; margin: 0; padding: 0;
+		display: flex; flex-direction: column; gap: 0; flex: 1;
+	}
+	.r-breakdown-item {
+		display: flex; align-items: flex-start; justify-content: space-between;
+		gap: 0.5rem; padding: 0.4rem 0;
+		border-bottom: 1px solid var(--border-soft);
+	}
+	.r-breakdown-item:last-child { border-bottom: none; }
+	.r-breakdown-item--meal { background: rgba(47,119,120,0.04); margin: 0 -0.25rem; padding: 0.4rem 0.25rem; border-radius: 6px; border-bottom: none; }
+	.r-breakdown-left { display: flex; flex-direction: column; gap: 0.05rem; min-width: 0; }
+	.r-breakdown-name { font-size: 0.875rem; font-weight: 600; color: var(--text); }
+	.r-breakdown-sub { font-size: 0.75rem; color: var(--muted); }
+	.r-breakdown-amt { font-size: 0.875rem; font-weight: 700; color: var(--text); flex-shrink: 0; }
+	.r-breakdown-total {
+		display: flex; justify-content: space-between; align-items: center;
+		padding: 0.5rem 0 0; margin-top: 0.25rem;
+		border-top: 2px solid var(--border);
+		font-size: 0.9375rem; font-weight: 800; color: var(--text);
+	}
+
+	/* Host total row */
 	.r-receipt-row {
 		display: flex; justify-content: space-between; align-items: center;
 		font-size: 0.875rem; color: var(--text);
-		padding: 0.4rem 0;
-		border-bottom: 1px solid var(--border-soft);
+		padding: 0.4rem 0; border-top: 1px dashed var(--border); margin-top: 0.25rem;
 	}
-	.r-receipt-row:last-child { border-bottom: none; }
 	.r-receipt-row--total { font-weight: 700; }
 	.r-receipt-val { font-weight: 600; }
-	.r-receipt-paid { color: #22c55e; }
-	.r-receipt-line { border: none; border-top: 1px dashed var(--border); margin: 0.2rem 0; }
-	.r-receipt-line--thick { border-top: 2px dashed var(--border); }
 
 	/* ── Activities list ── */
 	.r-list { list-style: none; margin: 0; padding: 0; flex: 1; display: flex; flex-direction: column; gap: 0; }

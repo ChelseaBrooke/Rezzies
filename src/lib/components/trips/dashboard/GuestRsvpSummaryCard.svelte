@@ -121,14 +121,7 @@
 			{#if peopleCount > 0}
 				<div class="detail-block">
 					<span class="detail-label">Party size</span>
-					<span class="detail-value">
-						{peopleCount} {peopleCount === 1 ? 'person' : 'people'}
-						{#if (userRsvp?.adultsCount ?? 0) > 0}
-							<span class="detail-sub">
-								({userRsvp?.adultsCount} adult{(userRsvp?.adultsCount ?? 0) === 1 ? '' : 's'}{(userRsvp?.kidsCount ?? 0) > 0 ? `, ${userRsvp?.kidsCount} kid${(userRsvp?.kidsCount ?? 0) === 1 ? '' : 's'}` : ''})
-							</span>
-						{/if}
-					</span>
+					<span class="detail-value">{peopleCount} {peopleCount === 1 ? 'person' : 'people'}</span>
 				</div>
 			{/if}
 
