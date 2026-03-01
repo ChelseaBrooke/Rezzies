@@ -153,7 +153,7 @@
 </script>
 
 {#if trip}
-	{#if dashboardMode !== 'vacation'}
+	{#if dashboardMode === 'planning'}
 		<TripHero
 			trip={{
 				id: trip.id,
@@ -212,14 +212,16 @@
 			{myAssignments}
 		/>
 		{:else if dashboardMode === 'recap'}
-			<RecapModeView
-				tripId={trip.id}
-				isHost={false}
-				trip={{
-					name: trip.name,
-					checkInDate: trip.checkInDate,
-					checkOutDate: trip.checkOutDate
-				}}
+		<RecapModeView
+			tripId={trip.id}
+			isHost={false}
+			trip={{
+				name: trip.name,
+				checkInDate: trip.checkInDate,
+				checkOutDate: trip.checkOutDate,
+				listingCoverPhoto: trip.listingCoverPhoto,
+				location: trip.location
+			}}
 				{activities}
 				{mealSlots}
 				{members}
