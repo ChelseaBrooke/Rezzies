@@ -306,6 +306,7 @@
 				houseRules: trip?.houseRules,
 				tripInfoEditedAt: trip?.tripInfoEditedAt
 			}}
+			tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
 		/>
 		{/if}
 {/if}

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import TripQuickActions from '$lib/components/trips/TripQuickActions.svelte';
-	import TripCalendarWidget from '$lib/components/trips/TripCalendarWidget.svelte';
 	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
 
 	interface Props {
@@ -50,6 +49,16 @@
 
 	const destinationLabel = $derived((trip.locationCity ?? trip.fullAddress ?? trip.location)?.trim() ?? '');
 	const isCompact = $derived(selectedMode === 'vacation' || selectedMode === 'recap');
+
+	const daysUntil = $derived.by(() => {
+		if (!checkInDate) return null;
+		const now = new Date();
+		now.setHours(0, 0, 0, 0);
+		const checkIn = new Date(checkInDate);
+		checkIn.setHours(0, 0, 0, 0);
+		const diff = Math.round((checkIn.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+		return diff > 0 ? diff : null;
+	});
 </script>
 
 {#if isCompact}
@@ -107,72 +116,62 @@
 	</div>
 {:else}
 	<!-- ═══ Full hero for Planning ═══ -->
-	<div class="hero-with-calendar">
-		<div class="trip-hero">
-			<div class="hero-image-wrap">
-				{#if trip.listingCoverPhoto}
-					<img src={trip.listingCoverPhoto} alt="" class="hero-image" />
-				{:else}
-					<div class="hero-placeholder"></div>
-				{/if}
-				{#if rsvpUrl}
-					<a href={rsvpUrl} class="hero-rsvp-button">RSVP</a>
-				{/if}
-				<div class="hero-overlay">
-					<div class="hero-content">
-					<h1 class="hero-name">{trip.name ?? 'Trip'}</h1>
-					<div class="hero-subline">
-						{#if calendarAddUrl}
-							<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Add to calendar">
-								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-								<span>{dateRange}</span>
+	<div class="trip-hero">
+		<div class="hero-image-wrap">
+			{#if trip.listingCoverPhoto}
+				<img src={trip.listingCoverPhoto} alt="" class="hero-image" />
+			{:else}
+				<div class="hero-placeholder"></div>
+			{/if}
+			{#if rsvpUrl}
+				<a href={rsvpUrl} class="hero-rsvp-button">RSVP</a>
+			{/if}
+			{#if daysUntil !== null}
+				<div class="hero-countdown" aria-label="{daysUntil} days until the trip">
+					<span class="hero-countdown-num">{daysUntil}</span>
+					<span class="hero-countdown-unit">day{daysUntil === 1 ? '' : 's'}</span>
+					<span class="hero-countdown-label">to go</span>
+				</div>
+			{/if}
+			<div class="hero-overlay">
+				<div class="hero-content">
+				<h1 class="hero-name">{trip.name ?? 'Trip'}</h1>
+				<div class="hero-subline">
+					{#if calendarAddUrl}
+						<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Add to calendar">
+							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+							<span>{dateRange}</span>
+						</a>
+					{:else}
+						<span class="hero-meta-text">
+							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+							<span>{dateRange}</span>
+						</span>
+					{/if}
+					{#if destinationLabel}
+						{#if mapsUrl}
+							<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Open in Google Maps">
+								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+								<span>{destinationLabel}</span>
 							</a>
 						{:else}
 							<span class="hero-meta-text">
-								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-								<span>{dateRange}</span>
+								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+								<span>{destinationLabel}</span>
 							</span>
 						{/if}
-						{#if destinationLabel}
-							{#if mapsUrl}
-								<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Open in Google Maps">
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-									<span>{destinationLabel}</span>
-								</a>
-							{:else}
-								<span class="hero-meta-text">
-									<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-									<span>{destinationLabel}</span>
-								</span>
-							{/if}
-						{/if}
-					</div>
-					<div class="hero-center-actions">
-						<TripQuickActions
-							tripId={trip.id}
-							{inviteCode}
-							onInvite={quickActions.onInvite}
-							showToast={quickActions.showToast}
-							{isHost}
-						/>
-					</div>
+					{/if}
 				</div>
-				</div>
-			</div>
-		</div>
-		<div class="hero-calendar-layer">
-			<div class="hero-calendar-outer">
-				<div class="hero-calendar-back" aria-hidden="true"></div>
-				<div class="hero-calendar-wrap">
-					<TripCalendarWidget
+				<div class="hero-center-actions">
+					<TripQuickActions
 						tripId={trip.id}
-						placement="sidebar"
-						{checkInDate}
-						{checkOutDate}
-						{activities}
-						{mealSlots}
+						{inviteCode}
+						onInvite={quickActions.onInvite}
+						showToast={quickActions.showToast}
+						{isHost}
 					/>
 				</div>
+			</div>
 			</div>
 		</div>
 	</div>
@@ -323,14 +322,8 @@
 	/* ════════════════════════════════════
 	   FULL HERO (Planning)
 	   ════════════════════════════════════ */
-	.hero-with-calendar {
-		position: relative;
-		width: 100%;
-		overflow: visible;
-		margin-top: 3rem;
-	}
-
 	.trip-hero {
+		margin-top: 3rem;
 		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
 		border-radius: var(--radius-3xl);
 		overflow: hidden;
@@ -381,7 +374,7 @@
 		font-weight: 700;
 		letter-spacing: 0.02em;
 		color: white;
-		background: var(--copper, #bf4e30);
+		background: var(--warm);
 		border: none;
 		border-radius: var(--radius-lg, 12px);
 		text-decoration: none;
@@ -394,6 +387,61 @@
 		color: white;
 	}
 
+	/* ── Countdown badge ── */
+	.hero-countdown {
+		position: absolute;
+		top: 1.25rem;
+		right: 1.25rem;
+		z-index: 2;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.05rem;
+		background: rgba(0, 0, 0, 0.42);
+		backdrop-filter: blur(20px);
+		-webkit-backdrop-filter: blur(20px);
+		border: 1px solid rgba(255, 255, 255, 0.22);
+		border-radius: 1.25rem;
+		padding: 1.125rem 1.625rem 1rem;
+		box-shadow:
+			0 8px 32px rgba(0, 0, 0, 0.3),
+			inset 0 1px 0 rgba(255, 255, 255, 0.12);
+		min-width: 96px;
+		text-align: center;
+		pointer-events: none;
+		user-select: none;
+	}
+
+	.hero-countdown-num {
+		font-size: 4.25rem;
+		font-weight: 800;
+		line-height: 1;
+		color: white;
+		letter-spacing: -0.04em;
+		font-variant-numeric: tabular-nums;
+		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+	}
+
+	.hero-countdown-unit {
+		font-size: 0.875rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--warm);
+		margin-top: 0.3rem;
+		line-height: 1;
+	}
+
+	.hero-countdown-label {
+		font-size: 0.625rem;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: rgba(255, 255, 255, 0.5);
+		line-height: 1;
+		margin-top: 0.15rem;
+	}
+
 	.hero-overlay {
 		position: absolute;
 		inset: 0;
@@ -404,205 +452,6 @@
 		justify-content: center;
 		align-items: center;
 		padding: 1.5rem 2rem;
-	}
-
-	.hero-calendar-layer {
-		position: absolute;
-		top: -3rem;
-		right: 6rem;
-		left: auto;
-		display: flex;
-		flex-direction: row;
-		align-items: flex-start;
-		gap: 1rem;
-		z-index: 2;
-		pointer-events: none;
-	}
-
-	.hero-calendar-layer > * {
-		pointer-events: auto;
-	}
-
-	.hero-calendar-outer {
-		position: relative;
-		width: 300px;
-		min-width: 300px;
-		min-height: 300px;
-	}
-
-	.hero-calendar-back {
-		position: absolute;
-		inset: 0;
-		border-radius: 12px;
-		border: none;
-		background: var(--bg);
-		z-index: 0;
-		box-shadow: 8px -4px 20px rgba(0, 27, 46, 0.04);
-	}
-
-	.hero-calendar-wrap {
-		position: relative;
-		z-index: 1;
-		border-radius: 12px;
-		border: none;
-		padding: 0.75rem 0.5rem;
-		width: 100%;
-		min-height: 300px;
-		font-size: 0.8125rem;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-		background: transparent;
-	}
-
-	.hero-calendar-wrap :global(.calendar-sidebar) {
-		flex: 1;
-		min-height: 0;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-		background: var(--bg) !important;
-		box-shadow: none !important;
-		border: none !important;
-		outline: none;
-		padding: 0;
-		min-width: 0;
-		justify-content: space-between;
-		gap: 0.5rem;
-	}
-
-	.hero-calendar-wrap :global(.day-detail-view) {
-		overflow-y: auto;
-		min-height: 0;
-		flex: 1;
-	}
-
-	.hero-calendar-wrap :global(.month-calendar.sidebar-style) {
-		font-size: inherit;
-		display: flex;
-		flex-direction: column;
-		gap: 0.625rem;
-		flex: 1;
-		min-height: 0;
-	}
-
-	.hero-calendar-wrap :global(.month-calendar.sidebar-style .days-grid) {
-		flex: 1;
-		min-height: 0;
-		align-content: space-evenly;
-		grid-auto-rows: minmax(28px, 1fr);
-		gap: 4px;
-	}
-
-	.hero-calendar-wrap :global(.month-header) {
-		margin-bottom: 0;
-		color: var(--text);
-	}
-
-	.hero-calendar-wrap :global(.month-title) {
-		font-size: 1.0625rem;
-		font-weight: 700;
-		color: var(--text);
-	}
-
-	.hero-calendar-wrap :global(.day-headers) {
-		margin-bottom: 0;
-	}
-
-	.hero-calendar-wrap :global(.day-header) {
-		font-size: 0.7rem;
-		color: var(--copper);
-	}
-
-	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell) {
-		font-size: 0.75rem;
-		color: var(--muted);
-		background: transparent;
-	}
-
-	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell.trip-day) {
-		background: rgba(191, 78, 48, 0.25);
-		color: var(--copper);
-	}
-
-	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell.trip-day:hover) {
-		background: rgba(191, 78, 48, 0.4);
-		color: var(--copper);
-	}
-
-	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell.trip-day.selected) {
-		background: var(--copper, #BF4E30);
-		color: white;
-	}
-
-	.hero-calendar-wrap :global(.calendar-sidebar .day-cell.sidebar-cell.trip-day.selected:hover) {
-		background: var(--primaryHover, #A03D24);
-		color: white;
-	}
-
-	.hero-calendar-wrap :global(.month-chevron-btn) {
-		color: var(--text);
-	}
-
-	.hero-calendar-wrap :global(.month-chevron-btn:hover:not(:disabled)) {
-		background: var(--border-soft);
-		color: var(--text);
-	}
-
-	.hero-calendar-wrap :global(.day-detail-hint) {
-		color: var(--muted);
-		font-size: 0.7rem;
-		opacity: 0.95;
-	}
-
-	.hero-calendar-wrap :global(.day-detail-back) {
-		color: var(--primary);
-	}
-
-	.hero-calendar-wrap :global(.day-detail-title) {
-		color: var(--text);
-	}
-
-	.hero-calendar-wrap :global(.day-detail-empty),
-	.hero-calendar-wrap :global(.day-detail-label) {
-		color: var(--muted);
-	}
-
-	.hero-calendar-wrap :global(.day-detail-item) {
-		color: var(--text);
-		border-bottom-color: var(--border);
-	}
-
-	.hero-calendar-wrap :global(.day-detail-ctas) {
-		border-top-color: var(--border);
-	}
-
-	.hero-calendar-wrap :global(.day-detail-cta) {
-		background: var(--primary);
-		border: 1px solid var(--primary);
-		color: white;
-	}
-
-	.hero-calendar-wrap :global(.day-detail-cta:hover) {
-		background: var(--primaryHover);
-		border-color: var(--primaryHover);
-	}
-
-	.hero-calendar-wrap :global(.calendar-empty-msg) {
-		color: var(--muted);
-	}
-
-	.hero-calendar-wrap :global(.calendar-empty-msg a) {
-		color: var(--primary);
-		text-decoration: underline;
-	}
-
-	.hero-calendar-wrap :global(.day-detail-item .item-title) {
-		color: var(--text);
-	}
-
-	.hero-calendar-wrap :global(.day-detail-item .item-meta) {
-		color: var(--muted);
 	}
 
 	.hero-content {

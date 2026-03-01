@@ -273,6 +273,7 @@
 				parkingNotes: trip?.parkingNotes,
 				houseRules: trip?.houseRules
 			}}
+			tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
 		/>
 		{/if}
 {/if}

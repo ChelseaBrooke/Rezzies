@@ -65,10 +65,10 @@
 		border-radius: var(--radius-2xl);
 		box-shadow: var(--shadow-soft);
 		border: 1px solid var(--border-soft);
-		padding: 0.5rem 0.625rem;
+		padding: 1rem 1.125rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.375rem;
+		gap: 0.5rem;
 		transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 		min-width: 0;
 		overflow: hidden;
