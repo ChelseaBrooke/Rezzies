@@ -39,6 +39,15 @@
 		dbFiles.filter(f => f.mimeType?.startsWith('image/') && f.category !== 'receipt')
 	);
 
+	// Receipts for quick-view section
+	const receipts = $derived(dbFiles.filter(f => f.category === 'receipt'));
+
+	// All photos (DB + local uploads) for gallery grid
+	const allPhotos = $derived([
+		...dbPhotos.map(f => ({ id: f.id, url: f.url, name: f.name })),
+		...photos
+	]);
+
 	function formatSize(bytes: number | null): string {
 		if (!bytes) return '';
 		if (bytes < 1024) return `${bytes} B`;
@@ -182,7 +191,6 @@
 	</section>
 
 	<!-- Receipts section (quick view) -->
-	{@const receipts = dbFiles.filter(f => f.category === 'receipt')}
 	{#if receipts.length > 0}
 		<section class="section">
 			<h2 class="section-title">Meal receipts</h2>
@@ -234,7 +242,6 @@
 					/>
 				</label>
 
-				{@const allPhotos = [...dbPhotos.map(f => ({ id: f.id, url: f.url, name: f.name })), ...photos]}
 				{#if allPhotos.length > 0}
 					<div class="photo-grid" role="list">
 						{#each allPhotos as photo (photo.id)}
