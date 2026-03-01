@@ -989,7 +989,7 @@
 		position: absolute;
 		top: 0.75rem;
 		right: 0.75rem;
-		background: rgba(0, 27, 46, 0.75);
+		background: rgba(20, 56, 41, 0.75);
 		color: white;
 		padding: 0.25rem 0.625rem;
 		border-radius: 100px;

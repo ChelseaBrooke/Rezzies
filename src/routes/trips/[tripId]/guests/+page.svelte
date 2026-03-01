@@ -1268,7 +1268,7 @@
 	.btn-secondary { padding: 0.5rem 1rem; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; font-size: 0.875rem; }
 	.btn-danger { padding: 0.5rem 1rem; background: var(--error, #b91c1c); color: white; border: none; border-radius: var(--radius-md); font-weight: 500; cursor: pointer; }
 
-	.modal-backdrop { position: fixed; inset: 0; background: rgba(0, 27, 46, 0.3); z-index: 100; }
+	.modal-backdrop { position: fixed; inset: 0; background: rgba(20, 56, 41, 0.3); z-index: 100; }
 	.modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow-xl); z-index: 101; min-width: 20rem; }
 	.modal h2 { margin: 0 0 0.75rem 0; font-size: 1.25rem; }
 	.modal p { margin: 0 0 1rem 0; font-size: 0.875rem; }

@@ -2,7 +2,6 @@
 	import DashboardCard from './DashboardCard.svelte';
 	import TripGoalsCombined from './TripGoalsCombined.svelte';
 	import TripInfoCard from './TripInfoCard.svelte';
-	import Checklist from './Checklist.svelte';
 	import GuestRsvpSummaryCard from './GuestRsvpSummaryCard.svelte';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
@@ -150,6 +149,11 @@
 			</svg>
 		</span>
 	{/snippet}
+	{#snippet activityIcon()}
+		<span class="activity-icon" aria-hidden="true">
+			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>
+		</span>
+	{/snippet}
 	{#snippet guestsNudgeButton()}
 		<button type="button" class="pill-btn pill-btn-text" onclick={nudgePending}>
 			Nudge pending
@@ -166,6 +170,7 @@
 					<DashboardCard
 						variant="sticky"
 						title="Progress"
+						headerLeft={stickyPinIcon}
 						headerRight={progressViewDetailButton}
 					>
 						<TripGoalsCombined
@@ -189,7 +194,7 @@
 						/>
 					</DashboardCard>
 				{:else}
-					<DashboardCard variant="sticky" title="Your RSVP">
+					<DashboardCard variant="sticky" title="Your RSVP" headerLeft={stickyPinIcon}>
 						<GuestRsvpSummaryCard
 							tripId={tripId}
 							{userRsvp}
@@ -224,11 +229,45 @@
 
 		<div class="recent-cell">
 			<DashboardCard
-				title="Reminders"
-				headerLeft={stickyPinIcon}
+				title="Recent Activity"
+				headerLeft={activityIcon}
 			>
-				<div class="sticky-content">
-					<Checklist role={isHost ? 'host' : 'guest'} {tripId} {currentUserId} computedStats={checklistStats} />
+				<div class="activity-feed">
+					{#each rsvps.slice(0, 6) as rsvp}
+						{#if rsvp.user?.name}
+							<div class="activity-item">
+								<span class="activity-avatar">
+									{rsvp.user.name.trim().split(/\s+/).map((p: string) => p[0]).slice(0, 2).join('').toUpperCase()}
+								</span>
+								<div class="activity-text">
+									<span class="activity-name">{rsvp.user.name.split(' ')[0]}</span>
+									<span class="activity-action">
+										{#if rsvp.status === 'yes'} joined the trip
+										{:else if rsvp.status === 'no'} declined
+										{:else} is pending
+										{/if}
+									</span>
+								</div>
+								<span class="activity-badge activity-badge-{rsvp.status}">
+									{#if rsvp.status === 'yes'}✓{:else if rsvp.status === 'no'}✕{:else}…{/if}
+								</span>
+							</div>
+						{/if}
+					{/each}
+					{#if nextUpcomingItem}
+						<div class="activity-item activity-item-upcoming">
+							<span class="activity-avatar activity-avatar-event">
+								<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+							</span>
+							<div class="activity-text">
+								<span class="activity-name">Up next</span>
+								<span class="activity-action">{nextUpcomingItem.title}</span>
+							</div>
+						</div>
+					{/if}
+					{#if rsvps.length === 0 && !nextUpcomingItem}
+						<p class="activity-empty">Activity will appear here as guests respond.</p>
+					{/if}
 				</div>
 			</DashboardCard>
 		</div>
@@ -346,12 +385,15 @@
 		flex-direction: column;
 	}
 
-	/* Col 3, Rows 1–2 — Progress / RSVP sidebar, spans full height */
+	/* Col 3, Rows 1–2 — Recent Activity sidebar, spans full height */
 	.recent-cell {
 		grid-column: 3;
 		grid-row: 1 / 3;
 		min-width: 0;
-		align-self: start;
+		align-self: stretch;
+		display: flex;
+		flex-direction: column;
+		padding-bottom: 2.5rem;
 	}
 
 	/* Cols 1–2, Row 2 — Guests, spans under Reminders + Trip Info */
@@ -374,9 +416,25 @@
 		min-height: 0;
 	}
 
-	/* Reminders card — plain white, same as Trip Info + Guests */
+	/* Recent Activity card — stretches full column height */
 	.recent-cell :global(.dashboard-card) {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
 		min-height: 0;
+	}
+
+	.recent-cell :global(.card-body) {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	.recent-cell .activity-feed {
+		flex: 1;
+		overflow-y: auto;
 	}
 
 	.guests-card-wrapper {
@@ -388,19 +446,22 @@
 		min-width: 0;
 	}
 
-	/* Progress sticky: overlaps hero, orange-tinted at same opacity as old yellow */
+	/* Progress sticky: overlaps hero, multi-tone with dimension */
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
 		max-height: 580px;
 		min-height: 440px;
 		width: 100%;
 		overflow-y: auto;
 		padding: 1rem 1.125rem;
-		background: linear-gradient(
-			to bottom,
-			rgba(191, 78, 48, 0.82) 0%,
-			rgba(191, 78, 48, 0.92) 55%,
-			rgba(172, 62, 35, 0.97) 100%
-		);
+		background:
+			radial-gradient(ellipse at 15% 10%, rgba(247, 170, 41, 0.28) 0%, transparent 55%),
+			radial-gradient(ellipse at 85% 90%, rgba(165, 68, 14, 0.35) 0%, transparent 50%),
+			linear-gradient(
+				158deg,
+				rgba(206, 86, 18, 0.62) 0%,
+				rgba(206, 86, 18, 0.72) 55%,
+				rgba(165, 68, 14, 0.80) 100%
+			);
 	}
 
 	.sticky-card-wrapper :global(.card-header) {
@@ -419,6 +480,8 @@
 
 	/* All Progress / RSVP content white on solid orange */
 	.sticky-card-wrapper :global(.card-title) { color: white; }
+	.sticky-card-wrapper :global(.pin-circle) { background: rgba(255, 255, 255, 0.22); }
+	.sticky-card-wrapper :global(.pin-svg) { color: white; stroke: white; }
 	.sticky-card-wrapper :global(.view-detail-btn) {
 		color: rgba(255, 255, 255, 0.85);
 		background: rgba(255, 255, 255, 0.15);
@@ -518,6 +581,127 @@
 		gap: 1.25rem;
 		flex: 1;
 		min-height: 0;
+	}
+
+	/* ── Recent Activity feed ── */
+	.activity-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		background: var(--slate);
+		color: white;
+		flex-shrink: 0;
+	}
+
+	.activity-icon svg {
+		display: block;
+	}
+
+	.activity-feed {
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+	}
+
+	.activity-item {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		padding: 0.5rem 0;
+		border-bottom: 1px solid var(--border-soft);
+	}
+
+	.activity-item:last-child {
+		border-bottom: none;
+	}
+
+	.activity-avatar {
+		width: 30px;
+		height: 30px;
+		border-radius: 50%;
+		background: var(--surface2);
+		border: 1px solid var(--border-soft);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		color: var(--slate);
+		flex-shrink: 0;
+	}
+
+	.activity-avatar-event {
+		background: rgba(247, 170, 41, 0.15);
+		border-color: rgba(247, 170, 41, 0.3);
+		color: var(--carrot);
+	}
+
+	.activity-text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.05rem;
+	}
+
+	.activity-name {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--text);
+		line-height: 1.3;
+	}
+
+	.activity-action {
+		font-size: 0.75rem;
+		color: var(--muted);
+		line-height: 1.3;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.activity-badge {
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.625rem;
+		font-weight: 700;
+		flex-shrink: 0;
+	}
+
+	.activity-badge-yes {
+		background: rgba(47, 119, 120, 0.12);
+		color: var(--slate);
+	}
+
+	.activity-badge-no {
+		background: rgba(165, 68, 14, 0.1);
+		color: var(--chocolate);
+	}
+
+	.activity-badge-pending {
+		background: rgba(247, 170, 41, 0.15);
+		color: #b07b10;
+	}
+
+	.activity-item-upcoming {
+		padding-top: 0.625rem;
+		margin-top: 0.125rem;
+	}
+
+	.activity-empty {
+		font-size: 0.8125rem;
+		color: var(--muted);
+		text-align: center;
+		padding: 1.5rem 0;
+		margin: 0;
+		opacity: 0.7;
 	}
 
 	.sticky-card-icon {

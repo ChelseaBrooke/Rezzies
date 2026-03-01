@@ -108,7 +108,8 @@
 	}
 
 	.card-title {
-		font-size: 0.9375rem;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1rem;
 		font-weight: 600;
 		color: var(--text);
 		margin: 0;

@@ -44,7 +44,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: linear-gradient(135deg, #001B2E 0%, #294C60 50%, #001B2E 100%);
+		background: linear-gradient(135deg, #1d4d4e 0%, #2F7778 50%, #1d4d4e 100%);
 		z-index: -1;
 	}
 
@@ -54,7 +54,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: rgba(0, 27, 46, 0.5);
+		background: rgba(10, 18, 22, 0.45);
 		z-index: 1;
 	}
 </style>

@@ -91,7 +91,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: linear-gradient(135deg, #001B2E 0%, #294C60 50%, #001B2E 100%);
+		background: linear-gradient(135deg, #1d4d4e 0%, #2F7778 50%, #1d4d4e 100%);
 		z-index: -1;
 	}
 
@@ -104,9 +104,9 @@
 		/* Bottom-heavy gradient so the landscape stays visible; text sits in the dark band */
 		background: linear-gradient(
 			to top,
-			rgba(0, 27, 46, 0.92) 0%,
-			rgba(0, 27, 46, 0.5) 35%,
-			rgba(0, 27, 46, 0.15) 60%,
+			rgba(10, 18, 22, 0.88) 0%,
+			rgba(10, 18, 22, 0.38) 32%,
+			rgba(10, 18, 22, 0.05) 58%,
 			transparent 100%
 		);
 		z-index: 1;
@@ -120,7 +120,7 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 1.5rem 2rem;
-		background: rgba(0, 27, 46, 0.25);
+		background: rgba(10, 18, 22, 0.22);
 		backdrop-filter: blur(10px);
 	}
 
@@ -161,11 +161,11 @@
 	}
 
 	.header-btn-primary {
-		background: var(--copper, #BF4E30);
+		background: var(--warm);
 		color: white;
 	}
 	.header-btn-primary:hover {
-		background: var(--primaryHover, #A03D24);
+		background: var(--chocolate);
 	}
 
 	.header-bell-wrap {
@@ -195,7 +195,7 @@
 		text-align: center;
 		max-width: 1280px;
 		padding: 1.5rem 2.5rem;
-		background: rgba(0, 27, 46, 0.12);
+		background: rgba(10, 18, 22, 0.1);
 		backdrop-filter: blur(10px);
 		-webkit-backdrop-filter: blur(10px);
 		border-radius: 12px;
@@ -216,11 +216,11 @@
 		line-height: 1.25;
 		letter-spacing: -0.02em;
 		color: #FFFBF7;
-		text-shadow: 0 1px 8px rgba(0, 27, 46, 0.35);
+		text-shadow: 0 1px 8px rgba(10, 18, 22, 0.45);
 	}
 
 	.hero-subheader .hero-divvi {
-		color: var(--copper, #BF4E30);
+		color: var(--carrot);
 		font-weight: 800;
 	}
 
@@ -237,7 +237,7 @@
 		line-height: 1.55;
 		letter-spacing: 0.02em;
 		color: rgba(255, 255, 255, 0.88);
-		text-shadow: 0 1px 4px rgba(0, 27, 46, 0.2);
+		text-shadow: 0 1px 4px rgba(10, 18, 22, 0.3);
 	}
 
 	.main-actions {
@@ -262,26 +262,26 @@
 	}
 
 	.action-btn.primary {
-		background: var(--copper, #BF4E30);
+		background: var(--slate);
 		color: white;
 		box-shadow: var(--shadow-md);
 	}
 
 	.action-btn.primary:hover {
-		background: var(--primaryHover, #A03D24);
+		background: var(--primaryHover);
 		transform: translateY(-2px);
 		box-shadow: var(--shadow-lg);
 	}
 
 	.action-btn.secondary {
-		background: rgba(41, 76, 96, 0.2);
+		background: rgba(47, 119, 120, 0.2);
 		color: white;
 		backdrop-filter: blur(10px);
 		border: 1px solid rgba(255, 255, 255, 0.25);
 	}
 
 	.action-btn.secondary:hover {
-		background: rgba(41, 76, 96, 0.35);
+		background: rgba(47, 119, 120, 0.35);
 		transform: translateY(-2px);
 	}
 

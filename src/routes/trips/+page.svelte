@@ -282,7 +282,7 @@
 	.trip-image-placeholder {
 		width: 100%;
 		height: 180px;
-		background: rgba(0, 27, 46, 0.4);
+		background: rgba(20, 56, 41, 0.4);
 		display: flex;
 		align-items: center;
 		justify-content: center;

@@ -1,15 +1,18 @@
-/* Divvi Design System - Neutral palette & semantic tokens
- * PALETTE: navy #001B2E | slate #294C60 | cool neutrals (no beige/copper).
- * Rules: page bg neutral gray; surfaces light gray/white; navy = headings/hero; slate = primary & borders.
+/* Divvi Design System - Coastal palette & semantic tokens
+ * PALETTE: alloy-orange #CE5612 | bright-yellow #F7AA29 | desert-sand #E3CEAA | middle-blue #7ACED3 | myrtle-green #2F7778
+ * Rules: page bg neutral light; surfaces white; myrtle-green = primary & borders; alloy-orange = CTAs & logo; yellow = accents.
  */
 :root {
 	/* Raw palette (use via semantic tokens) */
-	--navy: #001B2E;
-	--slate: #294C60;
-	--beige: #f2f3f5;
-	--copper: #294C60;
-	--warm: #BF4E30;
-	--chocolate: #732C2C;
+	--navy: #1d4d4e;
+	--slate: #2F7778;
+	--beige: #E3CEAA;
+	--copper: #2F7778;
+	--carrot: #F7AA29;
+	--warm: #CE5612;
+	--chocolate: #a5440e;
+	--sky: #7ACED3;
+	--sand: #E3CEAA;
 
 	/* Semantic tokens */
 	--bg: #f4f5f7;
@@ -18,14 +21,14 @@
 	--surface2: #eef0f3;
 	--text: #111827;
 	--muted: var(--slate);
-	--border: #294C6033;
-	--border-soft: rgba(17,24,39,0.06);
+	--border: #2F777833;
+	--border-soft: rgba(47,119,120,0.07);
 	--border-strong: var(--slate);
 	--primary: var(--slate);
-	--primaryHover: #1e3a4d;
-	--focusRing: rgba(41, 76, 96, 0.35);
+	--primaryHover: #245a5b;
+	--focusRing: rgba(47, 119, 120, 0.35);
 	--danger: var(--chocolate);
-	--dangerHover: #5A2222;
+	--dangerHover: #8a3a0b;
 	--sticky: #e8ecf0;
 
 	/* Legacy aliases for components that reference these */
@@ -58,12 +61,12 @@
 	--radius-3xl: 14px;
 
 	/* Shadows - subtle, premium */
-	--shadow-sm: 0 1px 2px 0 rgba(0, 27, 46, 0.04);
-	--shadow-md: 0 4px 6px -1px rgba(0, 27, 46, 0.06), 0 2px 4px -1px rgba(0, 27, 46, 0.04);
-	--shadow-lg: 0 10px 15px -3px rgba(0, 27, 46, 0.08), 0 4px 6px -2px rgba(0, 27, 46, 0.04);
-	--shadow-xl: 0 20px 25px -5px rgba(0, 27, 46, 0.08), 0 10px 10px -5px rgba(0, 27, 46, 0.03);
-	--shadow-soft: 0 10px 30px rgba(17,24,39,0.06);
-	--shadow-soft-hover: 0 14px 40px rgba(17,24,39,0.10);
+	--shadow-sm: 0 1px 2px 0 rgba(29, 77, 78, 0.05);
+	--shadow-md: 0 4px 6px -1px rgba(29, 77, 78, 0.07), 0 2px 4px -1px rgba(29, 77, 78, 0.04);
+	--shadow-lg: 0 10px 15px -3px rgba(29, 77, 78, 0.09), 0 4px 6px -2px rgba(29, 77, 78, 0.05);
+	--shadow-xl: 0 20px 25px -5px rgba(29, 77, 78, 0.09), 0 10px 10px -5px rgba(29, 77, 78, 0.04);
+	--shadow-soft: 0 10px 30px rgba(29,77,78,0.07);
+	--shadow-soft-hover: 0 14px 40px rgba(29,77,78,0.11);
 
 	/* Transitions */
 	--transition-fast: 150ms ease;

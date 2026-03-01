@@ -609,9 +609,10 @@
 		display: flex; flex-direction: column; gap: 0.25rem;
 	}
 	.v-hero-title {
+		font-family: 'Fraunces', Georgia, serif;
 		margin: 0;
 		font-size: clamp(1.5rem, 3.5vw, 2rem);
-		font-weight: 800; letter-spacing: -0.03em; line-height: 1.15;
+		font-weight: 700; letter-spacing: -0.03em; line-height: 1.15;
 		color: #fff;
 	}
 	.v-hero-meta {

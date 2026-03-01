@@ -214,11 +214,11 @@
 	.compact-overlay {
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(135deg, rgba(0, 27, 46, 0.7) 0%, rgba(41, 76, 96, 0.6) 100%);
+		background: linear-gradient(135deg, rgba(10, 18, 22, 0.65) 0%, rgba(47, 119, 120, 0.45) 100%);
 	}
 
 	.compact-hero.recap-mode .compact-overlay {
-		background: linear-gradient(135deg, rgba(0, 27, 46, 0.75) 0%, rgba(60, 40, 30, 0.6) 100%);
+		background: linear-gradient(135deg, rgba(10, 18, 22, 0.72) 0%, rgba(165, 68, 14, 0.45) 100%);
 	}
 
 	.compact-content {
@@ -239,6 +239,7 @@
 	}
 
 	.compact-name {
+		font-family: 'Fraunces', Georgia, serif;
 		margin: 0;
 		font-size: 1.75rem;
 		font-weight: 700;
@@ -465,7 +466,7 @@
 
 	.hero-name {
 		margin: 0;
-		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+		font-family: 'Fraunces', Georgia, serif;
 		font-size: 4rem;
 		font-weight: 700;
 		line-height: 1.1;

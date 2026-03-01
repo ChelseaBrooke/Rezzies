@@ -1021,7 +1021,7 @@
 		border-radius: 6px; color: #374151; font-size: .7rem;
 	}
 	.cal-day.empty { visibility: hidden; }
-	.cal-day.trip-day { background: rgba(41,76,96,.12); color: #294C60; font-weight: 600; }
+	.cal-day.trip-day { background: rgba(47,119,120,.12); color: var(--slate); font-weight: 600; }
 	.cal-day.today   {
 		color: #E85D26; font-weight: 700;
 		position: relative;
@@ -1065,14 +1065,15 @@
 	}
 	.schedule-header-left { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; justify-content: center; }
 	.schedule-date-range {
-		font-size: clamp(1.125rem, 2vw, 1.5rem); font-weight: 800; color: #1e293b;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: clamp(1.125rem, 2vw, 1.5rem); font-weight: 700; color: var(--text);
 		letter-spacing: -.02em; margin: 0;
 	}
 	.schedule-header-right { display: flex; align-items: center; gap: .75rem; justify-content: flex-end; }
 	/* ── Add Activity button ── */
 	.btn-add-activity {
 		padding: .42rem 1rem;
-		background: #E85D26;
+		background: var(--warm);
 		color: white;
 		border: none;
 		border-radius: 9px;
@@ -1232,9 +1233,9 @@
 	}
 	.footer-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
 	.footer-btn.footer-btn-active {
-		background: #001B2E; border-color: #001B2E; color: white;
+		background: var(--slate); border-color: var(--slate); color: white;
 	}
-	.footer-btn.footer-btn-active:hover { background: #0f2d45; border-color: #0f2d45; }
+	.footer-btn.footer-btn-active:hover { background: var(--primaryHover); border-color: var(--primaryHover); }
 
 	/* ── Hide-skipping toggle ── */
 	.skip-toggle {
@@ -1282,7 +1283,7 @@
 		display: flex; flex-direction: column; gap: 1rem;
 	}
 	.modal-header { display: flex; justify-content: space-between; align-items: center; }
-	.modal-title { font-size: 1.1rem; font-weight: 700; color: #001B2E; margin: 0; }
+	.modal-title { font-family: 'Fraunces', Georgia, serif; font-size: 1.1rem; font-weight: 700; color: var(--text); margin: 0; }
 	.modal-close {
 		background: none; border: none; cursor: pointer;
 		color: #94a3b8; font-size: 1.1rem; line-height: 1;

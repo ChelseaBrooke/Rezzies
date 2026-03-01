@@ -182,7 +182,7 @@
 	}
 
 	.card {
-		background: rgba(0, 27, 46, 0.85);
+		background: rgba(20, 56, 41, 0.85);
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
 		border-radius: 16px;

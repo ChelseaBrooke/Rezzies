@@ -73,7 +73,7 @@
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(135deg, #001b2e 0%, #294c60 50%, #001b2e 100%);
+		background: linear-gradient(135deg, #1d4d4e 0%, #2F7778 50%, #1d4d4e 100%);
 		z-index: -1;
 	}
 	.marketing-bg-overlay {
@@ -81,9 +81,9 @@
 		inset: 0;
 		background: linear-gradient(
 			to top,
-			rgba(0, 27, 46, 0.92) 0%,
-			rgba(0, 27, 46, 0.5) 35%,
-			rgba(0, 27, 46, 0.15) 60%,
+			rgba(10, 18, 22, 0.88) 0%,
+			rgba(10, 18, 22, 0.38) 32%,
+			rgba(10, 18, 22, 0.05) 58%,
 			transparent 100%
 		);
 		z-index: 1;
@@ -96,7 +96,7 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 1.5rem 2rem;
-		background: rgba(0, 27, 46, 0.25);
+		background: rgba(10, 18, 22, 0.22);
 		backdrop-filter: blur(10px);
 	}
 	.marketing-header-left,
@@ -122,10 +122,10 @@
 		background: rgba(255, 255, 255, 0.1);
 	}
 	.marketing-header-btn-primary {
-		background: var(--copper, #bf4e30);
+		background: var(--warm);
 	}
 	.marketing-header-btn-primary:hover {
-		background: var(--primaryHover, #a03d24);
+		background: var(--chocolate);
 	}
 	.marketing-icon-btn {
 		display: inline-flex;
@@ -170,7 +170,7 @@
 		margin: 0 auto;
 	}
 	.marketing-main :global(.marketing-card) {
-		background: rgba(0, 27, 46, 0.2);
+		background: rgba(10, 18, 22, 0.18);
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
 		border-radius: 12px;

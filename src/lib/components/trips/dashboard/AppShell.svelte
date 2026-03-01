@@ -216,12 +216,12 @@
 		width: 48px;
 		height: 48px;
 		border-radius: 50%;
-		background: #facc15;
+		background: var(--carrot);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		text-decoration: none;
-		transition: transform var(--transition-fast);
+		transition: transform var(--transition-fast), background var(--transition-fast);
 		flex-shrink: 0;
 		overflow: hidden;
 		padding: 6px;
@@ -230,7 +230,7 @@
 
 	.logo-button:hover {
 		transform: scale(1.05);
-		background: #fbbf24;
+		background: var(--warm);
 	}
 
 	.logo-img {
@@ -250,7 +250,7 @@
 	}
 
 	.rail-nav {
-		background: #d1d5db;
+		background: rgba(47, 119, 120, 0.1);
 		border-radius: 10px;
 		padding: 10px 0;
 		display: flex;
@@ -274,13 +274,13 @@
 	}
 
 	.rail-nav-item:hover {
-		background: rgba(0, 0, 0, 0.06);
-		color: #111827;
+		background: rgba(47, 119, 120, 0.12);
+		color: var(--navy);
 	}
 
 	.rail-nav-item.active {
-		background: rgba(0, 0, 0, 0.1);
-		color: #111827;
+		background: rgba(47, 119, 120, 0.2);
+		color: var(--navy);
 	}
 
 	.rail-nav-item-inner {

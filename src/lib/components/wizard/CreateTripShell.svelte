@@ -119,7 +119,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: rgba(0, 27, 46, 0.5);
+		background: rgba(10, 18, 22, 0.45);
 	}
 	
 	.main-card {
