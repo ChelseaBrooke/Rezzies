@@ -269,16 +269,16 @@ export const load: PageServerLoad = async ({ parent }) => {
 	}
 
 	const totalInvited = guestRows.length;
-	const withRoom = guestRows.filter((r) => r.roomId != null);
-	if (withRoom.length > 0) {
-		console.log('[guests load] rows with room:', withRoom.length, withRoom.map((r) => ({ userId: r.userId, roomId: r.roomId, roomName: r.roomName })));
-	}
 	const rooms =
 		trip?.rooms?.map((r) => ({
 			id: r.id,
 			name: r.name,
 			beds: (r.beds ?? []).map((b) => ({ id: b.id, bedType: b.bedType }))
 		})) ?? [];
+
+	// Max occupancy: trip-level setting, or sum of room max occupancies
+	const roomSum = trip?.rooms?.reduce((sum, r) => sum + (r.maxOccupancy ?? 0), 0) ?? 0;
+	const maxOccupancy = trip?.maxGuests ?? (roomSum > 0 ? roomSum : null);
 
 	let legacyReservations: { id: string; name: string; email: string; roomName: string; bedType: string | null; checkInDate: string; checkOutDate: string; nights: number; numberOfGuests: number; calculatedPrice: number; submittedAt: string }[] = [];
 	let legacyStats: { totalReservations: number; totalRevenue: number; totalNights: number; averagePrice: number } | null = null;
@@ -292,7 +292,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 			id: r.id,
 			name: r.name,
 			email: r.email,
-			roomName: r.room.name,
+			roomName: r.room?.name ?? '',
 			bedType: r.bed?.bedType ?? null,
 			checkInDate: r.checkInDate.toISOString(),
 			checkOutDate: r.checkOutDate.toISOString(),
@@ -331,6 +331,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 			notGoingCount,
 			unrespondedCount
 		},
+		maxOccupancy,
 		rooms,
 		invites,
 		isHost,
@@ -718,7 +719,7 @@ export const actions: Actions = {
 		const rows = trip.reservations.map((r) => [
 			r.name,
 			r.email,
-			r.room.name,
+			r.room?.name ?? '',
 			r.bed?.bedType ?? 'N/A',
 			new Date(r.checkInDate).toLocaleDateString(),
 			new Date(r.checkOutDate).toLocaleDateString(),

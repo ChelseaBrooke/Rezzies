@@ -30,6 +30,7 @@
 		checkOutDate?: string;
 		allowPartialStays: boolean;
 		onClose: () => void;
+		onRemove?: () => void;
 	}
 
 	let {
@@ -40,7 +41,8 @@
 		checkInDate = '',
 		checkOutDate = '',
 		allowPartialStays,
-		onClose
+		onClose,
+		onRemove
 	}: Props = $props();
 
 	let selectedBedIds = $state<string[]>([]);
@@ -193,9 +195,14 @@
 					</div>
 				{/if}
 
+				<div class="modal-actions modal-actions--top">
+					{#if onRemove && row.userId}
+						<button type="button" class="modal-btn modal-btn--danger-ghost" onclick={() => { onRemove(); }} disabled={saving}>Remove from trip</button>
+					{/if}
+				</div>
 				<div class="modal-actions">
-					<button type="button" class="btn-secondary" onclick={onClose} disabled={saving}>Cancel</button>
-					<button type="submit" class="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+					<button type="button" class="modal-btn modal-btn--ghost" onclick={onClose} disabled={saving}>Cancel</button>
+					<button type="submit" class="modal-btn modal-btn--primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
 				</div>
 			</form>
 		</div>
@@ -312,9 +319,60 @@
 	.modal-actions {
 		display: flex;
 		justify-content: flex-end;
-		gap: 0.75rem;
+		gap: 0.625rem;
 		margin-top: 0.5rem;
 		padding-top: 1rem;
 		border-top: 1px solid var(--border-soft, #eee);
+	}
+	.modal-actions--top {
+		justify-content: flex-start;
+		border-top: none;
+		padding-top: 0;
+		margin-top: 0;
+		margin-bottom: 0.5rem;
+	}
+	.modal-btn--danger-ghost {
+		background: transparent;
+		color: var(--error, #b91c1c);
+		border: none;
+		font-weight: 500;
+	}
+	.modal-btn--danger-ghost:hover:not(:disabled) {
+		background: rgba(185, 28, 28, 0.08);
+	}
+	.modal-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.4rem;
+		padding: 0.5rem 0.875rem;
+		font-size: 0.875rem;
+		font-weight: 600;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: background 140ms, transform 140ms, box-shadow 140ms;
+		border: none;
+		font-family: inherit;
+	}
+	.modal-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	.modal-btn--ghost {
+		background: var(--surfaceSolid, #fff);
+		color: var(--text, #222);
+		border: 1px solid var(--border-soft, #e5e7eb);
+	}
+	.modal-btn--ghost:hover:not(:disabled) {
+		background: var(--surface2, #f3f4f6);
+	}
+	.modal-btn--primary {
+		background: var(--warm, #ce5612);
+		color: #fff;
+		box-shadow: 0 3px 12px rgba(206, 86, 18, 0.22);
+	}
+	.modal-btn--primary:hover:not(:disabled) {
+		background: var(--chocolate, #a84510);
+		transform: translateY(-1px);
 	}
 </style>
