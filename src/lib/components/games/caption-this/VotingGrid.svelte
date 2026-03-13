@@ -21,7 +21,7 @@
 	}: Props = $props();
 
 	let voting = $state<string | null>(null);
-	let error = $state<string | null>(voteError ?? null);
+	let error = $state<string | null>(null);
 
 	$effect(() => {
 		error = voteError ?? null;
