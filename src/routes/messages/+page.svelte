@@ -18,12 +18,18 @@
 		createdAt: string;
 	}>>([]);
 	let otherUser = $state<{ id: string; name: string | null; email: string; avatarUrl: string | null } | null>(null);
-	let selectedWith = $state<string | null>($page.url.searchParams.get('with'));
+	let selectedWith = $state<string | null>(null);
 	let newMessage = $state('');
 	let loading = $state(true);
 	let sending = $state(false);
 
-	const currentUserId = $derived($page.data?.user?.id ?? null);
+	$effect(() => {
+		selectedWith = $page.url.searchParams.get('with');
+	});
+	let currentUserId = $state<string | null>(null);
+	$effect(() => {
+		currentUserId = $page.data?.user?.id ?? null;
+	});
 
 	function initials(name: string | null, email: string): string {
 		if (name?.trim()) {

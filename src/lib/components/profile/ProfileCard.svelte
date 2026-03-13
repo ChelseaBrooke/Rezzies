@@ -15,7 +15,11 @@
 	};
 
 	let currentUserId = $state<string | null>(null);
-	let currentUserIdForFetch = $derived($profileCardUserId);
+	let currentUserIdForFetch = $state<string | null>(null);
+	$effect(() => {
+		const unsub = profileCardUserId.subscribe((v) => { currentUserIdForFetch = v; });
+		return unsub;
+	});
 	let profile = $state<ProfileCardData | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
