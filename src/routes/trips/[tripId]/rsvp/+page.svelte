@@ -31,13 +31,13 @@
 		};
 	}
 
-	let adultsCount = $state(data.currentRsvp?.adultsCount ?? 1);
-	let kidsCount = $state(data.currentRsvp?.kidsCount ?? 0);
-	let petsCount = $state(data.currentRsvp?.petsCount ?? 0);
+	let adultsCount = $state(1);
+	let kidsCount = $state(0);
+	let petsCount = $state(0);
 
 	// ── Dietary info ────────────────────────────────────────────────────────
-	let myDietary = $state(data.currentProfile?.dietaryRestrictions ?? '');
-	let myAllergies = $state(data.currentProfile?.allergies ?? '');
+	let myDietary = $state('');
+	let myAllergies = $state('');
 
 	type PlusOneInfo = { name: string; dietary: string; allergies: string };
 	let plusOnes = $state<PlusOneInfo[]>([]);
@@ -55,15 +55,9 @@
 		if (d == null) return '';
 		return new Date(d).toISOString().slice(0, 10);
 	}
-	const defaultArrival = tripDateKey(data.trip?.checkInDate);
-	const defaultDeparture = tripDateKey(data.trip?.checkOutDate);
-	let arrivalDate = $state(
-		data.currentRsvp?.arrivalDatetime ? new Date(data.currentRsvp.arrivalDatetime).toISOString().slice(0, 10) : defaultArrival
-	);
-	let departureDate = $state(
-		data.currentRsvp?.departureDatetime ? new Date(data.currentRsvp.departureDatetime).toISOString().slice(0, 10) : defaultDeparture
-	);
-	let noNotes = $state(data.currentRsvp?.status === 'no' ? (data.currentRsvp?.notes ?? '') : '');
+	let arrivalDate = $state('');
+	let departureDate = $state('');
+	let noNotes = $state('');
 
 	const partySize = $derived(adultsCount);
 	const myClaimedSet = $derived(new Set(data.myClaimedBedIds ?? []));
@@ -107,7 +101,7 @@
 	const canSubmit = $derived(spotsSelected >= partySize);
 	const spotsShortfall = $derived(Math.max(0, partySize - spotsSelected));
 
-	let rsvpStatus = $state(data.currentRsvp?.status === 'no' ? 'no' : 'yes');
+	let rsvpStatus = $state('yes');
 	$effect(() => {
 		// Sync from server after submits
 		if (data.currentRsvp?.status === 'no') rsvpStatus = 'no';
@@ -115,9 +109,11 @@
 		if (data.currentRsvp?.adultsCount != null) adultsCount = data.currentRsvp.adultsCount;
 		if (data.currentRsvp?.kidsCount != null) kidsCount = data.currentRsvp.kidsCount;
 		if (data.currentRsvp?.petsCount != null) petsCount = data.currentRsvp.petsCount;
-		arrivalDate = data.currentRsvp?.arrivalDatetime ? new Date(data.currentRsvp.arrivalDatetime).toISOString().slice(0, 10) : tripDateKey(data.trip?.checkInDate);
-		departureDate = data.currentRsvp?.departureDatetime ? new Date(data.currentRsvp.departureDatetime).toISOString().slice(0, 10) : tripDateKey(data.trip?.checkOutDate);
+		arrivalDate = data.currentRsvp?.arrivalDatetime ? new Date(data.currentRsvp.arrivalDatetime).toISOString().slice(0, 10) : (tripDateKey(data.trip?.checkInDate) || '');
+		departureDate = data.currentRsvp?.departureDatetime ? new Date(data.currentRsvp.departureDatetime).toISOString().slice(0, 10) : (tripDateKey(data.trip?.checkOutDate) || '');
 		noNotes = data.currentRsvp?.status === 'no' ? (data.currentRsvp?.notes ?? '') : '';
+		if (data.currentProfile?.dietaryRestrictions != null) myDietary = data.currentProfile.dietaryRestrictions;
+		if (data.currentProfile?.allergies != null) myAllergies = data.currentProfile.allergies;
 	});
 	const isYes = $derived(rsvpStatus === 'yes');
 	const guestEstimateFromServer = $derived(data.guestEstimate ?? null);

@@ -21,9 +21,14 @@
 	const isHost = $derived(data.isHost ?? false);
 	const currentUserId = $derived(data.currentUserId ?? '');
 
-	let searchQuery = $state(data.searchQuery ?? '');
-	let category = $state<PollCategory>((data.category as PollCategory) ?? 'All');
-	let sort = $state<PollSort>((data.sort as PollSort) ?? 'recent');
+	let searchQuery = $state('');
+	let category = $state<PollCategory>('All');
+	let sort = $state<PollSort>('recent');
+	$effect(() => {
+		if (data.searchQuery != null) searchQuery = data.searchQuery;
+		if (data.category != null) category = data.category as PollCategory;
+		if (data.sort != null) sort = data.sort as PollSort;
+	});
 
 	let showCreateModal = $state(false);
 	let detailPollId = $state<string | null>(null);

@@ -6,7 +6,7 @@
 
 	let { data, form }: { data: PageData; form: any } = $props();
 
-	let activeTab = $state(data.openTab ?? 'profile');
+	let activeTab = $state('profile');
 	$effect(() => {
 		if (data.openTab) activeTab = data.openTab;
 	});

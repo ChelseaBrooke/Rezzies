@@ -12,12 +12,12 @@
 	};
 	let { roundId, maxLength, existingText = null, submitted = false, isPhotoSubmitter = false, activeTabId = null }: Props = $props();
 
-	let text = $state(existingText ?? '');
+	let text = $state('');
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 
 	$effect(() => {
-		if (existingText != null) text = existingText;
+		text = existingText ?? '';
 	});
 
 	function handleCaptionSubmit() {

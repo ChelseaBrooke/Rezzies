@@ -47,9 +47,9 @@
 		snack: 'Snack'
 	};
 
-	let date     = $state(prefill?.date ?? tripDays[0]?.value ?? '');
-	let time     = $state(prefill?.time ?? '');
-	let mealType = $state(prefill?.mealType ?? 'dinner');
+	let date     = $state('');
+	let time     = $state('');
+	let mealType = $state('dinner');
 	let option   = $state<MealOption>('cooking');
 	let cookId   = $state('');
 	let notes    = $state('');

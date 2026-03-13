@@ -7,8 +7,11 @@
 	let { user, isCollapsed = false }: { user?: { email?: string; name?: string } | null; isCollapsed?: boolean } = $props();
 	
 	let nightMode = $state(false);
-	let collapsed = $state(isCollapsed);
+	let collapsed = $state(false);
 	
+	$effect(() => {
+		collapsed = isCollapsed;
+	});
 	// Update CSS variable when collapsed state changes
 	$effect(() => {
 		if (browser) {
