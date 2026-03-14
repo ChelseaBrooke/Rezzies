@@ -71,8 +71,8 @@ npm run db:dev
 - `PUBLIC_SUPABASE_URL` - Your Supabase project URL
 - `PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key (public)
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (server-only, never expose to client)
-- `DATABASE_URL` - PostgreSQL connection string (pooled, for runtime)
-- `DIRECT_URL` - PostgreSQL direct connection string (non-pooled, for migrations)
+- `DATABASE_URL` - PostgreSQL connection string (use **Connection pooling** in Supabase, port **6543**). Append `?pgbouncer=true` so Prisma works with the pooler (e.g. `...6543/postgres?pgbouncer=true`). Without this you may see "connection forcibly closed" (10054) or timeouts.
+- `DIRECT_URL` - PostgreSQL direct connection string (Supabase **Direct** connection, port **5432**; used for migrations only)
 - `SENDGRID_API_KEY` - SendGrid API key
 - `SENDGRID_FROM_EMAIL` - Email address to send from
 - `SENDGRID_FROM_NAME` - Display name for sender (optional)
@@ -126,6 +126,18 @@ await prisma.adminUser.create({
   }
 });
 ```
+
+## Troubleshooting
+
+### "Can't reach database server" or "Connection forcibly closed" (10054)
+
+1. **Supabase project paused** – In [Supabase Dashboard](https://supabase.com/dashboard), open your project and **Restore** if it’s paused (common on free tier).
+2. **Pooler URL must use `?pgbouncer=true`** – For `DATABASE_URL` (pooler, port 6543), the query string must include `pgbouncer=true`. Example:
+   ```text
+   postgresql://postgres.[ref]:[password]@aws-1-us-east-2.pooler.supabase.com:6543/postgres?pgbouncer=true
+   ```
+   Prisma uses the pooler in transaction mode; without `pgbouncer=true`, connections can be dropped by the server (10054).
+3. **Direct URL for migrations** – Keep `DIRECT_URL` as the **Direct** connection (port 5432). Use it only for migrations; use `DATABASE_URL` (pooler) for the app at runtime.
 
 ## Development
 

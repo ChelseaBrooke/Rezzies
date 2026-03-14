@@ -310,6 +310,9 @@
 		transition: all 0.2s;
 		position: relative;
 		white-space: nowrap;
+		font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+		font-size: 0.8125rem;
+		font-weight: 500;
 	}
 
 	a.action-btn {
@@ -343,8 +346,9 @@
 	}
 
 	.action-label {
-		font-size: 0.8125rem;
-		font-weight: 500;
+		font-size: inherit;
+		font-weight: inherit;
+		font-family: inherit;
 	}
 
 	.dropdown-wrap {

@@ -28,6 +28,21 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const canRemoveGames = isHost;
 	const tabParam = url.searchParams.get('tab');
 
+	// Fetch trip games here so we always have fresh data after add-game redirect (layout may not re-run)
+	const tripGamesRows = trip
+		? await prisma.tripGame.findMany({
+				where: { tripId },
+				orderBy: { createdAt: 'asc' }
+			})
+		: [];
+	const tripGames = tripGamesRows.map((g) => ({
+		id: g.id,
+		gameId: g.gameId,
+		name: g.name,
+		addedByUserId: g.addedByUserId,
+		addedAt: g.createdAt.toISOString()
+	}));
+
 	// Caption This: load round + leaderboard + past rounds for inline game viewer
 	let captionThis = {
 		round: null as Awaited<ReturnType<typeof getActiveRound>>,
@@ -76,6 +91,7 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		isCoHost,
 		canRemoveGames,
 		tabParam,
+		tripGames,
 		captionThis
 	};
 };

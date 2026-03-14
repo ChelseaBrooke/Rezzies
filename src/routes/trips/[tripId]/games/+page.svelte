@@ -57,11 +57,14 @@
 		if (tripGames.length > 0 && !activeTabId) activeTabId = tripGames[0].id;
 	});
 
-	// After add-game redirect (?tab=newId), show instructions for that game if not yet understood
+	// After add-game redirect (?tab=newId), show instructions immediately and select that tab
 	$effect(() => {
 		if (!tabParam || !tripGames.length || instructionsGame) return;
 		const match = tripGames.find((g) => g.id === tabParam);
-		if (match && !understoodIds.has(match.id)) instructionsGame = match;
+		if (match && !understoodIds.has(match.id)) {
+			activeTabId = match.id;
+			instructionsGame = match;
+		}
 	});
 
 
@@ -466,9 +469,12 @@
 
 	function confirmUnderstand() {
 		if (!instructionsGame) return;
-		markUnderstood(tripId, userId, instructionsGame.id);
+		const tgId = instructionsGame.id;
+		setActiveTabAndUrl(tgId);
+		markUnderstood(tripId, userId, tgId);
 		refreshUnderstood();
 		instructionsGame = null;
+		setTimeout(() => document.getElementById('game-viewer')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 	}
 
 	function setActiveTabAndUrl(tgId: string) {
