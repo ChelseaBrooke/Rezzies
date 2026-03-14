@@ -1,6 +1,14 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
+
+	interface GalleryFile {
+		id: string;
+		name: string;
+		url: string;
+		mimeType?: string | null;
+	}
 
 	interface Activity {
 		id: string;
@@ -31,7 +39,8 @@
 		members = [],
 		userInvoices = [],
 		totalCost = 0,
-		rsvps = []
+		rsvps = [],
+		tripGalleryFiles = []
 	}: {
 		tripId: string;
 		isHost?: boolean;
@@ -48,7 +57,82 @@
 		userInvoices?: Array<{ status: string; totalAmount: number; breakdownJson?: string | null }>;
 		totalCost?: number;
 		rsvps?: Array<{ status: string; user?: { id: string; name: string | null; avatarUrl?: string | null } | null }>;
+		tripGalleryFiles?: GalleryFile[];
 	} = $props();
+
+	// Gallery: DB files + optimistic uploads (removed on success after invalidate)
+	let galleryOptimistic = $state<{ id: string; url: string; name?: string; mimeType?: string | null }[]>([]);
+	let galleryUploading = $state(false);
+	let galleryError = $state<string | null>(null);
+	let galleryInputEl: HTMLInputElement | null = $state(null);
+
+	const allGalleryMedia = $derived([
+		...galleryOptimistic.map((o) => ({ id: o.id, url: o.url, name: o.name, mimeType: o.mimeType })),
+		...(tripGalleryFiles ?? [])
+	]);
+
+	type GalleryMediaItem = { id: string; url: string; name?: string; mimeType?: string | null };
+	let lightboxMedia = $state<GalleryMediaItem | null>(null);
+	let lightboxDeleting = $state(false);
+	const canDeleteSelected = $derived(
+		lightboxMedia != null && (tripGalleryFiles ?? []).some((f) => f.id === lightboxMedia!.id)
+	);
+
+	async function deleteGalleryMedia(fileId: string) {
+		lightboxDeleting = true;
+		const res = await fetch(`/api/trips/${tripId}/files/${fileId}`, { method: 'DELETE' });
+		lightboxDeleting = false;
+		if (!res.ok) return;
+		lightboxMedia = null;
+		await invalidateAll();
+	}
+
+	$effect(() => {
+		if (!lightboxMedia) return;
+		const fn = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') lightboxMedia = null;
+		};
+		window.addEventListener('keydown', fn);
+		return () => window.removeEventListener('keydown', fn);
+	});
+
+	async function uploadGalleryFile(file: File, optimisticId: string) {
+		galleryUploading = true;
+		galleryError = null;
+		const fd = new FormData();
+		fd.append('file', file);
+		fd.append('category', 'photo');
+		const res = await fetch(`/api/trips/${tripId}/files`, { method: 'POST', body: fd });
+		const json = await res.json();
+		galleryUploading = false;
+		const entry = galleryOptimistic.find((p) => p.id === optimisticId);
+		if (!res.ok) {
+			galleryError = json.error ?? 'Upload failed';
+			if (entry?.url) URL.revokeObjectURL(entry.url);
+			galleryOptimistic = galleryOptimistic.filter((p) => p.id !== optimisticId);
+			return;
+		}
+		if (entry?.url) URL.revokeObjectURL(entry.url);
+		galleryOptimistic = galleryOptimistic.filter((p) => p.id !== optimisticId);
+		await invalidateAll();
+	}
+
+	function handleGallerySelected(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const files = Array.from(input.files ?? []).filter(
+			(f) => f.type.startsWith('image/') || f.type.startsWith('video/')
+		);
+		files.forEach((f) => {
+			const optimisticId = crypto.randomUUID();
+			galleryOptimistic = [
+				...galleryOptimistic,
+				{ id: optimisticId, url: URL.createObjectURL(f), name: f.name, mimeType: f.type }
+			];
+			uploadGalleryFile(f, optimisticId);
+		});
+		input.value = '';
+	}
+
 
 	// ── Stats ────────────────────────────────────────────────────────────
 	const nightsStayed = $derived.by(() => {
@@ -238,16 +322,88 @@
 			<div class="r-card-head">
 				<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
 				<h3>Photo &amp; video gallery</h3>
-				<span class="r-badge r-badge--muted">Coming soon</span>
+				<button
+					type="button"
+					class="r-gallery-add-btn"
+					disabled={galleryUploading}
+					onclick={() => galleryInputEl?.click()}
+				>
+					{#if galleryUploading}
+						<span class="r-gallery-spinner"></span>
+						Uploading…
+					{:else}
+						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+						Add more
+					{/if}
+				</button>
+				<input
+					type="file"
+					bind:this={galleryInputEl}
+					accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+					multiple
+					style="display:none"
+					onchange={handleGallerySelected}
+				/>
 			</div>
-			<div class="r-gallery-grid">
-				{#each Array(8) as _, i}
-					<div class="r-photo-slot" style="animation-delay:{i * 0.06}s" aria-hidden="true">
-						<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="0.2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+			{#if galleryError}
+				<p class="r-gallery-error">{galleryError}</p>
+			{/if}
+			{#if allGalleryMedia.length > 0}
+				<div class="r-gallery-grid r-gallery-grid--real">
+					{#each allGalleryMedia as item (item.id)}
+						<button
+							type="button"
+							class="r-photo-slot r-photo-slot--media r-photo-slot--btn"
+							onclick={() => (lightboxMedia = { id: item.id, url: item.url, name: item.name, mimeType: item.mimeType })}
+						>
+							{#if item.mimeType?.startsWith('video/')}
+								<video src={item.url} muted playsinline title={item.name ?? 'Video'}></video>
+							{:else}
+								<img src={item.url} alt={item.name ?? 'Trip photo'} />
+							{/if}
+						</button>
+					{/each}
+				</div>
+			{:else}
+				<p class="r-gallery-note">Photos and videos from the Files section appear here. <button type="button" class="r-gallery-note-btn" onclick={() => galleryInputEl?.click()}>Add some</button> or see <a href="/trips/{tripId}/files">Files</a>.</p>
+			{/if}
+			{#if lightboxMedia}
+				<div
+					class="r-lightbox-backdrop"
+					role="dialog"
+					aria-modal="true"
+					aria-label="Media full size"
+					onclick={(e) => e.target === e.currentTarget && (lightboxMedia = null)}
+				>
+					<div class="r-lightbox-content" onclick={(e) => e.stopPropagation()}>
+						<div class="r-lightbox-toolbar">
+							<span class="r-lightbox-name">{lightboxMedia.name ?? 'Photo'}</span>
+							<div class="r-lightbox-actions">
+								{#if canDeleteSelected}
+									<button
+										type="button"
+										class="r-lightbox-btn r-lightbox-btn-delete"
+										disabled={lightboxDeleting}
+										onclick={() => deleteGalleryMedia(lightboxMedia!.id)}
+									>
+										{lightboxDeleting ? 'Deleting…' : 'Delete'}
+									</button>
+								{/if}
+								<button type="button" class="r-lightbox-btn r-lightbox-btn-close" onclick={() => (lightboxMedia = null)}>
+									Close
+								</button>
+							</div>
+						</div>
+						<div class="r-lightbox-media">
+							{#if lightboxMedia.mimeType?.startsWith('video/')}
+								<video src={lightboxMedia.url} controls autoplay muted loop playsinline title={lightboxMedia.name ?? 'Video'}></video>
+							{:else}
+								<img src={lightboxMedia.url} alt={lightboxMedia.name ?? 'Trip photo'} />
+							{/if}
+						</div>
 					</div>
-				{/each}
-			</div>
-			<p class="r-gallery-note">Upload and relive your trip memories here. Gallery feature launching soon.</p>
+				</div>
+			{/if}
 		</section>
 
 		<!-- TROPHY CASE (full width) -->
@@ -322,7 +478,7 @@
 					<span class="r-trophy-cat">Photographer</span>
 					<span class="r-trophy-avatar r-trophy-avatar--empty" aria-hidden="true">?</span>
 					<span class="r-trophy-name r-trophy-name--empty">—</span>
-					<span class="r-trophy-stat">Gallery coming soon</span>
+					<a href="/trips/{tripId}/files" class="r-trophy-link">View gallery</a>
 				</div>
 			</div>
 		</section>
@@ -688,18 +844,101 @@
 	}
 
 	/* ── Gallery ── */
-	.r-card--gallery { border-style: dashed; }
+	.r-card--gallery { border-style: solid; }
+	.r-gallery-add-btn {
+		display: inline-flex; align-items: center; gap: 0.4rem;
+		margin-left: auto;
+		padding: 0.4rem 0.75rem;
+		font-size: 0.8125rem; font-weight: 600;
+		color: var(--slate);
+		background: var(--surface2);
+		border: 1px solid var(--border-soft);
+		border-radius: 9999px;
+		cursor: pointer;
+		transition: background .15s, border-color .15s;
+	}
+	.r-gallery-add-btn:hover:not(:disabled) {
+		background: var(--surface2);
+		border-color: var(--warm, #ce5612);
+		color: var(--warm, #ce5612);
+	}
+	.r-gallery-add-btn:disabled {
+		opacity: 0.7; cursor: not-allowed;
+	}
+	.r-gallery-spinner {
+		display: inline-block; width: 14px; height: 14px;
+		border: 2px solid var(--border); border-top-color: var(--warm);
+		border-radius: 50%; animation: r-spin .6s linear infinite;
+		flex-shrink: 0;
+	}
+	@keyframes r-spin { to { transform: rotate(360deg); } }
+	.r-gallery-error { margin: 0 0 .5rem; font-size: 0.875rem; color: #dc2626; }
 	.r-gallery-grid {
 		display: grid;
 		grid-template-columns: repeat(8, 1fr);
 		gap: 0.5rem;
+	}
+	.r-gallery-grid--real {
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
 	}
 	.r-photo-slot {
 		aspect-ratio: 1; border-radius: 8px;
 		background: var(--surface2);
 		display: flex; align-items: center; justify-content: center;
 		animation: r-fadein 0.35s ease both;
+		overflow: hidden;
 	}
+	.r-photo-slot--media {
+		padding: 0;
+	}
+	.r-photo-slot--btn {
+		border: none; cursor: pointer; display: block; width: 100%; height: 100%;
+		text-align: left;
+	}
+	.r-photo-slot--btn:hover { opacity: .92; }
+	.r-photo-slot--media img,
+	.r-photo-slot--media video {
+		width: 100%; height: 100%; object-fit: cover;
+	}
+	.r-photo-slot--media video { display: block; }
+	/* Recap lightbox */
+	.r-lightbox-backdrop {
+		position: fixed; inset: 0;
+		background: rgba(0,0,0,.88);
+		display: flex; align-items: center; justify-content: center;
+		z-index: 1000; padding: 1rem;
+	}
+	.r-lightbox-content {
+		display: flex; flex-direction: column;
+		max-width: 95vw; max-height: 95vh;
+		background: var(--surfaceSolid); border-radius: var(--r-radius);
+		overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.4);
+	}
+	.r-lightbox-toolbar {
+		display: flex; align-items: center; justify-content: space-between;
+		gap: 1rem; padding: .75rem 1rem;
+		background: var(--surface2); border-bottom: 1px solid var(--border-soft);
+	}
+	.r-lightbox-name {
+		font-size: .875rem; font-weight: 500; color: var(--text);
+		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+	}
+	.r-lightbox-actions { display: flex; gap: .5rem; flex-shrink: 0; }
+	.r-lightbox-btn {
+		padding: .4rem .75rem; font-size: .8125rem; font-weight: 600;
+		border-radius: var(--r-radius); border: 1px solid var(--border-soft);
+		background: var(--bg); color: var(--text); cursor: pointer;
+	}
+	.r-lightbox-btn:hover:not(:disabled) { background: var(--surface2); }
+	.r-lightbox-btn-close { border-color: var(--slate); color: var(--slate); }
+	.r-lightbox-btn-delete { border-color: #dc2626; color: #dc2626; }
+	.r-lightbox-btn-delete:hover:not(:disabled) { background: rgba(220,38,38,.1); }
+	.r-lightbox-media {
+		flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+		padding: .5rem;
+	}
+	.r-lightbox-media img,
+	.r-lightbox-media video { max-width: 100%; max-height: 80vh; object-fit: contain; display: block; }
 	@keyframes r-fadein {
 		from { opacity: 0; transform: scale(0.92); }
 		to   { opacity: 1; transform: scale(1); }
@@ -708,6 +947,14 @@
 		margin: 0; text-align: center;
 		font-size: 0.8125rem; color: var(--muted);
 	}
+	.r-gallery-note a { color: var(--slate); font-weight: 600; text-decoration: none; }
+	.r-gallery-note a:hover { text-decoration: underline; }
+	.r-gallery-note-btn {
+		background: none; border: none; padding: 0;
+		font: inherit; font-weight: 600; color: var(--slate);
+		cursor: pointer; text-decoration: underline;
+	}
+	.r-gallery-note-btn:hover { color: var(--warm, #ce5612); }
 
 	/* ── Trophy case ── */
 	.r-card--trophy {

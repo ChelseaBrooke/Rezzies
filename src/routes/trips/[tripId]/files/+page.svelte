@@ -17,34 +17,66 @@
 	};
 
 	let dbFiles  = $state<TripFile[]>((data.tripFiles as TripFile[]) ?? []);
-	let photos   = $state<{ id: string; url: string; name?: string }[]>([]);
+	let photos   = $state<{ id: string; url: string; name?: string; mimeType?: string | null }[]>([]);
 	let searchQuery  = $state('');
 	let uploadError  = $state<string | null>(null);
 	let uploading    = $state(false);
 	let fileInputEl: HTMLInputElement | null = $state(null);
 	let photoInputEl: HTMLInputElement | null = $state(null);
+	type MediaItem = { id: string; url: string; name?: string; mimeType?: string | null };
+	let lightboxMedia = $state<MediaItem | null>(null);
+	let deletingFileId = $state<string | null>(null);
 
 	const tripId = $derived(data.trip?.id ?? '');
 
-	// Filter non-photo files (receipts, documents)
+	async function deleteFile(fileId: string) {
+		deletingFileId = fileId;
+		const res = await fetch(`/api/trips/${tripId}/files/${fileId}`, { method: 'DELETE' });
+		deletingFileId = null;
+		if (!res.ok) return;
+		dbFiles = dbFiles.filter((f) => f.id !== fileId);
+		photos = photos.filter((p) => p.id !== fileId);
+		if (lightboxMedia?.id === fileId) lightboxMedia = null;
+	}
+	const canDeleteSelected = $derived(
+		lightboxMedia != null && dbFiles.some((f) => f.id === lightboxMedia!.id)
+	);
+	const lightboxDeleting = $derived(lightboxMedia != null && deletingFileId === lightboxMedia.id);
+
+	$effect(() => {
+		if (!lightboxMedia) return;
+		const fn = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') lightboxMedia = null;
+		};
+		window.addEventListener('keydown', fn);
+		return () => window.removeEventListener('keydown', fn);
+	});
+
+	// Filter non-gallery files (receipts, documents — exclude images and videos)
 	const filteredFiles = $derived.by(() => {
 		const q = searchQuery.trim().toLowerCase();
-		const docs = dbFiles.filter(f => !f.mimeType?.startsWith('image/'));
+		const docs = dbFiles.filter(
+			f => !f.mimeType?.startsWith('image/') && !f.mimeType?.startsWith('video/')
+		);
 		if (!q) return docs;
 		return docs.filter(f => f.name.toLowerCase().includes(q) || (f.category ?? '').toLowerCase().includes(q));
 	});
 
-	// Photo files — from DB (images that are not receipts attached to meals)
+	// Gallery media — from DB (images and videos that are not receipts)
 	const dbPhotos = $derived(
-		dbFiles.filter(f => f.mimeType?.startsWith('image/') && f.category !== 'receipt')
+		dbFiles.filter(
+			f =>
+				f.category !== 'receipt' &&
+				(f.mimeType?.startsWith('image/') || f.mimeType?.startsWith('video/'))
+		)
 	);
 
 	// Receipts for quick-view section
 	const receipts = $derived(dbFiles.filter(f => f.category === 'receipt'));
 
-	// All photos (DB + local uploads) for gallery grid
+	// All gallery media (DB + local uploads) for gallery grid
 	const allPhotos = $derived([
-		...dbPhotos.map(f => ({ id: f.id, url: f.url, name: f.name })),
+		...dbPhotos.map(f => ({ id: f.id, url: f.url, name: f.name, mimeType: f.mimeType })),
 		...photos
 	]);
 
@@ -67,7 +99,7 @@
 		return f.category ?? 'File';
 	}
 
-	async function uploadFile(file: File, category = 'document', isPhoto = false) {
+	async function uploadFile(file: File, category = 'document', isPhoto = false, optimisticPhotoId?: string) {
 		uploading = true; uploadError = null;
 		const fd = new FormData();
 		fd.append('file', file);
@@ -77,6 +109,12 @@
 		uploading = false;
 		if (!res.ok) { uploadError = json.error ?? 'Upload failed'; return; }
 		dbFiles = [json.file, ...dbFiles];
+		// Remove optimistic gallery entry so only the DB version shows (avoids duplicate in grid)
+		if (isPhoto && optimisticPhotoId) {
+			const entry = photos.find((p) => p.id === optimisticPhotoId);
+			if (entry) URL.revokeObjectURL(entry.url);
+			photos = photos.filter((p) => p.id !== optimisticPhotoId);
+		}
 	}
 
 	function handleFilesSelected(e: Event) {
@@ -88,8 +126,9 @@
 	function handlePhotosSelected(e: Event) {
 		const input = e.target as HTMLInputElement;
 		Array.from(input.files ?? []).forEach(f => {
-			photos = [...photos, { id: crypto.randomUUID(), url: URL.createObjectURL(f), name: f.name }];
-			uploadFile(f, 'photo', true);
+			const optimisticId = crypto.randomUUID();
+			photos = [...photos, { id: optimisticId, url: URL.createObjectURL(f), name: f.name, mimeType: f.type }];
+			uploadFile(f, 'photo', true, optimisticId);
 		});
 		input.value = '';
 	}
@@ -102,10 +141,11 @@
 	function handlePhotoDrop(e: DragEvent) {
 		e.preventDefault();
 		Array.from(e.dataTransfer?.files ?? [])
-			.filter(f => f.type.startsWith('image/'))
+			.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
 			.forEach(f => {
-				photos = [...photos, { id: crypto.randomUUID(), url: URL.createObjectURL(f), name: f.name }];
-				uploadFile(f, 'photo', true);
+				const optimisticId = crypto.randomUUID();
+				photos = [...photos, { id: optimisticId, url: URL.createObjectURL(f), name: f.name, mimeType: f.type }];
+				uploadFile(f, 'photo', true, optimisticId);
 			});
 	}
 
@@ -181,6 +221,19 @@
 								<span class="file-meta">
 									{#if f.sizeBytes}{formatSize(f.sizeBytes)} · {/if}{f.uploadedBy.name ?? 'Guest'}
 								</span>
+								<button
+									type="button"
+									class="file-delete-btn"
+									title="Delete file"
+									disabled={deletingFileId === f.id}
+									onclick={() => deleteFile(f.id)}
+								>
+									{#if deletingFileId === f.id}
+										<span class="spinner"></span>
+									{:else}
+										<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+									{/if}
+								</button>
 							</li>
 						{/each}
 					</ul>
@@ -211,6 +264,19 @@
 									{/if}
 								</div>
 								<span class="file-meta">{formatSize(f.sizeBytes)}</span>
+								<button
+									type="button"
+									class="file-delete-btn"
+									title="Delete file"
+									disabled={deletingFileId === f.id}
+									onclick={() => deleteFile(f.id)}
+								>
+									{#if deletingFileId === f.id}
+										<span class="spinner"></span>
+									{:else}
+										<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+									{/if}
+								</button>
 							</li>
 						{/each}
 					</ul>
@@ -231,12 +297,12 @@
 					ondragenter={preventDefault}
 					ondrop={handlePhotoDrop}
 				>
-					<p>Drop photos here or click to add</p>
-					<span class="upload-hint">JPG | PNG | WebP</span>
+					<p>Drop photos or videos here or click to add</p>
+					<span class="upload-hint">JPG · PNG · WebP · MP4 · WebM</span>
 					<input
 						type="file"
 						bind:this={photoInputEl}
-						accept="image/jpeg,image/png,image/webp,image/gif"
+						accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
 						multiple
 						style="display:none"
 						onchange={handlePhotosSelected}
@@ -246,15 +312,60 @@
 				{#if allPhotos.length > 0}
 					<div class="photo-grid" role="list">
 						{#each allPhotos as photo (photo.id)}
-							<div class="photo-cell">
-								<img src={photo.url} alt={photo.name ?? 'Trip photo'} />
-							</div>
+							<button
+								type="button"
+								class="photo-cell photo-cell-btn"
+								onclick={() => (lightboxMedia = { id: photo.id, url: photo.url, name: photo.name, mimeType: photo.mimeType })}
+							>
+								{#if photo.mimeType?.startsWith('video/')}
+									<video src={photo.url} muted playsinline title={photo.name ?? 'Video'}></video>
+								{:else}
+									<img src={photo.url} alt={photo.name ?? 'Trip photo'} />
+								{/if}
+							</button>
 						{/each}
 					</div>
 				{:else}
 					<div class="empty-gallery">
 						<span class="empty-icon">📷</span>
 						<p>No photos yet. Be the first to add memories from the trip!</p>
+					</div>
+				{/if}
+				{#if lightboxMedia}
+					<div
+						class="lightbox-backdrop"
+						role="dialog"
+						aria-modal="true"
+						aria-label="Media full size"
+						onclick={(e) => e.target === e.currentTarget && (lightboxMedia = null)}
+					>
+						<div class="lightbox-content" onclick={(e) => e.stopPropagation()}>
+							<div class="lightbox-toolbar">
+								<span class="lightbox-name">{lightboxMedia.name ?? 'Photo'}</span>
+								<div class="lightbox-actions">
+									{#if canDeleteSelected}
+										<button
+											type="button"
+											class="lightbox-btn lightbox-btn-delete"
+											disabled={lightboxDeleting}
+											onclick={() => deleteFile(lightboxMedia!.id)}
+										>
+											{lightboxDeleting ? 'Deleting…' : 'Delete'}
+										</button>
+									{/if}
+									<button type="button" class="lightbox-btn lightbox-btn-close" onclick={() => (lightboxMedia = null)}>
+										Close
+									</button>
+								</div>
+							</div>
+							<div class="lightbox-media">
+								{#if lightboxMedia.mimeType?.startsWith('video/')}
+									<video src={lightboxMedia.url} controls autoplay muted loop playsinline title={lightboxMedia.name ?? 'Video'}></video>
+								{:else}
+									<img src={lightboxMedia.url} alt={lightboxMedia.name ?? 'Trip photo'} />
+								{/if}
+							</div>
+						</div>
 					</div>
 				{/if}
 			</div>
@@ -322,6 +433,21 @@
 	}
 	.receipt-tag { background: rgba(232,93,38,.1); color: #c04a1a; }
 	.file-meta { flex-shrink: 0; font-size: .8rem; color: var(--muted); white-space: nowrap; }
+	.file-delete-btn {
+		flex-shrink: 0;
+		width: 1.75rem; height: 1.75rem;
+		display: inline-flex; align-items: center; justify-content: center;
+		padding: 0; border: none; border-radius: 4px;
+		background: transparent; color: #dc2626;
+		cursor: pointer;
+		transition: opacity .15s, background .15s;
+	}
+	.file-delete-btn:hover:not(:disabled) {
+		background: rgba(220,38,38,.12);
+		opacity: 1;
+	}
+	.file-delete-btn:disabled { cursor: not-allowed; opacity: .6; color: #dc2626; }
+	.file-delete-btn .spinner { border-color: rgba(220,38,38,.3); border-top-color: #dc2626; }
 	.error-note { font-size: .875rem; color: #ef4444; margin: 0 0 .75rem; }
 	.empty { color: var(--muted); margin: 0; font-size: .875rem; }
 	.empty-gallery { text-align: center; padding: 2.5rem 1.5rem; color: var(--muted); }
@@ -329,7 +455,51 @@
 	.empty-gallery p { margin: 0; font-size: .9375rem; }
 	.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; }
 	.photo-cell { aspect-ratio: 1; border-radius: var(--radius-md); overflow: hidden; background: var(--surface2); }
-	.photo-cell img { width: 100%; height: 100%; object-fit: cover; }
+	.photo-cell-btn {
+		border: none; padding: 0; cursor: pointer; display: block; width: 100%; height: 100%;
+		text-align: left;
+	}
+	.photo-cell-btn:hover { opacity: .92; }
+	.photo-cell img,
+	.photo-cell video { width: 100%; height: 100%; object-fit: cover; display: block; }
+	/* Lightbox */
+	.lightbox-backdrop {
+		position: fixed; inset: 0;
+		background: rgba(0,0,0,.88);
+		display: flex; align-items: center; justify-content: center;
+		z-index: 1000; padding: 1rem;
+	}
+	.lightbox-content {
+		display: flex; flex-direction: column;
+		max-width: 95vw; max-height: 95vh;
+		background: var(--surface); border-radius: var(--radius-lg);
+		overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.4);
+	}
+	.lightbox-toolbar {
+		display: flex; align-items: center; justify-content: space-between;
+		gap: 1rem; padding: .75rem 1rem;
+		background: var(--surface2); border-bottom: 1px solid var(--border);
+	}
+	.lightbox-name {
+		font-size: .875rem; font-weight: 500; color: var(--text);
+		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+	}
+	.lightbox-actions { display: flex; gap: .5rem; flex-shrink: 0; }
+	.lightbox-btn {
+		padding: .4rem .75rem; font-size: .8125rem; font-weight: 600;
+		border-radius: var(--radius-md); border: 1px solid var(--border);
+		background: var(--bg); color: var(--text); cursor: pointer;
+	}
+	.lightbox-btn:hover:not(:disabled) { background: var(--surface2); }
+	.lightbox-btn-close { border-color: var(--slate); color: var(--slate); }
+	.lightbox-btn-delete { border-color: #dc2626; color: #dc2626; }
+	.lightbox-btn-delete:hover:not(:disabled) { background: rgba(220,38,38,.1); }
+	.lightbox-media {
+		flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+		padding: .5rem;
+	}
+	.lightbox-media img,
+	.lightbox-media video { max-width: 100%; max-height: 80vh; object-fit: contain; display: block; }
 	.spinner {
 		display: inline-block; width: 12px; height: 12px;
 		border: 2px solid rgba(255,255,255,.5); border-top-color: white;

@@ -10,7 +10,8 @@ const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_TYPES = [
 	'image/jpeg', 'image/png', 'image/webp', 'image/gif',
 	'application/pdf',
-	'image/heic', 'image/heif'
+	'image/heic', 'image/heif',
+	'video/mp4', 'video/webm', 'video/quicktime'
 ];
 
 /** POST /api/trips/[tripId]/files — upload a file and persist a TripFile record */
@@ -39,7 +40,7 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 		return json({ error: 'File too large (max 20 MB)' }, { status: 400 });
 	}
 	if (!ALLOWED_TYPES.includes(file.type)) {
-		return json({ error: 'Unsupported file type. Use PDF, JPEG, PNG, or WebP.' }, { status: 400 });
+		return json({ error: 'Unsupported file type. Use PDF, images (JPEG, PNG, WebP), or video (MP4, WebM).' }, { status: 400 });
 	}
 
 	// Persist to disk

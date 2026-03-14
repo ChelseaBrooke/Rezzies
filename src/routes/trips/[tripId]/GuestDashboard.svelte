@@ -222,13 +222,14 @@
 				listingCoverPhoto: trip.listingCoverPhoto,
 				location: trip.location
 			}}
-				{activities}
-				{mealSlots}
-				{members}
-				userInvoices={userInvoices}
-				totalCost={totalCost}
-				{rsvps}
-			/>
+			{activities}
+			{mealSlots}
+			{members}
+			userInvoices={userInvoices}
+			totalCost={totalCost}
+			{rsvps}
+			tripGalleryFiles={data.tripGalleryFiles ?? []}
+		/>
 		{:else}
 		<TripDashboardGrid
 			isHost={false}

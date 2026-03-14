@@ -87,7 +87,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 
 	const allTrips = tripsResult.allTrips.map((m) => m.trip);
 
-	const [tripGamesRows, recentPolls] = await Promise.all([
+	const [tripGamesRows, recentPolls, tripGalleryFiles] = await Promise.all([
 		prisma.tripGame.findMany({
 			where: { tripId },
 			orderBy: { createdAt: 'asc' }
@@ -103,6 +103,19 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 				createdById: true,
 				createdBy: { select: { id: true, name: true } }
 			}
+		}),
+		// Photos & videos for recap gallery (exclude receipts)
+		prisma.tripFile.findMany({
+			where: {
+				tripId,
+				category: { not: 'receipt' },
+				OR: [
+					{ mimeType: { startsWith: 'image/' } },
+					{ mimeType: { startsWith: 'video/' } }
+				]
+			},
+			orderBy: { createdAt: 'desc' },
+			select: { id: true, name: true, url: true, mimeType: true }
 		})
 	]);
 	const tripGames = tripGamesRows.map((g) => ({
@@ -143,6 +156,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 		committedFundsFromYesRsvps: committedFunds,
 		pollsBadgeCount,
 		tripGames,
-		recentPolls
+		recentPolls,
+		tripGalleryFiles
 	};
 };
