@@ -1,14 +1,16 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { supabaseAdmin, UPLOAD_BUCKET } from '$lib/server/supabase.js';
 
-const UPLOAD_DIR = 'static/uploads';
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
+/** POST /api/upload-image — upload an image to Supabase Storage (bucket: uploads), e.g. for listing cover photo */
 export const POST: RequestHandler = async ({ request }) => {
 	try {
+		if (!supabaseAdmin) {
+			return json({ error: 'Storage not configured' }, 503);
+		}
 		const formData = await request.formData();
 		const file = formData.get('file') as File | null;
 		if (!file || !(file instanceof File)) {
@@ -22,15 +24,21 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 		const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
 		const safeExt = ['jpeg', 'jpg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
-		const filename = `${crypto.randomUUID()}.${safeExt}`;
-		const dir = join(process.cwd(), UPLOAD_DIR);
-		await mkdir(dir, { recursive: true });
-		const filepath = join(dir, filename);
-		const buf = Buffer.from(await file.arrayBuffer());
-		await writeFile(filepath, buf);
-		// URL is relative to site root; static files are served from /
-		const url = `/uploads/${filename}`;
-		return json({ url });
+		const storagePath = `images/${crypto.randomUUID()}.${safeExt}`;
+		const { error: uploadError } = await supabaseAdmin.storage
+			.from(UPLOAD_BUCKET)
+			.upload(storagePath, await file.arrayBuffer(), {
+				contentType: file.type,
+				upsert: false
+			});
+		if (uploadError) {
+			console.error('Supabase storage upload failed', uploadError);
+			return json({ error: 'Upload failed' }, 500);
+		}
+		const { data: publicUrlData } = supabaseAdmin.storage
+			.from(UPLOAD_BUCKET)
+			.getPublicUrl(storagePath);
+		return json({ url: publicUrlData.publicUrl });
 	} catch (err) {
 		console.error('Upload error:', err);
 		return json({ error: 'Upload failed' }, 500);

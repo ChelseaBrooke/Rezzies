@@ -16,7 +16,7 @@
 		mealSlot: { id: string; mealType: string; title: string | null; date: string } | null;
 	};
 
-	let dbFiles  = $state<TripFile[]>((data.tripFiles as TripFile[]) ?? []);
+	let dbFiles = $state<TripFile[]>((data.tripFiles as TripFile[]) ?? []);
 	let photos   = $state<{ id: string; url: string; name?: string; mimeType?: string | null }[]>([]);
 	let searchQuery  = $state('');
 	let uploadError  = $state<string | null>(null);
@@ -74,11 +74,23 @@
 	// Receipts for quick-view section
 	const receipts = $derived(dbFiles.filter(f => f.category === 'receipt'));
 
-	// All gallery media (DB + local uploads) for gallery grid
+	// All gallery media (DB + optimistic uploads) for gallery grid
 	const allPhotos = $derived([
 		...dbPhotos.map(f => ({ id: f.id, url: f.url, name: f.name, mimeType: f.mimeType })),
 		...photos
 	]);
+
+	const BROKEN_IMAGE_PLACEHOLDER =
+		"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='1.5'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
+
+	function onImageError(e: Event) {
+		const el = e.currentTarget as HTMLImageElement;
+		if (el) {
+			el.onerror = null;
+			el.src = BROKEN_IMAGE_PLACEHOLDER;
+			el.alt = 'Image failed to load';
+		}
+	}
 
 	function formatSize(bytes: number | null): string {
 		if (!bytes) return '';
@@ -108,8 +120,13 @@
 		const json = await res.json();
 		uploading = false;
 		if (!res.ok) { uploadError = json.error ?? 'Upload failed'; return; }
-		dbFiles = [json.file, ...dbFiles];
-		// Remove optimistic gallery entry so only the DB version shows (avoids duplicate in grid)
+		// Add to list immediately so it appears without refresh (same as photos)
+		const newFile: TripFile = {
+			...json.file,
+			uploadedBy: { id: data.user?.id ?? '', name: data.user?.name ?? null },
+			mealSlot: null
+		};
+		dbFiles = [newFile, ...dbFiles];
 		if (isPhoto && optimisticPhotoId) {
 			const entry = photos.find((p) => p.id === optimisticPhotoId);
 			if (entry) URL.revokeObjectURL(entry.url);
@@ -320,7 +337,7 @@
 								{#if photo.mimeType?.startsWith('video/')}
 									<video src={photo.url} muted playsinline title={photo.name ?? 'Video'}></video>
 								{:else}
-									<img src={photo.url} alt={photo.name ?? 'Trip photo'} />
+									<img src={photo.url} alt={photo.name ?? 'Trip photo'} onerror={onImageError} />
 								{/if}
 							</button>
 						{/each}
@@ -362,7 +379,7 @@
 								{#if lightboxMedia.mimeType?.startsWith('video/')}
 									<video src={lightboxMedia.url} controls autoplay muted loop playsinline title={lightboxMedia.name ?? 'Video'}></video>
 								{:else}
-									<img src={lightboxMedia.url} alt={lightboxMedia.name ?? 'Trip photo'} />
+									<img src={lightboxMedia.url} alt={lightboxMedia.name ?? 'Trip photo'} onerror={onImageError} />
 								{/if}
 							</div>
 						</div>

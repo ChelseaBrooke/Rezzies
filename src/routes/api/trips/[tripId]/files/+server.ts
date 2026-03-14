@@ -2,10 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { supabaseAdmin, UPLOAD_BUCKET } from '$lib/server/supabase.js';
 
-const UPLOAD_DIR = 'static/uploads/files';
 const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
 const ALLOWED_TYPES = [
 	'image/jpeg', 'image/png', 'image/webp', 'image/gif',
@@ -14,7 +12,7 @@ const ALLOWED_TYPES = [
 	'video/mp4', 'video/webm', 'video/quicktime'
 ];
 
-/** POST /api/trips/[tripId]/files — upload a file and persist a TripFile record */
+/** POST /api/trips/[tripId]/files — upload a file to Supabase Storage (bucket: uploads) and persist a TripFile record */
 export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
@@ -26,6 +24,10 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 		where: { tripId_userId: { tripId, userId: user.id } }
 	});
 	if (!member) return json({ error: 'Not a trip member' }, { status: 403 });
+
+	if (!supabaseAdmin) {
+		return json({ error: 'Storage not configured' }, { status: 503 });
+	}
 
 	const formData = await request.formData();
 	const file = formData.get('file') as File | null;
@@ -43,15 +45,26 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 		return json({ error: 'Unsupported file type. Use PDF, images (JPEG, PNG, WebP), or video (MP4, WebM).' }, { status: 400 });
 	}
 
-	// Persist to disk
 	const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
-	const filename = `${crypto.randomUUID()}.${ext}`;
-	const dir = join(process.cwd(), UPLOAD_DIR);
-	await mkdir(dir, { recursive: true });
-	await writeFile(join(dir, filename), Buffer.from(await file.arrayBuffer()));
-	const url = `/uploads/files/${filename}`;
+	const storagePath = `trip-files/${tripId}/${crypto.randomUUID()}.${ext}`;
 
-	// Save to DB
+	const { error: uploadError } = await supabaseAdmin.storage
+		.from(UPLOAD_BUCKET)
+		.upload(storagePath, await file.arrayBuffer(), {
+			contentType: file.type,
+			upsert: false
+		});
+
+	if (uploadError) {
+		console.error('Supabase storage upload failed', uploadError);
+		return json({ error: 'Upload failed' }, { status: 500 });
+	}
+
+	const { data: publicUrlData } = supabaseAdmin.storage
+		.from(UPLOAD_BUCKET)
+		.getPublicUrl(storagePath);
+	const url = publicUrlData.publicUrl;
+
 	const record = await prisma.tripFile.create({
 		data: {
 			tripId,

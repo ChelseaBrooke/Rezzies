@@ -2,12 +2,16 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
-import { unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { supabaseAdmin, UPLOAD_BUCKET } from '$lib/server/supabase.js';
 
-const UPLOAD_DIR = 'static/uploads/files';
+/** Extract storage path from Supabase Storage public URL, or return null. */
+function getStoragePathFromPublicUrl(url: string): string | null {
+	// Format: https://<project>.supabase.co/storage/v1/object/public/uploads/<path>
+	const match = url.match(/\/storage\/v1\/object\/public\/uploads\/(.+)$/);
+	return match ? decodeURIComponent(match[1]) : null;
+}
 
-/** DELETE /api/trips/[tripId]/files/[fileId] — delete a trip file (trip member only) */
+/** DELETE /api/trips/[tripId]/files/[fileId] — delete a trip file (trip member only) and remove from Supabase Storage */
 export const DELETE: RequestHandler = async ({ cookies, params }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
@@ -26,14 +30,12 @@ export const DELETE: RequestHandler = async ({ cookies, params }) => {
 
 	await prisma.tripFile.delete({ where: { id: fileId } });
 
-	// Remove from disk if it's under our upload dir (path like /uploads/files/xxx.ext)
-	if (file.url.startsWith('/uploads/files/')) {
-		const filename = file.url.replace(/^\/uploads\/files\//, '');
-		const filePath = join(process.cwd(), UPLOAD_DIR, filename);
+	const storagePath = getStoragePathFromPublicUrl(file.url);
+	if (supabaseAdmin && storagePath) {
 		try {
-			await unlink(filePath);
+			await supabaseAdmin.storage.from(UPLOAD_BUCKET).remove([storagePath]);
 		} catch {
-			// Ignore if file already missing
+			// Ignore; record is already deleted
 		}
 	}
 
