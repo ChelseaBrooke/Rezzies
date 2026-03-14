@@ -154,7 +154,8 @@
 					ondrop={handleFileDrop}
 				>
 					<p>Drop files here or click to upload</p>
-					<span class="upload-hint">PDF, images, documents — up to 20 MB</span>
+					<p><span class="upload-hint">PDF | Images | Documents</p>
+					<p>(up to 20 MB)</p>
 					<input
 						type="file"
 						accept=".pdf,image/*,.doc,.docx,.txt"
@@ -221,7 +222,7 @@
 	<!-- Trip photo gallery -->
 	<section class="section">
 		<h2 class="section-title">Trip photo gallery</h2>
-		<p class="section-subtitle">Everyone can contribute — share your favourite moments.</p>
+		<p class="section-subtitle">Everyone can contribute. Share your favourite moments.</p>
 		<div class="card">
 			<div class="card-body">
 				<label
@@ -231,7 +232,7 @@
 					ondrop={handlePhotoDrop}
 				>
 					<p>Drop photos here or click to add</p>
-					<span class="upload-hint">JPG, PNG, WebP • Everyone on the trip can upload</span>
+					<span class="upload-hint">JPG | PNG | WebP</span>
 					<input
 						type="file"
 						bind:this={photoInputEl}
