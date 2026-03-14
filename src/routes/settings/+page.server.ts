@@ -27,7 +27,9 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 			accessibilityNotes: true,
 			emailTripInvites: true,
 			emailTripUpdates: true,
-			inAppNotifications: true
+			inAppNotifications: true,
+			profileVisibility: true,
+			friendsListVisibility: true
 		}
 	});
 

@@ -10,13 +10,17 @@ import { TRAVEL_STYLE_OPTIONS, isValidTravelStyle } from '$lib/travel-style.js';
 import { z } from 'zod';
 
 const hexColorRe = /^#[0-9A-Fa-f]{6}$/;
+const visibilityOptions = ['public', 'trip_only', 'private'] as const;
+const friendsListVisibilityOptions = ['friends', 'trip_members', 'private'] as const;
 const updateSchema = z.object({
 	name: z.string().max(200).optional(),
 	avatarUrl: z.union([z.string().url(), z.literal('')]).optional(),
 	chatBubbleColor: z.union([z.string().regex(hexColorRe), z.literal('')]).optional(),
 	travelStyle: z.union([z.enum(TRAVEL_STYLE_OPTIONS), z.literal('')]).optional(),
 	homeCity: z.string().max(120).optional(),
-	timezone: z.string().max(80).optional()
+	timezone: z.string().max(80).optional(),
+	profileVisibility: z.enum(visibilityOptions).optional(),
+	friendsListVisibility: z.enum(friendsListVisibilityOptions).optional()
 });
 
 export const GET: RequestHandler = async ({ cookies }) => {
@@ -33,7 +37,9 @@ export const GET: RequestHandler = async ({ cookies }) => {
 			chatBubbleColor: true,
 			travelStyle: true,
 			homeCity: true,
-			timezone: true
+			timezone: true,
+			profileVisibility: true,
+			friendsListVisibility: true
 		}
 	});
 	if (!row) {
@@ -46,7 +52,9 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		chatBubbleColor: row.chatBubbleColor,
 		travelStyle: row.travelStyle,
 		homeCity: row.homeCity,
-		timezone: row.timezone
+		timezone: row.timezone,
+		profileVisibility: row.profileVisibility ?? 'public',
+		friendsListVisibility: row.friendsListVisibility ?? 'friends'
 	});
 };
 
@@ -73,6 +81,8 @@ export const PATCH: RequestHandler = async ({ request, cookies }) => {
 		travelStyle?: string | null;
 		homeCity?: string | null;
 		timezone?: string | null;
+		profileVisibility?: string;
+		friendsListVisibility?: string;
 	} = {};
 	if (d.name !== undefined) updateData.name = d.name || null;
 	if (d.avatarUrl !== undefined) updateData.avatarUrl = d.avatarUrl === '' ? null : d.avatarUrl;
@@ -80,6 +90,8 @@ export const PATCH: RequestHandler = async ({ request, cookies }) => {
 	if (d.travelStyle !== undefined) updateData.travelStyle = d.travelStyle === '' ? null : d.travelStyle;
 	if (d.homeCity !== undefined) updateData.homeCity = d.homeCity || null;
 	if (d.timezone !== undefined) updateData.timezone = d.timezone || null;
+	if (d.profileVisibility !== undefined) updateData.profileVisibility = d.profileVisibility;
+	if (d.friendsListVisibility !== undefined) updateData.friendsListVisibility = d.friendsListVisibility;
 	await prisma.user.update({
 		where: { id: user.id },
 		data: updateData

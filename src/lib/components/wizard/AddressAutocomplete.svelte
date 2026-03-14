@@ -18,33 +18,28 @@
 			return;
 		}
 		
-		// Check if Google Maps API is already loaded
 		if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
 			return;
 		}
 		
 		try {
 			console.log('AddressAutocomplete: Initializing autocomplete on input element');
-			autocomplete = new google.maps.places.Autocomplete(inputElement, {
+			const ac = new google.maps.places.Autocomplete(inputElement, {
 				types: ['address'],
 				fields: ['formatted_address', 'address_components', 'geometry']
 			});
-			
-			autocomplete.addListener('place_changed', () => {
-				const place = autocomplete?.getPlace();
-				console.log('AddressAutocomplete: Place selected:', place);
-				if (place && place.formatted_address && inputElement) {
+			ac.addListener('place_changed', () => {
+				const place = ac.getPlace();
+				if (place?.formatted_address && inputElement) {
 					inputElement.value = place.formatted_address;
 					value = place.formatted_address;
-					if (onSelect) {
-						onSelect(place.formatted_address, place);
-					}
+					onSelect?.(place.formatted_address, place);
 				}
 			});
-			
+			autocomplete = ac;
 			console.log('AddressAutocomplete: Autocomplete initialized successfully');
 		} catch (error) {
-			console.error('Error initializing autocomplete:', error);
+			console.error('AddressAutocomplete: Error initializing autocomplete:', error);
 		}
 	});
 	
@@ -100,40 +95,36 @@
 		try {
 			console.log('AddressAutocomplete: Loading Google Maps API script...');
 			
-			// Create script tag with API key in URL
+			// Create script tag with API key (standard URL; no loading=async to avoid load issues on some routes)
 			const script = document.createElement('script');
-			script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&loading=async`;
+			script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
 			script.async = true;
 			script.defer = true;
 			
 			script.onload = async () => {
 				console.log('AddressAutocomplete: Google Maps API script loaded');
 				
-				// Wait a bit for the API to fully initialize
-				await new Promise(resolve => setTimeout(resolve, 200));
+				// Wait for the API to be ready (classic script exposes google synchronously after load)
+				await new Promise(resolve => setTimeout(resolve, 150));
 				
-				// Try to import places library explicitly if importLibrary is available
+				if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+					console.log('AddressAutocomplete: Google Maps API ready with Places');
+					isLoaded = true;
+					return;
+				}
+				// Fallback: try dynamic loader if available
 				if (typeof google !== 'undefined' && google.maps && google.maps.importLibrary) {
 					try {
-						console.log('AddressAutocomplete: Importing places library explicitly...');
 						await google.maps.importLibrary('places');
-						console.log('AddressAutocomplete: Places library imported');
+						if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+							isLoaded = true;
+							return;
+						}
 					} catch (err) {
 						console.warn('AddressAutocomplete: Could not import places library:', err);
 					}
 				}
-				
-				// Check again after importing
-				if (typeof google !== 'undefined' && google.maps && google.maps.places) {
-					console.log('AddressAutocomplete: Google Maps API ready with Places');
-					isLoaded = true;
-				} else {
-					console.error('AddressAutocomplete: Google Maps API loaded but places not available');
-					console.log('AddressAutocomplete: Debug - google:', typeof google !== 'undefined');
-					console.log('AddressAutocomplete: Debug - google.maps:', typeof google !== 'undefined' && google.maps);
-					console.log('AddressAutocomplete: Debug - google.maps.places:', typeof google !== 'undefined' && google.maps && google.maps.places);
-					console.log('AddressAutocomplete: Debug - google.maps.importLibrary:', typeof google !== 'undefined' && google.maps && google.maps.importLibrary);
-				}
+				console.error('AddressAutocomplete: Google Maps API loaded but places not available');
 			};
 			
 			script.onerror = (error) => {

@@ -6,9 +6,10 @@
 		poll: PollWithMeta;
 		onClick?: () => void;
 		onWatch?: (pollId: string) => void;
+		onViewActivityDetails?: (snapshot: Record<string, unknown>) => void;
 	}
 
-	let { poll, onClick, onWatch }: Props = $props();
+	let { poll, onClick, onWatch, onViewActivityDetails }: Props = $props();
 
 	const isActive   = $derived(poll.statusDisplay === 'open' || poll.statusDisplay === 'closing_soon');
 	const needsVote  = $derived(isActive && !poll.userVoted);
@@ -66,6 +67,18 @@
 	<!-- Description -->
 	{#if poll.description}
 		<p class="poll-desc">{poll.description}</p>
+	{/if}
+
+	<!-- Activity poll: link to view full activity details before voting -->
+	{#if poll.category === 'Activities' && poll.activitySnapshot && onViewActivityDetails}
+		<button
+			type="button"
+			class="btn-view-activity-details"
+			onclick={(e) => { e.stopPropagation(); e.preventDefault(); onViewActivityDetails(poll.activitySnapshot ?? {}); }}
+			aria-label="View activity details"
+		>
+			View activity details
+		</button>
 	{/if}
 
 	<!-- Footer -->
@@ -246,6 +259,20 @@
 		overflow: hidden;
 	}
 	.voted .poll-desc { color: #94a3b8; }
+
+	.btn-view-activity-details {
+		align-self: flex-start;
+		font-size: .75rem;
+		color: var(--primary, #E85D26);
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-decoration: underline;
+	}
+	.btn-view-activity-details:hover {
+		text-decoration: none;
+	}
 
 	/* ── Footer ── */
 	.card-foot {

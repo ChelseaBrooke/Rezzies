@@ -46,6 +46,12 @@
 	let pollFormSubmittingId = $state<string | null>(null);
 	let showPollCreatedModal = $state(false);
 
+	// Propose-as-poll modal: require date + time before creating poll
+	let pollModalResult = $state<Record<string, unknown> | null>(null);
+	let pollModalDate = $state('');
+	let pollModalTime = $state('9:00 AM');
+	let pollModalSubmitting = $state(false);
+
 	// Carousel state: tracks current photo index per result id
 	let carouselIndex = $state<Record<string, number>>({});
 
@@ -95,6 +101,15 @@
 	}
 	function closeAddModal() {
 		addModalResult = null;
+	}
+
+	function openPollModal(result: Record<string, unknown>) {
+		pollModalResult = result;
+		pollModalDate = tripDateOptions[0]?.value ?? '';
+		pollModalTime = '9:00 AM';
+	}
+	function closePollModal() {
+		pollModalResult = null;
 	}
 
 	/** Find a trip activity that matches this discover result (by title). */
@@ -546,29 +561,8 @@
 									<span class="result-booked-slot">{formatBookedSlot(booked)}</span>
 								{:else}
 									<button type="button" class="btn btn-add-to-trip btn-sm" onclick={() => openAddModal(result)}>Add to trip</button>
+									<button type="button" class="btn btn-poll btn-sm" onclick={() => openPollModal(result)}>Propose as poll</button>
 								{/if}
-								<form
-									method="POST"
-									action="?/addDiscoveredActivity"
-									use:enhance={() => {
-										pollFormSubmittingId = result.id ?? result.name ?? 'poll';
-										return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
-											pollFormSubmittingId = null;
-											await update();
-											window.scrollTo({ top: 0, behavior: 'smooth' });
-										};
-									}}
-									class="action-link-form"
-								>
-									<input type="hidden" name="title" value={result.name ?? ''} />
-									<input type="hidden" name="location" value={result.address ?? ''} />
-									<input type="hidden" name="notes" value={buildDiscoverNotes(result)} />
-									<input type="hidden" name="additionType" value="poll" />
-									<input type="hidden" name="date" value={tripDateOptions[0]?.value ?? ''} />
-									<button type="submit" class="btn btn-poll btn-sm" disabled={pollFormSubmittingId !== null}>
-										{pollFormSubmittingId === (result.id ?? result.name ?? 'poll') ? 'Creating…' : 'Propose as poll'}
-									</button>
-								</form>
 							</div>
 							<div class="action-links">
 								{#if result.booking_url}
@@ -668,6 +662,63 @@
 						<button type="button" class="btn btn-secondary" onclick={closeAddModal}>Cancel</button>
 						<button type="submit" class="btn btn-add-to-trip" disabled={addModalSubmitting || !addModalDate || !addModalTime}>
 							{addModalSubmitting ? 'Adding…' : 'Add to trip'}
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Propose as poll modal: choose date + time first -->
+	{#if pollModalResult}
+		<div class="add-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="poll-modal-title" onclick={(e) => e.target === e.currentTarget && closePollModal()}>
+			<div class="add-modal">
+				<div class="add-modal-header">
+					<h2 id="poll-modal-title">Propose as poll</h2>
+					<button type="button" class="add-modal-close" onclick={closePollModal} aria-label="Close">×</button>
+				</div>
+				<p class="add-modal-activity-name">{pollModalResult.name as string}</p>
+				<p class="add-modal-note">Choose the date and time for this activity. If &quot;Add to itinerary&quot; wins when the poll closes, the activity will be added for this slot.</p>
+				<form
+					method="POST"
+					action="?/addDiscoveredActivity"
+					use:enhance={() => {
+						pollModalSubmitting = true;
+						return async ({ result, update }) => {
+							await update();
+							pollModalSubmitting = false;
+							if (result.type === 'success' && result.data?.addDiscoveredActivitySuccess && result.data?.pollCreated) {
+								closePollModal();
+								showPollCreatedModal = true;
+							}
+						};
+					}}
+					class="add-modal-form"
+				>
+					<input type="hidden" name="title" value={(pollModalResult.name as string) ?? ''} />
+					<input type="hidden" name="location" value={(pollModalResult.address as string) ?? ''} />
+					<input type="hidden" name="notes" value={buildDiscoverNotes(pollModalResult)} />
+					<input type="hidden" name="additionType" value="poll" />
+					<input type="hidden" name="activitySnapshot" value={(() => { try { return JSON.stringify(pollModalResult); } catch { return '{}'; } })()} />
+
+					<label class="add-modal-label">Day *</label>
+					<select name="date" class="add-modal-select" bind:value={pollModalDate} required>
+						{#each tripDateOptions as opt}
+							<option value={opt.value}>{opt.label}</option>
+						{/each}
+					</select>
+
+					<label class="add-modal-label">Time *</label>
+					<select name="time" class="add-modal-select" bind:value={pollModalTime} required>
+						{#each TIME_OPTIONS as t}
+							<option value={t}>{t}</option>
+						{/each}
+					</select>
+
+					<div class="add-modal-actions">
+						<button type="button" class="btn btn-secondary" onclick={closePollModal}>Cancel</button>
+						<button type="submit" class="btn btn-poll" disabled={pollModalSubmitting || !pollModalDate || !pollModalTime}>
+							{pollModalSubmitting ? 'Creating…' : 'Create poll'}
 						</button>
 					</div>
 				</form>

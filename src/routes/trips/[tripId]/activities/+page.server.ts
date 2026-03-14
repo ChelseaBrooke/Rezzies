@@ -81,6 +81,16 @@ export const actions: Actions = {
 		const time = (formData.get('time') as string)?.trim() || null;
 		const additionType = (formData.get('additionType') as string) || 'planned';
 		if (additionType === 'poll') {
+			if (!dateStr || !time) return { addDiscoveredActivityError: 'Please choose a date and time for the activity so it can be added to the itinerary if the poll wins.' };
+			let activitySnapshot: Record<string, unknown> | null = null;
+			const snapshotStr = formData.get('activitySnapshot') as string | null;
+			if (snapshotStr) {
+				try {
+					activitySnapshot = JSON.parse(snapshotStr) as Record<string, unknown>;
+				} catch {
+					// optional; ignore invalid JSON
+				}
+			}
 			const now = new Date();
 			const endAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 			try {
@@ -97,8 +107,9 @@ export const actions: Actions = {
 						startAt: now,
 						endAt,
 						activityDate: activityDate,
-						activityTime: time || null,
+						activityTime: time,
 						activityLocation: location || null,
+						activitySnapshot: activitySnapshot ?? undefined,
 						options: {
 							create: [
 								{ label: 'Add to itinerary', sortOrder: 0 },

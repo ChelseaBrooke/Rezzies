@@ -44,6 +44,11 @@ export interface PollWithMeta {
 	allowAnonymous: boolean;
 	userWatching: boolean;
 	watcherCount: number;
+	/** For activity polls from Discover: date/time/location + full snapshot for "View activity details" */
+	activityDate?: Date | string | null;
+	activityTime?: string | null;
+	activityLocation?: string | null;
+	activitySnapshot?: Record<string, unknown> | null;
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {

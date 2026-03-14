@@ -207,10 +207,17 @@ model User {
   emailTripInvites     Boolean @default(true)  // Email when invited to a trip
   emailTripUpdates     Boolean @default(true)  // Email for trip updates, new activity
   inAppNotifications   Boolean @default(true)  // Show in-app notification tray
+  // Profile and friends visibility
+  profileVisibility    String  @default("public")   // "public" | "trip_only" | "private"
+  friendsListVisibility String @default("friends")  // "friends" | "trip_members" | "private"
   createdAt       DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   tripMemberships      TripMember[]
+  friendRequestsSent   FriendRequest[]  @relation("FriendRequestSender")
+  friendRequestsReceived FriendRequest[] @relation("FriendRequestRecipient")
+  friendshipsAsA       Friendship[]     @relation("FriendshipUserA")
+  friendshipsAsB       Friendship[]     @relation("FriendshipUserB")
   invitesReceived      Invite[]              @relation("InviteRecipient")
   invitesSent          Invite[]              @relation("InviteSender")
   roomAssignments      RoomAssignment[]
@@ -268,6 +275,37 @@ model Session {
   @@index([token])
   @@index([userId])
   @@index([expiresAt])
+}
+
+// Friend requests (pending → accepted creates Friendship)
+model FriendRequest {
+  id        String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  status    String   @default("pending") // "pending" | "accepted" | "declined"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fromUser User @relation("FriendRequestSender", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("FriendRequestRecipient", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([fromUserId, toUserId])
+  @@index([toUserId, status])
+}
+
+// Symmetric friendship (one row per pair; store userIdA < userIdB)
+model Friendship {
+  id        String   @id @default(uuid())
+  userIdA   String
+  userIdB   String
+  createdAt DateTime @default(now())
+
+  userA User @relation("FriendshipUserA", fields: [userIdA], references: [id], onDelete: Cascade)
+  userB User @relation("FriendshipUserB", fields: [userIdB], references: [id], onDelete: Cascade)
+
+  @@unique([userIdA, userIdB])
+  @@index([userIdA])
+  @@index([userIdB])
 }
 
 // Trip Members (users who are part of trips)
@@ -646,6 +684,7 @@ model Poll {
   activityDate     DateTime?  // snapshot when created from Discover Activities
   activityTime     String?
   activityLocation String?
+  activitySnapshot Json?      // full discover result for "View activity details" on poll
   startAt          DateTime?
   endAt            DateTime?
   createdAt        DateTime  @default(now())

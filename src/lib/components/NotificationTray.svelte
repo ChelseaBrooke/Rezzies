@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { onMount, onDestroy } from 'svelte';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 
 	interface Notification {
 		id: string;
@@ -9,6 +10,7 @@
 		title: string;
 		message: string;
 		relatedTripId: string | null;
+		relatedEntityId: string | null;
 		read: boolean;
 		createdAt: string;
 	}
@@ -43,22 +45,30 @@
 		}
 	}
 
-	async function handleNotificationClick(notification: Notification) {
-		if (!notification.relatedTripId) return;
+	async function markRead(notificationId: string, tripId?: string | null) {
 		try {
 			await fetch('/api/notifications/mark-read', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					notificationId: notification.id,
-					tripId: notification.relatedTripId
-				})
+				body: JSON.stringify({ notificationId, tripId })
 			});
 		} catch {
-			// still navigate
+			// ignore
 		}
-		open = false;
-		goto(`/trips/${notification.relatedTripId}`);
+	}
+
+	async function handleNotificationClick(notification: Notification) {
+		if (notification.relatedTripId) {
+			await markRead(notification.id, notification.relatedTripId);
+			open = false;
+			goto(`/trips/${notification.relatedTripId}`);
+			return;
+		}
+		if (notification.type === 'friend_request' && notification.relatedEntityId) {
+			await markRead(notification.id);
+			open = false;
+			openProfileCard(notification.relatedEntityId);
+		}
 	}
 
 	function toggle() {
@@ -120,7 +130,7 @@
 					<p class="tray-empty">No notifications yet.</p>
 				{:else}
 					{#each notifications as notification}
-						{#if notification.relatedTripId}
+						{#if notification.relatedTripId || (notification.type === 'friend_request' && notification.relatedEntityId)}
 							<button
 								type="button"
 								class="tray-item {notification.read ? 'read' : 'unread'}"

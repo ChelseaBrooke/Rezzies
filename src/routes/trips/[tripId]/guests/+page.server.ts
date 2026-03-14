@@ -16,6 +16,8 @@ export type GuestRow = {
 	type: 'member' | 'invite';
 	userId?: string;
 	inviteId?: string;
+	/** For invite rows: recipient user id when they have an account */
+	recipientUserId?: string | null;
 	name: string;
 	email: string;
 	avatarUrl?: string | null;
@@ -243,6 +245,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		guestRows.push({
 			type: 'invite',
 			inviteId: inv.id,
+			recipientUserId: inv.recipientUserId ?? null,
 			name,
 			email,
 			avatarUrl: null,
@@ -421,6 +424,60 @@ export const actions: Actions = {
 		}
 
 		return { createInviteSuccess: true };
+	},
+
+	inviteFriend: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const host = await isTripHost(tripId, user.id);
+		if (!host) throw error(403, 'Only the trip host can invite guests');
+		const formData = await request.formData();
+		const friendUserId = (formData.get('friendUserId') as string)?.trim() ?? '';
+		if (!friendUserId) return { inviteFriendError: 'Missing friend' };
+		const friend = await prisma.user.findUnique({
+			where: { id: friendUserId },
+			select: { id: true, email: true }
+		});
+		if (!friend) return { inviteFriendError: 'User not found' };
+		const alreadyMember = await prisma.tripMember.findUnique({
+			where: { tripId_userId: { tripId, userId: friendUserId } }
+		});
+		if (alreadyMember) return { inviteFriendError: 'This person is already a guest.' };
+		const existingPending = await prisma.invite.findFirst({
+			where: {
+				tripId,
+				recipientUserId: friendUserId,
+				status: { in: PENDING_INVITE_STATUSES }
+			}
+		});
+		if (existingPending) return { inviteFriendError: 'A pending invite has already been sent to this person.' };
+		const token = crypto.randomUUID();
+		const invite = await prisma.invite.create({
+			data: {
+				tripId,
+				token,
+				invitedByUserId: user.id,
+				channel: 'email',
+				recipientEmail: friend.email,
+				recipientPhone: null,
+				recipientUserId: friendUserId,
+				expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+			}
+		});
+		const trip = await prisma.trip.findUnique({
+			where: { id: tripId },
+			select: { name: true }
+		});
+		if (trip) {
+			await notifyExistingUserOfInvite({
+				inviteId: invite.id,
+				tripId,
+				tripName: trip.name,
+				recipientUserId: friendUserId
+			});
+		}
+		return { inviteFriendSuccess: true };
 	},
 
 	removeGuest: async ({ request, params, cookies }) => {

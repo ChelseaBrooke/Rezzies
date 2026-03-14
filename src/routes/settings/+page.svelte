@@ -10,8 +10,21 @@
 	$effect(() => {
 		if (data.openTab) activeTab = data.openTab;
 	});
-	// Local state for security/privacy (persist via API when available)
-	let profileVisibility = $state<'public' | 'trip_only' | 'private'>('public');
+	// Profile and friends list visibility (persisted on User)
+	let profileVisibility = $state<string>((data.user as { profileVisibility?: string } | null)?.profileVisibility ?? 'public');
+	let friendsListVisibility = $state<string>((data.user as { friendsListVisibility?: string } | null)?.friendsListVisibility ?? 'friends');
+	$effect(() => {
+		const u = data.user as { profileVisibility?: string; friendsListVisibility?: string } | null;
+		if (u?.profileVisibility) profileVisibility = u.profileVisibility;
+		if (u?.friendsListVisibility) friendsListVisibility = u.friendsListVisibility;
+	});
+	async function saveVisibility() {
+		await fetch('/api/users/me', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ profileVisibility, friendsListVisibility })
+		});
+	}
 	let hideEmail = $state(false);
 	let hidePhone = $state(false);
 	let hideStats = $state(false);
@@ -217,9 +230,17 @@
 						<hr class="section-divider" />
 						<div class="field-row">
 							<span class="field-label">Profile visibility</span>
-							<select class="select" bind:value={profileVisibility}>
+							<select class="select" bind:value={profileVisibility} onchange={saveVisibility}>
 								<option value="public">Public</option>
 								<option value="trip_only">Trip-only</option>
+								<option value="private">Private</option>
+							</select>
+						</div>
+						<div class="field-row">
+							<span class="field-label">Who can see your friends list</span>
+							<select class="select" bind:value={friendsListVisibility} onchange={saveVisibility}>
+								<option value="friends">Friends only</option>
+								<option value="trip_members">Trip members</option>
 								<option value="private">Private</option>
 							</select>
 						</div>

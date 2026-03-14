@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
-	import { profileCardUserId, closeProfileCard, openEditProfileModal, profileCardRefreshRequested } from '$lib/stores/profileOverlay.js';
+	import { onMount } from 'svelte';
+	import { profileCardUserId, closeProfileCard, openEditProfileModal, openProfileCard, profileCardRefreshRequested } from '$lib/stores/profileOverlay.js';
 
 	type ProfileCardData = {
 		displayName: string;
@@ -11,7 +11,10 @@
 		tripsHosted: number;
 		tripsJoined: number;
 		sharedTrips: { tripId: string; name: string; checkInDate: string; checkOutDate: string }[];
-		friendshipStatus: 'self' | 'none' | 'friends';
+		friendshipStatus: 'self' | 'none' | 'friends' | 'pending_sent' | 'pending_received';
+		pendingRequestFromUserId?: string | null;
+		friends?: { id: string; name: string | null; avatarUrl: string | null }[];
+		limitedView?: boolean;
 	};
 
 	let currentUserId = $state<string | null>(null);
@@ -127,6 +130,63 @@
 		}
 	});
 
+	async function addFriend() {
+		if (!profile || !currentUserId) return;
+		const res = await fetch('/api/friends/request', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ toUserId: currentUserId })
+		});
+		if (res.ok) {
+			profileCardRefreshRequested.set(true);
+		} else {
+			const data = await res.json().catch(() => ({}));
+			error = data.error || 'Failed to send request';
+		}
+	}
+	async function unfriend() {
+		if (!profile || !currentUserId) return;
+		const res = await fetch('/api/friends/unfriend', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ friendUserId: currentUserId })
+		});
+		if (res.ok) {
+			profileCardRefreshRequested.set(true);
+		} else {
+			const data = await res.json().catch(() => ({}));
+			error = data.error || 'Failed to unfriend';
+		}
+	}
+	async function acceptRequest() {
+		if (!profile?.pendingRequestFromUserId) return;
+		const res = await fetch('/api/friends/accept', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ fromUserId: profile.pendingRequestFromUserId })
+		});
+		if (res.ok) {
+			profileCardRefreshRequested.set(true);
+		} else {
+			const data = await res.json().catch(() => ({}));
+			error = data.error || 'Failed to accept';
+		}
+	}
+	async function declineRequest() {
+		if (!profile?.pendingRequestFromUserId) return;
+		const res = await fetch('/api/friends/decline', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ fromUserId: profile.pendingRequestFromUserId })
+		});
+		if (res.ok) {
+			profileCardRefreshRequested.set(true);
+		} else {
+			const data = await res.json().catch(() => ({}));
+			error = data.error || 'Failed to decline';
+		}
+	}
+
 	onMount(() => {
 		document.addEventListener('keydown', handleKeydown);
 		return () => document.removeEventListener('keydown', handleKeydown);
@@ -151,6 +211,17 @@
 				<p class="profile-card-error">{error}</p>
 			{:else if profile}
 				<div class="profile-card-content">
+					{#if profile.limitedView}
+						<div class="profile-card-avatar-wrap">
+							{#if profile.avatarUrl}
+								<img src={profile.avatarUrl} alt="" />
+							{:else}
+								<span class="profile-card-initials">{initials(profile.displayName)}</span>
+							{/if}
+						</div>
+						<h2 id="profile-card-name" class="profile-card-name">{profile.displayName}</h2>
+						<p class="profile-card-limited">This profile is only visible to people they've been on a trip with.</p>
+					{:else}
 					<div class="profile-card-avatar-wrap">
 						{#if profile.avatarUrl}
 							<img src={profile.avatarUrl} alt="" />
@@ -187,12 +258,39 @@
 							<p class="muted">No trips together yet</p>
 						</div>
 					{/if}
+					{#if (profile.friends?.length ?? 0) > 0}
+						<div class="profile-card-friends">
+							<h3>Friends ({profile.friends.length})</h3>
+							<div class="profile-card-friends-list">
+								{#each profile.friends as friend}
+									<button
+										type="button"
+										class="profile-card-friend-chip"
+										title={friend.name ?? 'Traveler'}
+										onclick={() => openProfileCard(friend.id)}
+									>
+										{#if friend.avatarUrl}
+											<img src={friend.avatarUrl} alt="" />
+										{:else}
+											<span class="friend-initials">{initials(friend.name)}</span>
+										{/if}
+										<span class="friend-name">{friend.name ?? 'Traveler'}</span>
+									</button>
+								{/each}
+							</div>
+						</div>
+					{/if}
 					<div class="profile-card-actions">
 						{#if profile.isSelf}
 							<button type="button" class="btn btn-primary" onclick={() => { openEditProfileModal(); }}>Edit profile</button>
 						{:else}
-							{#if profile.friendshipStatus === 'none' || profile.friendshipStatus === 'friends'}
-								<button type="button" class="btn btn-primary">
+							{#if profile.friendshipStatus === 'pending_received' && profile.pendingRequestFromUserId}
+								<button type="button" class="btn btn-primary" onclick={acceptRequest}>Accept</button>
+								<button type="button" class="btn btn-ghost" onclick={declineRequest}>Decline</button>
+							{:else if profile.friendshipStatus === 'pending_sent'}
+								<span class="profile-card-pending">Request sent</span>
+							{:else if profile.friendshipStatus === 'none' || profile.friendshipStatus === 'friends'}
+								<button type="button" class="btn btn-primary" onclick={profile.friendshipStatus === 'friends' ? unfriend : addFriend}>
 									{profile.friendshipStatus === 'friends' ? 'Unfriend' : 'Add Friend'}
 								</button>
 							{/if}
@@ -200,6 +298,7 @@
 							<button type="button" class="btn btn-ghost">Report</button>
 						{/if}
 					</div>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -281,6 +380,11 @@
 		margin: 0 0 0.35rem 0;
 		color: var(--text, #0f172a);
 	}
+	.profile-card-limited {
+		font-size: 0.875rem;
+		color: var(--text-muted, #64748b);
+		margin: 0.5rem 0 0;
+	}
 	.profile-card-tag {
 		display: inline-block;
 		font-size: 0.8125rem;
@@ -344,6 +448,68 @@
 		font-size: 0.875rem;
 		color: var(--muted);
 		margin: 0;
+	}
+	.profile-card-friends {
+		text-align: left;
+		margin-bottom: 1rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--border);
+	}
+	.profile-card-friends h3 {
+		font-size: 0.875rem;
+		font-weight: 600;
+		margin: 0 0 0.5rem 0;
+		color: var(--text);
+	}
+	.profile-card-friends-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+	.profile-card-friend-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.25rem 0.5rem;
+		border-radius: 999px;
+		border: 1px solid var(--border);
+		background: var(--bg, #f8fafc);
+		cursor: pointer;
+		font-size: 0.8125rem;
+		color: var(--text);
+		transition: background 0.15s;
+	}
+	.profile-card-friend-chip:hover {
+		background: var(--border-soft);
+	}
+	.profile-card-friend-chip img {
+		width: 1.25rem;
+		height: 1.25rem;
+		border-radius: 50%;
+		object-fit: cover;
+	}
+	.profile-card-friend-chip .friend-initials {
+		width: 1.25rem;
+		height: 1.25rem;
+		border-radius: 50%;
+		background: var(--copper);
+		color: white;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.65rem;
+		font-weight: 600;
+	}
+	.profile-card-friend-chip .friend-name {
+		max-width: 6rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.profile-card-pending {
+		font-size: 0.875rem;
+		color: var(--muted);
+		font-style: italic;
 	}
 	.profile-card-actions {
 		display: flex;

@@ -33,6 +33,7 @@
 	let showCreateModal = $state(false);
 	let detailPollId = $state<string | null>(null);
 	let showDetailModal = $state(false);
+	let activityDetailSnapshot = $state<Record<string, unknown> | null>(null);
 
 	const rawPolls = $derived(data.polls ?? []);
 	const pollsWithMeta = $derived(
@@ -162,6 +163,13 @@
 		fd.set('pollId', pollId);
 		fetch(form.action, { method: 'POST', body: fd }).then(() => invalidateAll());
 	}
+
+	function openActivityDetail(snapshot: Record<string, unknown>) {
+		activityDetailSnapshot = snapshot;
+	}
+	function closeActivityDetail() {
+		activityDetailSnapshot = null;
+	}
 </script>
 
 <svelte:head>
@@ -246,7 +254,7 @@
 									<span class="sub-dot urgent"></span>Needs your vote
 								</p>
 								{#each pollsUnvoted as poll (poll.id)}
-									<PollCard {poll} onClick={() => openDetail(poll)} onWatch={handleWatch} />
+									<PollCard {poll} onClick={() => openDetail(poll)} onWatch={handleWatch} onViewActivityDetails={openActivityDetail} />
 								{/each}
 							</div>
 						{/if}
@@ -259,7 +267,7 @@
 									</p>
 								{/if}
 								{#each pollsVotedActive as poll (poll.id)}
-									<PollCard {poll} onClick={() => openDetail(poll)} onWatch={handleWatch} />
+									<PollCard {poll} onClick={() => openDetail(poll)} onWatch={handleWatch} onViewActivityDetails={openActivityDetail} />
 								{/each}
 							</div>
 						{/if}
@@ -270,7 +278,7 @@
 									<span class="sub-dot draft"></span>Drafts
 								</p>
 								{#each pollsDrafts as poll (poll.id)}
-									<PollCard {poll} onClick={() => openDetail(poll)} onWatch={handleWatch} />
+									<PollCard {poll} onClick={() => openDetail(poll)} onWatch={handleWatch} onViewActivityDetails={openActivityDetail} />
 								{/each}
 							</div>
 						{/if}
@@ -303,7 +311,7 @@
 							</div>
 						{:else}
 							{#each pollsClosed as poll (poll.id)}
-								<PollClosedCard {poll} onClick={() => openDetail(poll)} />
+								<PollClosedCard {poll} onClick={() => openDetail(poll)} onViewActivityDetails={openActivityDetail} />
 							{/each}
 						{/if}
 					</div>
@@ -333,6 +341,95 @@
 	canManage={isHost}
 	voteError={form?.voteError}
 />
+
+<!-- Activity detail popup (same format as Activities page) -->
+{#if activityDetailSnapshot}
+	<div class="activity-detail-backdrop" role="dialog" aria-modal="true" aria-labelledby="activity-detail-title" onclick={(e) => e.target === e.currentTarget && closeActivityDetail()}>
+		<div class="activity-detail-modal">
+			<div class="activity-detail-header">
+				<h2 id="activity-detail-title" class="activity-detail-title">{activityDetailSnapshot.name as string}</h2>
+				<button type="button" class="activity-detail-close" onclick={closeActivityDetail} aria-label="Close">×</button>
+			</div>
+			{#if activityDetailSnapshot.rating != null}
+				<div class="activity-detail-rating">
+					<span class="star">★</span>
+					<span>{Number(activityDetailSnapshot.rating).toFixed(1)}</span>
+					{#if activityDetailSnapshot.review_count != null}
+						<span class="review-count">({Number(activityDetailSnapshot.review_count).toLocaleString()} reviews)</span>
+					{/if}
+				</div>
+			{/if}
+			{#if activityDetailSnapshot.description}
+				<p class="activity-detail-desc">{activityDetailSnapshot.description as string}</p>
+			{/if}
+			{#if activityDetailSnapshot.why_recommended}
+				<p class="activity-detail-recommendation">{activityDetailSnapshot.why_recommended as string}</p>
+			{/if}
+			{#if activityDetailSnapshot.tags && Array.isArray(activityDetailSnapshot.tags)}
+				<div class="activity-detail-tags">
+					{#each (activityDetailSnapshot.tags as string[]).slice(0, 5) as tag}
+						<span class="activity-detail-tag">{tag}</span>
+					{/each}
+				</div>
+			{/if}
+			<div class="activity-detail-meta">
+				{#if activityDetailSnapshot.address}
+					<div class="activity-detail-row">
+						<span class="activity-detail-label">Address</span>
+						<span>{activityDetailSnapshot.address as string}</span>
+					</div>
+				{/if}
+				{#if activityDetailSnapshot.distance_miles != null}
+					<div class="activity-detail-row">
+						<span class="activity-detail-label">Distance</span>
+						<span>{Number(activityDetailSnapshot.distance_miles).toFixed(1)} mi away</span>
+					</div>
+				{/if}
+				{#if activityDetailSnapshot.hours_on_date && typeof activityDetailSnapshot.hours_on_date === 'object'}
+					{@const hours = activityDetailSnapshot.hours_on_date as { open?: string; close?: string }}
+					<div class="activity-detail-row">
+						<span class="activity-detail-label">Hours</span>
+						<span>{hours.open ?? '—'} – {hours.close ?? '—'}</span>
+					</div>
+				{/if}
+				{#if activityDetailSnapshot.phone}
+					<div class="activity-detail-row">
+						<span class="activity-detail-label">Phone</span>
+						<a href="tel:{activityDetailSnapshot.phone}">{activityDetailSnapshot.phone as string}</a>
+					</div>
+				{/if}
+				{#if activityDetailSnapshot.event_date}
+					<div class="activity-detail-row">
+						<span class="activity-detail-label">Event date</span>
+						<span>{new Date((activityDetailSnapshot.event_date as string) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+					</div>
+				{/if}
+				{#if activityDetailSnapshot.group_size_limit != null}
+					<div class="activity-detail-row">
+						<span class="activity-detail-label">Max group size</span>
+						<span>{activityDetailSnapshot.group_size_limit as number}</span>
+					</div>
+				{/if}
+				{#if activityDetailSnapshot.accessibility && typeof activityDetailSnapshot.accessibility === 'object'}
+					{@const acc = activityDetailSnapshot.accessibility as { wheelchair?: boolean; notes?: string }}
+					<div class="activity-detail-row">
+						<span class="activity-detail-label">Accessibility</span>
+						<span>{acc.wheelchair ? 'Wheelchair accessible' : 'Not wheelchair accessible'}{acc.notes ? ` — ${acc.notes}` : ''}</span>
+					</div>
+				{/if}
+			</div>
+			<div class="activity-detail-actions">
+				{#if activityDetailSnapshot.booking_url}
+					<a href={activityDetailSnapshot.booking_url as string} target="_blank" rel="noopener noreferrer" class="btn btn-primary">Book</a>
+				{/if}
+				{#if activityDetailSnapshot.website}
+					<a href={activityDetailSnapshot.website as string} target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Website</a>
+				{/if}
+				<button type="button" class="btn btn-ghost" onclick={closeActivityDetail}>Close</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	.polls-page {
@@ -494,6 +591,123 @@
 	.empty-icon { font-size: 2.5rem; opacity: .6; }
 	.empty-title { font-size: 1rem; font-weight: 600; color: #1e293b; margin: .25rem 0 0; }
 	.empty-hint  { font-size: .875rem; color: #94a3b8; margin: 0; }
+
+	/* ── Activity detail popup (same format as Activities page) ── */
+	.activity-detail-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.45);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+		padding: 1rem;
+	}
+	.activity-detail-modal {
+		background: white;
+		border-radius: 16px;
+		max-width: 480px;
+		width: 100%;
+		max-height: 90vh;
+		overflow-y: auto;
+		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+		padding: 1.5rem;
+	}
+	.activity-detail-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 0.75rem;
+	}
+	.activity-detail-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: #1e293b;
+		margin: 0;
+		line-height: 1.3;
+	}
+	.activity-detail-close {
+		flex-shrink: 0;
+		width: 32px;
+		height: 32px;
+		border: none;
+		background: #f1f5f9;
+		border-radius: 8px;
+		font-size: 1.25rem;
+		line-height: 1;
+		cursor: pointer;
+		color: #64748b;
+	}
+	.activity-detail-close:hover {
+		background: #e2e8f0;
+		color: #1e293b;
+	}
+	.activity-detail-rating {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 0.875rem;
+		color: #475569;
+		margin-bottom: 0.75rem;
+	}
+	.activity-detail-rating .star { color: #f59e0b; }
+	.activity-detail-rating .review-count { color: #94a3b8; }
+	.activity-detail-desc,
+	.activity-detail-recommendation {
+		font-size: 0.875rem;
+		color: #475569;
+		line-height: 1.5;
+		margin: 0 0 0.75rem;
+	}
+	.activity-detail-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin-bottom: 1rem;
+	}
+	.activity-detail-tag {
+		font-size: 0.75rem;
+		padding: 0.25rem 0.5rem;
+		background: #f1f5f9;
+		border-radius: 6px;
+		color: #64748b;
+	}
+	.activity-detail-meta {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin-bottom: 1.25rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid #e2e8f0;
+	}
+	.activity-detail-row {
+		font-size: 0.8125rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+	.activity-detail-label {
+		font-weight: 600;
+		color: #64748b;
+	}
+	.activity-detail-row a {
+		color: #E85D26;
+		text-decoration: none;
+	}
+	.activity-detail-row a:hover {
+		text-decoration: underline;
+	}
+	.activity-detail-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid #e2e8f0;
+	}
+	.activity-detail-actions .btn {
+		font-size: 0.875rem;
+	}
 
 	@media (max-width: 860px) {
 		.polls-body {

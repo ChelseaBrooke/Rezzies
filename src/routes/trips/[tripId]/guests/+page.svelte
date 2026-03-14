@@ -30,10 +30,14 @@
 	let showActivityLog = $state(false);
 
 	let inviteOpen = $state(false);
+	let inviteTab = $state<'email' | 'friends'>('email');
 	let inviteName = $state('');
 	let inviteEmail = $state('');
 	let inviteRole = $state<'guest' | 'co-host'>('guest');
 	let inviteError = $state('');
+	let friendsList = $state<{ id: string; name: string | null; avatarUrl: string | null }[]>([]);
+	let friendsLoading = $state(false);
+	let inviteFriendError = $state('');
 	let addManualOpen = $state(false);
 	let addManualName = $state('');
 	let addManualEmail = $state('');
@@ -163,11 +167,36 @@
 	}
 	function closeInvite() {
 		inviteOpen = false;
+		inviteTab = 'email';
 		inviteName = '';
 		inviteEmail = '';
 		inviteRole = 'guest';
 		inviteError = '';
+		inviteFriendError = '';
 	}
+	// User IDs already on the trip (members or pending invites with account)
+	const guestUserIds = $derived(
+		new Set(
+			(data.guestRows ?? []).map((r) => r.userId ?? r.recipientUserId).filter(Boolean) as string[]
+		)
+	);
+	const invitableFriends = $derived(friendsList.filter((f) => !guestUserIds.has(f.id)));
+	async function fetchFriendsForInvite() {
+		friendsLoading = true;
+		inviteFriendError = '';
+		try {
+			const res = await fetch('/api/users/me/friends');
+			const json = await res.json().catch(() => ({}));
+			friendsList = json.friends ?? [];
+		} finally {
+			friendsLoading = false;
+		}
+	}
+	$effect(() => {
+		if (inviteOpen && inviteTab === 'friends') {
+			fetchFriendsForInvite();
+		}
+	});
 	function openAddManual() {
 		addManualOpen = true;
 		addManualName = '';
@@ -1061,30 +1090,72 @@
 	<div class="gp-backdrop" onclick={closeInvite} role="presentation"></div>
 	<div class="gp-modal" role="dialog">
 		<h2 class="gp-modal-title">Invite someone</h2>
-		<form method="POST" action="?/createInvite" use:enhance={handleInviteSubmit}>
-			{#if inviteError}
-				<p class="gp-form-error" role="alert">{inviteError}</p>
-			{/if}
-			<div class="gp-form-group">
-				<label class="gp-label" for="invite-name">Name <span class="gp-label-opt">(optional)</span></label>
-				<input id="invite-name" class="gp-input" type="text" name="name" bind:value={inviteName} placeholder="Full name" />
+		<div class="gp-invite-tabs">
+			<button type="button" class="gp-invite-tab" class:active={inviteTab === 'email'} onclick={() => { inviteTab = 'email'; inviteError = ''; }}>By email</button>
+			<button type="button" class="gp-invite-tab" class:active={inviteTab === 'friends'} onclick={() => { inviteTab = 'friends'; inviteFriendError = ''; }}>From friends</button>
+		</div>
+		{#if inviteTab === 'email'}
+			<form method="POST" action="?/createInvite" use:enhance={handleInviteSubmit}>
+				{#if inviteError}
+					<p class="gp-form-error" role="alert">{inviteError}</p>
+				{/if}
+				<div class="gp-form-group">
+					<label class="gp-label" for="invite-name">Name <span class="gp-label-opt">(optional)</span></label>
+					<input id="invite-name" class="gp-input" type="text" name="name" bind:value={inviteName} placeholder="Full name" />
+				</div>
+				<div class="gp-form-group">
+					<label class="gp-label" for="invite-email">Email *</label>
+					<input id="invite-email" class="gp-input" type="email" name="email" bind:value={inviteEmail} placeholder="email@example.com" required />
+				</div>
+				<div class="gp-form-group">
+					<label class="gp-label" for="invite-role">Role</label>
+					<select id="invite-role" class="gp-input" name="role" bind:value={inviteRole}>
+						<option value="guest">Guest</option>
+						<option value="co-host">Co-host</option>
+					</select>
+				</div>
+				<div class="gp-modal-actions">
+					<button type="button" class="gp-btn gp-btn--ghost" onclick={closeInvite}>Cancel</button>
+					<button type="submit" class="gp-btn gp-btn--primary">Send invite</button>
+				</div>
+			</form>
+		{:else}
+			<div class="gp-invite-friends">
+				{#if inviteFriendError}
+					<p class="gp-form-error" role="alert">{inviteFriendError}</p>
+				{/if}
+				{#if friendsLoading}
+					<p class="gp-muted">Loading friends…</p>
+				{:else if invitableFriends.length === 0}
+					<p class="gp-muted">{friendsList.length === 0 ? "You don't have any friends yet. Add friends from their profiles, or invite by email above." : 'All your friends are already invited or on this trip.'}</p>
+				{:else}
+					<ul class="gp-friends-invite-list">
+						{#each invitableFriends as friend}
+							<li>
+								<form method="POST" action="?/inviteFriend" use:enhance={async ({ result }) => {
+									if (result.type === 'success' && result.data?.inviteFriendSuccess) { await invalidateAll(); inviteFriendError = ''; }
+									if (result.type === 'success' && result.data?.inviteFriendError) { inviteFriendError = result.data.inviteFriendError; }
+								}}>
+									<input type="hidden" name="friendUserId" value={friend.id} />
+									<div class="gp-friend-invite-row">
+										{#if friend.avatarUrl}
+											<img src={friend.avatarUrl} alt="" class="gp-friend-avatar" />
+										{:else}
+											<span class="gp-friend-initials">{friend.name ? (friend.name.slice(0, 2).toUpperCase()) : '?'}</span>
+										{/if}
+										<span class="gp-friend-name">{friend.name ?? 'Traveler'}</span>
+										<button type="submit" class="gp-btn gp-btn--primary gp-btn--sm">Invite</button>
+									</div>
+								</form>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+				<div class="gp-modal-actions">
+					<button type="button" class="gp-btn gp-btn--ghost" onclick={closeInvite}>Done</button>
+				</div>
 			</div>
-			<div class="gp-form-group">
-				<label class="gp-label" for="invite-email">Email *</label>
-				<input id="invite-email" class="gp-input" type="email" name="email" bind:value={inviteEmail} placeholder="email@example.com" required />
-			</div>
-			<div class="gp-form-group">
-				<label class="gp-label" for="invite-role">Role</label>
-				<select id="invite-role" class="gp-input" name="role" bind:value={inviteRole}>
-					<option value="guest">Guest</option>
-					<option value="co-host">Co-host</option>
-				</select>
-			</div>
-			<div class="gp-modal-actions">
-				<button type="button" class="gp-btn gp-btn--ghost" onclick={closeInvite}>Cancel</button>
-				<button type="submit" class="gp-btn gp-btn--primary">Send invite</button>
-			</div>
-		</form>
+		{/if}
 	</div>
 {/if}
 
@@ -1619,6 +1690,31 @@
 	}
 	.gp-input:focus { outline: none; border-color: var(--slate); box-shadow: 0 0 0 3px rgba(47,119,120,0.12); }
 	.gp-form-error { font-size: 0.875rem; color: #dc2626; margin: 0 0 1rem; }
+	.gp-muted { font-size: 0.875rem; color: var(--muted); margin: 0 0 1rem; }
+	.gp-invite-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
+	.gp-invite-tab {
+		padding: 0.4rem 0.75rem; border-radius: 8px; border: 1px solid var(--border);
+		background: var(--bg); color: var(--muted); font-size: 0.875rem; cursor: pointer;
+	}
+	.gp-invite-tab:hover { background: var(--border-soft); color: var(--text); }
+	.gp-invite-tab.active { background: var(--copper); color: white; border-color: var(--copper); }
+	.gp-invite-friends { min-height: 8rem; }
+	.gp-friends-invite-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+	.gp-friends-invite-list li { margin-bottom: 0.5rem; }
+	.gp-friends-invite-list form { margin: 0; }
+	.gp-friend-invite-row {
+		display: flex; align-items: center; gap: 0.75rem;
+		padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid var(--border);
+		background: var(--surfaceSolid);
+	}
+	.gp-friend-avatar { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; }
+	.gp-friend-initials {
+		width: 2rem; height: 2rem; border-radius: 50%;
+		background: var(--copper); color: white; display: flex; align-items: center; justify-content: center;
+		font-size: 0.75rem; font-weight: 600;
+	}
+	.gp-friend-name { flex: 1; font-size: 0.9375rem; color: var(--text); }
+	.gp-btn--sm { padding: 0.35rem 0.75rem; font-size: 0.8125rem; }
 
 	/* ── Responsive ── */
 	@media (max-width: 900px) {

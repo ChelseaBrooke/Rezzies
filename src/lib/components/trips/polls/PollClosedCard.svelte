@@ -5,9 +5,10 @@
 	interface Props {
 		poll: PollWithMeta;
 		onClick?: () => void;
+		onViewActivityDetails?: (snapshot: Record<string, unknown>) => void;
 	}
 
-	let { poll, onClick }: Props = $props();
+	let { poll, onClick, onViewActivityDetails }: Props = $props();
 
 	const icon = $derived(CATEGORY_ICONS[poll.category] ?? '📋');
 
@@ -61,6 +62,17 @@
 
 	<!-- Title -->
 	<h3 class="poll-title">{poll.title}</h3>
+
+	{#if poll.category === 'Activities' && poll.activitySnapshot && onViewActivityDetails}
+		<button
+			type="button"
+			class="btn-view-activity-details"
+			onclick={(e) => { e.stopPropagation(); e.preventDefault(); onViewActivityDetails(poll.activitySnapshot ?? {}); }}
+			aria-label="View activity details"
+		>
+			View activity details
+		</button>
+	{/if}
 
 		<!-- Results bars (top options, max 4) -->
 		{#if totalVotes > 0}
@@ -183,6 +195,19 @@
 		-webkit-line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
+	}
+	.btn-view-activity-details {
+		align-self: flex-start;
+		font-size: .75rem;
+		color: var(--primary, #E85D26);
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		text-decoration: underline;
+	}
+	.btn-view-activity-details:hover {
+		text-decoration: none;
 	}
 
 	/* Results bars */

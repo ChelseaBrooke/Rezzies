@@ -9,14 +9,18 @@ import { getStatusDisplay, getTimeLabel } from '$lib/components/trips/polls/util
 const POLL_CATEGORIES = ['Scheduling', 'Meals', 'Activities', 'Rooms/Beds', 'Other'];
 const VALID_SORTS = ['recent', 'ending_soon', 'most_votes', 'newest', 'oldest'];
 
-/** After a poll is closed: if it was an activity poll from Discover and "Add to itinerary" won, create the activity. */
+/** After a poll is closed: if it was an activity poll from Discover and "Add to itinerary" won, create the activity. Idempotent: skips if an activity already exists for same trip+title+date. */
 async function maybeCreateActivityFromClosedPoll(
-	poll: { id: string; tripId: string; title: string; description?: string | null; category: string; createdById: string; options: { id: string; label: string }[]; votes: { optionId: string }[] } & { activityDate?: Date | null; activityTime?: string | null; activityLocation?: string | null }
+	poll: { id: string; tripId: string; title: string; description?: string | null; category: string; createdById: string; options: { id: string; label: string }[]; votes: { optionId: string }[] } & { activityDate?: Date | string | null; activityTime?: string | null; activityLocation?: string | null }
 ): Promise<void> {
 	const p = poll;
-	if (p.category !== 'Activities' || p.activityDate == null) return;
-	const addOption = p.options.find((o) => o.label === 'Add to itinerary');
-	const skipOption = p.options.find((o) => o.label === 'Skip');
+	if (p.category !== 'Activities') return;
+	const activityDate = p.activityDate != null ? (p.activityDate instanceof Date ? p.activityDate : new Date(p.activityDate)) : null;
+	if (!activityDate || isNaN(activityDate.getTime())) return;
+	// Match options by normalized label (trim, case-insensitive)
+	const norm = (s: string) => (s ?? '').trim().toLowerCase();
+	const addOption = p.options.find((o) => norm(o.label) === 'add to itinerary');
+	const skipOption = p.options.find((o) => norm(o.label) === 'skip');
 	if (!addOption || !skipOption) return;
 	const addVotes = p.votes.filter((v) => v.optionId === addOption.id).length;
 	const skipVotes = p.votes.filter((v) => v.optionId === skipOption.id).length;
@@ -24,14 +28,27 @@ async function maybeCreateActivityFromClosedPoll(
 	const activityTitle = p.title.startsWith('Activity: ')
 		? p.title.slice('Activity: '.length).trim()
 		: p.title;
+	// Idempotent: avoid duplicate if we already created this activity (e.g. from a previous close/load)
+	const dayStart = new Date(activityDate);
+	dayStart.setUTCHours(0, 0, 0, 0);
+	const dayEnd = new Date(dayStart);
+	dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+	const existing = await prisma.activity.findFirst({
+		where: {
+			tripId: p.tripId,
+			title: activityTitle,
+			date: { gte: dayStart, lt: dayEnd }
+		}
+	});
+	if (existing) return;
 	const activity = await prisma.activity.create({
 		data: {
 			tripId: p.tripId,
 			title: activityTitle,
-			date: p.activityDate,
-			time: p.activityTime ?? null,
-			location: p.activityLocation ?? null,
-			notes: p.description ?? null,
+			date: activityDate,
+			time: (p.activityTime ?? null) as string | null,
+			location: (p.activityLocation ?? null) as string | null,
+			notes: (p.description ?? null) as string | null,
 			status: 'planned'
 		}
 	});
@@ -64,7 +81,23 @@ export const load: PageServerLoad = async ({ parent, params, url, cookies }) => 
 		});
 		for (const poll of expired) {
 			await prisma.poll.update({ where: { id: poll.id }, data: { status: 'closed' } });
-			await maybeCreateActivityFromClosedPoll(poll as any);
+			try {
+				await maybeCreateActivityFromClosedPoll(poll as any);
+			} catch (err) {
+				console.error('Polls load: failed to create activity from expired poll', poll.id, err);
+			}
+		}
+		// Repair: for already-closed Activities polls with activityDate where "Add to itinerary" won, ensure activity exists (idempotent)
+		const closedActivityPolls = await prisma.poll.findMany({
+			where: { tripId, status: 'closed', category: 'Activities', activityDate: { not: null } },
+			include: { options: true, votes: true }
+		});
+		for (const poll of closedActivityPolls) {
+			try {
+				await maybeCreateActivityFromClosedPoll(poll as any);
+			} catch (err) {
+				console.error('Polls load: failed to create activity from closed poll', poll.id, err);
+			}
 		}
 
 		const where: any = { tripId };
@@ -134,6 +167,10 @@ export const load: PageServerLoad = async ({ parent, params, url, cookies }) => 
 				updatedAt: poll.updatedAt,
 				createdById: poll.createdById,
 				createdBy: poll.createdBy,
+				activityDate: (poll as any).activityDate ?? null,
+				activityTime: (poll as any).activityTime ?? null,
+				activityLocation: (poll as any).activityLocation ?? null,
+				activitySnapshot: (poll as any).activitySnapshot ?? null,
 				options: poll.options.map((o: any) => ({
 					id: o.id,
 					label: o.label,
@@ -378,7 +415,12 @@ export const actions: Actions = {
 		}
 
 		await prisma.poll.update({ where: { id: pollId }, data: { status: 'closed' } });
-		await maybeCreateActivityFromClosedPoll(poll as any);
+		try {
+			await maybeCreateActivityFromClosedPoll(poll as any);
+		} catch (err) {
+			console.error('Polls close: failed to create activity from poll', pollId, err);
+			// Poll is already closed; still return success
+		}
 
 		return { closeSuccess: true };
 	},
