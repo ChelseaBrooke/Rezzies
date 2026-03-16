@@ -179,6 +179,9 @@
 			{activities}
 			{mealSlots}
 			selectedMode={dashboardMode}
+			itineraryHref={trip ? `/trips/${trip.id}/itinerary` : ''}
+			gamesHref={trip ? `/trips/${trip.id}/games` : ''}
+			gamesCount={data.tripGames?.length ?? 0}
 		/>
 	{/if}
 	{#if dashboardMode === 'vacation'}

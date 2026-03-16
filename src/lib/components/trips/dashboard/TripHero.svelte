@@ -28,6 +28,12 @@
 		mealSlots?: Array<unknown>;
 		/** From header store; read-only here */
 		selectedMode?: DashboardMode;
+		/** Link to itinerary (meals + activities); when set, meals/activities counts are clickable */
+		itineraryHref?: string;
+		/** Link to games page; when set, games count is clickable */
+		gamesHref?: string;
+		/** Number of games (for "Z games" line) */
+		gamesCount?: number;
 	}
 
 	let {
@@ -44,8 +50,15 @@
 		checkOutDate = '',
 		activities = [],
 		mealSlots = [],
-		selectedMode = 'planning'
+		selectedMode = 'planning',
+		itineraryHref = '',
+		gamesHref = '',
+		gamesCount = 0
 	}: Props = $props();
+
+	const mealsCount = $derived(mealSlots.length);
+	const activitiesCount = $derived(activities.length);
+	const showMealsActivitiesGames = $derived(mealsCount > 0 || activitiesCount > 0 || gamesCount > 0);
 
 	const destinationLabel = $derived((trip.locationCity ?? trip.fullAddress ?? trip.location)?.trim() ?? '');
 	const isCompact = $derived(selectedMode === 'vacation' || selectedMode === 'recap');
@@ -73,6 +86,27 @@
 
 		<div class="compact-content">
 			<div class="compact-left">
+				{#if showMealsActivitiesGames}
+					<div class="hero-counts">
+						{#if itineraryHref}
+							<a href={itineraryHref} class="hero-count-link">{mealsCount} meals</a>
+						{:else}
+							<span class="hero-count-text">{mealsCount} meals</span>
+						{/if}
+						<span class="hero-count-sep">|</span>
+						{#if itineraryHref}
+							<a href={itineraryHref} class="hero-count-link">{activitiesCount} activities</a>
+						{:else}
+							<span class="hero-count-text">{activitiesCount} activities</span>
+						{/if}
+						<span class="hero-count-sep">|</span>
+						{#if gamesHref}
+							<a href={gamesHref} class="hero-count-link">{gamesCount} games</a>
+						{:else}
+							<span class="hero-count-text">{gamesCount} games</span>
+						{/if}
+					</div>
+				{/if}
 				<h1 class="compact-name">{trip.name ?? 'Trip'}</h1>
 				<div class="compact-meta">
 					{#if calendarAddUrl}
@@ -135,6 +169,27 @@
 			{/if}
 			<div class="hero-overlay">
 				<div class="hero-content">
+				{#if showMealsActivitiesGames}
+					<div class="hero-counts">
+						{#if itineraryHref}
+							<a href={itineraryHref} class="hero-count-link">{mealsCount} meals</a>
+						{:else}
+							<span class="hero-count-text">{mealsCount} meals</span>
+						{/if}
+						<span class="hero-count-sep">|</span>
+						{#if itineraryHref}
+							<a href={itineraryHref} class="hero-count-link">{activitiesCount} activities</a>
+						{:else}
+							<span class="hero-count-text">{activitiesCount} activities</span>
+						{/if}
+						<span class="hero-count-sep">|</span>
+						{#if gamesHref}
+							<a href={gamesHref} class="hero-count-link">{gamesCount} games</a>
+						{:else}
+							<span class="hero-count-text">{gamesCount} games</span>
+						{/if}
+					</div>
+				{/if}
 				<h1 class="hero-name">{trip.name ?? 'Trip'}</h1>
 				<div class="hero-subline">
 					{#if calendarAddUrl}
@@ -236,6 +291,12 @@
 		flex-direction: column;
 		gap: 0.375rem;
 		min-width: 0;
+	}
+
+	.compact-left .hero-counts {
+		font-size: 0.8125rem;
+		color: rgba(255, 255, 255, 0.85);
+		justify-content: flex-start;
 	}
 
 	.compact-name {
@@ -462,6 +523,35 @@
 		align-items: center;
 		gap: 1rem;
 		text-align: center;
+	}
+
+	.hero-counts {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		font-size: 0.875rem;
+		color: rgba(255, 255, 255, 0.9);
+	}
+
+	.hero-count-link {
+		color: rgba(255, 255, 255, 0.95);
+		text-decoration: none;
+		font-weight: 500;
+	}
+	.hero-count-link:hover {
+		text-decoration: underline;
+		color: white;
+	}
+
+	.hero-count-text {
+		color: rgba(255, 255, 255, 0.9);
+	}
+
+	.hero-count-sep {
+		color: rgba(255, 255, 255, 0.5);
+		user-select: none;
 	}
 
 	.hero-name {
