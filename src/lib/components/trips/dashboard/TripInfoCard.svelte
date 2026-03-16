@@ -307,7 +307,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		margin-bottom: 0.75rem;
+		margin-bottom: 0.5rem;
 	}
 
 	.tic-header-icon {
@@ -377,8 +377,8 @@
 	.tic-desc-row {
 		display: flex;
 		flex-direction: column;
-		gap: 0.3rem;
-		padding-bottom: 1rem;
+		gap: 0.2rem;
+		padding-bottom: 0.5rem;
 		margin-bottom: 0.25rem;
 		border-bottom: 1px solid var(--border-soft, rgba(0,0,0,0.06));
 	}
@@ -387,7 +387,7 @@
 	.tic-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 0.75rem 1.25rem;
+		gap: 0.5rem 1rem;
 		flex: 1;
 		min-height: 0;
 		overflow: hidden;
@@ -397,14 +397,14 @@
 	.tic-cell {
 		display: flex;
 		flex-direction: column;
-		gap: 0.45rem;
+		gap: 0.3rem;
 		min-width: 0;
 	}
 
 	.tic-cell-label-row {
 		display: flex;
 		align-items: center;
-		gap: 0.3rem;
+		gap: 0.25rem;
 	}
 
 	.tic-cell-icon {
@@ -455,21 +455,22 @@
 	/* ── Check-in/out chips ── */
 	.tic-time-chips {
 		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
+		flex-direction: row;
+		flex-wrap: wrap;
+		gap: 0.5rem 0.75rem;
 	}
 
 	.tic-time-chip {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.35rem;
+		gap: 0.3rem;
 		font-size: 0.75rem;
 		font-weight: 500;
 		color: var(--text, #111827);
 		background: #f8fafc;
 		border: 1px solid #e2e8f0;
 		border-radius: 6px;
-		padding: 0.25rem 0.625rem;
+		padding: 0.2rem 0.5rem;
 		width: fit-content;
 	}
 
@@ -525,7 +526,7 @@
 	.tic-costs {
 		display: flex;
 		flex-direction: column;
-		gap: 0.35rem;
+		gap: 0.25rem;
 		padding-top: 0.25rem;
 		border-top: 1px solid var(--border-soft);
 	}
@@ -540,7 +541,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.3rem 0;
+		padding: 0.2rem 0;
 		font-size: 0.8125rem;
 		color: var(--text);
 		border-bottom: 1px solid var(--border-soft);

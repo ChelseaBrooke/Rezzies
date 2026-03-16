@@ -390,12 +390,6 @@
 								{acceptedRsvpCount} going
 							</span>
 						{/if}
-						{#if pendingRsvpCount > 0}
-							<span class="guests-stat">
-								<span class="guests-stat-dot pending"></span>
-								{pendingRsvpCount} pending
-							</span>
-						{/if}
 						{#if declinedRsvpCount > 0}
 							<span class="guests-stat">
 								<span class="guests-stat-dot declined"></span>
@@ -425,25 +419,18 @@
 	 *   Col 2 (wide):   Trip Info (row 1) + Guests (row 2)
 	 *   Col 3 (narrow): Progress / RSVP — spans rows 1–2
 	 */
+	/*
+	 * Uniform spacing: same gap (1rem) between main photo and grid, between columns, and between rows.
+	 * Progress box stays anchored: grid height reduced by the extra margin so the bottom doesn’t move.
+	 */
 	.dashboard-layout {
 		display: grid;
 		grid-template-columns: minmax(0, 370px) minmax(0, 1fr) minmax(0, 290px);
-		/*
-		 * Row 1 (Trip Info + sticky + Recent Activity top): takes all remaining space.
-		 * Row 2 (Guests + Recent Activity bottom): auto-sizes to Guests card content.
-		 * Together these fill exactly the remaining viewport, producing no page scroll.
-		 */
 		grid-template-rows: 1fr auto;
-		gap: 1.25rem;
-		/*
-		 * Fixed height = viewport - AppShell outer padding (24px) - main-content padding
-		 * top/bottom (8px + 32px = 40px) - TripHero (460px + 3rem margin = 508px)
-		 * - dashboard margin-top (0.5rem = 8px) = 100vh - 580px.
-		 * This anchors all cards and prevents any page scroll.
-		 */
-		height: calc(100vh - 580px);
+		gap: 1rem;
+		height: calc(100vh - 588px);
 		min-height: 260px;
-		margin-top: 0.5rem;
+		margin-top: 1rem;
 		position: relative;
 		z-index: 0;
 		width: 100%;
@@ -482,7 +469,7 @@
 		flex-direction: column;
 	}
 
-	/* Col 2, Row 1 — Trip Info: drives the row height; content is truncated, not scrolled */
+	/* Col 2, Row 1 — Trip Info */
 	.goals-cell {
 		grid-column: 2;
 		grid-row: 1;
@@ -522,12 +509,13 @@
 		min-height: 0;
 	}
 
-	/* Recent Activity card — stretches full column height */
+	/* Recent Activity card — limited height so it doesn’t collide with Chat */
 	.recent-cell :global(.dashboard-card) {
 		flex: 1;
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
+		max-height: 320px;
 	}
 
 	.recent-cell :global(.card-body) {
@@ -540,12 +528,18 @@
 
 	.recent-cell .activity-feed {
 		flex: 1;
-		overflow: hidden;
+		overflow: auto;
+		min-height: 0;
 	}
 
 	.guests-card-wrapper {
 		width: 100%;
 		overflow: hidden;
+		max-height: 140px;
+	}
+
+	.guests-card-wrapper :global(.dashboard-card) {
+		max-height: 140px;
 	}
 
 	/* Trip info card wrapper — fills goals-cell so card stretches to row 1 height */
@@ -556,7 +550,7 @@
 		flex-direction: column;
 	}
 
-	/* Progress / Your RSVP: fills the wrapper (which is sized by the layout, not content) */
+	/* Progress / Your RSVP: orange gradient, white text */
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
 		flex: 1;
 		width: 100%;
@@ -571,6 +565,7 @@
 				rgba(206, 86, 18, 0.72) 55%,
 				rgba(165, 68, 14, 0.80) 100%
 			);
+		box-shadow: var(--shadow-soft);
 	}
 
 	.sticky-card-wrapper :global(.card-header) {
@@ -590,7 +585,7 @@
 		min-height: 0;
 	}
 
-	/* All Progress / RSVP content white on solid orange */
+	/* Progress / RSVP — white text and UI on orange */
 	.sticky-card-wrapper :global(.card-title) { color: white; }
 	.sticky-card-wrapper :global(.pin-circle) { background: rgba(255, 255, 255, 0.22); }
 	.sticky-card-wrapper :global(.pin-svg) { color: white; stroke: white; }
@@ -604,7 +599,7 @@
 		border-color: rgba(255, 255, 255, 0.4);
 	}
 
-	/* TripGoalsCombined on solid orange */
+	/* TripGoalsCombined */
 	.sticky-card-wrapper :global(.overall-label) { color: rgba(255, 255, 255, 0.72); }
 	.sticky-card-wrapper :global(.overall-pct) { color: white; }
 	.sticky-card-wrapper :global(.overall-track) { background: rgba(255, 255, 255, 0.22); }
@@ -613,14 +608,13 @@
 	.sticky-card-wrapper :global(.stat-icon) { color: rgba(255, 255, 255, 0.8); opacity: 1; }
 	.sticky-card-wrapper :global(.stat-label) { color: rgba(255, 255, 255, 0.92); }
 	.sticky-card-wrapper :global(.stat-value) { color: white; }
-	.sticky-card-wrapper :global(.stat-value.done) { color: white; }
 	.sticky-card-wrapper :global(.stat-check) { color: white; }
 	.sticky-card-wrapper :global(.bar-track) { background: rgba(255, 255, 255, 0.22); }
 	.sticky-card-wrapper :global(.bar-fill) { background: white; opacity: 0.65; }
 	.sticky-card-wrapper :global(.bar-fill.done) { background: white; opacity: 1; }
 	.sticky-card-wrapper :global(.stat-row:hover) { background: rgba(255, 255, 255, 0.1); }
 
-	/* GuestRsvpSummaryCard on solid orange */
+	/* GuestRsvpSummaryCard */
 	.sticky-card-wrapper :global(.status-banner) { border-color: rgba(255, 255, 255, 0.2); color: white; }
 	.sticky-card-wrapper :global(.status-icon) { color: white; }
 	.sticky-card-wrapper :global(.status-text) { color: white; }
@@ -894,7 +888,7 @@
 	.guests-preview {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.35rem;
 	}
 
 	.avatar-row {
