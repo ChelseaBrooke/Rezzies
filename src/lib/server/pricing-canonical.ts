@@ -518,6 +518,65 @@ export async function computePerBedPricingAtHeadcount(
 	return { totalNights, bedPricing };
 }
 
+export interface CostAtMaxParticipation {
+	pricingModel: string;
+	maxHeadcount: number;
+	totalNights: number;
+	totalCost: number;
+	/** PER_PERSON: price per person when max headcount say yes */
+	perPersonAtMax: number | null;
+	/** PER_PERSON_PER_NIGHT: price per person per night at max */
+	perPersonPerNightAtMax: number | null;
+	/** PER_BED / PER_ROOM: average per person at max (totalCost / maxHeadcount) */
+	perPersonAverageAtMax: number | null;
+}
+
+/**
+ * For host dashboard: cost when everyone invited says yes (max participation).
+ * Used to incentivize driving RSVPs so price per person goes down.
+ */
+export async function getCostAtMaxParticipation(tripId: string): Promise<CostAtMaxParticipation | null> {
+	const trip = await prisma.trip.findUnique({
+		where: { id: tripId },
+		include: { rooms: { include: { beds: true } } }
+	});
+	if (!trip || trip.rooms.length === 0) return null;
+
+	const totalSlots = trip.rooms.reduce(
+		(s, r) => s + r.beds.reduce((b, bed) => b + (bed.capacitySlots ?? bed.capacity ?? 1), 0),
+		0
+	);
+	const maxHeadcount = Math.max(1, trip.maxGuests ?? totalSlots);
+	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
+	const model = (trip.pricingModel ?? 'per_person').toLowerCase();
+
+	const base: CostAtMaxParticipation = {
+		pricingModel: trip.pricingModel ?? 'PER_PERSON',
+		maxHeadcount,
+		totalNights,
+		totalCost: trip.totalCost,
+		perPersonAtMax: null,
+		perPersonPerNightAtMax: null,
+		perPersonAverageAtMax: null
+	};
+
+	if (model === 'per_person') {
+		base.perPersonAtMax = Math.round((trip.totalCost / maxHeadcount) * 100) / 100;
+		return base;
+	}
+	if (model === 'per_person_per_night') {
+		const perPersonPerNight = trip.totalCost / (maxHeadcount * totalNights);
+		base.perPersonPerNightAtMax = Math.round(perPersonPerNight * 100) / 100;
+		base.perPersonAtMax = Math.round((trip.totalCost / maxHeadcount) * 100) / 100;
+		return base;
+	}
+	if (model === 'per_bed' || model === 'per_room') {
+		base.perPersonAverageAtMax = Math.round((trip.totalCost / maxHeadcount) * 100) / 100;
+		return base;
+	}
+	return base;
+}
+
 /**
  * Sum of current expected cost for all yes-RSVPs based on their reserved beds/rooms/slots.
  * PER_BED: uses same formula as calculateReservationPrice (effectiveGuests × avgSpotWeight).

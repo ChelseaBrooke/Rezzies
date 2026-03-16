@@ -2,9 +2,11 @@
 	import DashboardCard from './DashboardCard.svelte';
 	import TripGoalsCombined from './TripGoalsCombined.svelte';
 	import TripInfoCard from './TripInfoCard.svelte';
+	import CostAtMaxParticipationCard from './CostAtMaxParticipationCard.svelte';
 	import GuestRsvpSummaryCard from './GuestRsvpSummaryCard.svelte';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
+	import type { CostAtMaxParticipation } from '$lib/server/pricing-canonical.js';
 
 	interface ChecklistStats {
 		rsvp_pending?: number;
@@ -81,6 +83,8 @@
 		tripInfoEdited?: boolean;
 		/** ISO date string for check-in (drives countdown in progress/RSVP cards) */
 		tripCheckInDate?: string;
+		/** Host only: cost when all spots fill (incentive to drive RSVPs) */
+		costAtMaxParticipation?: CostAtMaxParticipation | null;
 		/** Recent activity feed sources */
 		recentActivities?: Array<{ title: string; createdAt: string }>;
 		recentMealSlots?: Array<{ mealType: string; title: string | null; createdAt: string }>;
@@ -130,6 +134,7 @@
 		tripInfo = {},
 		tripInfoEdited = false,
 		tripCheckInDate = '',
+		costAtMaxParticipation = null,
 		recentActivities = [],
 		recentMealSlots = [],
 		recentGames = [],
@@ -161,6 +166,14 @@
 	function mealLabel(mealType: string): string {
 		return mealType.charAt(0).toUpperCase() + mealType.slice(1).toLowerCase();
 	}
+
+	/** Trip info progress: check-in time, check-out time, parking (3 things) */
+	const TRIP_INFO_TOTAL = 3;
+	const tripInfoFilled = $derived(
+		(tripInfo?.checkInTime?.trim() ? 1 : 0) +
+		(tripInfo?.checkOutTime?.trim() ? 1 : 0) +
+		(tripInfo?.parkingNotes?.trim() ? 1 : 0)
+	);
 
 	const activityFeed = $derived.by((): RecentActivity[] => {
 		const items: RecentActivity[] = [];
@@ -282,6 +295,8 @@
 							{roomsHref}
 							{paymentsHref}
 							{tripCheckInDate}
+							tripInfoFilled={tripInfoFilled}
+							tripInfoTotal={TRIP_INFO_TOTAL}
 						/>
 					</DashboardCard>
 				{:else}
@@ -301,19 +316,23 @@
 		<div class="goals-cell" id="trip-info">
 			<div class="goals-card-wrap">
 				<DashboardCard>
-					<TripInfoCard
-						isHost={isHost}
-						tripId={tripId}
-						description={tripInfo?.description ?? tripDescription}
-						checkInTime={tripInfo?.checkInTime}
-						checkOutTime={tripInfo?.checkOutTime}
-						fullAddress={tripInfo?.fullAddress}
-						parkingNotes={tripInfo?.parkingNotes}
-						houseRules={tripInfo?.houseRules}
-						{extraCostRules}
-						itineraryHref={itineraryHref}
-						showToast={showToast}
-					/>
+					{#if isHost && costAtMaxParticipation != null}
+						<CostAtMaxParticipationCard data={costAtMaxParticipation} {tripId} />
+					{:else}
+						<TripInfoCard
+							isHost={isHost}
+							tripId={tripId}
+							description={tripInfo?.description ?? tripDescription}
+							checkInTime={tripInfo?.checkInTime}
+							checkOutTime={tripInfo?.checkOutTime}
+							fullAddress={tripInfo?.fullAddress}
+							parkingNotes={tripInfo?.parkingNotes}
+							houseRules={tripInfo?.houseRules}
+							{extraCostRules}
+							itineraryHref={itineraryHref}
+							showToast={showToast}
+						/>
+					{/if}
 				</DashboardCard>
 			</div>
 		</div>

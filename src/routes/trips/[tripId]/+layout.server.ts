@@ -2,7 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { getUserTripMembership, getUserTrips } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
-import { computeCommittedFundsFromYesRsvps } from '$lib/server/pricing-canonical.js';
+import { computeCommittedFundsFromYesRsvps, getCostAtMaxParticipation } from '$lib/server/pricing-canonical.js';
 
 export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 	// Re-use the user attached by hooks.server.ts — avoids a second DB session lookup.
@@ -38,7 +38,8 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 		membership = { ...membership, inviteStatus: 'accepted' };
 	}
 
-	const [trip, , tripsResult, userRsvp, committedFunds] = await Promise.all([
+	const isHost = membership?.role === 'host';
+	const [trip, , tripsResult, userRsvp, committedFunds, costAtMaxParticipation] = await Promise.all([
 		prisma.trip.findUnique({
 			where: { id: tripId },
 			include: {
@@ -78,7 +79,8 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 			where: { tripId_userId: { tripId, userId: user.id } }
 		}),
 		// Runs in parallel with trip fetch instead of serially after
-		computeCommittedFundsFromYesRsvps(tripId)
+		computeCommittedFundsFromYesRsvps(tripId),
+		isHost ? getCostAtMaxParticipation(tripId) : Promise.resolve(null)
 	]);
 
 	if (!trip) {
@@ -149,7 +151,8 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 		trip,
 		allTrips,
 		membership,
-		isHost: membership?.role === 'host',
+		isHost,
+		costAtMaxParticipation: costAtMaxParticipation ?? null,
 		userRsvp,
 		canChat: userRsvp?.status === 'yes' || membership?.role === 'host',
 		pendingInviteToken,

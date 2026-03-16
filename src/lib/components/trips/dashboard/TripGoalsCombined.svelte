@@ -16,7 +16,9 @@
 		guestsHref = '',
 		roomsHref = '',
 		paymentsHref = '',
-		tripCheckInDate = ''
+		tripCheckInDate = '',
+		tripInfoFilled = 0,
+		tripInfoTotal = 3
 	}: {
 		rsvpCurrent?: number;
 		rsvpTotal?: number;
@@ -35,6 +37,8 @@
 		roomsHref?: string;
 		paymentsHref?: string;
 		tripCheckInDate?: string;
+		tripInfoFilled?: number;
+		tripInfoTotal?: number;
 	} = $props();
 
 	const daysUntil = $derived.by(() => {
@@ -53,6 +57,8 @@
 			? `$${Math.round(fundingCurrent).toLocaleString()} / $${Math.round(fundingTotal).toLocaleString()}`
 			: fundingDisplay || 'Not set'
 	);
+
+	const tripInfoPct = $derived(tripInfoTotal > 0 ? Math.min(100, Math.round((tripInfoFilled / tripInfoTotal) * 100)) : 0);
 
 	const stats = $derived([
 		{
@@ -82,12 +88,19 @@
 			value: bedsTotal > 0 ? `${bedsCurrent} / ${bedsTotal}` : '—',
 			pct: bedsPct,
 			href: roomsHref
+		},
+		{
+			key: 'tripinfo',
+			label: 'Trip info',
+			value: tripInfoTotal > 0 ? `${tripInfoFilled} / ${tripInfoTotal}` : '—',
+			pct: tripInfoPct,
+			href: '#trip-info'
 		}
 	]);
 
 	const overallPct = $derived(
 		Math.round(
-			([rsvpPct, bedsPct, roomsPct, fundingPctClamped].reduce((a, b) => a + b, 0)) / 4
+			([rsvpPct, bedsPct, roomsPct, fundingPctClamped, tripInfoPct].reduce((a, b) => a + b, 0)) / 5
 		)
 	);
 </script>
@@ -122,6 +135,12 @@
 							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 								<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
 								<polyline points="9 22 9 12 15 12 15 22"/>
+							</svg>
+						{:else if stat.key === 'tripinfo'}
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<circle cx="12" cy="12" r="10"/>
+								<line x1="12" y1="8" x2="12" y2="12"/>
+								<line x1="12" y1="16" x2="12.01" y2="16"/>
 							</svg>
 						{:else}
 							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

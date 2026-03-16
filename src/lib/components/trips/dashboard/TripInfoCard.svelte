@@ -14,7 +14,9 @@
 		extraCostRules = [],
 		itineraryHref = '',
 		onSave,
-		showToast
+		showToast,
+		/** When true, render only the body (no "Trip Info" header) for embedding in hero strip */
+		embedInHero = false
 	}: {
 		isHost?: boolean;
 		tripId?: string;
@@ -28,6 +30,7 @@
 		itineraryHref?: string;
 		onSave?: () => void;
 		showToast?: (msg: string) => void;
+		embedInHero?: boolean;
 	} = $props();
 
 	let editing = $state(false);
@@ -115,27 +118,29 @@
 	});
 </script>
 
-<div class="tic">
-	<!-- Header band — negative margin matches DashboardCard padding (0.5rem / 0.625rem) -->
-	<div class="tic-header">
-		<span class="tic-header-icon" aria-hidden="true">
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-				<circle cx="12" cy="12" r="10"/>
-				<line x1="12" y1="8" x2="12" y2="12"/>
-				<line x1="12" y1="16" x2="12.01" y2="16"/>
-			</svg>
-		</span>
-		<h2 class="tic-title">Trip Info</h2>
-		{#if isHost}
-			<button type="button" class="tic-edit-btn" onclick={startEdit} aria-label="Edit trip info">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-					<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+<div class="tic" class:tic-embed={embedInHero}>
+	{#if !embedInHero}
+		<!-- Header band — negative margin matches DashboardCard padding (0.5rem / 0.625rem) -->
+		<div class="tic-header">
+			<span class="tic-header-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+					<circle cx="12" cy="12" r="10"/>
+					<line x1="12" y1="8" x2="12" y2="12"/>
+					<line x1="12" y1="16" x2="12.01" y2="16"/>
 				</svg>
-				Edit
-			</button>
-		{/if}
-	</div>
+			</span>
+			<h2 class="tic-title">Trip Info</h2>
+			{#if isHost}
+				<button type="button" class="tic-edit-btn" onclick={startEdit} aria-label="Edit trip info">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+						<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+					</svg>
+					Edit
+				</button>
+			{/if}
+		</div>
+	{/if}
 
 	{#if isHost && editing}
 		<!-- ── Edit form ── -->
@@ -300,6 +305,11 @@
 		flex: 1;
 		min-height: 0;
 		overflow: hidden;
+	}
+
+	.tic-embed {
+		/* In hero strip: no card chrome, content only */
+		min-height: unset;
 	}
 
 	/* ── Header: matches DashboardCard .card-header exactly, no background ── */
