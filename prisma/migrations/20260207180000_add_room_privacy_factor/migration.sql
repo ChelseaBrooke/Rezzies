@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Room" ADD COLUMN "privacyFactor" DOUBLE PRECISION NOT NULL DEFAULT 1.0;

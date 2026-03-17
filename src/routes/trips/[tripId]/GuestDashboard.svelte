@@ -5,6 +5,7 @@
 	import TripHero from '$lib/components/trips/dashboard/TripHero.svelte';
 	import TripDashboardGrid from '$lib/components/trips/dashboard/TripDashboardGrid.svelte';
 	import VacationModeView from '$lib/components/trips/dashboard/VacationModeView.svelte';
+	import PollCardContainer from '$lib/components/trips/polls/PollCardContainer.svelte';
 	import RecapModeView from '$lib/components/trips/dashboard/RecapModeView.svelte';
 	import { dashboardModeByTripId } from '$lib/stores/dashboardMode.js';
 	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
@@ -154,7 +155,8 @@
 
 {#if trip}
 	{#if dashboardMode === 'planning'}
-		<TripHero
+		<div class="planning-hero-wrap">
+			<TripHero
 			trip={{
 				id: trip.id,
 				name: trip.name,
@@ -183,6 +185,8 @@
 			gamesHref={trip ? `/trips/${trip.id}/games` : ''}
 			gamesCount={data.tripGames?.length ?? 0}
 		/>
+			<PollCardContainer tripId={trip.id} placement="hero" />
+		</div>
 	{/if}
 	{#if dashboardMode === 'vacation'}
 		<VacationModeView
@@ -288,3 +292,9 @@
 		/>
 		{/if}
 {/if}
+
+<style>
+	.planning-hero-wrap {
+		position: relative;
+	}
+</style>

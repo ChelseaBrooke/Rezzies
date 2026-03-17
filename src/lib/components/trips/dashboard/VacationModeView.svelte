@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
+	import PollCardContainer from '$lib/components/trips/polls/PollCardContainer.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import { getTripGames, GAME_DEFS } from '$lib/stores/tripGames.js';
 	import type { TripGame } from '$lib/stores/tripGames.js';
@@ -295,6 +296,7 @@
 
 <!-- ════════════════ TEMPLATE ════════════════ -->
 <div class="v">
+	<PollCardContainer tripId={tripId} placement="sidebar-left" />
 	<!-- 1 ── HERO -->
 	<header class="v-hero">
 		<div class="v-hero-clip">

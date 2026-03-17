@@ -3,7 +3,6 @@
 	import type { Snippet } from 'svelte';
 	import AppShell from '$lib/components/trips/dashboard/AppShell.svelte';
 	import TripChat from '$lib/components/trips/TripChat.svelte';
-
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
 	// Trip is in recap (past checkout) — disable editing (e.g. hide Settings)
