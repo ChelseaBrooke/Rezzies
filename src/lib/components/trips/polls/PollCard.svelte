@@ -45,9 +45,10 @@
 		background: var(--surface, #fff);
 		border-radius: var(--radius-xl, 16px);
 		box-shadow: var(--shadow-soft, 0 4px 20px rgba(0, 0, 0, 0.08));
-		padding: 1rem 1.125rem;
-		min-width: 0;
-		max-width: 320px;
+		padding: 1.25rem 1.375rem;
+		width: 320px;
+		min-height: 200px;
+		box-sizing: border-box;
 		border: 1px solid var(--border-soft, rgba(0, 0, 0, 0.06));
 	}
 
