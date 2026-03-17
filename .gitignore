@@ -5,6 +5,9 @@ node_modules/
 
 # Testing
 coverage/
+e2e/.auth/
+playwright-report/
+test-results/
 
 # Production
 build/
@@ -28,7 +31,7 @@ yarn-error.log*
 .env.development.local
 
 # Prisma
-prisma/migrations/
+# prisma/migrations/ should be tracked in git
 
 # IDE
 .vscode/
