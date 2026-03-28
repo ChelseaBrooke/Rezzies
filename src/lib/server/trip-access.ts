@@ -1,5 +1,4 @@
 import { prisma } from './prisma.js';
-import type { User } from '@prisma/client';
 
 export async function getUserTripMembership(tripId: string, userId: string) {
 	return prisma.tripMember.findUnique({
@@ -26,31 +25,48 @@ export async function isTripHostOrCoHost(tripId: string, userId: string): Promis
 	return membership?.role === 'host' || membership?.role === 'co-host';
 }
 
-/** Invite statuses that still have access to the trip. Removed = no access. */
-const ACTIVE_INVITE_STATUSES: string[] = ['invited', 'accepted'];
-
-/** Display state for a user on a trip: Invited → Accepted → RSVPyes | RSVPno; or Removed by host. */
-export type MemberTripState = 'invited' | 'accepted' | 'rsvp_yes' | 'rsvp_no' | 'removed';
+/** Display state for a user on a trip. */
+export type MemberTripState = 'pending' | 'approved' | 'rsvp_yes' | 'rsvp_no' | 'denied';
 
 export function getMemberTripState(
 	member: { inviteStatus: string },
 	rsvp: { status: string } | null
 ): MemberTripState {
-	if (member.inviteStatus === 'removed') return 'removed';
-	if (member.inviteStatus === 'invited') return 'invited';
+	if (member.inviteStatus === 'denied') return 'denied';
+	if (member.inviteStatus === 'pending') return 'pending';
 	if (rsvp?.status === 'yes') return 'rsvp_yes';
 	if (rsvp?.status === 'no') return 'rsvp_no';
-	return 'accepted'; // accepted + no yes/no RSVP (or maybe)
+	return 'approved'; // approved + no yes/no RSVP yet
 }
 
+/** Returns the membership row only for **approved** members. */
+export async function isApprovedMember(
+	tripId: string,
+	userId: string
+): Promise<boolean> {
+	const membership = await prisma.tripMember.findUnique({
+		where: { tripId_userId: { tripId, userId } },
+		select: { inviteStatus: true }
+	});
+	return membership?.inviteStatus === 'approved';
+}
+
+/** Returns true if the user has a pending join request. */
+export async function isPendingMember(tripId: string, userId: string): Promise<boolean> {
+	const membership = await prisma.tripMember.findUnique({
+		where: { tripId_userId: { tripId, userId } },
+		select: { inviteStatus: true }
+	});
+	return membership?.inviteStatus === 'pending';
+}
+
+/** Legacy helper — now only returns true for approved members. */
 export async function isTripMember(tripId: string, userId: string): Promise<boolean> {
-	const membership = await getUserTripMembership(tripId, userId);
-	return membership != null && ACTIVE_INVITE_STATUSES.includes(membership.inviteStatus);
+	return isApprovedMember(tripId, userId);
 }
 
 /**
  * Backfill TripMember rows for a user who has Reservations by email but no membership.
- * Call this explicitly from a one-time migration or a post-login hook — NOT on every page load.
  */
 export async function backfillTripMembershipsForUser(userId: string): Promise<void> {
 	const user = await prisma.user.findUnique({
@@ -67,7 +83,7 @@ export async function backfillTripMembershipsForUser(userId: string): Promise<vo
 	for (const { tripId } of reservationsByEmail) {
 		await prisma.tripMember.upsert({
 			where: { tripId_userId: { tripId, userId } },
-			create: { tripId, userId, role: 'guest', inviteStatus: 'accepted' },
+			create: { tripId, userId, role: 'guest', inviteStatus: 'approved' },
 			update: {}
 		});
 	}
@@ -75,13 +91,10 @@ export async function backfillTripMembershipsForUser(userId: string): Promise<vo
 
 export async function getUserTrips(userId: string) {
 	try {
-
-		// Only select fields needed by the trips list page and sidebar — avoids loading
-		// rooms/beds/members for every trip the user has ever joined.
 		const memberships = await prisma.tripMember.findMany({
 			where: {
 				userId,
-				inviteStatus: { in: ACTIVE_INVITE_STATUSES }
+				inviteStatus: { in: ['approved', 'pending'] }
 			},
 			include: {
 				trip: {
@@ -92,24 +105,24 @@ export async function getUserTrips(userId: string) {
 						checkOutDate: true,
 						isPublished: true,
 						listingCoverPhoto: true,
-						location: true,
-						inviteCode: true
+						location: true
 					}
 				}
 			},
 			orderBy: { createdAt: 'desc' }
 		});
 
-		// Sort by checkInDate descending
 		memberships.sort((a, b) => b.trip.checkInDate.getTime() - a.trip.checkInDate.getTime());
 
-		const ownedTrips = memberships.filter(m => m.role === 'host').map(m => m.trip);
-		const invitedTrips = memberships.filter(m => m.role === 'guest').map(m => m.trip);
+		const ownedTrips = memberships.filter((m) => m.role === 'host').map((m) => m.trip);
+		const invitedTrips = memberships
+			.filter((m) => m.role !== 'host' && m.inviteStatus === 'approved')
+			.map((m) => m.trip);
 
 		return {
 			ownedTrips,
 			invitedTrips,
-			allTrips: memberships.map(m => ({ trip: m.trip, membership: m }))
+			allTrips: memberships.map((m) => ({ trip: m.trip, membership: m }))
 		};
 	} catch (err) {
 		console.error('Error in getUserTrips:', err);

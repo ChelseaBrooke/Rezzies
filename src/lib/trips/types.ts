@@ -13,7 +13,6 @@ export interface TripForSidebar {
 	location: string | null;
 	listingCoverPhoto: string | null;
 	isPublished: boolean;
-	inviteCode: string;
 	rooms?: { id: number; beds: { id: string }[] }[];
 	members?: { id: string }[];
 	mealPlan?: { id: string } | null;

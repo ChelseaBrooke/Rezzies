@@ -7,6 +7,7 @@
 	import PollCardContainer from '$lib/components/trips/polls/PollCardContainer.svelte';
 	import VacationModeView from '$lib/components/trips/dashboard/VacationModeView.svelte';
 	import RecapModeView from '$lib/components/trips/dashboard/RecapModeView.svelte';
+	import PendingMembersBanner from '$lib/components/trips/dashboard/PendingMembersBanner.svelte';
 	import { dashboardModeByTripId } from '$lib/stores/dashboardMode.js';
 	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
 
@@ -189,6 +190,7 @@
 </script>
 
 {#if trip}
+	<PendingMembersBanner tripId={trip.id} initialCount={data.pendingMemberCount ?? 0} />
 	{#if dashboardMode === 'planning'}
 		<div class="planning-hero-wrap">
 			<TripHero
@@ -207,10 +209,9 @@
 				onInvite: quickActions?.onInvite ?? (() => {}),
 				showToast: quickActions?.showToast ?? (() => {})
 			}}
-			{tripInfoContent}
-			isHost={true}
-			inviteCode={trip.inviteCode}
-			checkInDate={trip.checkInDate ?? ''}
+		{tripInfoContent}
+		isHost={true}
+		checkInDate={trip.checkInDate ?? ''}
 			checkOutDate={trip.checkOutDate ?? ''}
 			{activities}
 			{mealSlots}
@@ -272,10 +273,9 @@
 		/>
 		{:else}
 		<TripDashboardGrid
-			isHost={true}
-			tripId={trip.id}
-			inviteCode={trip.inviteCode}
-			showToast={quickActions?.showToast}
+		isHost={true}
+		tripId={trip.id}
+		showToast={quickActions?.showToast}
 			currentUserId={user.id}
 			{members}
 			{rsvps}
@@ -318,8 +318,9 @@
 				tripInfoEditedAt: trip?.tripInfoEditedAt
 			}}
 			tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
-			costAtMaxParticipation={data.costAtMaxParticipation ?? null}
-		recentActivities={activities.map(a => ({ title: a.title, createdAt: String(a.createdAt) }))}
+		costAtMaxParticipation={data.costAtMaxParticipation ?? null}
+		costSharingEnabled={trip.costSharingEnabled ?? true}
+	recentActivities={activities.map(a => ({ title: a.title, createdAt: String(a.createdAt) }))}
 		recentMealSlots={mealSlots.map(m => ({ mealType: m.mealType, title: m.title ?? null, createdAt: String(m.createdAt) }))}
 		recentGames={data.tripGames ?? []}
 		recentPolls={data.recentPolls ?? []}

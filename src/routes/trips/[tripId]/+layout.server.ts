@@ -5,7 +5,6 @@ import { prisma } from '$lib/server/prisma.js';
 import { computeCommittedFundsFromYesRsvps, getCostAtMaxParticipation } from '$lib/server/pricing-canonical.js';
 
 export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
-	// Re-use the user attached by hooks.server.ts — avoids a second DB session lookup.
 	const user = locals.user;
 
 	if (!user) {
@@ -13,32 +12,27 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 	}
 
 	const tripId = params.tripId;
-	// Single membership query — replaces the previous isTripMember() + getUserTripMembership() double-hit
-	let membership = await getUserTripMembership(tripId, user.id);
-	const ACTIVE_STATUSES = ['invited', 'accepted'];
-	if (!membership || !ACTIVE_STATUSES.includes(membership.inviteStatus)) {
+	const membership = await getUserTripMembership(tripId, user.id);
+
+	// Not a member at all: show the join page
+	if (!membership) {
+		throw redirect(303, `/trips/${tripId}/join`);
+	}
+
+	// Pending or denied: render slim shell (not full trip layout)
+	if (membership.inviteStatus === 'pending') {
+		throw redirect(303, `/trips/${tripId}/pending`);
+	}
+	if (membership.inviteStatus === 'denied') {
+		throw redirect(303, `/trips/${tripId}/denied`);
+	}
+
+	// Only approved members reach here
+	if (membership.inviteStatus !== 'approved') {
 		throw error(403, 'You do not have access to this trip');
 	}
 
-	// When user is in "invited" state, fetch the pending invite token BEFORE
-	// upgrading the status so the "Accept invite" link can still be shown.
-	let pendingInviteToken: string | null = null;
-	if (membership?.inviteStatus === 'invited') {
-		const pendingInvite = await prisma.invite.findFirst({
-			where: { tripId, recipientUserId: user.id, status: 'sent' },
-			select: { token: true }
-		});
-		pendingInviteToken = pendingInvite?.token ?? null;
-
-		// Mark as accepted now that the user has visited the trip page.
-		await prisma.tripMember.update({
-			where: { tripId_userId: { tripId, userId: user.id } },
-			data: { inviteStatus: 'accepted' }
-		});
-		membership = { ...membership, inviteStatus: 'accepted' };
-	}
-
-	const isHost = membership?.role === 'host';
+	const isHost = membership.role === 'host';
 	const [trip, , tripsResult, userRsvp, committedFunds, costAtMaxParticipation] = await Promise.all([
 		prisma.trip.findUnique({
 			where: { id: tripId },
@@ -68,7 +62,6 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 						recipient: { select: { id: true, name: true } }
 					}
 				},
-				// Limit to latest 50 — prevents full table scans on active trips
 				tripActivities: { orderBy: { createdAt: 'desc' }, take: 50 },
 				extraCostRules: true
 			}
@@ -78,7 +71,6 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 		prisma.rSVP.findUnique({
 			where: { tripId_userId: { tripId, userId: user.id } }
 		}),
-		// Runs in parallel with trip fetch instead of serially after
 		computeCommittedFundsFromYesRsvps(tripId),
 		isHost ? getCostAtMaxParticipation(tripId) : Promise.resolve(null)
 	]);
@@ -89,7 +81,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 
 	const allTrips = tripsResult.allTrips.map((m) => m.trip);
 
-	const [tripGamesRows, recentPolls, tripGalleryFiles] = await Promise.all([
+	const [tripGamesRows, recentPolls, tripGalleryFiles, pendingMemberCount] = await Promise.all([
 		prisma.tripGame.findMany({
 			where: { tripId },
 			orderBy: { createdAt: 'asc' }
@@ -106,7 +98,6 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 				createdBy: { select: { id: true, name: true } }
 			}
 		}),
-		// Photos & videos for recap gallery (exclude receipts)
 		prisma.tripFile.findMany({
 			where: {
 				tripId,
@@ -118,8 +109,12 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 			},
 			orderBy: { createdAt: 'desc' },
 			select: { id: true, name: true, url: true, mimeType: true }
-		})
+		}),
+		isHost
+			? prisma.tripMember.count({ where: { tripId, inviteStatus: 'pending' } })
+			: Promise.resolve(0)
 	]);
+
 	const tripGames = tripGamesRows.map((g) => ({
 		id: g.id,
 		gameId: g.gameId,
@@ -128,20 +123,13 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 		addedAt: g.createdAt.toISOString()
 	}));
 
-	// committedFunds already resolved from the parallel Promise.all above
-
-	// Badge: only show when a new poll was added since last visit (hidden when on polls page)
 	let pollsBadgeCount = 0;
 	if (user) {
 		const lastVisitRaw = cookies.get(`polls_visit_${tripId}`);
 		const lastVisit = lastVisitRaw ? new Date(lastVisitRaw).getTime() : 0;
-
 		if (lastVisit > 0) {
 			pollsBadgeCount = await prisma.poll.count({
-				where: {
-					tripId,
-					createdAt: { gt: new Date(lastVisit) }
-				}
+				where: { tripId, createdAt: { gt: new Date(lastVisit) } }
 			});
 		}
 	}
@@ -155,7 +143,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 		costAtMaxParticipation: costAtMaxParticipation ?? null,
 		userRsvp,
 		canChat: userRsvp?.status === 'yes' || membership?.role === 'host',
-		pendingInviteToken,
+		pendingMemberCount,
 		committedFundsFromYesRsvps: committedFunds,
 		pollsBadgeCount,
 		tripGames,

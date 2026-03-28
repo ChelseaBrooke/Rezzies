@@ -31,7 +31,7 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 	let eligibleCaptionCount = 0;
 	if (round?.phase === 'CAPTION_SUBMISSION') {
 		const memberCount = await prisma.tripMember.count({
-			where: { tripId, inviteStatus: 'accepted' }
+			where: { tripId, inviteStatus: 'approved' }
 		});
 		eligibleCaptionCount = round.photoSubmitterUserId ? memberCount - 1 : memberCount;
 	}

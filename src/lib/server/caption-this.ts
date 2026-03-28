@@ -268,7 +268,7 @@ export async function advancePhaseIfReady(roundId: string): Promise<boolean> {
 	if (round.phase === 'CAPTION_SUBMISSION') {
 		const trip = await prisma.trip.findUnique({
 			where: { id: round.tripId },
-			include: { members: { where: { inviteStatus: 'accepted' }, select: { userId: true } } }
+			include: { members: { where: { inviteStatus: 'approved' }, select: { userId: true } } }
 		});
 		const eligibleCount = (trip?.members.length ?? 0) - (round.photoSubmitterUserId ? 1 : 0);
 		const submittedCount = round.captions.length;
@@ -284,7 +284,7 @@ export async function advancePhaseIfReady(roundId: string): Promise<boolean> {
 	if (round.phase === 'VOTING') {
 		const trip = await prisma.trip.findUnique({
 			where: { id: round.tripId },
-			include: { members: { where: { inviteStatus: 'accepted' }, select: { userId: true } } }
+			include: { members: { where: { inviteStatus: 'approved' }, select: { userId: true } } }
 		});
 		const voterCount = round.votes.length;
 		const allVoted = voterCount >= (trip?.members.length ?? 0);
@@ -360,7 +360,7 @@ export async function getLeaderboard(
 	tripId: string
 ): Promise<{ userId: string; name: string | null; pointsTotal: number; rank: number }[]> {
 	const members = await prisma.tripMember.findMany({
-		where: { tripId, inviteStatus: 'accepted' },
+		where: { tripId, inviteStatus: 'approved' },
 		include: { user: { select: { id: true, name: true } } }
 	});
 	const scores = await prisma.captionThisScore.findMany({

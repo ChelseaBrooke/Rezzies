@@ -31,14 +31,8 @@
 	];
 
 	const guestJourney: (Step | StepHub)[] = [
-		{
-			label: 'Land on invite',
-			options: [
-				{ label: 'Invite link', path: '/invite/[token]' },
-				{ label: 'Trip by code', path: '/trip/[inviteCode]' },
-			],
-		},
-		{ label: 'Accept invite / View trip' },
+		{ label: 'Trip link', path: '/trips/[tripId]/join' },
+		{ label: 'Request to join / View trip' },
 		{
 			label: 'Trip dashboard (guest)',
 			path: '/trips/[tripId]',

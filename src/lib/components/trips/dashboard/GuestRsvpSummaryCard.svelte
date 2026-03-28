@@ -10,9 +10,10 @@
 		myAssignments: Assignment[];
 		userReservationPrice: number | null;
 		tripCheckInDate?: string;
+		costSharingEnabled?: boolean;
 	}
 
-	let { tripId, userRsvp, myAssignments, userReservationPrice, tripCheckInDate = '' }: Props = $props();
+	let { tripId, userRsvp, myAssignments, userReservationPrice, tripCheckInDate = '', costSharingEnabled = true }: Props = $props();
 
 	const peopleCount = $derived((userRsvp?.adultsCount ?? 0) + (userRsvp?.kidsCount ?? 0));
 	const hasAccepted = $derived(userRsvp?.status === 'yes');
@@ -92,14 +93,14 @@
 			{/if}
 
 			<!-- Accepted: details -->
-			{#if userReservationPrice != null}
-				<div class="detail-block">
-					<span class="detail-label">Current Price Estimate</span>
-					<div class="detail-price-row">
-						<span class="detail-price">${userReservationPrice.toFixed(2)}</span>
-					</div>
-					<span class="detail-note">Subject to change based on headcount</span>
+		{#if costSharingEnabled && userReservationPrice != null}
+			<div class="detail-block">
+				<span class="detail-label">Current Price Estimate</span>
+				<div class="detail-price-row">
+					<span class="detail-price">${userReservationPrice.toFixed(2)}</span>
 				</div>
+				<span class="detail-note">Subject to change based on headcount</span>
+			</div>
 			{/if}
 
 			{#if roomBedItems.length > 0}

@@ -2,7 +2,6 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
-import { generateInviteCode } from '$lib/server/pricing.js';
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
 	const user = await getSessionUser(cookies);
@@ -97,33 +96,29 @@ export const actions: Actions = {
 				return fail(400, { error: 'Invalid total cost' });
 			}
 
-			// Generate unique invite code
-			const inviteCode = generateInviteCode();
-
-			// Use a transaction to ensure atomicity
-			const trip = await prisma.$transaction(async (tx) => {
-				// Create trip
-				const newTrip = await tx.trip.create({
-					data: {
-						name: data.name,
-						description: data.description || null,
-						location: data.location || data.destination || null,
-						fullAddress: data.fullAddress || data.location || data.destination || null,
-						locationCity: data.locationCity?.trim() || null,
-						listingUrl: data.listingUrl || null,
-						listingTitle: data.listingTitle || null,
-						listingCoverPhoto: data.coverPhoto || null,
-						checkInDate,
-						checkOutDate,
-						totalCost,
-						pricingModel: data.pricingModel || 'PER_PERSON',
-						inviteCode,
-						isPublished: false,
-						maxGuests: data.maxGuests ? parseInt(data.maxGuests) : null,
-						allowPartialStays: data.allowPartialStays || false,
-						timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-					}
-				});
+		// Use a transaction to ensure atomicity
+		const trip = await prisma.$transaction(async (tx) => {
+			// Create trip
+			const newTrip = await tx.trip.create({
+				data: {
+					name: data.name,
+					description: data.description || null,
+					location: data.location || data.destination || null,
+					fullAddress: data.fullAddress || data.location || data.destination || null,
+					locationCity: data.locationCity?.trim() || null,
+					listingUrl: data.listingUrl || null,
+					listingTitle: data.listingTitle || null,
+					listingCoverPhoto: data.coverPhoto || null,
+					checkInDate,
+					checkOutDate,
+					totalCost,
+					pricingModel: data.pricingModel || 'PER_PERSON',
+					isPublished: false,
+					maxGuests: data.maxGuests ? parseInt(data.maxGuests) : null,
+					allowPartialStays: data.allowPartialStays || false,
+					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+				}
+			});
 
 				// Create TripMember record for the host
 				await tx.tripMember.create({
@@ -131,7 +126,7 @@ export const actions: Actions = {
 						tripId: newTrip.id,
 						userId: user.id,
 						role: 'host',
-						inviteStatus: 'accepted'
+						inviteStatus: 'approved'
 					}
 				});
 

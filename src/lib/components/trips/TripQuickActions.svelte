@@ -14,13 +14,11 @@
 
 	let {
 		tripId,
-		inviteCode,
 		onInvite,
 		showToast,
 		isHost = false
 	}: {
 		tripId: string;
-		inviteCode?: string;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
 		isHost?: boolean;
@@ -105,7 +103,7 @@
 
 	function getTripLink(): string {
 		const origin = typeof window !== 'undefined' ? window.location.origin : '';
-		return inviteCode ? `${origin}/trip/${inviteCode}` : `${origin}/trips/${tripId}`;
+		return `${origin}/trips/${tripId}`;
 	}
 
 	function handleCopyLink() {

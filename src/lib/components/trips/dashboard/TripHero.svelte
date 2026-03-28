@@ -20,9 +20,8 @@
 		};
 		tripInfoContent: string;
 		isHost: boolean;
-		rsvpUrl?: string | null;
-		inviteCode?: string;
-		checkInDate?: string;
+	rsvpUrl?: string | null;
+	checkInDate?: string;
 		checkOutDate?: string;
 		activities?: Array<{ id: string; title: string; date: Date | string; time?: string | null; location?: string | null }>;
 		mealSlots?: Array<unknown>;
@@ -43,10 +42,9 @@
 		mapsUrl,
 		quickActions,
 		tripInfoContent,
-		isHost,
-		rsvpUrl = null,
-		inviteCode,
-		checkInDate = '',
+	isHost,
+	rsvpUrl = null,
+	checkInDate = '',
 		checkOutDate = '',
 		activities = [],
 		mealSlots = [],
@@ -139,15 +137,14 @@
 		</div>
 
 		<div class="compact-actions">
-			<TripQuickActions
-				tripId={trip.id}
-				{inviteCode}
-				onInvite={quickActions.onInvite}
-				showToast={quickActions.showToast}
-				{isHost}
-			/>
-		</div>
+		<TripQuickActions
+			tripId={trip.id}
+			onInvite={quickActions.onInvite}
+			showToast={quickActions.showToast}
+			{isHost}
+		/>
 	</div>
+</div>
 {:else}
 	<!-- ═══ Full hero for Planning ═══ -->
 	<div class="trip-hero">
@@ -218,13 +215,12 @@
 					{/if}
 				</div>
 				<div class="hero-center-actions">
-					<TripQuickActions
-						tripId={trip.id}
-						{inviteCode}
-						onInvite={quickActions.onInvite}
-						showToast={quickActions.showToast}
-						{isHost}
-					/>
+			<TripQuickActions
+					tripId={trip.id}
+					onInvite={quickActions.onInvite}
+					showToast={quickActions.showToast}
+					{isHost}
+				/>
 				</div>
 			</div>
 			</div>

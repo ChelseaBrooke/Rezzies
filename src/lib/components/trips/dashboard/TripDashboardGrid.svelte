@@ -63,8 +63,7 @@
 		roomsHref: string;
 		paymentsHref: string;
 		nudgePending?: () => void;
-		inviteCode?: string;
-		showToast?: (msg: string) => void;
+	showToast?: (msg: string) => void;
 		/** Checklist stats for role-based checklists */
 		checklistStats: ChecklistStats;
 		/** Trip info for TripInfoCard */
@@ -84,8 +83,10 @@
 		/** ISO date string for check-in (drives countdown in progress/RSVP cards) */
 		tripCheckInDate?: string;
 		/** Host only: cost when all spots fill (incentive to drive RSVPs) */
-		costAtMaxParticipation?: CostAtMaxParticipation | null;
-		/** Recent activity feed sources */
+	costAtMaxParticipation?: CostAtMaxParticipation | null;
+	/** Whether cost-sharing features are enabled for this trip */
+	costSharingEnabled?: boolean;
+	/** Recent activity feed sources */
 		recentActivities?: Array<{ title: string; createdAt: string }>;
 		recentMealSlots?: Array<{ mealType: string; title: string | null; createdAt: string }>;
 		recentGames?: Array<{ name: string; addedByUserId: string; addedAt: string }>;
@@ -125,8 +126,7 @@
 		roomsHref,
 		paymentsHref,
 		nudgePending,
-		inviteCode,
-		showToast,
+	showToast,
 		checklistStats,
 		tripDescription = null,
 		extraCostRules = [],
@@ -135,7 +135,8 @@
 		tripInfoEdited = false,
 		tripCheckInDate = '',
 		costAtMaxParticipation = null,
-		recentActivities = [],
+	costSharingEnabled = true,
+	recentActivities = [],
 		recentMealSlots = [],
 		recentGames = [],
 		recentPolls = []
@@ -277,37 +278,39 @@
 						headerLeft={stickyPinIcon}
 						headerRight={progressViewDetailButton}
 					>
-						<TripGoalsCombined
-							{rsvpCurrent}
-							{rsvpTotal}
-							{rsvpPct}
-							{bedsCurrent}
-							{bedsTotal}
-							{bedsPct}
-							{roomsFilled}
-							{roomsTotal}
-							{roomsPct}
-							{fundingCurrent}
-							{fundingTotal}
-							{fundingPct}
-							{fundingDisplay}
-							{guestsHref}
-							{roomsHref}
-							{paymentsHref}
-							{tripCheckInDate}
-							tripInfoFilled={tripInfoFilled}
-							tripInfoTotal={TRIP_INFO_TOTAL}
-						/>
+					<TripGoalsCombined
+						{rsvpCurrent}
+						{rsvpTotal}
+						{rsvpPct}
+						{bedsCurrent}
+						{bedsTotal}
+						{bedsPct}
+						{roomsFilled}
+						{roomsTotal}
+						{roomsPct}
+						{fundingCurrent}
+						{fundingTotal}
+						{fundingPct}
+						{fundingDisplay}
+						{guestsHref}
+						{roomsHref}
+						{paymentsHref}
+						{tripCheckInDate}
+						tripInfoFilled={tripInfoFilled}
+						tripInfoTotal={TRIP_INFO_TOTAL}
+						{costSharingEnabled}
+					/>
 					</DashboardCard>
 				{:else}
 					<DashboardCard variant="sticky" title="Your RSVP" headerLeft={stickyPinIcon}>
-						<GuestRsvpSummaryCard
-							tripId={tripId}
-							{userRsvp}
-							myAssignments={myAssignments}
-							userReservationPrice={userReservationPrice}
-							{tripCheckInDate}
-						/>
+				<GuestRsvpSummaryCard
+						tripId={tripId}
+						{userRsvp}
+						myAssignments={myAssignments}
+						userReservationPrice={userReservationPrice}
+						{tripCheckInDate}
+						{costSharingEnabled}
+					/>
 					</DashboardCard>
 				{/if}
 			</div>
@@ -316,7 +319,7 @@
 		<div class="goals-cell" id="trip-info">
 			<div class="goals-card-wrap">
 				<DashboardCard>
-					{#if isHost && costAtMaxParticipation != null}
+					{#if isHost && costSharingEnabled && costAtMaxParticipation != null}
 						<CostAtMaxParticipationCard data={costAtMaxParticipation} {tripId} />
 					{:else}
 						<TripInfoCard

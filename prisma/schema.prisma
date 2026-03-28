@@ -21,12 +21,13 @@ model Trip {
   checkInDate       DateTime
   checkOutDate      DateTime
   rsvpByDate        DateTime? // Optional: RSVP-by date for guests
-  totalCost         Float // Total cost of the rental
-  pricingModel      String // "per_room" | "per_bed" | "per_person" | "per_person_per_night"
-  inviteCode        String   @unique // Unique code for guests to access
+  totalCost         Float    @default(0) // Total cost of the rental (0 when costSharingEnabled = false)
+  pricingModel      String   @default("PER_PERSON") // "per_room" | "per_bed" | "per_person" | "per_person_per_night"
   isPublished       Boolean  @default(false)
   timezone          String   @default("UTC")
   location          String?
+  inviteMode        String   @default("approval_required") // "approval_required" | "open"
+  costSharingEnabled Boolean @default(true) // When false, hides all cost/payment UX
 
   // Trip info / house rules (editable on dashboard)
   fullAddress       String?  // Full address for maps; auto-populated from creation address
@@ -76,7 +77,6 @@ model Trip {
   tripGames           TripGame[]
   files               TripFile[]
 
-  @@index([inviteCode])
   @@index([isPublished])
 }
 
@@ -313,8 +313,8 @@ model TripMember {
   id           String   @id @default(uuid())
   tripId       String
   userId       String
-  role         String   @default("guest") // "host" | "guest"
-  inviteStatus String   @default("invited") // "invited" | "accepted" | "removed" — display state is derived with RSVP: Invited, Accepted, RSVPyes, RSVPno, Removed
+  role         String   @default("guest") // "host" | "co-host" | "guest"
+  inviteStatus String   @default("pending") // "pending" | "approved" | "denied"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

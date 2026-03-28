@@ -37,12 +37,13 @@ export async function seedTestData() {
 		},
 	});
 
-	// Clean up existing test trip if it exists (by invite code)
-	const existingTrip = await prisma.trip.findUnique({
-		where: { inviteCode: TEST_TRIP.inviteCode },
+	// Clean up any existing test trips by name
+	const existingTrips = await prisma.trip.findMany({
+		where: { name: TEST_TRIP.name },
+		select: { id: true },
 	});
-	if (existingTrip) {
-		await prisma.trip.delete({ where: { id: existingTrip.id } });
+	for (const t of existingTrips) {
+		await prisma.trip.delete({ where: { id: t.id } });
 	}
 
 	// Create test trip
@@ -53,13 +54,14 @@ export async function seedTestData() {
 	const trip = await prisma.trip.create({
 		data: {
 			name: TEST_TRIP.name,
-			inviteCode: TEST_TRIP.inviteCode,
 			location: TEST_TRIP.location,
 			totalCost: TEST_TRIP.totalCost,
 			pricingModel: TEST_TRIP.pricingModel,
 			checkInDate: checkIn,
 			checkOutDate: checkOut,
 			isPublished: true,
+			inviteMode: 'approval_required',
+			costSharingEnabled: true,
 			rooms: {
 				create: TEST_ROOMS.map((room) => ({
 					name: room.name,
@@ -74,46 +76,33 @@ export async function seedTestData() {
 		},
 	});
 
-	// Add host as trip member
+	// Add host as approved trip member
 	await prisma.tripMember.upsert({
 		where: { tripId_userId: { tripId: trip.id, userId: host.id } },
-		update: { role: 'host', inviteStatus: 'accepted' },
+		update: { role: 'host', inviteStatus: 'approved' },
 		create: {
 			tripId: trip.id,
 			userId: host.id,
 			role: 'host',
-			inviteStatus: 'accepted',
+			inviteStatus: 'approved',
 		},
 	});
 
-	// Add guest as trip member (invited, not yet accepted)
+	// Add guest as approved trip member
 	await prisma.tripMember.upsert({
 		where: { tripId_userId: { tripId: trip.id, userId: guest.id } },
-		update: { role: 'guest', inviteStatus: 'accepted' },
+		update: { role: 'guest', inviteStatus: 'approved' },
 		create: {
 			tripId: trip.id,
 			userId: guest.id,
 			role: 'guest',
-			inviteStatus: 'accepted',
-		},
-	});
-
-	// Create an invite for the guest
-	await prisma.invite.create({
-		data: {
-			tripId: trip.id,
-			invitedByUserId: host.id,
-			recipientEmail: GUEST_USER.email,
-			recipientUserId: guest.id,
-			channel: 'email',
-			status: 'accepted',
-			token: `e2e-invite-${Date.now()}`,
+			inviteStatus: 'approved',
 		},
 	});
 
 	console.log(`[e2e seed] Created host: ${host.id}`);
 	console.log(`[e2e seed] Created guest: ${guest.id}`);
-	console.log(`[e2e seed] Created trip: ${trip.id} (invite code: ${TEST_TRIP.inviteCode})`);
+	console.log(`[e2e seed] Created trip: ${trip.id}`);
 	console.log('[e2e seed] Done.');
 
 	return { host, guest, trip };
@@ -122,11 +111,9 @@ export async function seedTestData() {
 export async function cleanupTestData() {
 	console.log('[e2e cleanup] Cleaning up test data...');
 
-	// Delete test trip by invite code (cascades to rooms, beds, members, invites, etc.)
+	// Delete test trips by name (cascades to rooms, beds, members, invites, etc.)
 	try {
-		await prisma.trip.delete({
-			where: { inviteCode: TEST_TRIP.inviteCode },
-		});
+		await prisma.trip.deleteMany({ where: { name: TEST_TRIP.name } });
 	} catch {
 		// Trip may already be deleted
 	}
@@ -139,8 +126,7 @@ export async function cleanupTestData() {
 	const e2eUserIds = e2eUsers.map((u) => u.id);
 
 	if (e2eUserIds.length > 0) {
-		// Delete records that reference users with onDelete: Restrict (not Cascade)
-		// Invite.invitedByUserId has onDelete: Restrict
+		// Delete records that reference users with onDelete: Restrict
 		await prisma.invite.deleteMany({
 			where: { invitedByUserId: { in: e2eUserIds } },
 		});

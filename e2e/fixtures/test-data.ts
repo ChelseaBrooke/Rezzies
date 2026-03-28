@@ -21,10 +21,9 @@ export const SIGNUP_USER = {
 
 export const TEST_TRIP = {
 	name: 'E2E Test Beach House',
-	inviteCode: 'E2ETST',
 	location: 'Malibu, CA',
 	totalCost: 5000,
-	pricingModel: 'per_bed',
+	pricingModel: 'PER_BED',
 } as const;
 
 export const TEST_ROOMS = [

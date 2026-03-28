@@ -156,8 +156,8 @@
 	}
 
 	const inviteLink = $derived(
-		typeof window !== 'undefined' && data.trip?.inviteCode
-			? `${window.location.origin}/trip/${data.trip.inviteCode}`
+		typeof window !== 'undefined' && data.trip?.id
+			? `${window.location.origin}/trips/${data.trip.id}`
 			: ''
 	);
 

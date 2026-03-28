@@ -29,13 +29,13 @@ export async function linkPendingInvitesForUser(userId: string, email: string): 
 				where: {
 					tripId_userId: { tripId: inv.tripId, userId }
 				},
-				create: {
-					tripId: inv.tripId,
-					userId,
-					role: 'guest',
-					inviteStatus: 'invited'
-				},
-				update: { inviteStatus: 'invited' }
+			create: {
+				tripId: inv.tripId,
+				userId,
+				role: 'guest',
+				inviteStatus: 'approved'
+			},
+			update: { inviteStatus: 'approved' }
 			}),
 			prisma.notification.create({
 				data: {
@@ -70,9 +70,9 @@ export async function notifyExistingUserOfInvite(params: {
 				tripId,
 				userId: recipientUserId,
 				role: 'guest',
-				inviteStatus: 'invited'
+				inviteStatus: 'approved'
 			},
-			update: { inviteStatus: 'invited' }
+			update: { inviteStatus: 'approved' }
 		}),
 		prisma.notification.create({
 			data: {

@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { TEST_TRIP } from '../fixtures/test-data.js';
 
-test.describe('Find a Trip (anonymous)', () => {
+// Anonymous / unauthenticated user flows.
+// Invite codes have been removed — trips are accessed by direct link only.
+
+test.describe('Find a Trip (unauthenticated)', () => {
 	test('home page has Find a Trip link', async ({ page }) => {
 		await page.goto('/');
 		const findTripLink = page.locator('a[href="/find-vacation"]').first();
@@ -14,44 +16,30 @@ test.describe('Find a Trip (anonymous)', () => {
 		await expect(hostLink).toBeVisible();
 	});
 
-	test('can navigate to find vacation page', async ({ page }) => {
+	test('find-vacation page explains link-based access (no code input)', async ({ page }) => {
 		await page.goto('/find-vacation');
 		await expect(page).toHaveURL(/\/find-vacation/);
-		// Should have invite code input with name="code"
-		await expect(page.locator('input[name="code"]')).toBeVisible();
+		// There should be no invite code input field
+		const codeInput = page.locator('input[name="code"]');
+		await expect(codeInput).toHaveCount(0);
+		// Should explain that trips are accessed by link
+		await expect(page.getByText(/direct link/i)).toBeVisible({ timeout: 5_000 });
 	});
 
-	test('entering valid invite code navigates to trip page', async ({ page }) => {
-		await page.goto('/find-vacation');
-		// The form uses GET action="/trip" with input name="code"
-		await page.fill('input[name="code"]', TEST_TRIP.inviteCode);
-		await page.click('button[type="submit"]');
-
-		// Should navigate to the public trip page
-		await page.waitForURL(`**/trip/${TEST_TRIP.inviteCode}`, { timeout: 10_000 });
-		await expect(page).toHaveURL(new RegExp(`/trip/${TEST_TRIP.inviteCode}`));
+	test('old invite code URL returns gone / redirect', async ({ page }) => {
+		// /trip/[code] now returns 410 Gone or redirect
+		const response = await page.goto('/trip/ZZZZZZ');
+		const statusOk =
+			response?.status() === 410 ||
+			response?.status() === 404 ||
+			response?.url().endsWith('/');
+		expect(statusOk).toBeTruthy();
 	});
 
-	test('invalid invite code shows error or redirects', async ({ page }) => {
-		await page.goto('/find-vacation');
-		await page.fill('input[name="code"]', 'ZZZZZZ');
-		await page.click('button[type="submit"]');
-
-		// Should either show an error or redirect to home (trip not found)
-		await page.waitForTimeout(2000);
-		const url = page.url();
-		const hasError = await page.locator('.error, [class*="error"], [role="alert"]').count() > 0;
-		expect(url.includes('/find-vacation') || url.endsWith('/') || hasError).toBeTruthy();
-	});
-
-	test('public trip page shows trip details', async ({ page }) => {
-		await page.goto(`/trip/${TEST_TRIP.inviteCode}`);
-		await expect(page.getByText(TEST_TRIP.name)).toBeVisible({ timeout: 10_000 });
-	});
-
-	test('public trip page shows rooms', async ({ page }) => {
-		await page.goto(`/trip/${TEST_TRIP.inviteCode}`);
-		await page.waitForLoadState('networkidle');
-		await expect(page.getByText('Master Suite')).toBeVisible({ timeout: 10_000 });
+	test('unauthenticated visit to a trip redirects to login', async ({ page }) => {
+		// Visiting a trip URL without a session should redirect to login
+		await page.goto('/trips/nonexistent-trip-id');
+		await page.waitForURL(/\/login/, { timeout: 8_000 });
+		await expect(page).toHaveURL(/\/login/);
 	});
 });

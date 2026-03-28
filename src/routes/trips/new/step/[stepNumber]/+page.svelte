@@ -125,12 +125,12 @@
 				publishError = data.error || `Publish failed (${res.status})`;
 				return;
 			}
-			if (data.inviteCode) {
-				tripDraft.clear();
-				goto(`/trip/${data.inviteCode}`);
-			} else {
-				publishError = data.error || 'Publish failed';
-			}
+		if (data.tripId) {
+			tripDraft.clear();
+			goto(`/trips/${data.tripId}`);
+		} else {
+			publishError = data.error || 'Publish failed';
+		}
 		} catch (e) {
 			publishError = e instanceof Error ? e.message : 'Failed to publish trip';
 		} finally {

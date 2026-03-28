@@ -13,33 +13,35 @@
 		fundingTotal = 0,
 		fundingPct = 0,
 		fundingDisplay = '',
-		guestsHref = '',
-		roomsHref = '',
-		paymentsHref = '',
-		tripCheckInDate = '',
-		tripInfoFilled = 0,
-		tripInfoTotal = 3
-	}: {
-		rsvpCurrent?: number;
-		rsvpTotal?: number;
-		rsvpPct?: number;
-		bedsCurrent?: number;
-		bedsTotal?: number;
-		bedsPct?: number;
-		roomsFilled?: number;
-		roomsTotal?: number;
-		roomsPct?: number;
-		fundingCurrent?: number;
-		fundingTotal?: number;
-		fundingPct?: number;
-		fundingDisplay?: string;
-		guestsHref?: string;
-		roomsHref?: string;
-		paymentsHref?: string;
-		tripCheckInDate?: string;
-		tripInfoFilled?: number;
-		tripInfoTotal?: number;
-	} = $props();
+	guestsHref = '',
+	roomsHref = '',
+	paymentsHref = '',
+	tripCheckInDate = '',
+	tripInfoFilled = 0,
+	tripInfoTotal = 3,
+	costSharingEnabled = true
+}: {
+	rsvpCurrent?: number;
+	rsvpTotal?: number;
+	rsvpPct?: number;
+	bedsCurrent?: number;
+	bedsTotal?: number;
+	bedsPct?: number;
+	roomsFilled?: number;
+	roomsTotal?: number;
+	roomsPct?: number;
+	fundingCurrent?: number;
+	fundingTotal?: number;
+	fundingPct?: number;
+	fundingDisplay?: string;
+	guestsHref?: string;
+	roomsHref?: string;
+	paymentsHref?: string;
+	tripCheckInDate?: string;
+	tripInfoFilled?: number;
+	tripInfoTotal?: number;
+	costSharingEnabled?: boolean;
+} = $props();
 
 	const daysUntil = $derived.by(() => {
 		if (!tripCheckInDate) return null;
@@ -61,13 +63,13 @@
 	const tripInfoPct = $derived(tripInfoTotal > 0 ? Math.min(100, Math.round((tripInfoFilled / tripInfoTotal) * 100)) : 0);
 
 	const stats = $derived([
-		{
+		...(costSharingEnabled ? [{
 			key: 'funding',
 			label: 'Funding',
 			value: fundingValueLabel,
 			pct: fundingPctClamped,
 			href: paymentsHref
-		},
+		}] : []),
 		{
 			key: 'rsvps',
 			label: 'RSVPs confirmed',
@@ -98,11 +100,11 @@
 		}
 	]);
 
-	const overallPct = $derived(
-		Math.round(
-			([rsvpPct, bedsPct, roomsPct, fundingPctClamped, tripInfoPct].reduce((a, b) => a + b, 0)) / 5
-		)
-	);
+	const overallPct = $derived.by(() => {
+		const parts = [rsvpPct, bedsPct, roomsPct, tripInfoPct];
+		if (costSharingEnabled) parts.push(fundingPctClamped);
+		return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
+	});
 </script>
 
 <div class="readiness">

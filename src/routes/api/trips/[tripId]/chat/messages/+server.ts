@@ -38,7 +38,7 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 
 	// Trip members for this trip (userId -> role) so we can show host badge
 	const tripMembers = await prisma.tripMember.findMany({
-		where: { tripId, inviteStatus: 'accepted' },
+		where: { tripId, inviteStatus: 'approved' },
 		select: { userId: true, role: true }
 	});
 	const memberRoleByUserId = new Map(tripMembers.map((m) => [m.userId, m.role]));

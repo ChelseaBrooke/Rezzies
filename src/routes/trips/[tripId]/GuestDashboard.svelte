@@ -173,10 +173,9 @@
 				showToast: quickActions?.showToast ?? (() => {})
 			}}
 			{tripInfoContent}
-			isHost={false}
-			rsvpUrl={showRsvpButton ? `/trips/${trip.id}/rsvp` : null}
-			inviteCode={trip.inviteCode}
-			checkInDate={trip.checkInDate ?? ''}
+		isHost={false}
+		rsvpUrl={showRsvpButton ? `/trips/${trip.id}/rsvp` : null}
+		checkInDate={trip.checkInDate ?? ''}
 			checkOutDate={trip.checkOutDate ?? ''}
 			{activities}
 			{mealSlots}
@@ -239,10 +238,9 @@
 		/>
 		{:else}
 		<TripDashboardGrid
-			isHost={false}
-			tripId={trip.id}
-			inviteCode={trip.inviteCode}
-			showToast={quickActions?.showToast}
+		isHost={false}
+		tripId={trip.id}
+		showToast={quickActions?.showToast}
 			currentUserId={user.id}
 			{members}
 			{rsvps}
@@ -284,8 +282,9 @@
 				parkingNotes: trip?.parkingNotes,
 				houseRules: trip?.houseRules
 			}}
-			tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
-		recentActivities={activities.map(a => ({ title: a.title, createdAt: String(a.createdAt) }))}
+		tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
+		costSharingEnabled={trip.costSharingEnabled ?? true}
+	recentActivities={activities.map(a => ({ title: a.title, createdAt: String(a.createdAt) }))}
 		recentMealSlots={mealSlots.map(m => ({ mealType: m.mealType, title: m.title ?? null, createdAt: String(m.createdAt) }))}
 		recentGames={data.tripGames ?? []}
 		recentPolls={data.recentPolls ?? []}

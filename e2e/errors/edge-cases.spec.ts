@@ -8,9 +8,9 @@ test.describe('Edge cases and error handling', () => {
 	let tripId: string;
 
 	test.beforeAll(async () => {
-		const trip = await prisma.trip.findUnique({
-			where: { inviteCode: TEST_TRIP.inviteCode },
-		});
+		const trip = await prisma.trip.findFirst({
+		where: { name: TEST_TRIP.name },
+	});
 		tripId = trip!.id;
 	});
 

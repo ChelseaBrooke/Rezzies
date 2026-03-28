@@ -148,8 +148,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 	let notGoingCount = 0;
 	let unrespondedCount = 0;
 
-	const activeMembers = members.filter((m) => m.inviteStatus !== 'removed');
-	const removedMembers = members.filter((m) => m.inviteStatus === 'removed');
+	const activeMembers = members.filter((m) => m.inviteStatus !== 'denied');
+	const removedMembers = members.filter((m) => m.inviteStatus === 'denied');
 	const guestRows: GuestRow[] = [];
 
 	for (const member of activeMembers) {
@@ -320,8 +320,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 					name: trip.name,
 					rsvpByDate: trip.rsvpByDate ? trip.rsvpByDate.toISOString().slice(0, 10) : null,
 					allowPartialStays: trip.allowPartialStays ?? false,
-					inviteCode: trip.inviteCode,
-					checkInDate: trip.checkInDate ? trip.checkInDate.toISOString().slice(0, 10) : null,
+				checkInDate: trip.checkInDate ? trip.checkInDate.toISOString().slice(0, 10) : null,
 					checkOutDate: trip.checkOutDate ? trip.checkOutDate.toISOString().slice(0, 10) : null
 				}
 			: null,
@@ -499,7 +498,7 @@ export const actions: Actions = {
 
 		await prisma.tripMember.update({
 			where: { tripId_userId: { tripId, userId } },
-			data: { inviteStatus: 'removed' }
+			data: { inviteStatus: 'denied' }
 		});
 		return { removeGuestSuccess: true };
 	},
@@ -517,7 +516,7 @@ export const actions: Actions = {
 
 		await prisma.tripMember.update({
 			where: { tripId_userId: { tripId, userId } },
-			data: { inviteStatus: 'accepted' }
+			data: { inviteStatus: 'approved' }
 		});
 		return { restoreGuestSuccess: true };
 	},
@@ -547,7 +546,7 @@ export const actions: Actions = {
 		});
 		const respondedUserIds = new Set(rsvps.filter((r) => r.status === 'yes' || r.status === 'no').map((r) => r.userId));
 		const members = await prisma.tripMember.findMany({
-			where: { tripId, inviteStatus: { in: ['invited', 'accepted'] } },
+			where: { tripId, inviteStatus: 'approved' },
 			select: { userId: true }
 		});
 		const _unrespondedUserIds = members.map((m) => m.userId).filter((uid) => !respondedUserIds.has(uid));
@@ -574,7 +573,7 @@ export const actions: Actions = {
 			where: { tripId_userId: { tripId, userId } }
 		});
 		if (!isMember) return fail(400, { updateGuestRsvpError: 'User is not a guest on this trip' });
-		if (isMember.inviteStatus === 'removed') return fail(400, { updateGuestRsvpError: 'Cannot update RSVP for a removed guest' });
+		if (isMember.inviteStatus !== 'approved') return fail(400, { updateGuestRsvpError: 'Cannot update RSVP for a non-approved guest' });
 
 		if (rsvpStatusRaw === '' || rsvpStatusRaw === 'no-response') {
 			await prisma.rSVP.deleteMany({ where: { tripId, userId } });
@@ -635,7 +634,7 @@ export const actions: Actions = {
 		const isMember = await prisma.tripMember.findUnique({
 			where: { tripId_userId: { tripId, userId } }
 		});
-		if (!isMember || isMember.inviteStatus === 'removed') return { assignBedsSuccess: true };
+		if (!isMember || isMember.inviteStatus !== 'approved') return { assignBedsSuccess: true };
 
 		let startDate: Date | null = trip.checkInDate;
 		let endDate: Date | null = trip.checkOutDate;
@@ -713,37 +712,37 @@ export const actions: Actions = {
 				});
 				if (alreadyMember) return fail(400, { addManualGuestError: 'This person is already a guest' });
 				userId = existing.id;
-				await prisma.tripMember.create({
-					data: { tripId, userId: existing.id, role: 'guest', inviteStatus: 'accepted' }
-				});
-			} else {
-				const passwordHash = await hashPassword(crypto.randomUUID());
-				const newUser = await prisma.user.create({
-					data: {
-						email: emailRaw.toLowerCase(),
-						passwordHash,
-						name: name || null
-					}
-				});
-				userId = newUser.id;
-				await prisma.tripMember.create({
-					data: { tripId, userId: newUser.id, role: 'guest', inviteStatus: 'accepted' }
-				});
-			}
+			await prisma.tripMember.create({
+				data: { tripId, userId: existing.id, role: 'guest', inviteStatus: 'approved' }
+			});
 		} else {
-			const placeholderEmail = `manual-${crypto.randomUUID()}@guest.placeholder`;
 			const passwordHash = await hashPassword(crypto.randomUUID());
 			const newUser = await prisma.user.create({
 				data: {
-					email: placeholderEmail,
+					email: emailRaw.toLowerCase(),
 					passwordHash,
 					name: name || null
 				}
 			});
 			userId = newUser.id;
 			await prisma.tripMember.create({
-				data: { tripId, userId: newUser.id, role: 'guest', inviteStatus: 'accepted' }
+				data: { tripId, userId: newUser.id, role: 'guest', inviteStatus: 'approved' }
 			});
+		}
+	} else {
+		const placeholderEmail = `manual-${crypto.randomUUID()}@guest.placeholder`;
+		const passwordHash = await hashPassword(crypto.randomUUID());
+		const newUser = await prisma.user.create({
+			data: {
+				email: placeholderEmail,
+				passwordHash,
+				name: name || null
+			}
+		});
+		userId = newUser.id;
+		await prisma.tripMember.create({
+			data: { tripId, userId: newUser.id, role: 'guest', inviteStatus: 'approved' }
+		});
 		}
 
 		// Save dietary info to GuestProfile if provided

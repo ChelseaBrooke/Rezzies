@@ -13,7 +13,7 @@
 		onInvite,
 		showToast
 	}: {
-		trip: TripForSidebar & { inviteCode?: string };
+		trip: TripForSidebar;
 		allTrips: { id: string; name: string; checkInDate: Date; checkOutDate: Date; isPublished?: boolean }[];
 		user?: { id: string; name: string | null; email: string; avatarUrl?: string | null } | null;
 		onInvite?: () => void;
