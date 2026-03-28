@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
+	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
 
 	// Universal bed weights (see PRICING_MATH.md); privacy from room type or inferred from slot count
 	const BED_WEIGHTS: Record<string, number> = {
@@ -22,10 +23,10 @@
 		if (!room.beds?.length) return 0;
 		return room.beds.reduce((s, b) => s + (b.count || 1), 0);
 	}
-	// For per-bed: always infer from slot count so "lone bed in own room" costs more (1.25), multi-bed room = shared (1.0)
+	// Matches server getEffectivePrivacyFactor: 1 bed → 1.25, 2 → 1.125, 3+ → 1.0
 	function privacyFactor(room: { type?: string; beds?: Array<{ count?: number }> }): number {
-		const slots = roomSlotCount(room);
-		return slots === 1 ? 1.25 : 1.0;
+		const bedCount = roomSlotCount(room);
+		return Math.max(1.0, Math.min(1.25, 1.25 - (bedCount - 1) * 0.125));
 	}
 
 	type PricingModelOption = 'per-person' | 'per-room' | 'per-bed';
@@ -69,26 +70,6 @@
 	const perPersonAtMin = $derived(expected > 0 ? total / expected : 0);
 	const perPersonAtMax = $derived(max > 0 ? total / max : 0);
 
-	// Per-bed: price = (total ÷ max(effective guest count, yes-RSVPs)) × (bed weight × privacy ÷ average combined weight)
-	const perBedSlotCount = $derived(
-		rooms.reduce((s, room) => s + room.beds.reduce((b, bed) => b + (bed.count || 1), 0), 0)
-	);
-	const perBedSumCombinedWeight = $derived.by(() => {
-		let sum = 0;
-		rooms.forEach((room) => {
-			const p = privacyFactor(room);
-			room.beds.forEach((bed) => {
-				sum += (bed.count || 1) * bedWeight(bed.bedType) * p;
-			});
-		});
-		return sum;
-	});
-	const perBedAvgCombinedWeight = $derived(perBedSlotCount > 0 ? perBedSumCombinedWeight / perBedSlotCount : 1);
-	// Base = total ÷ number of beds so the per-bed breakdown sums to the trip total
-	const basePerBedSlots = $derived(perBedSlotCount > 0 ? total / perBedSlotCount : 0);
-	const basePerPersonExpected = $derived(expected > 0 ? total / expected : 0);
-	const basePerPersonMax = $derived(max > 0 ? total / max : 0);
-
 	// Per-room: denominator = sum of (room privacy × people in room). We don't have assignments in preview, so approximate: assume guests fill rooms (by maxOccupancy). Then denominator = sum over rooms of (privacy × min(people in room, capacity)).
 	const roomDenomExpected = $derived.by(() => {
 		let remaining = expected;
@@ -117,37 +98,48 @@
 	const perRoomPricePerPersonExpected = $derived(roomDenomExpected > 0 ? total / roomDenomExpected : 0);
 	const perRoomPricePerPersonMax = $derived(roomDenomMax > 0 ? total / roomDenomMax : 0);
 
-	// One row per bed slot: price = (total ÷ slot count) × (bed weight × privacy ÷ avg combined weight) so breakdown sums to trip total
+	// PER_BED: selection simulation (matches server / Add-Ons step)
 	const perBedSlotBreakdown = $derived.by(() => {
-		if (perBedSlotCount <= 0) return [];
-		const avgCombined = perBedAvgCombinedWeight || 1;
+		type U = { bedId: string; weight: number };
+		const units: U[] = [];
+		rooms.forEach((room, ri) => {
+			const p = privacyFactor(room);
+			room.beds.forEach((bed, bi) => {
+				const w = bedWeight(bed.bedType) * p;
+				const count = Math.max(1, bed.count || 1);
+				for (let i = 0; i < count; i++) {
+					units.push({ bedId: `p-${ri}-${bi}-${i}`, weight: w });
+				}
+			});
+		});
+		if (units.length === 0 || total <= 0) return [];
+		const sim = Math.min(expected, units.length);
+		const rangeMap = computePerBedRangeByBedId(total, sim, units);
 		const list: {
 			roomName: string;
 			bedType: string;
 			label: string;
-			pricePerBed: number;
-			pricePerBedPerNight: number;
-			pricePerBedMax: number;
-			pricePerBedPerNightMax: number;
+			low: number;
+			high: number;
+			perNightLow: number;
+			perNightHigh: number;
 		}[] = [];
-		rooms.forEach((room) => {
+		rooms.forEach((room, ri) => {
 			const roomName = room.name || 'Room';
-			const p = privacyFactor(room);
-			room.beds.forEach((bed) => {
-				const w = bedWeight(bed.bedType);
-				const unitExpected = (basePerBedSlots * (w * p)) / avgCombined;
-				const unitMax = (basePerPersonMax * (w * p)) / avgCombined;
+			room.beds.forEach((bed, bi) => {
 				const count = Math.max(1, bed.count || 1);
 				const typeLabel = bed.bedType.charAt(0).toUpperCase() + bed.bedType.slice(1).replace(/_/g, ' ');
 				for (let i = 0; i < count; i++) {
+					const id = `p-${ri}-${bi}-${i}`;
+					const r = rangeMap.get(id) ?? { low: 0, high: 0 };
 					list.push({
 						roomName,
 						bedType: bed.bedType,
 						label: count > 1 ? `${roomName}, ${typeLabel} ${i + 1}` : `${roomName}, ${typeLabel}`,
-						pricePerBed: unitExpected,
-						pricePerBedPerNight: nights > 0 ? unitExpected / nights : 0,
-						pricePerBedMax: unitMax,
-						pricePerBedPerNightMax: nights > 0 ? unitMax / nights : 0
+						low: r.low,
+						high: r.high,
+						perNightLow: nights > 0 ? r.low / nights : 0,
+						perNightHigh: nights > 0 ? r.high / nights : 0
 					});
 				}
 			});
@@ -290,36 +282,22 @@
 							</label>
 						</td>
 						<td class="col-model">Per Bed</td>
-						<td class="col-scenario">
+						<td class="col-scenario" colspan="2">
 							{#if perBedSlotBreakdown.length > 0}
 								<ul class="bed-breakdown bed-by-room">
 									{#each perBedSlotBreakdown as item, i (item.roomName + '-' + item.bedType + '-' + i)}
 										<li>
 											<span class="bed-slot-label">{item.label}</span>
-											<span class="bed-slot-price">${item.pricePerBed.toFixed(2)}</span>
+											<span class="bed-slot-price">${item.low.toFixed(2)}–${item.high.toFixed(2)}</span>
 											{#if nights > 0}
-												<p class="per-night"><strong>Per night:</strong> ${item.pricePerBedPerNight.toFixed(2)}</p>
+												<p class="per-night">
+													<strong>Per night:</strong> ${item.perNightLow.toFixed(2)}–${item.perNightHigh.toFixed(2)}
+												</p>
 											{/if}
 										</li>
 									{/each}
 								</ul>
-							{:else}
-								—
-							{/if}
-						</td>
-						<td class="col-scenario">
-							{#if perBedSlotBreakdown.length > 0}
-								<ul class="bed-breakdown bed-by-room">
-									{#each perBedSlotBreakdown as item, i (item.roomName + '-' + item.bedType + '-' + i)}
-										<li>
-											<span class="bed-slot-label">{item.label}</span>
-											<span class="bed-slot-price">${item.pricePerBedMax.toFixed(2)}</span>
-											{#if nights > 0}
-												<p class="per-night"><strong>Per night:</strong> ${item.pricePerBedPerNightMax.toFixed(2)}</p>
-											{/if}
-										</li>
-									{/each}
-								</ul>
+								<p class="per-bed-col-note">Simulated at {expected} guest{expected !== 1 ? 's' : ''} (capped to bed count). Live price uses who actually books which bed.</p>
 							{:else}
 								—
 							{/if}
@@ -329,8 +307,9 @@
 			</table>
 		</div>
 		{#if draft.pricingModel === 'per-bed'}
-			<p class="per-bed-note">In per-bed pricing, everyone pays based on the bed they choose. Larger beds and beds in private rooms cost a bit more (bed-type weight × room privacy). The breakdown below shows the price per bed so that <strong>when all beds are filled, the total collected equals the trip cost.</strong></p>
-			<p class="formula-note"><strong>Formula:</strong> Base = total trip cost ÷ number of sleeping spots. Each bed’s price = base × (bed weight × privacy ÷ average combined weight). Sum of all bed prices = trip cost.</p>
+			<p class="per-bed-note">
+				Each <strong>bed</strong> earns a share of the trip total from bed weight and room privacy. We show a <strong>low–high</strong> range for each bed by simulating which other beds get picked first at your expected headcount. After guests choose beds, <strong>live price</strong> splits each bed’s share among the people on that bed.
+			</p>
 		{/if}
 		{#if draft.pricingModel === 'per-room'}
 			<p class="formula-note"><strong>Formula:</strong> Price per person = Total cost × (room privacy) ÷ denominator. Denominator = sum of (room privacy × people in that room) for occupied rooms, with a floor of guest count. More guests → larger denominator → lower price per person.</p>
@@ -417,6 +396,13 @@
 		color: var(--muted);
 		line-height: 1.5;
 		max-width: 56ch;
+	}
+	.per-bed-col-note {
+		margin: 0.5rem 0 0;
+		font-size: 0.8125rem;
+		color: var(--muted);
+		line-height: 1.45;
+		max-width: 52ch;
 	}
 	.formula-note {
 		margin: 0.5rem 0 0;

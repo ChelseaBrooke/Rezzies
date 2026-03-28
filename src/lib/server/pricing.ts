@@ -1,6 +1,6 @@
 // Pricing calculation logic for Divvi
 // Supports multiple pricing models: per_room, per_bed, per_person, per_person_per_night
-// PER_BED uses canonical effectiveGuests × effectiveWeight formula via pricing-canonical.
+// PER_BED uses selection-based live pricing via pricing-canonical.
 
 import { prisma } from './prisma.js';
 import { calculateReservationPrice } from './pricing-canonical.js';
@@ -20,6 +20,12 @@ export interface CalculatePriceParams {
 	numberOfGuests?: number;
 	checkInDate: Date;
 	checkOutDate: Date;
+	/**
+	 * PER_BED: merge this bed into occupancy (for quotes / new bookings). Omit for stored assignments only.
+	 */
+	perBedQuote?: boolean;
+	/** PER_BED quote: exclude this user's assignments before merging the quoted bed */
+	quoteForUserId?: string;
 }
 
 /**
@@ -49,7 +55,8 @@ export function generateInviteCode(): string {
 export async function calculatePrice(
 	params: CalculatePriceParams
 ): Promise<PriceCalculationResult> {
-	const { tripId, roomId, bedId, numberOfGuests = 1, checkInDate, checkOutDate } = params;
+	const { tripId, roomId, bedId, numberOfGuests = 1, checkInDate, checkOutDate, perBedQuote, quoteForUserId } =
+		params;
 
 	// Get trip details
 	const trip = await prisma.trip.findUnique({
@@ -84,13 +91,20 @@ export async function calculatePrice(
 			const resolvedRoomId =
 				roomId ?? trip.rooms.find((r) => r.beds.some((b) => b.id === bedId))?.id;
 			if (resolvedRoomId == null) throw new Error('Room not found for bed');
+			const slots = numberOfGuests ?? 1;
 			const canonical = await calculateReservationPrice({
 				tripId,
 				roomId: resolvedRoomId,
 				bedId: bedId!,
-				numberOfSlots: numberOfGuests ?? 1,
+				numberOfSlots: slots,
 				checkInDate,
-				checkOutDate
+				checkOutDate,
+				...(perBedQuote && bedId
+					? {
+							provisionalPick: { bedId, partySize: Math.max(1, slots) },
+							...(quoteForUserId ? { quoteForUserId } : {})
+						}
+					: {})
 			});
 			return {
 				nights: canonical.nights,

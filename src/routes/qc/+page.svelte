@@ -160,7 +160,7 @@
 	<div class="main">
 		<header class="qc-header">
 			<h1>Pricing QC</h1>
-			<p class="subtitle">PER_BED: trip + guest counts + rooms/beds + my selections → price & range.</p>
+			<p class="subtitle">PER_BED: selection simulation (expected headcount) + your selections → low/high range & mid display.</p>
 		</header>
 
 		<form
@@ -269,29 +269,29 @@
 				<dl class="result-meta">
 					<dt>Nights</dt><dd>{result.totalTripNights}</dd>
 					<dt>Night cost</dt><dd>${result.nightCost.toFixed(2)}</dd>
-					<dt>Eff. guests</dt><dd>{result.effectiveGuests}</dd>
-					<dt>Eff. weight</dt><dd>{result.effectiveWeight}</dd>
-					<dt>Avg spot W</dt><dd>{result.avgSpotWeight}</dd>
+					<dt>Sim guest count</dt><dd>{result.simGuestCount}</dd>
+					<dt>Min expected</dt><dd>{result.minExpectedGuests}</dd>
+					<dt>Max capacity</dt><dd>{result.maxCapacityGuests}</dd>
 				</dl>
 				<div class="formula-filled">
-					<div class="formula-title">Formula (filled)</div>
-					<pre class="formula-pre">nightCost = totalCost / nights = {totalTripCost} / {result.totalTripNights} = ${result.nightCost.toFixed(2)}
-effectiveGuests = max(minExp, yes) = max({result.minExpectedGuests}, {yesRsvpGuests}) = {result.effectiveGuests}
-effectiveWeight = effectiveGuests × avgSpotWeight = {result.effectiveWeight}
-spotPricePerNight = nightCost × (spotWeight / effectiveWeight)
-guestDisplayedTotal = spotPricePerNight × nightsStayed × spotsClaimed
-displayPrice = sum(contrib) = ${result.displayPrice.toFixed(2)}
-Range: highEnd = same denominator (effWeight); lowEnd = maxCap × avgW
-highEnd → ${result.highEnd.toFixed(2)}  lowEnd → ${result.lowEnd.toFixed(2)}</pre>
+					<div class="formula-title">Selection model (filled)</div>
+					<pre class="formula-pre">simGuestCount = min(minExpectedGuests, expanded bed count) = {result.simGuestCount}
+Per bed unit: low = totalCost × w / (w + sum of next (sim−1) heaviest other weights)
+high = totalCost × w / (w + sum of next (sim−1) lightest other weights)
+Contributions × stay factor (nights stayed / trip nights)
+displayPrice (mid) = ${result.displayPrice.toFixed(2)}
+lowEnd → ${result.lowEnd.toFixed(2)}  highEnd → ${result.highEnd.toFixed(2)}</pre>
 				</div>
 				{#if result.breakdown?.length}
 					<table class="tbl">
-						<thead><tr><th>R</th><th>Bed</th><th>Type</th><th>W</th><th>N</th><th>Sp</th><th>$</th></tr></thead>
+						<thead><tr><th>R</th><th>Bed</th><th>Type</th><th>W</th><th>N</th><th>Sp</th><th>Low</th><th>High</th><th>Mid</th></tr></thead>
 						<tbody>
 							{#each result.breakdown as row}
 								<tr>
 									<td>{row.roomIndex + 1}</td><td>{row.bedIndex + 1}</td><td>{row.bedType}</td>
-									<td>{row.spotWeight.toFixed(2)}</td><td>{row.nightsStayed}</td><td>{row.spotsClaimed}</td>
+									<td>{row.weight.toFixed(2)}</td><td>{row.nightsStayed}</td><td>{row.spotsClaimed}</td>
+									<td>${row.lowContribution.toFixed(2)}</td>
+									<td>${row.highContribution.toFixed(2)}</td>
 									<td>${row.contribution.toFixed(2)}</td>
 								</tr>
 							{/each}

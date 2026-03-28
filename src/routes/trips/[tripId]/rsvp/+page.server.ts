@@ -111,7 +111,10 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	});
 	const yesRsvpHeadcount = Math.max(1, yesRsvps.reduce((s, r) => s + (r.adultsCount ?? 1), 0));
 
-	let bedPricing: Record<string, { perNight: number; total: number }> | null = null;
+	let bedPricing: Record<
+		string,
+		{ low: number; high: number; total: number; perNightLow: number; perNightHigh: number; perNight: number }
+	> | null = null;
 	if ((trip.pricingModel ?? '').toLowerCase() === 'per_bed' && trip.rooms.length > 0) {
 		const perBed = await computePerBedPricingAtHeadcount(tripId, yesRsvpHeadcount);
 		if (perBed) bedPricing = perBed.bedPricing;

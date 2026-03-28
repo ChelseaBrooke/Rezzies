@@ -8,12 +8,10 @@ import {
 	calculateReservationPrice,
 	calculateNights,
 	parseBedWeights,
-	getBedWeight,
-	getRoomEffectivePrivacy,
-	computePerBedInventoryWeights,
-	getPerBedRangeGuestCounts,
-	getSpotWeight,
-	getSpotCount
+	perBedSelectionRangeForTripBedIds,
+	buildPerBedOccupancyMap,
+	computePerBedLivePriceForBed,
+	getRoomEffectivePrivacy
 } from './pricing-canonical.js';
 import { createHash } from 'crypto';
 
@@ -168,13 +166,12 @@ export async function computeGuestEstimateRange(
 	}
 
 	// For PER_PERSON and PER_PERSON_PER_NIGHT, price doesn't vary by headcount in the same way; use capacity.
-	let lowCents: number;
-	let highCents: number;
+	let lowCents = 0;
+	let highCents = 0;
 	let explanationReason = 'Based on current headcount range.';
 	let displayCents: number | undefined;
 
 	if (pricingModel === 'per_bed' && guestAssignments.length > 0) {
-		const assignedSlots = guestAssignments.reduce((s, a) => s + (a.partySize || 1), 0);
 		const guestClaimedBedIds = new Set(
 			guestAssignments.map((a) => a.bedId).filter((id): id is string => id != null)
 		);
@@ -191,41 +188,43 @@ export async function computeGuestEstimateRange(
 			highCents = fullStayCents;
 			explanationReason = "You're taking the full lodging; no split with other guests.";
 		} else {
-			// PER_BED: display and high end use effectiveGuests = max(minExpected, yesRsvpGuests); effectiveWeight = effectiveGuests × avgSpotWeight.
 			const bedWeights = parseBedWeights(trip.bedWeights);
-			const yesRsvpGuests = rsvps.reduce((s, r) => s + (r.adultsCount ?? 1), 0);
-			const { minExpectedGuests, maxCapacityGuests } = getPerBedRangeGuestCounts(trip);
-			const effectiveGuests = Math.max(minExpectedGuests, yesRsvpGuests);
-			const inv = computePerBedInventoryWeights(trip, bedWeights);
-			const avgSpotWeight = inv.avgW;
-			const effectiveWeight = effectiveGuests * avgSpotWeight;
+			const simExpected = Math.max(1, trip.expectedPeopleCount ?? 1);
 			const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
-			const nightCost = totalNights > 0 ? trip.totalCost / totalNights : trip.totalCost;
-			let guestDisplayedTotal = 0;
-			let highEnd = 0;
 			let lowEnd = 0;
+			let highEnd = 0;
+			let guestDisplayedTotal = 0;
 			for (const a of guestAssignments) {
-				const room = trip.rooms.find((r) => r.id === a.roomId);
-				const bed = room?.beds.find((b) => b.id === (a.bedId ?? ''));
-				if (!room || !bed) continue;
-				const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
-				const spotsClaimed = a.partySize || 1;
+				if (!a.bedId) continue;
 				const stayNights = calculateNights(a.startDate ?? trip.checkInDate, a.endDate ?? trip.checkOutDate);
-				guestDisplayedTotal +=
-					effectiveWeight > 0
-						? nightCost * (spotWeight / effectiveWeight) * stayNights * spotsClaimed
-						: 0;
-				highEnd +=
-					effectiveWeight > 0
-						? nightCost * (spotWeight / effectiveWeight) * stayNights * spotsClaimed
-						: 0;
-				lowEnd += nightCost * (spotWeight / (maxCapacityGuests * avgSpotWeight)) * stayNights * spotsClaimed;
+				const { low, high } = perBedSelectionRangeForTripBedIds(
+					trip.totalCost,
+					simExpected,
+					trip,
+					bedWeights,
+					[a.bedId],
+					totalNights,
+					stayNights
+				);
+				lowEnd += low;
+				highEnd += high;
+				const pr = await calculateReservationPrice({
+					tripId,
+					roomId: a.roomId,
+					bedId: a.bedId,
+					numberOfSlots: a.partySize || 1,
+					checkInDate: a.startDate ?? trip.checkInDate,
+					checkOutDate: a.endDate ?? trip.checkOutDate
+				});
+				guestDisplayedTotal += pr.totalPrice;
 			}
 			lowCents = Math.round(lowEnd * 100);
 			highCents = Math.round(highEnd * 100);
-			let dc = Math.round(guestDisplayedTotal * 100);
-			displayCents = Math.max(lowCents, Math.min(highCents, dc));
-			if (minExpectedGuests < maxCapacityGuests) explanationReason = 'Fewer guests confirmed; final amount depends on headcount.';
+			displayCents = Math.round(guestDisplayedTotal * 100);
+			if (lowCents > highCents) [lowCents, highCents] = [highCents, lowCents];
+			displayCents = Math.max(lowCents, Math.min(highCents, displayCents));
+			explanationReason =
+				'Range shows how your bed share moves if others pick cheaper vs pricier beds first (simulated at expected headcount). Live amount uses current assignments.';
 		}
 	} else if (pricingModel === 'per_room') {
 		// Price at Hmax (more people) = lower share; at Hmin (fewer people) = higher share
@@ -313,8 +312,6 @@ export async function computeGuestEstimateWithOverrides(
 	]);
 	if (!trip || trip.rooms.length === 0) return null;
 	const yesUserIds = new Set(yesRsvps.map((r) => r.userId));
-	const yesRsvpGuestsForOverrides = yesRsvps.reduce((s, r) => s + (r.adultsCount ?? 1), 0);
-
 	const totalSlots = trip.rooms.reduce(
 		(s, r) => s + r.beds.reduce((b, bed) => b + (bed.capacitySlots ?? bed.capacity ?? 1), 0),
 		0
@@ -371,8 +368,8 @@ export async function computeGuestEstimateWithOverrides(
 	}
 
 	const costBasisVersion = computeCostBasisVersion(trip);
-	let lowCents: number;
-	let highCents: number;
+	let lowCents = 0;
+	let highCents = 0;
 	let explanationReason = 'Based on current headcount range.';
 	let displayCents: number | undefined;
 
@@ -392,39 +389,54 @@ export async function computeGuestEstimateWithOverrides(
 				highCents = fullStayCents;
 				explanationReason = "You're taking the full lodging; no split with other guests.";
 			} else {
-				// PER_BED: display and high end use effectiveGuests = max(minExpected, yesRsvpGuests); effectiveWeight = effectiveGuests × avgSpotWeight.
 				const bedWeights = parseBedWeights(trip.bedWeights);
-				const { minExpectedGuests, maxCapacityGuests } = getPerBedRangeGuestCounts(trip);
-				const effectiveGuests = Math.max(minExpectedGuests, yesRsvpGuestsForOverrides);
-				const inv = computePerBedInventoryWeights(trip, bedWeights);
-				const avgSpotWeight = inv.avgW;
-				const effectiveWeight = effectiveGuests * avgSpotWeight;
+				const simExpected = Math.max(1, trip.expectedPeopleCount ?? 1);
 				const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
-				const nightCost = totalNights > 0 ? trip.totalCost / totalNights : trip.totalCost;
 				const stayNights = calculateNights(checkInDate, checkOutDate);
-				let guestDisplayedTotal = 0;
-				let highEnd = 0;
 				let lowEnd = 0;
-				for (const { roomId: rId, bedId: bId, slots } of perBedSelections) {
-					const room = trip.rooms.find((r) => r.id === rId);
-					const bed = room?.beds.find((b) => b.id === bId);
-					if (!room || !bed) continue;
-					const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
-					guestDisplayedTotal +=
-						effectiveWeight > 0
-							? nightCost * (spotWeight / effectiveWeight) * stayNights * slots
-							: 0;
-					highEnd +=
-						effectiveWeight > 0
-							? nightCost * (spotWeight / effectiveWeight) * stayNights * slots
-							: 0;
-					lowEnd += nightCost * (spotWeight / (maxCapacityGuests * avgSpotWeight)) * stayNights * slots;
+				let highEnd = 0;
+				for (const { bedId: bId } of perBedSelections) {
+					const { low, high } = perBedSelectionRangeForTripBedIds(
+						trip.totalCost,
+						simExpected,
+						trip,
+						bedWeights,
+						[bId],
+						totalNights,
+						stayNights
+					);
+					lowEnd += low;
+					highEnd += high;
+				}
+				const assignRows = trip.roomAssignments.map((a) => ({
+					userId: a.userId,
+					roomId: a.roomId,
+					bedId: a.bedId,
+					partySize: a.partySize
+				}));
+				const occ = buildPerBedOccupancyMap(assignRows, yesUserIds, { excludeUserId: guestId });
+				for (const { bedId: bId, slots } of perBedSelections) {
+					const p = Math.max(1, slots);
+					occ.set(bId, (occ.get(bId) ?? 0) + p);
+				}
+				let guestDisplayedTotal = 0;
+				for (const { bedId: bId, slots } of perBedSelections) {
+					guestDisplayedTotal += computePerBedLivePriceForBed(
+						trip,
+						bedWeights,
+						occ,
+						bId,
+						Math.max(1, slots),
+						stayNights
+					);
 				}
 				lowCents = Math.round(lowEnd * 100);
 				highCents = Math.round(highEnd * 100);
-				let dc = Math.round(guestDisplayedTotal * 100);
-				displayCents = Math.max(lowCents, Math.min(highCents, dc));
-				if (minExpectedGuests < maxCapacityGuests) explanationReason = 'Fewer guests confirmed; final amount depends on headcount.';
+				displayCents = Math.round(guestDisplayedTotal * 100);
+				if (lowCents > highCents) [lowCents, highCents] = [highCents, lowCents];
+				displayCents = Math.max(lowCents, Math.min(highCents, displayCents));
+				explanationReason =
+					'Range shows how your bed share moves if others pick cheaper vs pricier beds first (simulated at expected headcount). Live amount uses current assignments.';
 			}
 		} else if (pricingModel === 'per_room') {
 			const priceAtHmax = await calculateReservationPriceWithHeadcount(tripId, {
@@ -480,8 +492,7 @@ export async function computeGuestEstimateWithOverrides(
 }
 
 /**
- * Calculate reservation price with an overridden headcount (for PER_ROOM) or effective weight (for PER_BED range).
- * PER_BED: overrideWEff = effectiveWeight or maxCap×avgW for range low/high.
+ * Calculate reservation price with an overridden headcount (PER_ROOM preview range).
  */
 async function calculateReservationPriceWithHeadcount(
 	tripId: string,
@@ -492,7 +503,6 @@ async function calculateReservationPriceWithHeadcount(
 		checkInDate: Date;
 		checkOutDate: Date;
 		overrideHeadcount: number;
-		overrideWEff?: number;
 	}
 ): Promise<number> {
 	const trip = await prisma.trip.findUnique({
@@ -504,42 +514,14 @@ async function calculateReservationPriceWithHeadcount(
 	});
 	if (!trip) throw new Error('Trip not found');
 
-	const { roomId, bedId, numberOfSlots, checkInDate, checkOutDate, overrideHeadcount, overrideWEff } = params;
+	const { roomId, bedId, numberOfSlots, checkInDate, checkOutDate, overrideHeadcount } = params;
 	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
 	const stayNights = calculateNights(checkInDate, checkOutDate);
 	const stayFactor = totalNights > 0 ? stayNights / totalNights : 1;
 	const room = trip.rooms.find((r) => r.id === roomId);
 	if (!room) throw new Error('Room not found');
-	const bedWeights = parseBedWeights(trip.bedWeights);
 	const privacyFactor = getRoomEffectivePrivacy(room.beds);
 	const pricingModel = (trip.pricingModel || 'per_person').toLowerCase();
-
-	if (pricingModel === 'per_bed') {
-		const bed = bedId ? room.beds.find((b) => b.id === bedId) : room.beds[0];
-		if (!bed) throw new Error('Bed not found');
-		const spotWeight = getSpotWeight(bed, room.beds, bedWeights);
-		if (overrideWEff != null && overrideWEff > 0) {
-			// PRICING_MATH: low = n×nightCost×(k×w/W_max), high = n×nightCost×(k×w/W_min)
-			const nightCost = totalNights > 0 ? trip.totalCost / totalNights : trip.totalCost;
-			const price = stayNights * nightCost * (numberOfSlots * spotWeight) / overrideWEff;
-			return price;
-		}
-		let totalSlots = 0;
-		let sumCombinedWeight = 0;
-		for (const r of trip.rooms) {
-			const p = getRoomEffectivePrivacy(r.beds);
-			for (const b of r.beds) {
-				const slots = getSpotCount(b);
-				totalSlots += slots;
-				sumCombinedWeight += slots * getBedWeight(bedWeights, b.bedType) * p;
-			}
-		}
-		const avgCombinedWeight = totalSlots > 0 ? sumCombinedWeight / totalSlots : 1;
-		const denominator = Math.max(1, overrideHeadcount);
-		const basePerPerson = trip.totalCost / denominator;
-		const pricePerPersonFullStay = (basePerPerson * spotWeight) / avgCombinedWeight;
-		return pricePerPersonFullStay * stayFactor;
-	}
 
 	if (pricingModel === 'per_room') {
 		const avgPrivacy =

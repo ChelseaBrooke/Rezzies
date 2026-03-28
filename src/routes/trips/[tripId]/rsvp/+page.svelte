@@ -421,8 +421,10 @@
 													{@const spots = bed.capacitySlots ?? bed.capacity ?? 1}
 													{@const isClaimedByOther = claimedByOtherSet.has(bed.id)}
 													{@const bp = data.bedPricing?.[bed.id]}
-													{@const perNight = bp ? bp.perNight : bedPricePerNight(room.id, spots)}
-													{@const total = bp ? bp.total : bedTotal(room.id, spots)}
+													{@const perNightLow = bp ? bp.perNightLow : bedPricePerNight(room.id, spots)}
+													{@const perNightHigh = bp ? bp.perNightHigh : perNightLow}
+													{@const totalLow = bp ? bp.low : bedTotal(room.id, spots)}
+													{@const totalHigh = bp ? bp.high : totalLow}
 													<label class="bed-option hotel-bed" class:disabled={isClaimedByOther} class:selected={selectedBedIds.includes(bed.id)}>
 														<input
 															type="checkbox"
@@ -433,8 +435,10 @@
 															onchange={(e) => onBedChange((e.currentTarget as HTMLInputElement).checked, bed.id)}
 														/>
 														<span class="bed-type">{bed.bedType}</span>
-														{#if perNight > 0 && tripNights > 0}
-															<span class="bed-price">{formatDollars(perNight)}/night · {formatDollars(total)} total</span>
+														{#if perNightLow > 0 && tripNights > 0}
+															<span class="bed-price"
+																>{formatDollars(perNightLow)}–{formatDollars(perNightHigh)}/night · {formatDollars(totalLow)}–{formatDollars(totalHigh)} est.</span
+															>
 														{/if}
 														{#if isClaimedByOther}
 															<span class="claimed-badge">Claimed</span>

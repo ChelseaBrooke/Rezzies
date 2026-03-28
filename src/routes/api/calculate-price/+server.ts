@@ -60,7 +60,10 @@ export const POST: RequestHandler = async (event) => {
 			bedId,
 			numberOfSlots,
 			checkInDate,
-			checkOutDate
+			checkOutDate,
+			provisionalPick:
+				bedId != null ? { bedId, partySize: numberOfSlots } : undefined,
+			...(user?.id ? { quoteForUserId: user.id } : {})
 		});
 
 		return json(createSuccessResponse({

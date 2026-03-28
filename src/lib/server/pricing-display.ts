@@ -92,7 +92,7 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 		};
 	}
 
-	// PER_BED: use canonical pricing (effectiveGuests × avgSpotWeight) so display matches RSVP page
+	// PER_BED: selection-based estimated range per bed (matches RSVP / canonical)
 	let perBedPricing: Awaited<ReturnType<typeof computePerBedPricingAtHeadcount>> = null;
 	if (pricingModel === 'PER_BED') {
 		perBedPricing = await computePerBedPricingAtHeadcount(tripId, 0);
@@ -115,7 +115,7 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 					bedPricing.push({
 						bedId: bed.id,
 						bedType: bed.bedType,
-						priceDisplay: `$${p.perNight.toFixed(2)} per night ($${p.total.toFixed(2)} for ${perBedPricing.totalNights} nights)`
+						priceDisplay: `$${p.perNightLow.toFixed(2)}–$${p.perNightHigh.toFixed(2)}/night ($${p.low.toFixed(2)}–$${p.high.toFixed(2)} est. for ${perBedPricing.totalNights} nights)`
 					});
 				}
 			}

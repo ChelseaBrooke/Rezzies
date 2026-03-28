@@ -115,60 +115,43 @@ Each person in Room B: 5000 × 1.0 / 5.5 ≈ $909.09.
 
 ---
 
-### 4. PER_BED (with privacy) — per sleeping spot, per night
+### 4. PER_BED — selection simulation + live split by occupied beds
 
-Everyone pays based on the bed they choose. Pricing is **per sleeping spot, per night**: larger beds and beds in rooms with fewer beds cost more (bed-type weight × effective room privacy). **partySize** = sleeping spots claimed by that RSVP.
+Each **bed** in inventory has a weight:
 
-**Displayed price** assumes at least the host’s minimum expected guest count attend. If more guests RSVP, the price decreases proportionally.
-
-**Range** shows:
-- **High end:** price at effectiveGuests (same denominator as displayed price).
-- **Low end:** price at maxCapacityGuests.
-
-**Spot weight:**  
 ```
-spotWeight = bedTypeWeight × effectiveRoomPrivacyFactor
+bedWeight = bedTypeWeight × effectiveRoomPrivacyFactor
 ```
 
-**Night cost:**  
+(one row in the `Bed` table = one priced unit; sharing the same physical bed splits that bed’s dollar share).
+
+**Estimated range (preview / marketing):** Fix `simGuestCount = min(expectedPeopleCount, number of bed rows)`. For each bed row, simulate which *other* `simGuestCount − 1` beds are “taken” first:
+
+- **Low (best case for this bed):** other guests take the **heaviest** remaining beds first.  
+  `lowPrice = totalTripCost × w_this / (w_this + sum of next (simGuestCount−1) largest other weights)`
+- **High (worst case):** other guests take the **lightest** remaining beds first.  
+  `highPrice = totalTripCost × w_this / (w_this + sum of next (simGuestCount−1) smallest other weights)`
+
+If `simGuestCount = 1`, that bed’s row is the only one in the denominator → it shows the full trip cost for the stay (before splitting among occupants).
+
+**Live reservation price (after people pick beds):** Consider only beds that have at least one guest assigned (yes RSVPs with room assignments). Let `totalWeight = sum of bedWeight over occupied beds`.
+
 ```
-nightCost = totalTripCost ÷ totalTripNights
+bedShare = totalTripCost × bedWeight / totalWeight   (full trip, for that bed)
 ```
 
-**avgSpotWeight:**  
+An assignment with `partySize` on that bed pays:
+
 ```
-avgSpotWeight = fullInventoryWeight ÷ totalSpotCapacity
+assignmentPrice = bedShare × (partySize / totalPartyOnThatBed) × (nightsStayed / totalTripNights)
 ```
 
-**effectiveGuests** (used for both displayed price and range high end):  
-```
-effectiveGuests = max(minExpectedGuests, yesRsvpGuests)
-```
-
-**effectiveWeight:**  
-```
-effectiveWeight = effectiveGuests × avgSpotWeight
-```
-
-**Displayed price and reservation total:**  
-```
-spotPricePerNight = nightCost × (spotWeight ÷ effectiveWeight)
-guestDisplayedTotal = spotPricePerNight × nightsStayed × spotsClaimed
-```
-
-**Range:**  
-```
-highEnd = nightCost × (spotWeight ÷ (effectiveGuests × avgSpotWeight)) × nightsStayed × spotsClaimed
-lowEnd  = nightCost × (spotWeight ÷ (maxCapacityGuests × avgSpotWeight)) × nightsStayed × spotsClaimed
-```
-
-Display and high end use the same denominator (effectiveWeight), so displayed price always lies within [lowEnd, highEnd]. Early RSVPs are not front-loaded; the range shrinks as more guests RSVP.
+**Quotes** (before save): merge the guest’s proposed bed into occupancy; optionally exclude that user’s existing assignments so changing beds re-prices correctly.
 
 **UI implications**
 
-- Prices shown next to beds use effectiveGuests; adding unused rooms does not change prices.
-- A bed with multiple spots can be partially claimed; show **claimedSpots / spotCount** (e.g. “1/2” for one of two spots on a King).
-- Enforce availability: a bed cannot exceed spotCount for any overlapping night.
+- Show **low–high** per bed type or per bed row for estimates; show **live** amount from the occupied-bed formula once assignments exist.
+- Guests sharing one bed split that bed’s share; occupancy does not change the bed’s weight, only how many people divide `bedShare`.
 
 ---
 
@@ -178,7 +161,7 @@ Partial stays are **model-dependent**.
 
 - **PER_PERSON and PER_PERSON_PER_NIGHT:** Multiplying by a stay factor (e.g. `nightsStayed / totalNights`) is valid.
 - **PER_ROOM:** Do **not** use “full stay price × stayFactor”. Allocate cost **per night**: for each night in the guest’s stay, compute that night’s share (nightly denominator in weighted units), then **sum** across the guest’s stayed nights. Minimum expected floor in weighted units.
-- **PER_BED:** Do **not** use “full stay price × stayFactor”. Reservation total = nightCost × (spotWeight ÷ effectiveWeight) × nightsStayed × spotsClaimed (single formula; no per-night allocation by claimed spots or load factors).
+- **PER_BED:** Apply **stay factor** to the full-trip bed share: `bedShare × (party fraction on bed) × (nightsStayed / totalTripNights)`.
 
 ---
 

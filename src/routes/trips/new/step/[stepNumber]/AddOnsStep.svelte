@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
+	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
 
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
 
@@ -76,9 +77,10 @@
 	function bedWeight(type: string): number {
 		return BED_WEIGHTS[type.toLowerCase().replace(/\s+/g, '_')] ?? 1.0;
 	}
+	// Matches server getEffectivePrivacyFactor: 1 bed → 1.25, 2 → 1.125, 3+ → 1.0
 	function privacyFactor(room: { beds?: Array<{ count?: number }> }): number {
-		const slots = (room.beds ?? []).reduce((s, b) => s + (b.count || 1), 0);
-		return slots === 1 ? 1.25 : 1.0;
+		const bedCount = (room.beds ?? []).reduce((s, b) => s + (b.count || 1), 0);
+		return Math.max(1.0, Math.min(1.25, 1.25 - (bedCount - 1) * 0.125));
 	}
 
 	const expected = $derived(Math.max(1, Number(draft.expectedGuestCount) || 1));
@@ -127,52 +129,101 @@
 	const prExpected = $derived(roomDenomExpected > 0 ? total / roomDenomExpected : 0);
 	const prMax      = $derived(roomDenomMax      > 0 ? total / roomDenomMax      : 0);
 
-	// Per-bed breakdown
-	const perBedSlotCount = $derived(
-		rooms.reduce((s, r) => s + r.beds.reduce((b, bed) => b + (bed.count || 1), 0), 0)
-	);
-	const perBedSumWeight = $derived.by(() => {
-		let sum = 0;
-		rooms.forEach((room) => {
-			const p = privacyFactor(room);
-			room.beds.forEach((bed) => { sum += (bed.count || 1) * bedWeight(bed.bedType) * p; });
-		});
-		return sum;
-	});
-	const perBedAvgWeight  = $derived(perBedSlotCount > 0 ? perBedSumWeight / perBedSlotCount : 1);
-	const basePerBedSlots  = $derived(perBedSlotCount > 0 ? total / perBedSlotCount : 0);
-	const basePerPersonMax = $derived(maxG > 0 ? total / maxG : 0);
-
-	/** Per-bed prices grouped by room for readable two-column layout */
-	const perBedByRoom = $derived.by(() => {
-		if (perBedSlotCount <= 0) return [];
-		const avg = perBedAvgWeight || 1;
-		const groups: {
-			roomName: string;
-			beds: { label: string; priceExp: number; priceMax: number }[];
-		}[] = [];
+	/** Selection-based PER_BED: expected sim + full occupancy (every bed taken). */
+	const perBedSelection = $derived.by(() => {
+		type U = { bedId: string; bedType: string; weight: number };
+		const units: U[] = [];
 		rooms.forEach((room, ri) => {
 			const p = privacyFactor(room);
-			const roomName = room.name?.trim() || `Room ${ri + 1}`;
-			const beds: { label: string; priceExp: number; priceMax: number }[] = [];
-			room.beds.forEach((bed) => {
-				const w = bedWeight(bed.bedType);
-				const unitExp = (basePerBedSlots * (w * p)) / avg;
-				const unitMax = (basePerPersonMax * (w * p)) / avg;
+			room.beds.forEach((bed, bi) => {
+				const w = bedWeight(bed.bedType) * p;
 				const count = Math.max(1, bed.count || 1);
-				const typeLabel = bed.bedType.charAt(0).toUpperCase() + bed.bedType.slice(1).replace(/_/g, ' ');
 				for (let i = 0; i < count; i++) {
-					beds.push({
-						label: count > 1 ? `${typeLabel} ${i + 1}` : typeLabel,
-						priceExp: unitExp,
-						priceMax: unitMax
+					units.push({
+						bedId: `w-${ri}-${bi}-${i}`,
+						bedType: bed.bedType.toLowerCase(),
+						weight: w
 					});
 				}
 			});
-			if (beds.length > 0) groups.push({ roomName, beds });
 		});
-		return groups;
+		type BedRow = { label: string; low: number; high: number };
+		type RoomGrp = { roomName: string; beds: BedRow[] };
+		const empty = {
+			groups: [] as RoomGrp[],
+			groupsFull: [] as RoomGrp[],
+			byType: [] as { type: string; low: number; high: number }[],
+			bedCount: 0
+		};
+		if (units.length === 0 || total <= 0) {
+			return empty;
+		}
+		const sim = Math.min(expected, units.length);
+		const rangeMap = computePerBedRangeByBedId(total, sim, units);
+		const rangeMapFull = computePerBedRangeByBedId(total, units.length, units);
+
+		function buildGroups(map: Map<string, { low: number; high: number }>): RoomGrp[] {
+			const groups: RoomGrp[] = [];
+			rooms.forEach((room, ri) => {
+				const roomName = room.name?.trim() || `Room ${ri + 1}`;
+				const beds: BedRow[] = [];
+				room.beds.forEach((bed, bi) => {
+					const count = Math.max(1, bed.count || 1);
+					const typeLabel = bed.bedType.charAt(0).toUpperCase() + bed.bedType.slice(1).replace(/_/g, ' ');
+					for (let i = 0; i < count; i++) {
+						const id = `w-${ri}-${bi}-${i}`;
+						const r = map.get(id) ?? { low: 0, high: 0 };
+						beds.push({
+							label: count > 1 ? `${typeLabel} ${i + 1}` : typeLabel,
+							low: r.low,
+							high: r.high
+						});
+					}
+				});
+				if (beds.length > 0) groups.push({ roomName, beds });
+			});
+			return groups;
+		}
+
+		const groups = buildGroups(rangeMap);
+		const groupsFull = buildGroups(rangeMapFull);
+
+		const byType: Record<string, { low: number; high: number }> = {};
+		for (const u of units) {
+			const r = rangeMap.get(u.bedId);
+			if (!r) continue;
+			if (!byType[u.bedType]) byType[u.bedType] = { low: r.low, high: r.high };
+			else {
+				byType[u.bedType].low = Math.min(byType[u.bedType].low, r.low);
+				byType[u.bedType].high = Math.max(byType[u.bedType].high, r.high);
+			}
+		}
+		const byTypeList = Object.entries(byType).map(([type, r]) => ({
+			type: type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' '),
+			low: r.low,
+			high: r.high
+		}));
+		return { groups, groupsFull, byType: byTypeList, bedCount: units.length };
 	});
+
+	const perBedByRoom = $derived(perBedSelection.groups);
+	const perBedByRoomFull = $derived(perBedSelection.groupsFull);
+	const perBedBedCount = $derived(perBedSelection.bedCount);
+	const perBedTypeEstimates = $derived(perBedSelection.byType);
+
+	function formatBedPriceTotal(low: number, high: number): string {
+		const a = roundUsd(low);
+		const b = roundUsd(high);
+		if (a === b) return `$${a}`;
+		return `$${a}–$${b}`;
+	}
+	function formatBedPriceNight(low: number, high: number): string {
+		if (nights <= 0) return '';
+		const a = roundUsd(low / nights);
+		const b = roundUsd(high / nights);
+		if (a === b) return `$${a}/night`;
+		return `$${a}–$${b}/night`;
+	}
 
 	// ─── Games catalogue ─────────────────────────────────────────────────────────
 
@@ -298,8 +349,8 @@
 										<tr>
 											<th></th>
 											<th>Model</th>
-											<th>Total Cost, at {expected} guest{expected !== 1 ? 's' : ''}</th>
-											<th>Total Cost, at {maxG} guest{maxG !== 1 ? 's' : ''}</th>
+											<th>At {expected} guest{expected !== 1 ? 's' : ''}</th>
+											<th>At {maxG} guest{maxG !== 1 ? 's' : ''}</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -342,13 +393,23 @@
 											<td class="pt-model">Per Bed</td>
 											<td class="pt-val pt-val--bed-summary" colspan="2">
 												<div class="bed-summary-copy">
-													Price will vary with bed-type chosen and room privacy.
+													{#if perBedTypeEstimates.length > 0 && total > 0}
+														<div class="bed-type-est-list">
+															{#each perBedTypeEstimates as row}
+																<span class="bed-type-est"
+																	>{row.type}: ${roundUsd(row.low)}–${roundUsd(row.high)}</span
+																>
+															{/each}
+														</div>
+													{:else}
+														<span class="bed-summary-muted">Estimated price per bed (by type) after you add beds and cost.</span>
+													{/if}
 													<button
 														type="button"
 														class="bed-summary-link"
 														onclick={openBedBreakdownModal}
 													>
-														Click here for more information.
+														Room-by-room breakdown
 													</button>
 												</div>
 											</td>
@@ -619,22 +680,22 @@
 						<strong>Single-bed rooms</strong> get a privacy bump compared to rooms with several beds.
 					</li>
 				</ul>
-				<p class="bed-modal-follow">
-					<span class="bed-follow-when">When more guests chip in,</span>
-					<span class="bed-follow-mid">each person's share usually </span>
-					<span class="bed-follow-drop">drops</span><span class="bed-follow-mid">.</span>
-					<span class="bed-follow-why">That's why we show both </span>
-					<span class="bed-follow-tag bed-follow-tag--exp">expected</span>
-					<span class="bed-follow-why"> and </span>
-					<span class="bed-follow-tag bed-follow-tag--max">max</span>
-					<span class="bed-follow-why"> headcount.</span>
-				</p>
+			<p class="bed-modal-follow">
+				<span class="bed-follow-mid">The left column assumes </span>
+				<span class="bed-follow-tag bed-follow-tag--exp">{expected} guest{expected !== 1 ? 's' : ''}</span>
+				<span class="bed-follow-mid">
+					booking beds (capped at bed count). <strong>Low</strong> = others take priciest beds first; <strong>high</strong> = cheapest first.
+					The right column is </span>
+				<span class="bed-follow-tag bed-follow-tag--max">full occupancy</span>
+				<span class="bed-follow-mid">
+					— every bed taken ({perBedBedCount} guest{perBedBedCount !== 1 ? 's' : ''}), so each bed’s share is a fixed slice of the total. After people pick beds, cost is split among who’s on each bed.</span>
+			</p>
 
 				{#if perBedByRoom.length > 0 && total > 0}
 					<div class="bed-modal-columns">
 						<div class="bed-modal-col">
-							<h4 class="bed-modal-col-title">Total Cost, at {expected} guest{expected !== 1 ? 's' : ''}</h4>
-							<p class="bed-modal-col-sub bed-modal-col-sub--exp">Expected group size</p>
+							<h4 class="bed-modal-col-title">At expected headcount</h4>
+							<p class="bed-modal-col-sub bed-modal-col-sub--exp">{expected} guest{expected !== 1 ? 's' : ''} · low–high (full trip)</p>
 							<div class="bed-modal-table-shell bed-modal-table-shell--exp">
 								<table class="bed-mini-table bed-mini-table--modal">
 									<tbody>
@@ -646,7 +707,8 @@
 													</td>
 													<td class="bed-mini-price-modal">
 														<div class="bed-price-stack">
-															<span class="bed-price-total">${roundUsd(b.priceExp)}</span>{#if nights > 0}<span class="bed-price-night">${roundUsd(b.priceExp / nights)}/night</span>{/if}
+															<span class="bed-price-total">{formatBedPriceTotal(b.low, b.high)}</span>
+															{#if nights > 0}<span class="bed-price-night">{formatBedPriceNight(b.low, b.high)}</span>{/if}
 														</div>
 													</td>
 												</tr>
@@ -657,20 +719,21 @@
 							</div>
 						</div>
 						<div class="bed-modal-col">
-							<h4 class="bed-modal-col-title">Total Cost, at {maxG} guest{maxG !== 1 ? 's' : ''}</h4>
-							<p class="bed-modal-col-sub bed-modal-col-sub--max">Max capacity</p>
+							<h4 class="bed-modal-col-title">Full capacity</h4>
+							<p class="bed-modal-col-sub bed-modal-col-sub--max">Every bed taken · est. per bed</p>
 							<div class="bed-modal-table-shell bed-modal-table-shell--max">
 								<table class="bed-mini-table bed-mini-table--modal">
 									<tbody>
-										{#each perBedByRoom as grp, gi}
+										{#each perBedByRoomFull as grp, gi}
 											{#each grp.beds as b, bi}
 												<tr class:bed-mini-room-sep={bi === 0 && gi > 0}>
 													<td class="bed-mini-desc-modal">
-														<span class="bed-mini-room-name">{grp.roomName}</span><span class="bed-mini-dot" aria-hidden="true">·</span><span class="bed-mini-bed-label">{b.label}</span>
+														<span class="bed-mini-room-name">{grp.roomName}</span><span class="bed-mini-dot" aria-hidden="true">·</span><span class="bed-mini-bed-label bed-mini-bed-label--max">{b.label}</span>
 													</td>
 													<td class="bed-mini-price-modal">
 														<div class="bed-price-stack">
-															<span class="bed-price-total">${roundUsd(b.priceMax)}</span>{#if nights > 0}<span class="bed-price-night">${roundUsd(b.priceMax / nights)}/night</span>{/if}
+															<span class="bed-price-total bed-price-total--max">{formatBedPriceTotal(b.low, b.high)}</span>
+															{#if nights > 0}<span class="bed-price-night">{formatBedPriceNight(b.low, b.high)}</span>{/if}
 														</div>
 													</td>
 												</tr>
@@ -1444,6 +1507,30 @@
 		color: var(--primary-dark, #152a66);
 	}
 
+	.bed-type-est-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 0.6rem;
+		justify-content: center;
+		margin-bottom: 0.35rem;
+	}
+
+	.bed-type-est {
+		font-size: 0.8125rem;
+		color: var(--text);
+	}
+
+	.bed-summary-muted {
+		font-size: 0.8125rem;
+		color: var(--muted);
+		display: block;
+		margin-bottom: 0.25rem;
+	}
+
+	.bed-modal-single {
+		margin-top: 0.75rem;
+	}
+
 	.bed-mini-table {
 		width: 100%;
 		border-collapse: collapse;
@@ -1496,7 +1583,7 @@
 		left: 50%;
 		top: 50%;
 		transform: translate(-50%, -50%);
-		width: min(44rem, calc(100vw - 1.5rem));
+		width: min(56rem, calc(100vw - 1.5rem));
 		max-height: min(88vh, 52rem);
 		display: flex;
 		flex-direction: column;
@@ -1664,6 +1751,10 @@
 		margin-top: 0.25rem;
 	}
 
+	.bed-modal-col {
+		min-width: 0;
+	}
+
 	.bed-modal-col-title {
 		margin: 0 0 0.2rem;
 		font-size: 0.9375rem;
@@ -1758,7 +1849,12 @@
 		color: var(--bed-violet);
 	}
 
-	.bed-modal-table-shell--max .bed-mini-bed-label {
+	.bed-modal-table-shell--max .bed-mini-bed-label,
+	.bed-mini-bed-label--max {
+		color: var(--warm, #ce5612);
+	}
+
+	.bed-price-total--max {
 		color: var(--warm, #ce5612);
 	}
 

@@ -54,7 +54,8 @@ export const POST: RequestHandler = async (event) => {
 			roomId: bed.roomId,
 			bedId: data.bedId,
 			checkInDate: data.checkInDate,
-			checkOutDate: data.checkOutDate
+			checkOutDate: data.checkOutDate,
+			perBedQuote: true
 		});
 
 		// Check for existing submission for this bed (prevent double-booking)
