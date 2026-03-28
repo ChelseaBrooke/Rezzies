@@ -98,26 +98,26 @@
 		{ value: 'sofa', label: 'Sofa Bed', iconUrl: sofaBedIconUrl, fallbackIcon: '🛋️' }
 	];
 	
-	function getRoomDisplayName(room: { roomType: string; customRoomDescription?: string }, roomIndex: number): string {
-		const option = roomTypeOptions.find(opt => opt.value === room.roomType);
-		let baseName = option ? option.label : room.roomType;
-		
-		if (room.roomType === 'other' && room.customRoomDescription) {
-			baseName = room.customRoomDescription;
+	/** Stable labels Room 1, Room 2, … by list order (used in wizard + pricing tables). */
+	function normalizeRoomNames() {
+		draft.rooms.forEach((r, i) => {
+			r.name = `Room ${i + 1}`;
+		});
+	}
+
+	function getRoomDisplayName(room: { name?: string }, roomIndex: number): string {
+		const n = room.name?.trim();
+		if (n) return n;
+		return `Room ${roomIndex + 1}`;
+	}
+
+	/** Provisional number for the "add room" / edit card before fields are filled. */
+	function provisionalRoomNumber(): number {
+		if (editingRoomId && editingRoomId !== 'new') {
+			const idx = draft.rooms.findIndex((r) => r.id === editingRoomId);
+			if (idx >= 0) return idx + 1;
 		}
-		
-		// Count how many rooms of this type exist
-		const sameTypeRooms = draft.rooms.filter(r => r.roomType === room.roomType);
-		const sameTypeCount = sameTypeRooms.length;
-		
-		// If multiple rooms of same type, add number
-		if (sameTypeCount > 1) {
-			// Count how many of this type come before this one
-			const beforeCount = draft.rooms.slice(0, roomIndex).filter(r => r.roomType === room.roomType).length;
-			return `${baseName} ${beforeCount + 1}`;
-		}
-		
-		return baseName;
+		return draft.rooms.length + 1;
 	}
 	
 	function getBedIconMeta(bedType: string): { url?: string; alt: string; fallback: string } {
@@ -222,6 +222,7 @@
 				beds
 			}
 		];
+		normalizeRoomNames();
 		autosave();
 		cancelAddingRoom();
 	}
@@ -275,6 +276,7 @@
 		const totalSlots = room.beds.reduce((s, b) => s + (b.count || 1), 0);
 		room.type = totalSlots === 1 ? 'private' : 'shared';
 
+		normalizeRoomNames();
 		autosave();
 		editingRoomId = null;
 		newRoomBedTypesArray = [];
@@ -284,6 +286,7 @@
 	
 	function removeRoom(roomId: string) {
 		draft.rooms = draft.rooms.filter((r) => r.id !== roomId);
+		normalizeRoomNames();
 		autosave();
 	}
 	
@@ -393,6 +396,7 @@
 		<!-- Add Room Card -->
 		{#if editingRoomId === 'new'}
 			<div class="room-card add-room-editing">
+				<div class="editing-room-title">Room {provisionalRoomNumber()}</div>
 				<div class="add-room-dropdowns">
 					<div class="dropdown-wrapper">
 						<select class="room-type-dropdown" bind:value={newRoomType} required>
@@ -495,6 +499,7 @@
 		{#each draft.rooms as room, index}
 			{#if editingRoomId === room.id}
 				<div class="room-card add-room-editing">
+					<div class="editing-room-title">{getRoomDisplayName(room, index)}</div>
 					<div class="add-room-dropdowns">
 						<div class="dropdown-wrapper">
 							<select class="room-type-dropdown" bind:value={newRoomType} required>
@@ -791,6 +796,14 @@
 		width: 100%;
 		overflow: visible;
 		box-sizing: border-box;
+	}
+
+	.editing-room-title {
+		font-size: 0.8125rem;
+		font-weight: 700;
+		color: var(--text);
+		letter-spacing: -0.02em;
+		margin: 0 0 -0.25rem;
 	}
 	
 	.add-room-dropdowns {

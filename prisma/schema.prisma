@@ -27,7 +27,8 @@ model Trip {
   timezone          String   @default("UTC")
   location          String?
   inviteMode        String   @default("approval_required") // "approval_required" | "open"
-  costSharingEnabled Boolean @default(true) // When false, hides all cost/payment UX
+  costSharingEnabled    Boolean @default(true) // When false, hides all cost/payment UX
+  platformFeePerPerson  Float   @default(0)  // Per-guest share of the Divvi fee (set when host splits the cost)
 
   // Trip info / house rules (editable on dashboard)
   fullAddress       String?  // Full address for maps; auto-populated from creation address

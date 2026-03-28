@@ -249,8 +249,9 @@
 			{userRsvp}
 			{userProfile}
 			{myAssignment}
-			userReservationPrice={data.userReservationPrice ?? null}
-			{myAssignments}
+		userReservationPrice={data.userReservationPrice ?? null}
+		platformFeePerPerson={trip.platformFeePerPerson ?? 0}
+		{myAssignments}
 			{myDueTotal}
 			{myPaidTotal}
 			{nextUpcomingItem}

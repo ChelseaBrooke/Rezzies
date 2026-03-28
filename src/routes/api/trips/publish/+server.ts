@@ -47,7 +47,22 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	const expectedGuestCount = typeof d.expectedGuestCount === 'number' ? d.expectedGuestCount : null;
 	const maxOccupancy = typeof d.maxOccupancy === 'number' ? d.maxOccupancy : null;
 	const partialStayAllowed = d.partialStayAllowed === true;
-	const costSharingEnabled = d.costSharingEnabled !== false; // default true
+	const costSharingEnabled = d.costSharingEnabled === true; // explicit opt-in; default false
+	const isPublished = d.isPublished !== false; // default true, pass false to save as draft
+	const splitPlatformFee = d.splitCost === true;
+	const gamesEnabled = d.gamesEnabled === true;
+	const selectedGames = Array.isArray(d.selectedGames) ? (d.selectedGames as string[]) : [];
+	const VALID_GAME_IDS = ['caption-this', 'scavenger-bingo', 'alphabet-hunt', 'daily-trivia'];
+	const GAME_NAMES: Record<string, string> = {
+		'caption-this': 'Caption This',
+		'scavenger-bingo': 'Scavenger Bingo',
+		'alphabet-hunt': 'Alphabet Hunt',
+		'daily-trivia': 'Daily Trivia'
+	};
+	const PLATFORM_FEE = 25;
+	const platformFeePerPerson = splitPlatformFee
+		? PLATFORM_FEE / Math.max(1, typeof d.expectedGuestCount === 'number' ? d.expectedGuestCount : 1)
+		: 0;
 
 	if (!name) {
 		return json({ error: 'Trip name is required' }, 400);
@@ -105,8 +120,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				rsvpByDate,
 				totalCost,
 				pricingModel,
-				isPublished: true,
-				costSharingEnabled,
+			isPublished,
+			costSharingEnabled,
+			platformFeePerPerson,
 				expectedPeopleCount: expectedGuestCount,
 				maxGuests: maxOccupancy,
 				allowPartialStays: partialStayAllowed,
@@ -128,8 +144,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		});
 
 		// Create rooms and beds
-		for (const room of rooms) {
-			const roomName = typeof room.name === 'string' ? room.name : 'Room';
+		for (let ri = 0; ri < rooms.length; ri++) {
+			const room = rooms[ri];
+			const rawName = typeof room.name === 'string' ? room.name.trim() : '';
+			const roomName = rawName || `Room ${ri + 1}`;
 			const roomPhotos = Array.isArray(room.photos) ? room.photos : [];
 			const roomBeds = Array.isArray(room.beds) ? room.beds : [];
 			const maxOccupancyRoom =
@@ -165,6 +183,21 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 						}
 					});
 				}
+			}
+		}
+
+		// Create selected TripGames if games add-on is enabled
+		if (gamesEnabled && selectedGames.length > 0) {
+			for (const gameId of selectedGames) {
+				if (!VALID_GAME_IDS.includes(gameId)) continue;
+				await prisma.tripGame.create({
+					data: {
+						tripId: trip.id,
+						gameId,
+						name: GAME_NAMES[gameId] ?? gameId,
+						addedByUserId: user.id
+					}
+				});
 			}
 		}
 

@@ -212,6 +212,11 @@ export interface TripDraft {
 	// Optional cached coords for nearby search
 	destinationLat?: number;
 	destinationLng?: number;
+
+	// Add-Ons (configured in step 2)
+	costSharingEnabled: boolean;
+	gamesEnabled: boolean;
+	selectedGames: string[]; // e.g. ['caption-this']
 }
 
 const defaultDraft: TripDraft = {
@@ -272,7 +277,10 @@ const defaultDraft: TripDraft = {
 	checkOutInstructions: '',
 	accessibilityNotes: '',
 	meals: getDefaultMealsConfig(),
-	activities: getDefaultActivitiesConfig()
+	activities: getDefaultActivitiesConfig(),
+	costSharingEnabled: false,
+	gamesEnabled: false,
+	selectedGames: []
 };
 
 /** Trip shape from layout (Prisma trip with rooms/beds) for converting to draft */

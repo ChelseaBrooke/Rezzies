@@ -10,10 +10,8 @@
 
 	const DEFAULT_STEPS: Step[] = [
 		{ number: 1, label: 'Basics & Rooms' },
-		{ number: 2, label: 'Pricing' },
-		{ number: 3, label: 'Meals & Activities', optional: true },
-		{ number: 4, label: 'Invite People' },
-		{ number: 5, label: 'Review & Publish' }
+		{ number: 2, label: 'Trip Add-Ons', optional: true },
+		{ number: 3, label: 'Review & Publish' }
 	];
 
 	let {

@@ -9,11 +9,18 @@
 		userRsvp?: { status?: string; adultsCount?: number; kidsCount?: number } | null;
 		myAssignments: Assignment[];
 		userReservationPrice: number | null;
+		/** Per-person share of the Divvi platform fee added by the host; 0 when not split */
+		platformFeePerPerson?: number;
 		tripCheckInDate?: string;
 		costSharingEnabled?: boolean;
 	}
 
-	let { tripId, userRsvp, myAssignments, userReservationPrice, tripCheckInDate = '', costSharingEnabled = true }: Props = $props();
+	let { tripId, userRsvp, myAssignments, userReservationPrice, platformFeePerPerson = 0, tripCheckInDate = '', costSharingEnabled = true }: Props = $props();
+
+	/** Total price the guest will pay: reservation cost + their share of the Divvi fee */
+	const totalGuestPrice = $derived(
+		userReservationPrice != null ? userReservationPrice + platformFeePerPerson : null
+	);
 
 	const peopleCount = $derived((userRsvp?.adultsCount ?? 0) + (userRsvp?.kidsCount ?? 0));
 	const hasAccepted = $derived(userRsvp?.status === 'yes');
@@ -93,13 +100,19 @@
 			{/if}
 
 			<!-- Accepted: details -->
-		{#if costSharingEnabled && userReservationPrice != null}
+		{#if costSharingEnabled && totalGuestPrice != null}
 			<div class="detail-block">
 				<span class="detail-label">Current Price Estimate</span>
 				<div class="detail-price-row">
-					<span class="detail-price">${userReservationPrice.toFixed(2)}</span>
+					<span class="detail-price">${totalGuestPrice.toFixed(2)}</span>
 				</div>
-				<span class="detail-note">Subject to change based on headcount</span>
+				{#if platformFeePerPerson > 0}
+					<span class="detail-note fee-note">
+						Includes ${platformFeePerPerson.toFixed(2)} Divvi fee · {userReservationPrice != null ? `$${userReservationPrice.toFixed(2)} trip cost` : ''}
+					</span>
+				{:else}
+					<span class="detail-note">Subject to change based on headcount</span>
+				{/if}
 			</div>
 			{/if}
 
@@ -283,6 +296,10 @@
 		font-size: 0.6875rem;
 		color: var(--muted);
 		line-height: 1.4;
+	}
+
+	.fee-note {
+		font-size: 0.625rem;
 	}
 
 	.detail-values {

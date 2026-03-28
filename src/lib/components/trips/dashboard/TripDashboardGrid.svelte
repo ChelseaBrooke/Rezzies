@@ -40,6 +40,8 @@
 		myAssignment?: { room?: { name: string | null } | null } | null;
 		/** Guest only: current reservation price (may change as more RSVP) */
 		userReservationPrice?: number | null;
+	/** Guest only: per-person share of the Divvi platform fee (0 when host didn't split it) */
+		platformFeePerPerson?: number;
 		/** Guest only: current user's room/bed assignments for RSVP summary */
 		myAssignments?: Array<{ room?: { id: number; name: string | null; photoUrls?: string[] } | null; bed?: { id: string; bedType: string | null } | null; partySize?: number }>;
 		myDueTotal: number;
@@ -105,6 +107,7 @@
 		userProfile,
 		myAssignment,
 		userReservationPrice = null,
+	platformFeePerPerson = 0,
 		myAssignments = [],
 		myDueTotal,
 		myPaidTotal,
@@ -308,6 +311,7 @@
 						{userRsvp}
 						myAssignments={myAssignments}
 						userReservationPrice={userReservationPrice}
+						{platformFeePerPerson}
 						{tripCheckInDate}
 						{costSharingEnabled}
 					/>

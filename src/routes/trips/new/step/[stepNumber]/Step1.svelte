@@ -165,25 +165,6 @@
 				</div>
 			</div>
 			
-			<div class="basics-bottom-section">
-				<div class="form-section">
-					<label for="totalTripCost" class="form-label">Total Trip Cost *</label>
-					<div class="currency-input-wrapper">
-						<span class="currency-symbol">$</span>
-						<input
-							type="number"
-							id="totalTripCost"
-							class="form-input currency-input"
-							bind:value={draft.totalTripCost}
-							oninput={autosave}
-							placeholder="0.00"
-							step="0.01"
-							required
-						/>
-					</div>
-					<p class="cost-note">*Include fees and taxes if you would like your guests to split these costs as well</p>
-				</div>
-			</div>
 			</div>
 		</div>
 		
@@ -267,14 +248,6 @@
 		min-height: 450px;
 	}
 	
-	.basics-bottom-section {
-		margin-top: 0;
-		padding-top: 0.75rem;
-		border-top: 1px solid #f3f4f6;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
 	
 	.rooms-section {
 		display: flex;
