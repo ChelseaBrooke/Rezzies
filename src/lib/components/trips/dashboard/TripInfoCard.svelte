@@ -120,7 +120,7 @@
 
 <div class="tic" class:tic-embed={embedInHero}>
 	{#if !embedInHero}
-		<!-- Header band — negative margin matches DashboardCard padding (0.5rem / 0.625rem) -->
+		<!-- Header band, negative margin matches DashboardCard padding (0.5rem / 0.625rem) -->
 		<div class="tic-header">
 			<span class="tic-header-icon" aria-hidden="true">
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -372,7 +372,7 @@
 		height: 10px;
 	}
 
-	/* ── Read body — fills card height, distributes sections evenly ── */
+	/* ── Read body, fills card height, distributes sections evenly ── */
 	.tic-body {
 		display: flex;
 		flex-direction: column;

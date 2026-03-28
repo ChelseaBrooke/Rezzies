@@ -5,7 +5,7 @@ import { supabaseAdmin, UPLOAD_BUCKET } from '$lib/server/supabase.js';
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-/** POST /api/upload-image — upload an image to Supabase Storage (bucket: uploads), e.g. for listing cover photo */
+/** POST /api/upload-image, upload an image to Supabase Storage (bucket: uploads), e.g. for listing cover photo */
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		if (!supabaseAdmin) {

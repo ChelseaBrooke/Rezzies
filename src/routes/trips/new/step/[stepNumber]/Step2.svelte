@@ -199,7 +199,7 @@
 						checked={getSelectedMealMode() === 'informal'}
 						onchange={() => setMealModeSingle('informal')}
 					/>
-					<span class="meal-mode-label">Informal (no assignments or money—just notes/visibility)</span>
+					<span class="meal-mode-label">Informal (no assignments or money, just notes/visibility)</span>
 				</label>
 			</div>
 		</SectionCard>
@@ -213,7 +213,7 @@
 					{:else}
 						<button type="button" class="btn-secondary" onclick={generateDefaultSlots}>Generate default slots</button>
 						{#if datesChangedAfterSlots}
-							<p class="warning-copy">Dates changed—review your meal slots.</p>
+							<p class="warning-copy">Dates changed, review your meal slots.</p>
 						{/if}
 					{/if}
 					<div class="slots-list">

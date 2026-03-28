@@ -12,7 +12,7 @@ const ALLOWED_TYPES = [
 	'video/mp4', 'video/webm', 'video/quicktime'
 ];
 
-/** POST /api/trips/[tripId]/files — upload a file to Supabase Storage (bucket: uploads) and persist a TripFile record */
+/** POST /api/trips/[tripId]/files, upload a file to Supabase Storage (bucket: uploads) and persist a TripFile record */
 export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
@@ -82,7 +82,7 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	return json({ file: record });
 };
 
-/** GET /api/trips/[tripId]/files — list all files for a trip */
+/** GET /api/trips/[tripId]/files, list all files for a trip */
 export const GET: RequestHandler = async ({ cookies, params, url }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });

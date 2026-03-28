@@ -423,7 +423,7 @@
 			duration: dur,
 			pointerOffsetY: e.clientY - (e.currentTarget as HTMLElement).getBoundingClientRect().top
 		};
-		// Ghost is intentionally NOT set here — it only appears once the pointer moves.
+		// Ghost is intentionally NOT set here, it only appears once the pointer moves.
 		ghostDate = null;
 		ghostStartMin = null;
 
@@ -492,7 +492,7 @@
 	}
 
 	function onGridPointerLeave() {
-		// Don't cancel drag on leave — pointer capture keeps it alive
+		// Don't cancel drag on leave, pointer capture keeps it alive
 	}
 
 	// ── Ghost event dimensions ─────────────────────────────────────────────

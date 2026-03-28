@@ -508,9 +508,9 @@ export async function computePerBedPricingAtHeadcount(
 			const distinctTypes = new Set(roomPerNights.map((p) => (p.bedType ?? '').toLowerCase().trim()));
 			if (distinctPrices.size === 1) {
 				if (distinctTypes.size > 1) {
-					console.warn('[PER_BED] Same price for different bed types in one room — trip.bedWeights may set both to same value.', roomPerNights);
+					console.warn('[PER_BED] Same price for different bed types in one room, trip.bedWeights may set both to same value.', roomPerNights);
 				} else {
-					console.warn('[PER_BED] Same price for all beds in room — each bed has the same bedType in DB. Expected distinct types (e.g. queen vs bunk) to get different prices.', roomPerNights);
+					console.warn('[PER_BED] Same price for all beds in room, each bed has the same bedType in DB. Expected distinct types (e.g. queen vs bunk) to get different prices.', roomPerNights);
 				}
 			}
 		}

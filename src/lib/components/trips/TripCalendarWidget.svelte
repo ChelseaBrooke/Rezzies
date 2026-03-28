@@ -175,7 +175,7 @@
 			else if (h > 12) h -= 12;
 			return `${h}:${min} ${ap}`;
 		}
-		// Already 12-hr — return as-is
+		// Already 12-hr, return as-is
 		return t;
 	}
 
@@ -349,7 +349,7 @@
 											<span class="item-meta menu">{m.menuText}</span>
 										{/if}
 										{#if m.assignedUser?.name}
-											<span class="item-meta">— {m.assignedUser.name}</span>
+											<span class="item-meta">, {m.assignedUser.name}</span>
 										{/if}
 									</li>
 								{/each}

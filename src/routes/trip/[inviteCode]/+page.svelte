@@ -1,5 +1,5 @@
 <script lang="ts">
-	// This page is never rendered — +page.server.ts throws 410.
+	// This page is never rendered, +page.server.ts throws 410.
 	// Keeping minimal markup as a fallback.
 </script>
 

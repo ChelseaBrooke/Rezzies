@@ -83,7 +83,7 @@ test.describe('Edge cases and error handling', () => {
 				checkOutDate: 'not-a-date',
 			},
 		});
-		// API should respond (not hang or crash) — any status is acceptable
+		// API should respond (not hang or crash), any status is acceptable
 		expect(response.status()).toBeDefined();
 	});
 

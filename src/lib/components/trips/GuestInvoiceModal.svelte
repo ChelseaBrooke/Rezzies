@@ -83,7 +83,7 @@
 				{#each breakdown?.extras ?? [] as extra}
 					<div class="detail-row">
 						<span class="detail-label">{extra.label}</span>
-						<span class="detail-value">× {extra.quantity} — ${extra.amount.toFixed(2)}</span>
+						<span class="detail-value">× {extra.quantity}, ${extra.amount.toFixed(2)}</span>
 					</div>
 				{/each}
 				{#if roomBedLines.length === 0 && !(breakdown?.meals?.length) && !(breakdown?.activities?.length) && !(breakdown?.extras?.length)}

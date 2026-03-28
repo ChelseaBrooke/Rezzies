@@ -10,7 +10,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// read event.locals.user without hitting the DB again.
 	event.locals.user = await getSessionUser(event.cookies);
 
-	// Lazy session cleanup — fire-and-forget, never blocks the response.
+	// Lazy session cleanup, fire-and-forget, never blocks the response.
 	if (Math.random() < CLEANUP_PROBABILITY) {
 		cleanupExpiredSessions().catch((err) =>
 			console.error('[session cleanup]', err)

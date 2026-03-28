@@ -122,7 +122,7 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 
 		// Determine whether the room/bed structure has actually changed.
 		// A "structural change" means the room names or bed types differ between the
-		// current state and the submitted payload — only in that case do we rebuild rooms.
+		// current state and the submitted payload, only in that case do we rebuild rooms.
 		// Metadata-only edits (name, dates, cost, pricing model) leave rooms intact.
 		const existingRoomSignature = (existingTrip?.rooms ?? [])
 			.map((r) => `${r.name}:${r.beds.map((b) => b.bedType).sort().join(',')}`)
@@ -137,9 +137,9 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 			.join('|');
 
 		if (existingRoomSignature !== incomingRoomSignature) {
-			// Room structure changed — rebuild rooms but preserve trip-level data (RSVPs, members).
+			// Room structure changed, rebuild rooms but preserve trip-level data (RSVPs, members).
 			// Reservations and room assignments reference specific room/bed IDs so we must clear them,
-			// but RSVP records (yes/no answers) are kept — guests can re-pick rooms.
+			// but RSVP records (yes/no answers) are kept, guests can re-pick rooms.
 			const existingRoomIds = (existingTrip?.rooms ?? []).map((r) => r.id);
 			if (existingRoomIds.length > 0) {
 				// Clear room-specific foreign-key records before deleting rooms.
@@ -189,7 +189,7 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 				}
 			}
 		} else {
-			// Room structure unchanged — only update metadata (name, photos, maxOccupancy) on existing rooms.
+			// Room structure unchanged, only update metadata (name, photos, maxOccupancy) on existing rooms.
 			for (const room of rooms) {
 				const existingRoom = (existingTrip?.rooms ?? []).find(
 					(r) => r.name === (room.name ?? '')

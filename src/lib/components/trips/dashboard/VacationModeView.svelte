@@ -447,7 +447,7 @@
 				</section>
 			{/if}
 
-			<!-- ROW 3: House Info (if present — wifi, door code, etc.) -->
+			<!-- ROW 3: House Info (if present, wifi, door code, etc.) -->
 			{#if hasHouseInfo}
 				<section class="v-tile v-tile--house">
 					<h3 class="v-tile-heading">🏠 House Info</h3>
@@ -507,7 +507,7 @@
 					{#if todayItinerary.length === 0}
 						<div class="v-today-empty">
 							<span class="v-today-empty-icon" aria-hidden="true">✨</span>
-							<p>Nothing planned — enjoy the downtime.</p>
+							<p>Nothing planned, enjoy the downtime.</p>
 						</div>
 					{:else}
 						<ul class="v-today-list">
@@ -622,7 +622,7 @@
 		pointer-events: none;
 	}
 
-	/* Day counter badge — top-right corner of hero */
+	/* Day counter badge, top-right corner of hero */
 	.v-day-badge {
 		position: absolute;
 		top: 4.8rem;
@@ -935,7 +935,7 @@
 	.v-assistant {
 		position: fixed; top: 0; right: 0; bottom: 0;
 		width: var(--v-right);
-		/* Warm desert sand feel matching the divvi coastal palette — fully opaque */
+		/* Warm desert sand feel matching the divvi coastal palette, fully opaque */
 		background: linear-gradient(175deg,
 			#fdf5e6 0%,
 			#fdf8f0 40%,

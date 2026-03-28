@@ -146,7 +146,7 @@ export async function submitCaption(
 	if (round.phase !== 'CAPTION_SUBMISSION')
 		return { ok: false, error: 'Caption phase ended' };
 	if (round.photoSubmitterUserId === userId)
-		return { ok: false, error: 'You submitted the photo — you cannot add a caption this round' };
+		return { ok: false, error: 'You submitted the photo, you cannot add a caption this round' };
 	await prisma.captionThisCaption.upsert({
 		where: {
 			roundId_userId: { roundId, userId }

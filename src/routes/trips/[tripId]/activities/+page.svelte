@@ -526,7 +526,7 @@
 								{#if result.accessibility}
 									<div class="detail-row">
 										<span class="detail-label">Accessibility</span>
-										<span>{result.accessibility.wheelchair ? 'Wheelchair accessible' : 'Not wheelchair accessible'}{result.accessibility.notes ? ` — ${result.accessibility.notes}` : ''}</span>
+										<span>{result.accessibility.wheelchair ? 'Wheelchair accessible' : 'Not wheelchair accessible'}{result.accessibility.notes ? `, ${result.accessibility.notes}` : ''}</span>
 									</div>
 								{/if}
 								{#if result.group_size_limit}

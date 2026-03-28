@@ -132,7 +132,7 @@
 	</div>
 </MarketingShell>
 
-<!-- Delete confirmation modal — replaces browser confirm() -->
+<!-- Delete confirmation modal, replaces browser confirm() -->
 {#if deletingTrip}
 	<div class="modal-backdrop" role="presentation" onclick={cancelDelete}>
 		<div

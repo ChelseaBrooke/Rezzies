@@ -199,7 +199,7 @@
 						<label class="checkbox-label">
 							<input type="checkbox" name="allowAnonymous" value="1" bind:checked={allowAnonymous} />
 							<span>
-								Anonymous voting — votes are tracked (one per person) but individual choices are hidden from everyone
+								With anonymous voting, votes are still tracked (one per person), but individual choices are hidden from everyone
 							</span>
 						</label>
 					</div>

@@ -52,7 +52,7 @@
 		return () => window.removeEventListener('keydown', fn);
 	});
 
-	// Filter non-gallery files (receipts, documents — exclude images and videos)
+	// Filter non-gallery files (receipts, documents, exclude images and videos)
 	const filteredFiles = $derived.by(() => {
 		const q = searchQuery.trim().toLowerCase();
 		const docs = dbFiles.filter(
@@ -62,7 +62,7 @@
 		return docs.filter(f => f.name.toLowerCase().includes(q) || (f.category ?? '').toLowerCase().includes(q));
 	});
 
-	// Gallery media — from DB (images and videos that are not receipts)
+	// Gallery media, from DB (images and videos that are not receipts)
 	const dbPhotos = $derived(
 		dbFiles.filter(
 			f =>

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Anonymous / unauthenticated user flows.
-// Invite codes have been removed — trips are accessed by direct link only.
+// Invite codes have been removed, trips are accessed by direct link only.
 
 test.describe('Find a Trip (unauthenticated)', () => {
 	test('home page has Find a Trip link', async ({ page }) => {

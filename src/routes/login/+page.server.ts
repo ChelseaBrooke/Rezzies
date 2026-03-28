@@ -62,7 +62,7 @@ export const actions: Actions = {
 				console.error('[backfill memberships]', err)
 			);
 
-			// Redirect to trips page or return URL — validate it is a safe relative path
+			// Redirect to trips page or return URL, validate it is a safe relative path
 			// to prevent open-redirect attacks (e.g. ?redirect=https://evil.com)
 			const raw = url.searchParams.get('redirect') ?? '';
 			const redirectTo =

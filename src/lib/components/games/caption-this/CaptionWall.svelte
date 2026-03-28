@@ -11,10 +11,8 @@
 <div class="caption-wall-wrap">
 	{#if phase === 'CAPTION_SUBMISSION' && expectedCount > 0}
 		<p class="caption-count">
-			{captions.length} of {expectedCount} caption{captions.length !== 1 ? 's' : ''} in
-			{#if captions.length < expectedCount}
-				— more can still submit
-			{/if}
+			{captions.length} of {expectedCount} caption{captions.length !== 1 ? 's' : ''} in{#if captions.length < expectedCount},
+				more can still submit{/if}
 		</p>
 	{/if}
 	<ul class="caption-list" role="list">

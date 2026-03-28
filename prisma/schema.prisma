@@ -247,7 +247,7 @@ model User {
   @@index([email])
 }
 
-// Trip games (add-on games for a trip) — shared for all trip members
+// Trip games (add-on games for a trip), shared for all trip members
 model TripGame {
   id             String   @id @default(uuid())
   tripId         String

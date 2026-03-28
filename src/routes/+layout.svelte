@@ -10,8 +10,8 @@
 
 	/**
 	 * Derive nav visibility from URL patterns instead of a manually maintained allowlist.
-	 *   - Trip portal (/trips/[id]/...) has its own sidebar nav — no top navbar.
-	 *   - Trip creation wizard (/trips/new/step/...) is full-screen — no top navbar.
+	 *   - Trip portal (/trips/[id]/...) has its own sidebar nav, no top navbar.
+	 *   - Trip creation wizard (/trips/new/step/...) is full-screen, no top navbar.
 	 *   - Auth/marketing pages (/, /login, /signup, etc.) have their own nav via MarketingShell.
 	 *   - Everything else (404, /settings, /messages, /qc, ...) should show the top navbar.
 	 *

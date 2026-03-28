@@ -401,7 +401,7 @@
 				</div>
 			{/if}
 			{#if going.length === 0 && skipping.length === 0}
-				<p class="no-attendees">No RSVPs yet — be the first!</p>
+				<p class="no-attendees">No RSVPs yet, be the first!</p>
 			{/if}
 		{/if}
 

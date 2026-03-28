@@ -58,7 +58,7 @@
 		return bedPriceByRoom.get(roomId)?.get(bedId) ?? null;
 	}
 
-	/** For each room, build list of { bed, assignedUser } — match by bedId first, then by bedType */
+	/** For each room, build list of { bed, assignedUser }, match by bedId first, then by bedType */
 	const roomSlots = $derived.by(() => {
 		return rooms.map((room) => {
 			const assignments = roomAssignments.filter((a) => a.roomId === room.id);
@@ -134,7 +134,7 @@
 		{#if isHost}
 			<a href="/trips/{tripId}/settings" class="manage-link">Manage rooms</a>
 		{/if}
-		<p class="page-subtitle">See who’s in each room and bed. Open spots? Request to join — your bed mate will get a notification to approve. Prices update as more people RSVP.</p>
+		<p class="page-subtitle">See who’s in each room and bed. Open spots? Request to join, your bed mate will get a notification to approve. Prices update as more people RSVP.</p>
 	</div>
 
 	{#if rooms.length === 0}

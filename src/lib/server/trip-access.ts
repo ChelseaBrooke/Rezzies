@@ -60,7 +60,7 @@ export async function isPendingMember(tripId: string, userId: string): Promise<b
 	return membership?.inviteStatus === 'pending';
 }
 
-/** Legacy helper — now only returns true for approved members. */
+/** Legacy helper, now only returns true for approved members. */
 export async function isTripMember(tripId: string, userId: string): Promise<boolean> {
 	return isApprovedMember(tripId, userId);
 }

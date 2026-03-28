@@ -25,7 +25,7 @@
 		return 'per person';
 	});
 	const subline = $derived(
-		data ? `If all ${data.maxHeadcount} spots fill — total $${data.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : null
+		data ? `If all ${data.maxHeadcount} spots fill, total $${data.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : null
 	);
 </script>
 

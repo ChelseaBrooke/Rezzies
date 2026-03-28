@@ -143,7 +143,7 @@
 	});
 
 	const tripInfoContent = $derived(
-		'Check-in is 4pm. Keys at the lockbox — code in your confirmation.\n\n' +
+		'Check-in is 4pm. Keys at the lockbox, code in your confirmation.\n\n' +
 		'Wi‑Fi, Check-in, and Rules are in the itinerary.'
 	);
 

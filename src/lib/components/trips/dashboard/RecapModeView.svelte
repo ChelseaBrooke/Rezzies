@@ -143,7 +143,7 @@
 	const finalAttendees = $derived(rsvps.filter((r) => r.status === 'yes'));
 	const activitiesCount = $derived(activities.length);
 	const mealsCookedCount = $derived(mealSlots.filter((m) => m.assignedUserId).length);
-	// One invoice per guest — totalAmount is the single cost, status is host's payment receipt note
+	// One invoice per guest, totalAmount is the single cost, status is host's payment receipt note
 	const myInvoice = $derived(userInvoices[0] ?? null);
 	const myCost = $derived(myInvoice?.totalAmount ?? null);
 	const isPaid = $derived(myInvoice?.status === 'paid');
@@ -586,7 +586,7 @@
 						<span>${myCost.toFixed(2)}</span>
 					</div>
 				{:else}
-					<!-- No breakdown JSON — just show the total -->
+					<!-- No breakdown JSON, just show the total -->
 					<div class="r-cost-main">
 						<span class="r-cost-amount">${myCost.toFixed(2)}</span>
 						<span class="r-cost-label">your trip cost</span>

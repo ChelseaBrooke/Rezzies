@@ -182,7 +182,7 @@ export async function computeGuestEstimateRange(
 		const allBedsClaimed = totalBeds > 0 && guestClaimedBedIds.size >= totalBeds;
 
 		if (allBedsClaimed) {
-			// Guest has the full lodging — no one to split with. Single value = full trip cost (for their stay).
+			// Guest has the full lodging, no one to split with. Single value = full trip cost (for their stay).
 			const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
 			const stayNights = calculateNights(checkInDate, checkOutDate);
 			const stayFactor = totalNights > 0 ? stayNights / totalNights : 1;
@@ -383,7 +383,7 @@ export async function computeGuestEstimateWithOverrides(
 			const allBedsSelected = totalBeds > 0 && selectedBedCount >= totalBeds;
 
 			if (allBedsSelected) {
-				// You're taking the full lodging — no one to split with. Single value = full trip cost (for your stay).
+				// You're taking the full lodging, no one to split with. Single value = full trip cost (for your stay).
 				const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
 				const stayNights = calculateNights(checkInDate, checkOutDate);
 				const stayFactor = totalNights > 0 ? stayNights / totalNights : 1;

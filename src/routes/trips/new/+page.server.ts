@@ -132,7 +132,7 @@ export const actions: Actions = {
 
 				// Create rooms and beds
 				for (const roomData of data.rooms) {
-					// Privacy: use draft type if set, else infer — single-slot room = private (1.25), multi-slot = shared (1.0)
+					// Privacy: use draft type if set, else infer, single-slot room = private (1.25), multi-slot = shared (1.0)
 					const roomSlots = (roomData.beds || []).reduce(
 						(sum: number, b: { quantity?: number; count?: number }) => sum + (b.quantity ?? b.count ?? 1),
 						0

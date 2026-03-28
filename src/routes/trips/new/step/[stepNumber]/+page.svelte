@@ -114,7 +114,7 @@
 {#if validationError}
 	<div class="validation-error">{validationError}</div>
 {/if}
-<div class="card-footer">
+<div class="card-footer" class:card-footer--addons={stepNumber() === 2}>
 	<button type="button" class="btn-back" onclick={prevStep}>
 		Back
 	</button>
@@ -151,6 +151,13 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+	}
+
+	/* Trip Add-Ons (step 2): no divider line; sit closer to grid (not pushed to card bottom) */
+	.card-footer--addons {
+		border-top: none;
+		padding-top: 0.5rem;
+		margin-top: 0.75rem;
 	}
 	
 	.footer-right {

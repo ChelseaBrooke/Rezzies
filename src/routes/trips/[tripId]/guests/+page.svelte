@@ -1409,7 +1409,7 @@
 	.gp-card + .gp-card { margin-top: 0; }
 	.gp-card--legacy, .gp-card--removed { margin-top: 0; }
 
-	/* Controls bar — filters */
+	/* Controls bar, filters */
 	.gp-controls {
 		display: flex; align-items: center; justify-content: space-between;
 		gap: 1rem; flex-wrap: nowrap;

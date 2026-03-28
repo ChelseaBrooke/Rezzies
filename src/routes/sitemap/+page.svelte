@@ -47,7 +47,7 @@
 </script>
 
 <svelte:head>
-	<title>Site map — How the site works</title>
+	<title>Site map, how the site works</title>
 </svelte:head>
 
 <MarketingShell user={data?.user}>

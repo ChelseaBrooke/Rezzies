@@ -337,7 +337,7 @@
 				<!-- Nearby tab -->
 				<div class="nearby-panel">
 					{#if !searchAvailable}
-						<p class="inline-message muted">Nearby search isn't configured yet—add activities manually or paste a link above.</p>
+						<p class="inline-message muted">Nearby search isn't configured yet, add activities manually or paste a link above.</p>
 					{:else if !hasDestination}
 						<p class="inline-message muted">Set destination on Overview to enable search.</p>
 					{:else}

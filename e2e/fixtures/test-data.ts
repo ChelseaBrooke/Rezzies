@@ -12,7 +12,7 @@ export const GUEST_USER = {
 	name: 'E2E Guest',
 } as const;
 
-// Used by signup tests — a fresh user that gets created and cleaned up per test
+// Used by signup tests, a fresh user that gets created and cleaned up per test
 export const SIGNUP_USER = {
 	email: 'e2e-signup@test.divvi.com',
 	password: 'TestSignup123!',

@@ -441,9 +441,9 @@
 
 	/*
 	 * LAYOUT: 3-column, full page width
-	 *   Col 1 (narrow): Reminders — overlaps hero, row 1
+	 *   Col 1 (narrow): Reminders, overlaps hero, row 1
 	 *   Col 2 (wide):   Trip Info (row 1) + Guests (row 2)
-	 *   Col 3 (narrow): Progress / RSVP — spans rows 1–2
+	 *   Col 3 (narrow): Progress / RSVP, spans rows 1–2
 	 */
 	/*
 	 * Uniform spacing: same gap (1rem) between main photo and grid, between columns, and between rows.
@@ -465,7 +465,7 @@
 	}
 
 	/*
-	 * Col 1, Row 1 — positioning context for the sticky card.
+	 * Col 1, Row 1, positioning context for the sticky card.
 	 * Has NO flow content; its height is driven by the grid row (= Trip Info height).
 	 * overflow: visible lets the sticky card extend upward into the hero.
 	 */
@@ -495,7 +495,7 @@
 		flex-direction: column;
 	}
 
-	/* Col 2, Row 1 — Trip Info */
+	/* Col 2, Row 1, Trip Info */
 	.goals-cell {
 		grid-column: 2;
 		grid-row: 1;
@@ -505,7 +505,7 @@
 		flex-direction: column;
 	}
 
-	/* Col 3, Rows 1–2 — Recent Activity spans both rows */
+	/* Col 3, Rows 1–2, Recent Activity spans both rows */
 	.recent-cell {
 		grid-column: 3;
 		grid-row: 1 / 3;
@@ -515,7 +515,7 @@
 		flex-direction: column;
 	}
 
-	/* Cols 1–2, Row 2 — Guests; uniform gap comes from grid, no extra margin */
+	/* Cols 1–2, Row 2, Guests; uniform gap comes from grid, no extra margin */
 	.guests-row {
 		grid-column: 1 / 3;
 		grid-row: 2;
@@ -535,7 +535,7 @@
 		min-height: 0;
 	}
 
-	/* Recent Activity card — limited height so it doesn’t collide with Chat */
+	/* Recent Activity card, limited height so it doesn’t collide with Chat */
 	.recent-cell :global(.dashboard-card) {
 		flex: 1;
 		display: flex;
@@ -568,7 +568,7 @@
 		max-height: 140px;
 	}
 
-	/* Trip info card wrapper — fills goals-cell so card stretches to row 1 height */
+	/* Trip info card wrapper, fills goals-cell so card stretches to row 1 height */
 	.goals-card-wrap {
 		min-width: 0;
 		flex: 1;
@@ -611,7 +611,7 @@
 		min-height: 0;
 	}
 
-	/* Progress / RSVP — white text and UI on orange */
+	/* Progress / RSVP, white text and UI on orange */
 	.sticky-card-wrapper :global(.card-title) { color: white; }
 	.sticky-card-wrapper :global(.pin-circle) { background: rgba(255, 255, 255, 0.22); }
 	.sticky-card-wrapper :global(.pin-svg) { color: white; stroke: white; }
@@ -765,35 +765,35 @@
 		border: 1.5px solid transparent;
 	}
 
-	/* RSVP — teal/slate */
+	/* RSVP, teal/slate */
 	.activity-type-rsvp {
 		background: rgba(47, 119, 120, 0.12);
 		border-color: rgba(47, 119, 120, 0.2);
 		color: var(--slate);
 	}
 
-	/* Itinerary — muted gold */
+	/* Itinerary, muted gold */
 	.activity-type-itinerary {
 		background: rgba(247, 170, 41, 0.13);
 		border-color: rgba(247, 170, 41, 0.25);
 		color: #9a6c10;
 	}
 
-	/* Poll — soft purple */
+	/* Poll, soft purple */
 	.activity-type-poll {
 		background: rgba(120, 80, 180, 0.1);
 		border-color: rgba(120, 80, 180, 0.2);
 		color: #7850b4;
 	}
 
-	/* Game — warm orange */
+	/* Game, warm orange */
 	.activity-type-game {
 		background: rgba(206, 86, 18, 0.1);
 		border-color: rgba(206, 86, 18, 0.2);
 		color: var(--warm);
 	}
 
-	/* Meal — earthy green */
+	/* Meal, earthy green */
 	.activity-type-meal {
 		background: rgba(47, 119, 120, 0.08);
 		border-color: rgba(47, 119, 120, 0.18);

@@ -135,7 +135,7 @@ let {
 				{#if canVote}
 					<div class="vote-section">
 						{#if isChangingVote}
-							<p class="change-vote-notice">Changing your vote — select a new option below.</p>
+							<p class="change-vote-notice">Changing your vote, select a new option below.</p>
 						{/if}
 						<p class="section-label">Select your {poll.pollType === 'single' ? 'answer' : 'answers'}</p>
 						{#if voteError}

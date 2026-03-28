@@ -106,7 +106,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		(guestProfiles ?? []).map((p) => [p.userId, { dietaryRestrictions: p.dietaryRestrictions, allergies: p.allergies }])
 	);
 
-	// Refresh invoice for every unique guest with a room assignment — run in parallel, not serially
+	// Refresh invoice for every unique guest with a room assignment, run in parallel, not serially
 	if (tripId) {
 		const uniqueUserIds = [...new Set(roomAssignments.map((a) => a.userId))];
 		await Promise.allSettled(uniqueUserIds.map((uid) => createInvoiceForUser(tripId, uid)));

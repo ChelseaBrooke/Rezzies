@@ -46,7 +46,7 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		}
 	}
 
-	// Override / merge with GuestProfile (trip-scoped) — takes priority
+	// Override / merge with GuestProfile (trip-scoped), takes priority
 	const guestProfiles = await prisma.guestProfile.findMany({
 		where: { tripId },
 		select: { userId: true, dietaryRestrictions: true, allergies: true }
@@ -124,7 +124,7 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		}
 	});
 
-	// Meal slots — full attendance included
+	// Meal slots, full attendance included
 	trip.mealSlots.forEach((slot) => {
 		const date = slot.date.toISOString().split('T')[0];
 		if (!eventsByDate[date]) eventsByDate[date] = [];
@@ -160,7 +160,7 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		});
 	});
 
-	// Activities — full participant RSVP included
+	// Activities, full participant RSVP included
 	trip.activities.forEach((activity) => {
 		const date = activity.date.toISOString().split('T')[0];
 		if (!eventsByDate[date]) eventsByDate[date] = [];

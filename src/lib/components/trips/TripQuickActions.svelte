@@ -124,7 +124,7 @@
 	}
 
 	function handleDelete() {
-		showToast?.('Delete requires confirmation — coming soon');
+		showToast?.('Delete requires confirmation, coming soon');
 		editOpen = false;
 	}
 

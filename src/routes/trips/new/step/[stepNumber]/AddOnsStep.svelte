@@ -3,6 +3,17 @@
 
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
 
+	let bedBreakdownModalOpen = $state(false);
+
+	function openBedBreakdownModal(ev: MouseEvent) {
+		ev.stopPropagation();
+		bedBreakdownModalOpen = true;
+	}
+
+	function closeBedBreakdownModal() {
+		bedBreakdownModalOpen = false;
+	}
+
 	// ─── Toggle helpers ──────────────────────────────────────────────────────────
 
 	function toggleCostSharing() {
@@ -40,6 +51,10 @@
 	function selectModel(model: TripDraft['pricingModel']) {
 		draft.pricingModel = model;
 		autosave();
+	}
+
+	function roundUsd(n: number): number {
+		return Math.round(Number.isFinite(n) ? n : 0);
 	}
 
 	// ─── Simple card state ───────────────────────────────────────────────────────
@@ -128,32 +143,35 @@
 	const basePerBedSlots  = $derived(perBedSlotCount > 0 ? total / perBedSlotCount : 0);
 	const basePerPersonMax = $derived(maxG > 0 ? total / maxG : 0);
 
-	const perBedRows = $derived.by(() => {
+	/** Per-bed prices grouped by room for readable two-column layout */
+	const perBedByRoom = $derived.by(() => {
 		if (perBedSlotCount <= 0) return [];
 		const avg = perBedAvgWeight || 1;
-		const list: { label: string; priceExp: number; priceMax: number }[] = [];
+		const groups: {
+			roomName: string;
+			beds: { label: string; priceExp: number; priceMax: number }[];
+		}[] = [];
 		rooms.forEach((room, ri) => {
 			const p = privacyFactor(room);
 			const roomName = room.name?.trim() || `Room ${ri + 1}`;
+			const beds: { label: string; priceExp: number; priceMax: number }[] = [];
 			room.beds.forEach((bed) => {
 				const w = bedWeight(bed.bedType);
-				const unitExp = (basePerBedSlots  * (w * p)) / avg;
-				const unitMax = (basePerPersonMax  * (w * p)) / avg;
+				const unitExp = (basePerBedSlots * (w * p)) / avg;
+				const unitMax = (basePerPersonMax * (w * p)) / avg;
 				const count = Math.max(1, bed.count || 1);
 				const typeLabel = bed.bedType.charAt(0).toUpperCase() + bed.bedType.slice(1).replace(/_/g, ' ');
 				for (let i = 0; i < count; i++) {
-					list.push({
-						label:
-							count > 1
-								? `${roomName} - ${typeLabel} ${i + 1}`
-								: `${roomName} - ${typeLabel}`,
+					beds.push({
+						label: count > 1 ? `${typeLabel} ${i + 1}` : typeLabel,
 						priceExp: unitExp,
 						priceMax: unitMax
 					});
 				}
 			});
+			if (beds.length > 0) groups.push({ roomName, beds });
 		});
-		return list;
+		return groups;
 	});
 
 	// ─── Games catalogue ─────────────────────────────────────────────────────────
@@ -167,7 +185,7 @@
 		{
 			id: 'scavenger-bingo',
 			name: 'Scavenger Bingo',
-			desc: 'Mark off items you spot at the destination — first to bingo wins'
+			desc: 'Mark off items you spot at the destination, first to bingo wins'
 		},
 		{
 			id: 'alphabet-hunt',
@@ -181,6 +199,15 @@
 		}
 	];
 </script>
+
+<svelte:window
+	onkeydown={(e) => {
+		if (bedBreakdownModalOpen && e.key === 'Escape') {
+			e.preventDefault();
+			closeBedBreakdownModal();
+		}
+	}}
+/>
 
 <div class="addons-screen">
 	<div class="addons-header">
@@ -235,32 +262,34 @@
 					</div>
 				{:else}
 					<div class="addon-pane checked-pane cost-checked-pane" onclick={(e) => e.stopPropagation()} role="none">
-					<!-- Total cost input row -->
-					<div class="cost-input-row">
-						<label class="config-label cost-input-label" for="totalTripCost">Total Trip Cost</label>
-						<div class="currency-wrap">
-							<span class="currency-sym">$</span>
-							<input
-								id="totalTripCost"
-								type="number"
-								class="config-input cost-input"
-								bind:value={draft.totalTripCost}
-								oninput={autosave}
-								placeholder="0.00"
-								step="0.01"
-								min="0"
-							/>
-						</div>
-						<span class="inline-note">incl. fees &amp; taxes guests will split</span>
-					</div>
-
 						<!-- Pricing model comparison table -->
 						<div class="pricing-section">
-							<div class="pricing-table-header">
-								<span class="pricing-table-title">Choose pricing model</span>
-								<span class="pricing-table-meta">
-									{expected} expected · {maxG} max · {nights > 0 ? `${nights}n` : 'dates not set'}
-								</span>
+							<div class="cost-pricing-toolbar">
+								<div class="pricing-toolbar-left">
+									<span class="pricing-table-title">Choose pricing model</span>
+									<span class="pricing-table-meta">
+										{expected} expected · {maxG} max · {nights > 0 ? `${nights}n` : 'dates not set'}
+									</span>
+								</div>
+								<div class="pricing-toolbar-total">
+									<div class="cost-input-inline">
+										<label class="config-label cost-input-label" for="totalTripCost">Total Trip Cost</label>
+										<div class="currency-wrap">
+											<span class="currency-sym">$</span>
+											<input
+												id="totalTripCost"
+												type="number"
+												class="config-input cost-input"
+												bind:value={draft.totalTripCost}
+												oninput={autosave}
+												placeholder="0.00"
+												step="0.01"
+												min="0"
+											/>
+										</div>
+									</div>
+									<span class="inline-note inline-note--total">incl. fees &amp; taxes guests will split</span>
+								</div>
 							</div>
 
 							<div class="pricing-table-wrap">
@@ -269,8 +298,8 @@
 										<tr>
 											<th></th>
 											<th>Model</th>
-											<th>At {expected} guest{expected !== 1 ? 's' : ''}</th>
-											<th>At {maxG} guest{maxG !== 1 ? 's' : ''}</th>
+											<th>Total Cost, at {expected} guest{expected !== 1 ? 's' : ''}</th>
+											<th>Total Cost, at {maxG} guest{maxG !== 1 ? 's' : ''}</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -280,10 +309,14 @@
 											<td class="pt-radio"><span class="radio-dot" class:radio-dot-on={draft.pricingModel === 'per-person'}></span></td>
 											<td class="pt-model">Per Person</td>
 										<td class="pt-val">
-											{total > 0 ? `$${ppExpected.toFixed(2)}` : '—'}{#if nights > 0 && total > 0}<span class="pt-night"> · ${(ppExpected/nights).toFixed(2)}/n</span>{/if}
+											{#if total > 0}
+												<span class="pt-amount">${roundUsd(ppExpected)}</span>{#if nights > 0}<span class="pt-night">${roundUsd(ppExpected / nights)}/night</span>{/if}
+											{:else}—{/if}
 										</td>
 										<td class="pt-val">
-											{total > 0 ? `$${ppMax.toFixed(2)}` : '—'}{#if nights > 0 && total > 0}<span class="pt-night"> · ${(ppMax/nights).toFixed(2)}/n</span>{/if}
+											{#if total > 0}
+												<span class="pt-amount">${roundUsd(ppMax)}</span>{#if nights > 0}<span class="pt-night">${roundUsd(ppMax / nights)}/night</span>{/if}
+											{:else}—{/if}
 										</td>
 										</tr>
 										<tr class="pt-row" class:pt-selected={draft.pricingModel === 'per-room'}
@@ -292,10 +325,14 @@
 											<td class="pt-radio"><span class="radio-dot" class:radio-dot-on={draft.pricingModel === 'per-room'}></span></td>
 											<td class="pt-model">Per Room</td>
 										<td class="pt-val">
-											{#if totalRooms > 0 && total > 0}${prExpected.toFixed(2)}/p{#if nights > 0}<span class="pt-night"> · ${(prExpected/nights).toFixed(2)}/n</span>{/if}{:else}—{/if}
+											{#if totalRooms > 0 && total > 0}
+												<span class="pt-amount">${roundUsd(prExpected)}</span>{#if nights > 0}<span class="pt-night">${roundUsd(prExpected / nights)}/night</span>{/if}
+											{:else}—{/if}
 										</td>
 										<td class="pt-val">
-											{#if totalRooms > 0 && total > 0}${prMax.toFixed(2)}/p{#if nights > 0}<span class="pt-night"> · ${(prMax/nights).toFixed(2)}/n</span>{/if}{:else}—{/if}
+											{#if totalRooms > 0 && total > 0}
+												<span class="pt-amount">${roundUsd(prMax)}</span>{#if nights > 0}<span class="pt-night">${roundUsd(prMax / nights)}/night</span>{/if}
+											{:else}—{/if}
 										</td>
 										</tr>
 										<tr class="pt-row" class:pt-selected={draft.pricingModel === 'per-bed'}
@@ -303,15 +340,17 @@
 											onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectModel('per-bed')}>
 											<td class="pt-radio"><span class="radio-dot" class:radio-dot-on={draft.pricingModel === 'per-bed'}></span></td>
 											<td class="pt-model">Per Bed</td>
-											<td class="pt-val">
-												{#if perBedRows.length > 0 && total > 0}
-													<ul class="bed-list">{#each perBedRows as row}<li><span class="bed-name">{row.label}</span><span class="bed-price">${row.priceExp.toFixed(2)}</span></li>{/each}</ul>
-												{:else}—{/if}
-											</td>
-											<td class="pt-val">
-												{#if perBedRows.length > 0 && total > 0}
-													<ul class="bed-list">{#each perBedRows as row}<li><span class="bed-name">{row.label}</span><span class="bed-price">${row.priceMax.toFixed(2)}</span></li>{/each}</ul>
-												{:else}—{/if}
+											<td class="pt-val pt-val--bed-summary" colspan="2">
+												<div class="bed-summary-copy">
+													Price will vary with bed-type chosen and room privacy.
+													<button
+														type="button"
+														class="bed-summary-link"
+														onclick={openBedBreakdownModal}
+													>
+														Click here for more information.
+													</button>
+												</div>
 											</td>
 										</tr>
 									</tbody>
@@ -552,8 +591,108 @@
 			</div>
 		</div>
 		</div>
-
 	</div>
+
+	{#if bedBreakdownModalOpen}
+		<div class="bed-modal-backdrop" onclick={closeBedBreakdownModal} role="presentation"></div>
+		<div
+			class="bed-modal-panel"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="bed-modal-title"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<div class="bed-modal-header">
+				<h3 id="bed-modal-title" class="bed-modal-title">Per-bed pricing</h3>
+				<button type="button" class="bed-modal-close" onclick={closeBedBreakdownModal} aria-label="Close">×</button>
+			</div>
+			<div class="bed-modal-body">
+				<p class="bed-modal-lede">
+					<strong>Each bed gets a share of the total trip cost.</strong>
+					What you pay for a spot depends on bed type and whether the room feels more private or shared.
+				</p>
+				<ul class="bed-modal-bullets">
+					<li>
+						<strong>Bigger beds</strong> (i.e., king vs. twin) are weighted a little higher, so they can cost a bit more per spot.
+					</li>
+					<li>
+						<strong>Single-bed rooms</strong> get a privacy bump compared to rooms with several beds.
+					</li>
+				</ul>
+				<p class="bed-modal-follow">
+					<span class="bed-follow-when">When more guests chip in,</span>
+					<span class="bed-follow-mid">each person's share usually </span>
+					<span class="bed-follow-drop">drops</span><span class="bed-follow-mid">.</span>
+					<span class="bed-follow-why">That's why we show both </span>
+					<span class="bed-follow-tag bed-follow-tag--exp">expected</span>
+					<span class="bed-follow-why"> and </span>
+					<span class="bed-follow-tag bed-follow-tag--max">max</span>
+					<span class="bed-follow-why"> headcount.</span>
+				</p>
+
+				{#if perBedByRoom.length > 0 && total > 0}
+					<div class="bed-modal-columns">
+						<div class="bed-modal-col">
+							<h4 class="bed-modal-col-title">Total Cost, at {expected} guest{expected !== 1 ? 's' : ''}</h4>
+							<p class="bed-modal-col-sub bed-modal-col-sub--exp">Expected group size</p>
+							<div class="bed-modal-table-shell bed-modal-table-shell--exp">
+								<table class="bed-mini-table bed-mini-table--modal">
+									<tbody>
+										{#each perBedByRoom as grp, gi}
+											{#each grp.beds as b, bi}
+												<tr class:bed-mini-room-sep={bi === 0 && gi > 0}>
+													<td class="bed-mini-desc-modal">
+														<span class="bed-mini-room-name">{grp.roomName}</span><span class="bed-mini-dot" aria-hidden="true">·</span><span class="bed-mini-bed-label">{b.label}</span>
+													</td>
+													<td class="bed-mini-price-modal">
+														<div class="bed-price-stack">
+															<span class="bed-price-total">${roundUsd(b.priceExp)}</span>{#if nights > 0}<span class="bed-price-night">${roundUsd(b.priceExp / nights)}/night</span>{/if}
+														</div>
+													</td>
+												</tr>
+											{/each}
+										{/each}
+									</tbody>
+								</table>
+							</div>
+						</div>
+						<div class="bed-modal-col">
+							<h4 class="bed-modal-col-title">Total Cost, at {maxG} guest{maxG !== 1 ? 's' : ''}</h4>
+							<p class="bed-modal-col-sub bed-modal-col-sub--max">Max capacity</p>
+							<div class="bed-modal-table-shell bed-modal-table-shell--max">
+								<table class="bed-mini-table bed-mini-table--modal">
+									<tbody>
+										{#each perBedByRoom as grp, gi}
+											{#each grp.beds as b, bi}
+												<tr class:bed-mini-room-sep={bi === 0 && gi > 0}>
+													<td class="bed-mini-desc-modal">
+														<span class="bed-mini-room-name">{grp.roomName}</span><span class="bed-mini-dot" aria-hidden="true">·</span><span class="bed-mini-bed-label">{b.label}</span>
+													</td>
+													<td class="bed-mini-price-modal">
+														<div class="bed-price-stack">
+															<span class="bed-price-total">${roundUsd(b.priceMax)}</span>{#if nights > 0}<span class="bed-price-night">${roundUsd(b.priceMax / nights)}/night</span>{/if}
+														</div>
+													</td>
+												</tr>
+											{/each}
+										{/each}
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+				{:else}
+					<p class="bed-modal-empty">
+						Add rooms and beds in <strong>Basics &amp; Rooms</strong> and enter a <strong>total trip cost</strong> above to see per-bed estimates here.
+					</p>
+				{/if}
+			</div>
+			<div class="bed-modal-footer">
+				<button type="button" class="bed-modal-done" onclick={closeBedBreakdownModal}>Done</button>
+			</div>
+		</div>
+	{/if}
+
 </div>
 
 <style>
@@ -1083,37 +1222,65 @@
 		overflow: visible;
 	}
 
-	.cost-input-row {
-		display: flex;
-		flex-direction: row;
-		flex-wrap: nowrap;
-		align-items: center;
-		gap: 0.5rem;
-		flex-shrink: 0;
-		min-width: 0;
-	}
-
 	.cost-input-label {
 		flex-shrink: 0;
 		white-space: nowrap;
 		margin: 0;
 	}
 
-	.cost-input-row .currency-wrap {
-		width: 7rem;
-		flex-shrink: 0;
-	}
-
 	.cost-input {
 		width: 100%;
 	}
 
-	.cost-input-row .inline-note {
+	/* One row: Choose pricing model (left) · Total Trip Cost (right) */
+	.cost-pricing-toolbar {
+		display: flex;
+		flex-direction: row;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		flex-shrink: 0;
+	}
+
+	.pricing-toolbar-left {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.5rem;
+		min-width: 0;
+		flex: 1 1 auto;
+	}
+
+	.pricing-toolbar-total {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.12rem;
+		flex-shrink: 0;
+	}
+
+	.cost-input-inline {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.5rem;
+		flex-wrap: nowrap;
+	}
+
+	.pricing-toolbar-total .currency-wrap {
+		width: 7rem;
+		flex-shrink: 0;
+	}
+
+	.inline-note--total {
 		font-size: 0.625rem;
 		color: var(--muted);
 		line-height: 1.25;
-		flex: 1 1 auto;
-		min-width: 0;
+		text-align: right;
+		max-width: 16rem;
 	}
 
 	/* ── Pricing section ─────────────────────────────────── */
@@ -1123,13 +1290,6 @@
 		gap: 0.375rem;
 		flex: 1;
 		min-height: 0;
-	}
-
-	.pricing-table-header {
-		display: flex;
-		align-items: baseline;
-		gap: 0.5rem;
-		flex-shrink: 0;
 	}
 
 	.pricing-table-title {
@@ -1147,19 +1307,21 @@
 		overflow-x: auto;
 		flex: 1;
 		min-height: 0;
+		padding-left: 0.125rem;
+		padding-right: 0.125rem;
 	}
 
 	.pricing-table {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		table-layout: fixed;
 	}
 
 	.pricing-table th {
-		padding: 0.25rem 0.375rem;
+		padding: 0.45rem 0.5rem;
 		text-align: center;
-		font-size: 0.6875rem;
+		font-size: 0.8125rem;
 		font-weight: 600;
 		color: var(--muted);
 		background: var(--bg, #f8fafc);
@@ -1167,14 +1329,31 @@
 		white-space: nowrap;
 	}
 
-	.pricing-table th:first-child { width: 22px; }
-	.pricing-table th:nth-child(2) { width: 70px; }
+	/* Dividers only: Model | At X guests | At Y guests */
+	.pricing-table th:nth-child(2),
+	.pricing-table td:nth-child(2),
+	.pricing-table th:nth-child(3),
+	.pricing-table td:nth-child(3) {
+		border-right: 1px solid rgba(0, 0, 0, 0.07);
+	}
+
+	.pricing-table th:first-child {
+		width: 1.5rem;
+	}
+	.pricing-table th:nth-child(2) {
+		width: 18%;
+	}
+	.pricing-table th:nth-child(3),
+	.pricing-table th:nth-child(4) {
+		width: 41%;
+		text-align: center;
+	}
 
 	.pricing-table td {
-		padding: 0.3rem 0.375rem;
+		padding: 0.45rem 0.5rem;
 		vertical-align: middle;
 		text-align: center;
-		border-bottom: 1px solid rgba(0,0,0,0.04);
+		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 	}
 
 	.pt-row {
@@ -1193,8 +1372,8 @@
 
 	.radio-dot {
 		display: inline-block;
-		width: 14px;
-		height: 14px;
+		width: 16px;
+		height: 16px;
 		border-radius: 50%;
 		border: 2px solid var(--border);
 		background: white;
@@ -1205,11 +1384,11 @@
 
 	.radio-dot.radio-dot-on {
 		border-color: var(--primary);
-		box-shadow: inset 0 0 0 3px white, inset 0 0 0 7px var(--primary);
+		box-shadow: inset 0 0 0 3px white, inset 0 0 0 8px var(--primary);
 	}
 
 	.pt-model {
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		font-weight: 600;
 		color: var(--text);
 		white-space: nowrap;
@@ -1217,61 +1396,436 @@
 	}
 
 	.pt-val {
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		font-weight: 600;
 		color: var(--text);
 		text-align: center;
+		line-height: 1.45;
+	}
+
+	.pt-amount {
+		display: block;
+		font-weight: 600;
+		color: var(--text);
+	}
+
+	.pt-val--bed-summary {
+		text-align: center;
+		vertical-align: middle;
+		padding: 0.45rem 0.5rem;
+		font-weight: 400;
+		line-height: 1.45;
+	}
+
+	.bed-summary-copy {
+		margin: 0;
+		font-size: 0.875rem;
+		line-height: 1.45;
+		color: var(--text);
+		display: block;
+	}
+
+	.bed-summary-link {
+		display: inline;
+		margin: 0;
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		font-size: inherit;
+		font-weight: 600;
+		color: var(--primary);
+		cursor: pointer;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	.bed-summary-link:hover {
+		color: var(--primary-dark, #152a66);
+	}
+
+	.bed-mini-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.6875rem;
+		table-layout: auto;
+	}
+
+	.bed-mini-table tbody tr.bed-mini-room-sep td {
+		padding-top: 0.4rem;
+		border-top: 1px solid rgba(0, 0, 0, 0.07);
+	}
+
+	.bed-mini-table td {
+		padding: 0.08rem 0.3rem 0.08rem 0;
+		vertical-align: top;
+		border: none;
+		line-height: 1.35;
 	}
 
 	.pt-night {
-		display: inline;
-		font-size: 0.625rem;
-		font-weight: 400;
+		display: block;
+		margin-top: 0.12rem;
+		font-size: 0.75rem;
+		font-weight: 500;
 		color: var(--muted);
+		line-height: 1.25;
 	}
 
-	/* Per-bed list inside table cell */
-	.bed-list {
-		list-style: none;
-		padding: 0;
-		margin: 0 auto;
+	/* ── Per-bed breakdown modal ──────────────────────────── */
+	.bed-modal-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 2000;
+		background: rgba(15, 23, 42, 0.5);
+		backdrop-filter: blur(3px);
+	}
+
+	.bed-modal-panel {
+		--bed-violet: #6d28d9;
+		--bed-violet-soft: rgba(109, 40, 217, 0.12);
+		--bed-teal: #0f766e;
+		--bed-teal-soft: rgba(15, 118, 110, 0.12);
+		--bed-coral: #c2410c;
+		--bed-coral-soft: rgba(194, 65, 12, 0.12);
+		--bed-amber: #b45309;
+		--bed-slate: #475569;
+
+		position: fixed;
+		z-index: 2010;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		width: min(44rem, calc(100vw - 1.5rem));
+		max-height: min(88vh, 52rem);
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
-		align-items: center;
-		max-width: 100%;
-	}
-
-	.bed-list li {
-		display: flex;
-		justify-content: center;
-		align-items: baseline;
-		gap: 0.2rem;
-		flex-wrap: nowrap;
-	}
-
-	.bed-name {
-		font-size: 0.625rem;
-		color: var(--muted);
-		font-weight: 400;
-		min-width: 0;
+		background: linear-gradient(165deg, #ffffff 0%, #f8fafc 48%, #f5f3ff 100%);
+		border-radius: 0.875rem;
+		box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.28);
+		border: 1px solid var(--border);
 		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		flex: 0 1 auto;
 	}
 
-	.bed-price {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		color: var(--text);
+	.bed-modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 1rem 1.125rem;
+		border-bottom: 1px solid rgba(109, 40, 217, 0.15);
+		background: linear-gradient(110deg, rgba(109, 40, 217, 0.07) 0%, rgba(15, 118, 110, 0.08) 100%);
 		flex-shrink: 0;
+	}
+
+	.bed-modal-title {
+		margin: 0;
+		font-size: 1.2rem;
+		font-weight: 800;
+		letter-spacing: -0.03em;
+		line-height: 1.2;
+		background: linear-gradient(120deg, var(--primary, #1e3a8a) 0%, var(--bed-violet) 55%, var(--bed-teal) 100%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		color: transparent;
+	}
+
+	.bed-modal-close {
+		width: 2.25rem;
+		height: 2.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: none;
+		border-radius: 0.5rem;
+		background: transparent;
+		color: var(--muted);
+		font-size: 1.5rem;
+		line-height: 1;
+		cursor: pointer;
+		transition: background 0.15s, color 0.15s;
+	}
+
+	.bed-modal-close:hover {
+		background: rgba(0, 0, 0, 0.06);
+		color: var(--text);
+	}
+
+	.bed-modal-body {
+		padding: 1.1rem 1.2rem 1.35rem;
+		overflow-y: auto;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.bed-modal-lede {
+		margin: 0 0 0.85rem;
+		font-size: 0.9375rem;
+		line-height: 1.6;
+		color: var(--text);
+		font-weight: 400;
+	}
+
+	.bed-modal-lede > strong:first-of-type {
+		display: block;
+		margin-bottom: 0.35rem;
+		font-weight: 700;
+		color: var(--text);
+		letter-spacing: -0.015em;
+	}
+
+	.bed-modal-bullets {
+		margin: 0 0 0.85rem;
+		padding: 0.65rem 0.85rem;
+		list-style: none;
+		font-size: 0.875rem;
+		line-height: 1.55;
+		color: var(--text);
+		font-weight: 400;
+		background: rgba(255, 255, 255, 0.65);
+		border-radius: 0.65rem;
+		border: 1px solid rgba(15, 23, 42, 0.08);
+		box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+	}
+
+	.bed-modal-bullets li {
+		margin-bottom: 0.55rem;
+	}
+
+	.bed-modal-bullets li:last-child {
+		margin-bottom: 0;
+	}
+
+	.bed-modal-bullets li strong {
+		font-weight: 700;
+		color: var(--text);
+	}
+
+	.bed-modal-follow {
+		margin: 0 0 1rem;
+		font-size: 0.875rem;
+		line-height: 1.6;
+		padding: 0;
+		color: var(--bed-slate);
+	}
+
+	.bed-follow-when {
+		font-weight: 700;
+		color: var(--text);
+	}
+
+	.bed-follow-mid {
+		font-weight: 450;
+	}
+
+	.bed-follow-drop {
+		font-weight: 900;
+		font-size: 1.02em;
+		color: var(--bed-teal);
+		letter-spacing: -0.02em;
+	}
+
+	.bed-follow-why {
+		font-weight: 450;
+	}
+
+	.bed-follow-tag {
+		display: inline-block;
+		font-weight: 800;
+		font-size: 0.8125rem;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		padding: 0.12em 0.45em;
+		border-radius: 0.3rem;
+		vertical-align: baseline;
+	}
+
+	.bed-follow-tag--exp {
+		color: var(--bed-violet);
+		background: var(--bed-violet-soft);
+	}
+
+	.bed-follow-tag--max {
+		color: var(--bed-coral);
+		background: var(--bed-coral-soft);
+	}
+
+	.bed-modal-empty {
+		margin: 0;
+		font-size: 0.875rem;
+		line-height: 1.5;
+		color: var(--muted);
+	}
+
+	.bed-modal-columns {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1rem 1.25rem;
+		margin-top: 0.25rem;
+	}
+
+	.bed-modal-col-title {
+		margin: 0 0 0.2rem;
+		font-size: 0.9375rem;
+		font-weight: 800;
+		color: var(--text);
+		text-align: center;
+		letter-spacing: -0.02em;
+	}
+
+	.bed-modal-col-sub {
+		margin: 0 0 0.55rem;
+		font-size: 0.72rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--muted);
+		text-align: center;
+	}
+
+	.bed-modal-col-sub--exp {
+		color: var(--bed-violet);
+	}
+
+	.bed-modal-col-sub--max {
+		color: var(--warm, #ce5612);
+	}
+
+	.bed-modal-table-shell {
+		border-radius: 0.7rem;
+		overflow: hidden;
+		border: 1px solid rgba(15, 23, 42, 0.1);
+		background: #fff;
+		box-shadow:
+			0 1px 3px rgba(15, 23, 42, 0.06),
+			0 8px 24px -8px rgba(109, 40, 217, 0.12);
+	}
+
+	.bed-mini-table--modal {
+		font-size: 0.8125rem;
+		table-layout: fixed;
+		width: 100%;
+	}
+
+	.bed-mini-table--modal tbody tr:nth-child(odd) {
+		background: rgba(248, 250, 252, 0.9);
+	}
+
+	.bed-mini-table--modal tbody tr:nth-child(even) {
+		background: rgba(255, 255, 255, 0.95);
+	}
+
+	.bed-mini-table--modal tbody tr:hover {
+		background: rgba(109, 40, 217, 0.06);
+	}
+
+	.bed-modal-table-shell--max .bed-mini-table--modal tbody tr:hover {
+		background: rgba(206, 86, 18, 0.07);
+	}
+
+	.bed-mini-table--modal td {
+		padding: 0.38rem 0.65rem;
+		vertical-align: middle;
+	}
+
+	.bed-mini-table--modal tbody tr.bed-mini-room-sep td {
+		padding-top: 0.55rem;
+		border-top: 1px dashed rgba(15, 23, 42, 0.14);
+	}
+
+	.bed-mini-desc-modal {
+		padding-right: 0.5rem !important;
+		line-height: 1.4;
+		word-break: break-word;
+	}
+
+	.bed-mini-room-name {
+		font-weight: 800;
+		color: var(--text);
+		letter-spacing: -0.02em;
+	}
+
+	.bed-mini-dot {
+		display: inline-block;
+		padding: 0 0.28em;
+		font-weight: 400;
+		color: var(--muted);
+		font-size: 0.85em;
+	}
+
+	.bed-mini-bed-label {
+		font-weight: 600;
+		color: var(--bed-violet);
+	}
+
+	.bed-modal-table-shell--max .bed-mini-bed-label {
+		color: var(--warm, #ce5612);
+	}
+
+	.bed-mini-price-modal {
+		font-variant-numeric: tabular-nums;
+		width: 42%;
+		text-align: right;
+		vertical-align: middle;
+		padding-left: 0.35rem !important;
+	}
+
+	.bed-price-stack {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.08rem;
+		line-height: 1.2;
+	}
+
+	.bed-price-total {
+		font-weight: 800;
+		color: var(--text);
+		letter-spacing: -0.02em;
+		white-space: nowrap;
+	}
+
+	.bed-price-night {
+		font-weight: 600;
+		font-size: 0.78em;
+		color: var(--muted);
+		white-space: nowrap;
+	}
+
+	.bed-modal-footer {
+		padding: 0.75rem 1.125rem;
+		border-top: 1px solid var(--border);
+		display: flex;
+		justify-content: flex-end;
+		flex-shrink: 0;
+		background: var(--bg, #f8fafc);
+	}
+
+	.bed-modal-done {
+		padding: 0.5rem 1.25rem;
+		font-size: 0.875rem;
+		font-weight: 600;
+		font-family: inherit;
+		color: white;
+		background: var(--primary);
+		border: none;
+		border-radius: 0.5rem;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+
+	.bed-modal-done:hover {
+		background: var(--primary-dark, #152a66);
 	}
 
 	/* ── Responsive ───────────────────────────────────────── */
 	@media (max-width: 800px) {
 		.addons-grid {
 			flex-direction: column;
+		}
+
+		.bed-modal-columns {
+			grid-template-columns: 1fr;
 		}
 	}
 </style>

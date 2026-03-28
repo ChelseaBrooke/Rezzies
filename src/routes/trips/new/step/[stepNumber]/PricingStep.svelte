@@ -143,7 +143,7 @@
 					list.push({
 						roomName,
 						bedType: bed.bedType,
-						label: count > 1 ? `${roomName} — ${typeLabel} ${i + 1}` : `${roomName} — ${typeLabel}`,
+						label: count > 1 ? `${roomName}, ${typeLabel} ${i + 1}` : `${roomName}, ${typeLabel}`,
 						pricePerBed: unitExpected,
 						pricePerBedPerNight: nights > 0 ? unitExpected / nights : 0,
 						pricePerBedMax: unitMax,

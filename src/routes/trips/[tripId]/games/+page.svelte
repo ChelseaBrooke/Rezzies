@@ -656,7 +656,7 @@
 													<p class="game-option-hint">No questions yet. Add one in the panel to the right.</p>
 												{/if}
 												{#if isTriviaHost && !triviaCanEdit}
-													<p class="game-option-hint">Someone has submitted — questions are locked.</p>
+													<p class="game-option-hint">Someone has submitted, questions are locked.</p>
 												{/if}
 												{#if !isTriviaHost && triviaQuestions.length > 0 && Object.keys(triviaAnswers).length > 0}
 													<p class="game-option-hint trivia-score">You got <strong>{triviaScore}</strong> of <strong>{triviaQuestions.length}</strong> correct.</p>
@@ -888,7 +888,7 @@
 													</div>
 												{/if}
 												{#if isTriviaHost && triviaPublished}
-													<p class="game-option-hint trivia-published-badge">Published — guests can play.</p>
+													<p class="game-option-hint trivia-published-badge">Published, guests can play.</p>
 												{/if}
 												{#if !isTriviaHost && triviaPublished && triviaQuestions.length > 0 && Object.keys(triviaAnswers).length === 0}
 													<div class="trivia-submit-row">

@@ -414,7 +414,7 @@
 					{@const acc = activityDetailSnapshot.accessibility as { wheelchair?: boolean; notes?: string }}
 					<div class="activity-detail-row">
 						<span class="activity-detail-label">Accessibility</span>
-						<span>{acc.wheelchair ? 'Wheelchair accessible' : 'Not wheelchair accessible'}{acc.notes ? ` — ${acc.notes}` : ''}</span>
+						<span>{acc.wheelchair ? 'Wheelchair accessible' : 'Not wheelchair accessible'}{acc.notes ? `, ${acc.notes}` : ''}</span>
 					</div>
 				{/if}
 			</div>

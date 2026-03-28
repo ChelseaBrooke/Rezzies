@@ -56,7 +56,7 @@ export const GAME_DEFS: GameDef[] = [
 		description: 'A game master posts a trivia question each day. Great for birthdays & weddings!',
 		icon: '❓',
 		instructions:
-			'The "game master" (whoever volunteers) posts one trivia question per day. First correct answer wins that day. Perfect for themed trips like birthdays or weddings—questions can be tailored to the guest of honor!',
+			'The "game master" (whoever volunteers) posts one trivia question per day. First correct answer wins that day. Perfect for themed trips like birthdays or weddings, questions can be tailored to the guest of honor!',
 		prize: 'Bragging rights and a winner badge on your profile.'
 	}
 ];

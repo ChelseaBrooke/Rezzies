@@ -14,7 +14,7 @@ export const OPTIONS: RequestHandler = async () => {
 	return new Response(null, { status: 204, headers: corsHeaders() });
 };
 
-// POST /api/mobile/auth/logout  — Authorization: Bearer <token>
+// POST /api/mobile/auth/logout , Authorization: Bearer <token>
 export const POST: RequestHandler = async ({ request }) => {
 	const auth = request.headers.get('Authorization') ?? '';
 	const token = auth.replace(/^Bearer\s+/i, '').trim();

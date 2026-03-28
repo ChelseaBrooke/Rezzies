@@ -44,7 +44,7 @@
 </script>
 
 {#if isPhotoSubmitter}
-	<p class="message">You submitted the photo — you can vote, but you can't add a caption this round.</p>
+	<p class="message">You submitted the photo, you can vote, but you can't add a caption this round.</p>
 {:else if submitted}
 	<p class="submitted-badge">Submitted</p>
 {:else}

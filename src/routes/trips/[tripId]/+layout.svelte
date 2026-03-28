@@ -5,7 +5,7 @@
 	import TripChat from '$lib/components/trips/TripChat.svelte';
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
-	// Trip is in recap (past checkout) — disable editing (e.g. hide Settings)
+	// Trip is in recap (past checkout), disable editing (e.g. hide Settings)
 	const tripLockedForRecap = $derived.by(() => {
 		const out = data.trip?.checkOutDate;
 		if (!out) return false;

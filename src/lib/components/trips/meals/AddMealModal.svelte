@@ -134,7 +134,7 @@
 					<div class="field">
 						<label class="label" for="add-meal-time">Time</label>
 						<select id="add-meal-time" name="time" bind:value={time}>
-							<option value="">— Select —</option>
+							<option value="">Select</option>
 							{#each TIME_OPTIONS as t}
 								<option value={t}>{t}</option>
 							{/each}

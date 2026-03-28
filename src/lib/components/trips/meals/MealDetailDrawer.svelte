@@ -163,7 +163,7 @@
 									<span class="group-label">Opted out</span>
 									<ul>
 										{#each optedOut as a}
-											<li>{a.guest?.name ?? 'Guest'}{#if a.optOutReason} — {a.optOutReason}{/if}</li>
+											<li>{a.guest?.name ?? 'Guest'}{#if a.optOutReason}, {a.optOutReason}{/if}</li>
 										{/each}
 									</ul>
 								</div>

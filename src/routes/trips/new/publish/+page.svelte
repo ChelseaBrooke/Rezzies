@@ -50,7 +50,7 @@
 		discountInput = '';
 	}
 
-	// Payment placeholder — swap in Stripe or similar
+	// Payment placeholder, swap in Stripe or similar
 	async function processPayment(_amount: number): Promise<boolean> {
 		return true;
 	}
@@ -149,7 +149,7 @@
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
 								<polyline points="20 6 9 17 4 12"/>
 							</svg>
-							Discount applied — trip fee is free!
+							Discount applied, trip fee is free!
 						</div>
 						<button type="button" class="btn-remove-discount" onclick={removeDiscount}>
 							Remove

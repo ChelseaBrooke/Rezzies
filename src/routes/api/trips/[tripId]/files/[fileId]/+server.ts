@@ -11,7 +11,7 @@ function getStoragePathFromPublicUrl(url: string): string | null {
 	return match ? decodeURIComponent(match[1]) : null;
 }
 
-/** DELETE /api/trips/[tripId]/files/[fileId] — delete a trip file (trip member only) and remove from Supabase Storage */
+/** DELETE /api/trips/[tripId]/files/[fileId], delete a trip file (trip member only) and remove from Supabase Storage */
 export const DELETE: RequestHandler = async ({ cookies, params }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });

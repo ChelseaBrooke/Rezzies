@@ -207,7 +207,7 @@
 						# of nights I'm staying <input type="number" min="1" bind:value={nightsStaying} class="w4" title="Nights applied to all my selections" />
 					</span>
 					{#if totalSpotsSelected !== partySize}
-						<p class="party-match">Spots selected: <strong>{totalSpotsSelected}</strong> — should match party size for correct QC.</p>
+						<p class="party-match">Spots selected: <strong>{totalSpotsSelected}</strong>, should match party size for correct QC.</p>
 					{/if}
 				</div>
 			</div>
