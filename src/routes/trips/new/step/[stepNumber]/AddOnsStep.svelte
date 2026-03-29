@@ -592,8 +592,67 @@
 
 		<div class="addons-column">
 		<!-- ── Meal-planning ────────────────────────────────── -->
-		<div class="addon-card addon-card--compact" class:active={mealsEnabled} onclick={toggleMeals} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleMeals()}>
-			<div class="addon-header">
+		<div
+			class="addon-card addon-card--compact"
+			class:addon-card--meal-fullmock={!mealsEnabled}
+			class:active={mealsEnabled}
+			onclick={toggleMeals}
+			role="button"
+			tabindex="0"
+			onkeydown={(e) => e.key === 'Enter' && toggleMeals()}
+		>
+			{#if !mealsEnabled}
+				<div class="meal-fullcard-mock-layer" aria-hidden="true">
+					<div class="meal-add-modal-fade">
+						<div class="meal-add-modal-mock">
+							<div class="meal-add-modal-mock-header">
+								<span class="meal-add-modal-mock-title">Add Dinner</span>
+								<span class="meal-add-modal-mock-close">×</span>
+							</div>
+							<div class="meal-add-modal-mock-form">
+								<div class="meal-add-modal-mock-form-stack">
+									<div class="meal-add-modal-mock-row2">
+										<div class="meal-add-modal-mock-field">
+											<span class="meal-add-modal-mock-lbl">Date</span>
+											<div class="meal-add-modal-mock-inputish">Sat, Mar 15</div>
+										</div>
+										<div class="meal-add-modal-mock-field">
+											<span class="meal-add-modal-mock-lbl">Time</span>
+											<div class="meal-add-modal-mock-inputish">7:00 PM</div>
+										</div>
+									</div>
+									<span class="meal-add-modal-mock-lbl meal-add-modal-mock-lbl--block">Meal plan</span>
+									<div class="meal-add-modal-mock-options">
+										<div class="meal-add-modal-mock-opt meal-add-modal-mock-opt--selected">
+											👨‍🍳 Chef is cooking
+										</div>
+										<div class="meal-add-modal-mock-opt">📦 Ordering In</div>
+										<div class="meal-add-modal-mock-opt">🍽 Going out to Eat</div>
+										<div class="meal-add-modal-mock-opt">🤷 Fend for yourself</div>
+									</div>
+									<div class="meal-add-modal-mock-field">
+										<span class="meal-add-modal-mock-lbl">Cook</span>
+										<div class="meal-add-modal-mock-inputish">Audrey</div>
+									</div>
+									<p class="meal-add-modal-mock-preview">
+										Will show as: <strong>Dinner by Audrey</strong>
+									</p>
+								</div>
+								<div class="meal-add-modal-mock-actions">
+									<span class="meal-add-modal-mock-btn meal-add-modal-mock-btn--secondary">Cancel</span>
+									<span class="meal-add-modal-mock-btn meal-add-modal-mock-btn--primary">Add meal</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			{/if}
+
+			<div
+				class="addon-header addon-header--meal"
+				class:addon-header--meal-over-mock={!mealsEnabled}
+			>
+				<span class="meal-mock-header-spacer" aria-hidden="true"></span>
 				<div class="addon-title-group">
 					<span class="addon-icon meal-icon">
 						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -613,10 +672,12 @@
 				</label>
 			</div>
 
-			<div class="addon-body">
+			<div class="addon-body" class:addon-body--meal-over-mock={!mealsEnabled}>
 				{#if !mealsEnabled}
-					<div class="addon-pane unchecked-pane">
-						<p class="addon-desc">Coordinate meals and food plans with your group. Sign-up sheets, shared funds, or just let everyone know what's happening.</p>
+					<div class="addon-pane unchecked-pane meal-unchecked-pane meal-unchecked-pane--desc-only">
+						<p class="addon-desc meal-unchecked-desc">
+							Coordinate meals and food plans with your group.
+						</p>
 					</div>
 			{:else}
 				<div class="addon-pane checked-pane meal-checked-pane" onclick={(e) => e.stopPropagation()} role="none">
@@ -925,6 +986,20 @@
 		box-shadow: 0 2px 12px rgba(30, 58, 138, 0.08);
 	}
 
+	.addon-card--meal-fullmock:hover {
+		border-color: transparent;
+		background:
+			linear-gradient(#f3f4f6, #f3f4f6) padding-box,
+			linear-gradient(
+				to right,
+				transparent 0%,
+				transparent 34%,
+				rgba(30, 58, 138, 0.22) 48%,
+				var(--primary) 56%
+			) border-box;
+		background-clip: padding-box, border-box;
+	}
+
 	.addon-card:focus-visible {
 		outline: 2px solid var(--primary);
 		outline-offset: 2px;
@@ -935,6 +1010,23 @@
 		background: rgba(30, 58, 138, 0.025);
 	}
 
+	.addon-card--meal-fullmock {
+		position: relative;
+		overflow: hidden;
+		/* Border fades out on the left where the mock meets the edge (no double line) */
+		border-color: transparent;
+		background:
+			linear-gradient(#f3f4f6, #f3f4f6) padding-box,
+			linear-gradient(
+				to right,
+				transparent 0%,
+				transparent 36%,
+				rgba(15, 23, 42, 0.05) 46%,
+				rgba(15, 23, 42, 0.1) 54%
+			) border-box;
+		background-clip: padding-box, border-box;
+	}
+
 	/* ── Card header ──────────────────────────────────────── */
 	.addon-header {
 		display: flex;
@@ -942,6 +1034,66 @@
 		justify-content: space-between;
 		padding: 1rem 1.125rem 0.75rem;
 		border-bottom: 1px solid var(--border);
+	}
+
+	/* Meal card: same header chrome & layout on / off (spacer keeps title + toggle aligned) */
+	.addon-header--meal {
+		padding: 1.125rem 1.25rem 0.875rem;
+		/* Space mock → title and title group → toggle (toggle was flush against title) */
+		gap: 1.125rem;
+	}
+
+	.addon-header--meal .addon-title {
+		font-size: 1.125rem;
+		font-weight: 700;
+		letter-spacing: -0.025em;
+		line-height: 1.2;
+	}
+
+	.addon-header--meal .meal-icon {
+		width: 34px;
+		height: 34px;
+		border-radius: 0.55rem;
+	}
+
+	.addon-header--meal .addon-title-group {
+		gap: 0.625rem;
+	}
+
+	.addon-header--meal .toggle-track {
+		width: 46px;
+		height: 28px;
+		box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+	}
+
+	.addon-header--meal .toggle-thumb {
+		top: 4px;
+		left: 4px;
+		width: 20px;
+		height: 20px;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+	}
+
+	.addon-header--meal .addon-toggle.checked .toggle-thumb {
+		transform: translateX(18px);
+	}
+
+	.addon-header--meal-over-mock {
+		position: relative;
+		z-index: 3;
+		border-bottom: none;
+		/* Same gray as .addon-card — not white, so off-state matches sibling cards */
+		background: linear-gradient(
+			to right,
+			transparent 0%,
+			transparent 44%,
+			#f3f4f6 52%
+		);
+	}
+
+	.meal-mock-header-spacer {
+		flex: 1 1 auto;
+		min-width: 0.25rem;
 	}
 
 	.addon-title-group {
@@ -1022,14 +1174,25 @@
 		overflow: hidden;
 	}
 
+	.addon-body--meal-over-mock {
+		z-index: 3;
+		background: linear-gradient(
+			to right,
+			transparent 0%,
+			transparent 44%,
+			#f3f4f6 52%
+		);
+	}
+
 	/* Shorter pair: meal-planning + activity-planning (same height) */
 	.addon-card--compact .addon-body {
 		height: 175px;
 		overflow-y: auto;
 	}
 
-	/* Activity unchecked: no scroll — clip faux itinerary at card bottom */
-	.addon-card--compact:has(.activity-unchecked-pane) .addon-body {
+	/* Activity / meal unchecked: no scroll — clip faux previews at card edge */
+	.addon-card--compact:has(.activity-unchecked-pane) .addon-body,
+	.addon-card--compact:has(.meal-unchecked-pane) .addon-body {
 		overflow-y: hidden;
 	}
 
@@ -1078,6 +1241,265 @@
 	.activity-unchecked-desc {
 		flex: 0 1 auto;
 		padding-right: 0.25rem;
+	}
+
+	/* Meal card unchecked: full-card-height mock layer (z 2); header + body sit above on the right */
+	.meal-unchecked-pane {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		overflow: hidden;
+	}
+
+	.meal-unchecked-pane--desc-only {
+		align-items: flex-end;
+		text-align: right;
+		padding-left: 46%;
+	}
+
+	.meal-unchecked-desc {
+		flex: 0 1 auto;
+		width: 100%;
+		max-width: 13.5rem;
+		margin: 0;
+		padding: 0;
+		text-align: right;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		line-height: 1.55;
+		color: var(--text);
+		opacity: 0.88;
+		letter-spacing: -0.01em;
+	}
+
+	.meal-fullcard-mock-layer {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		pointer-events: none;
+		display: block;
+	}
+
+	.meal-fullcard-mock-layer .meal-add-modal-fade {
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: min(19.75rem, 64%);
+		min-width: 9.25rem;
+		margin: 0;
+		padding: 0 0.2rem 0 0;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		justify-content: stretch;
+		-webkit-mask-image: linear-gradient(
+			to top right,
+			#000 0%,
+			#000 38%,
+			rgba(0, 0, 0, 0.4) 72%,
+			transparent 100%
+		);
+		mask-image: linear-gradient(
+			to top right,
+			#000 0%,
+			#000 38%,
+			rgba(0, 0, 0, 0.4) 72%,
+			transparent 100%
+		);
+	}
+
+	.meal-fullcard-mock-layer .meal-add-modal-mock {
+		position: relative;
+		width: 100%;
+		max-width: 100%;
+		height: 100%;
+		min-height: 0;
+		flex: 1 1 auto;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		background: var(--surfaceSolid, #fff);
+		border-radius: var(--radius-2xl, 1rem);
+		/* No outer glow — it sits outside the box and breaks the fade into the card */
+		box-shadow: none;
+		border: none;
+		overflow: hidden;
+		opacity: 0.8;
+		filter: saturate(0.92);
+		pointer-events: none;
+		line-height: normal;
+		text-align: left;
+	}
+
+	/* White modal blends into meal card gray (#f3f4f6) on the right */
+	.meal-fullcard-mock-layer .meal-add-modal-mock::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 1;
+		background: linear-gradient(
+			to right,
+			transparent 0%,
+			transparent 48%,
+			rgba(243, 244, 246, 0.45) 72%,
+			#f3f4f6 92%,
+			#f3f4f6 100%
+		);
+	}
+
+	.meal-add-modal-mock-header {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.35rem;
+		padding: 0.62rem 0.68rem 0.32rem 0.72rem;
+	}
+
+	.meal-add-modal-mock-title {
+		font-size: 0.86rem;
+		font-weight: 600;
+		color: var(--text);
+		margin: 0;
+	}
+
+	.meal-add-modal-mock-close {
+		font-size: 0.92rem;
+		line-height: 1;
+		color: var(--muted);
+		padding: 0 0.1rem;
+	}
+
+	.meal-add-modal-mock-form {
+		flex: 1 1 auto;
+		min-height: 0;
+		padding: 0 0.72rem 0.55rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.36rem;
+	}
+
+	.meal-add-modal-mock-form-stack {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.44rem;
+	}
+
+	.meal-add-modal-mock-row2 {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.38rem;
+	}
+
+	.meal-add-modal-mock-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.14rem;
+		min-width: 0;
+	}
+
+	.meal-add-modal-mock-lbl {
+		font-size: 0.52rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+
+	.meal-add-modal-mock-lbl--block {
+		margin-top: 0.05rem;
+	}
+
+	.meal-add-modal-mock-inputish {
+		font-size: 0.54rem;
+		font-weight: 500;
+		color: var(--text);
+		padding: 0.3rem 0.4rem;
+		min-height: 1.85em;
+		display: flex;
+		align-items: center;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md, 0.375rem);
+		background: var(--surfaceSolid, #fff);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.meal-add-modal-mock-options {
+		flex: 1 1 auto;
+		min-height: 2.5rem;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		grid-auto-rows: 1fr;
+		gap: 0.3rem;
+		align-content: stretch;
+	}
+
+	.meal-add-modal-mock-opt {
+		font-size: 0.5rem;
+		font-weight: 500;
+		line-height: 1.22;
+		padding: 0.34rem 0.38rem;
+		min-height: 2.35em;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: flex-start;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md, 0.375rem);
+		background: var(--surface2, #f4f4f5);
+		color: var(--text);
+	}
+
+	.meal-add-modal-mock-opt--selected {
+		border-color: var(--primary, #e85d04);
+		background: rgba(var(--primary-rgb, 232, 93, 38), 0.1);
+	}
+
+	.meal-add-modal-mock-preview {
+		margin: 0.1rem 0 0;
+		font-size: 0.5rem;
+		color: var(--muted);
+		line-height: 1.35;
+	}
+
+	.meal-add-modal-mock-preview strong {
+		font-weight: 600;
+		color: var(--text);
+	}
+
+	.meal-add-modal-mock-actions {
+		flex-shrink: 0;
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.36rem;
+		padding-top: 0.12rem;
+	}
+
+	.meal-add-modal-mock-btn {
+		font-size: 0.52rem;
+		font-weight: 500;
+		padding: 0.3rem 0.54rem;
+		border-radius: var(--radius-md, 0.375rem);
+	}
+
+	.meal-add-modal-mock-btn--secondary {
+		background: var(--surface2, #f4f4f5);
+		color: var(--text);
+		border: 1px solid var(--border);
+	}
+
+	.meal-add-modal-mock-btn--primary {
+		background: var(--primary, #e85d04);
+		color: #fff;
+		border: 1px solid transparent;
 	}
 
 	.activity-itin-fade {
