@@ -3,6 +3,7 @@
 	import type { PageData } from './$types';
 	import type { GameId, TripGame, TriviaQuestion } from '$lib/stores/tripGames.js';
 	import CaptionThisEmbed from '$lib/components/games/caption-this/CaptionThisEmbed.svelte';
+	import { SCAVENGER_BINGO_ITEMS as BINGO_ITEMS } from '$lib/games/scavengerBingoItems.js';
 	import {
 		GAME_DEFS,
 		getUnderstoodGames,
@@ -512,34 +513,6 @@
 		}, 0);
 	}
 
-	// Scavenger bingo: label + icon per square (could later be loaded from Supabase scavenger_bingo_boards / squares)
-	const BINGO_ITEMS: { label: string; icon: string }[] = [
-		{ label: 'Sunset selfie', icon: '🌅' },
-		{ label: 'Pool float', icon: '🛟' },
-		{ label: 'Beach towel', icon: '🏖️' },
-		{ label: 'Someone napping', icon: '😴' },
-		{ label: 'Local snack', icon: '🥨' },
-		{ label: 'Palm tree', icon: '🌴' },
-		{ label: 'Souvenir shop', icon: '🛍️' },
-		{ label: 'Someone dancing', icon: '💃' },
-		{ label: 'Hotel key card', icon: '🗝️' },
-		{ label: 'Empty suitcase', icon: '🧳' },
-		{ label: 'Room key', icon: '🔑' },
-		{ label: 'View from balcony', icon: '🌆' },
-		{ label: 'Breakfast buffet', icon: '🥐' },
-		{ label: 'Beach umbrella', icon: '⛱️' },
-		{ label: 'Flip flops', icon: '👡' },
-		{ label: 'Someone snorkeling', icon: '🤿' },
-		{ label: 'Cocktail with umbrella', icon: '🍹' },
-		{ label: 'Flight boarding pass', icon: '✈️' },
-		{ label: 'Sunburn', icon: '🦞' },
-		{ label: 'Group selfie', icon: '🤳' },
-		{ label: 'Local wildlife', icon: '🦜' },
-		{ label: 'Street sign', icon: '🪧' },
-		{ label: 'Sunrise', icon: '🌄' },
-		{ label: 'Packed luggage', icon: '🧳' },
-		{ label: 'Vacation mode', icon: '😎' }
-	];
 </script>
 
 <div class="page">
@@ -972,7 +945,7 @@
 </form>
 
 <style>
-	@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500;600&display=swap');
+	/* Dancing Script: loaded in app.html with other fonts to avoid bingo-letter FOUT */
 	.modal-form .modal-actions { margin-bottom: 0; }
 	form.hidden { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
 

@@ -2,6 +2,10 @@
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 	import { getDefaultMealsConfig } from '$lib/stores/tripDraft.js';
 	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
+	import { SCAVENGER_BINGO_ITEMS } from '$lib/games/scavengerBingoItems.js';
+
+	/** Faux "photo" squares on the add-ons bingo preview (indices match SCAVENGER_BINGO_ITEMS). */
+	const GAMES_BINGO_MOCK_PHOTOS = new Set([0, 8, 19]);
 
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
 
@@ -283,7 +287,7 @@
 <div class="addons-screen">
 	<div class="addons-header">
 		<h2 class="addons-title">Trip Add-Ons</h2>
-		<p class="addons-subtitle">Select the features you want for this trip. Everything can be changed later.</p>
+		<p class="addons-subtitle">Select the features you want for this trip.</p>
 	</div>
 
 	<div class="addons-grid">
@@ -322,15 +326,15 @@
 						<!-- Pricing model comparison table -->
 						<div class="pricing-section">
 							<div class="cost-pricing-toolbar">
-								<div class="pricing-toolbar-left">
-									<span class="pricing-table-title">Choose pricing model</span>
-									<span class="pricing-table-meta">
-										{expected} expected · {maxG} max · {nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : 'dates not set'}
-									</span>
-								</div>
-								<div class="pricing-toolbar-total">
-									<div class="cost-input-inline">
-										<label class="config-label cost-input-label" for="totalTripCost">Total Trip Cost</label>
+								<div class="cost-total-block">
+									<div class="cost-total-inline">
+										<label
+											class="config-label cost-input-label cost-input-label--tip"
+											for="totalTripCost"
+											title="trip fees and taxes that all guests will split"
+										>
+											Total Trip Cost
+										</label>
 										<div class="currency-wrap">
 											<span class="currency-sym">$</span>
 											<input
@@ -342,10 +346,16 @@
 												placeholder="0.00"
 												step="0.01"
 												min="0"
+												title="trip fees and taxes that all guests will split"
 											/>
 										</div>
 									</div>
-									<span class="inline-note inline-note--total">incl. fees &amp; taxes guests will split</span>
+								</div>
+								<div class="pricing-model-header">
+									<span class="pricing-table-title">Choose pricing model</span>
+									<span class="pricing-table-meta">
+										{expected} expected guest{expected !== 1 ? 's' : ''} · {maxG} max guest{maxG !== 1 ? 's' : ''} · {nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : 'dates not set'}
+									</span>
 								</div>
 							</div>
 							<div class="pricing-table-wrap">
@@ -445,8 +455,113 @@
 
 			<div class="addon-body">
 				{#if !activitiesEnabled}
-					<div class="addon-pane unchecked-pane">
-						<p class="addon-desc">Plan and organize what your group will do during the trip. Discover nearby places, build a shared itinerary, and let guests suggest ideas.</p>
+					<div class="addon-pane unchecked-pane activity-unchecked-pane">
+						<p class="addon-desc activity-unchecked-desc">
+							Plan and organize what your group will do during the trip. Discover nearby places, build a shared itinerary, and let guests suggest ideas.
+						</p>
+						<div class="activity-itin-fade" aria-hidden="true">
+							<div class="activity-itin-mock">
+								<div class="itin-mini-grid itin-mini-grid--3day">
+									<div class="itin-mini-corner"></div>
+									<div class="itin-mini-dayhead itin-mini-dayhead--col">
+										<span class="itin-mini-daynum">13</span>
+										<span class="itin-mini-dow">FRI</span>
+									</div>
+									<div class="itin-mini-dayhead itin-mini-dayhead--col">
+										<span class="itin-mini-daynum">14</span>
+										<span class="itin-mini-dow">SAT</span>
+									</div>
+									<div class="itin-mini-dayhead">
+										<span class="itin-mini-daynum">15</span>
+										<span class="itin-mini-dow">SUN</span>
+									</div>
+									<div class="itin-mini-time">9 AM</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--activity">
+											<span class="itin-mini-evt-title">Road trip</span>
+											<div class="itin-mini-evt-row">
+												<span class="itin-mini-evt-time">9:00 AM</span>
+												<span class="itin-mini-evt-pill">✓5</span>
+											</div>
+										</div>
+									</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--meal">
+											<span class="itin-mini-evt-title">Breakfast</span>
+											<span class="itin-mini-evt-time">9:00 AM</span>
+										</div>
+									</div>
+									<div class="itin-mini-cell itin-mini-cell--empty"></div>
+									<div class="itin-mini-time">10 AM</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--activity">
+											<span class="itin-mini-evt-title">Check-in</span>
+											<span class="itin-mini-evt-time">10:00 AM</span>
+										</div>
+									</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--activity">
+											<span class="itin-mini-evt-title">Kayak</span>
+											<div class="itin-mini-evt-row">
+												<span class="itin-mini-evt-time">10:30 AM</span>
+												<span class="itin-mini-evt-pill">✓4</span>
+											</div>
+										</div>
+									</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--activity">
+											<span class="itin-mini-evt-title">Hike</span>
+											<div class="itin-mini-evt-row">
+												<span class="itin-mini-evt-time">10:00 AM</span>
+												<span class="itin-mini-evt-pill">✓6</span>
+											</div>
+										</div>
+									</div>
+									<div class="itin-mini-time">11 AM</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--activity">
+											<span class="itin-mini-evt-title">Explore town</span>
+											<span class="itin-mini-evt-time">11:00 AM</span>
+										</div>
+									</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--activity">
+											<span class="itin-mini-evt-title">Farmers market</span>
+											<span class="itin-mini-evt-time">11:20 AM</span>
+										</div>
+									</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--meal">
+											<span class="itin-mini-evt-title">Brunch</span>
+											<span class="itin-mini-evt-time">11:45 AM</span>
+											<span class="itin-mini-chef">🍳 Sam</span>
+										</div>
+									</div>
+									<div class="itin-mini-time">2 PM</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--activity">
+											<span class="itin-mini-evt-title">Sunset walk</span>
+											<span class="itin-mini-evt-time">2:00 PM</span>
+										</div>
+									</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--activity">
+											<span class="itin-mini-evt-title">Board games</span>
+											<span class="itin-mini-evt-time">2:00 PM</span>
+										</div>
+									</div>
+									<div class="itin-mini-cell">
+										<div class="itin-mini-event itin-mini-event--activity">
+											<span class="itin-mini-evt-title">Pack up</span>
+											<div class="itin-mini-evt-row">
+												<span class="itin-mini-evt-time">2:30 PM</span>
+												<span class="itin-mini-evt-pill">✓3</span>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
 					</div>
 				{:else}
 				<div class="addon-pane checked-pane info-pane">
@@ -599,8 +714,35 @@
 
 			<div class="addon-body">
 				{#if !gamesEnabled}
-					<div class="addon-pane unchecked-pane">
-						<p class="addon-desc">Add fun, interactive games for your group. Keep everyone entertained before and during the trip.</p>
+					<div class="addon-pane unchecked-pane games-unchecked-pane">
+						<p class="addon-desc games-unchecked-desc">
+							Add fun, interactive games for your group. Keep everyone entertained before and during the trip.
+						</p>
+						<div class="games-bingo-fade" aria-hidden="true">
+							<div class="games-bingo-mock">
+								<div class="bingo-board-frame">
+									<div class="bingo-board-inner">
+										<span class="bingo-letter">B</span>
+										<span class="bingo-letter">I</span>
+										<span class="bingo-letter">N</span>
+										<span class="bingo-letter">G</span>
+										<span class="bingo-letter">O</span>
+										{#each SCAVENGER_BINGO_ITEMS as item, idx}
+											<div
+												class="bingo-cell"
+												class:has-photo={GAMES_BINGO_MOCK_PHOTOS.has(idx)}
+											>
+												{#if GAMES_BINGO_MOCK_PHOTOS.has(idx)}
+													<div class="games-bingo-mock-snapshim"></div>
+												{/if}
+												<span class="bingo-item-icon">{item.icon}</span>
+												<span class="bingo-label">{item.label}</span>
+											</div>
+										{/each}
+									</div>
+								</div>
+							</div>
+						</div>
 					</div>
 				{:else}
 				<div class="addon-pane checked-pane" onclick={(e) => e.stopPropagation()} role="none">
@@ -723,6 +865,8 @@
 </div>
 
 <style>
+	/* Dancing Script: loaded in app.html with other fonts to avoid bingo-letter FOUT */
+
 	/* ── Layout ───────────────────────────────────────────── */
 	.addons-screen {
 		display: flex;
@@ -880,14 +1024,23 @@
 
 	/* Shorter pair: meal-planning + activity-planning (same height) */
 	.addon-card--compact .addon-body {
-		height: 140px;
+		height: 175px;
 		overflow-y: auto;
+	}
+
+	/* Activity unchecked: no scroll — clip faux itinerary at card bottom */
+	.addon-card--compact:has(.activity-unchecked-pane) .addon-body {
+		overflow-y: hidden;
 	}
 
 	/* Taller pair: cost-sharing + games (same height) */
 	.addon-card--tall .addon-body {
-		height: 330px;
+		height: 312px;
 		overflow-y: auto;
+	}
+
+	.addon-card--tall:has(.games-unchecked-pane) .addon-body {
+		overflow-y: hidden;
 	}
 
 	.addon-pane {
@@ -910,6 +1063,396 @@
 		line-height: 1.55;
 		margin: 0;
 		flex: 1;
+	}
+
+	/* Activity card · ghost itinerary: lives in the bottom-right quadrant of the body */
+	.activity-unchecked-pane {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		overflow: hidden;
+	}
+
+	.activity-unchecked-desc {
+		flex: 0 1 auto;
+		padding-right: 0.25rem;
+	}
+
+	.activity-itin-fade {
+		position: relative;
+		flex: 1;
+		min-height: 0;
+		align-self: stretch;
+		/* Cancel .addon-pane padding so the quadrant can hug the card body */
+		margin-left: -1.125rem;
+		margin-right: -1.125rem;
+		margin-bottom: -1rem;
+		padding: 0 0.15rem 0 0.25rem;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-end;
+		align-items: flex-end;
+		-webkit-mask-image: linear-gradient(
+			to right,
+			#000 0%,
+			#000 58%,
+			rgba(0, 0, 0, 0.5) 80%,
+			transparent 100%
+		);
+		mask-image: linear-gradient(
+			to right,
+			#000 0%,
+			#000 58%,
+			rgba(0, 0, 0, 0.5) 80%,
+			transparent 100%
+		);
+	}
+
+	.activity-itin-mock {
+		width: min(26.5rem, 100%);
+		max-height: 100%;
+		flex-shrink: 0;
+		margin-right: 1.65rem;
+		background: rgba(255, 255, 255, 0.38);
+		border: 1px solid rgba(226, 232, 240, 0.65);
+		border-radius: 0.5rem;
+		box-shadow: 0 1px 6px rgba(17, 24, 39, 0.04);
+		padding: 0;
+		overflow: hidden;
+		opacity: 0.62;
+		filter: saturate(0.38);
+	}
+
+	/* Same palette as itinerary EVENT_STYLES */
+	.itin-mini-grid {
+		display: grid;
+		grid-template-columns: 2.15rem 1fr;
+		grid-template-rows: auto repeat(4, minmax(2.05rem, auto));
+		font-size: 0.5rem;
+		line-height: 1.15;
+		align-items: stretch;
+	}
+
+	.itin-mini-grid--3day {
+		grid-template-columns: 2.15rem minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+	}
+
+	.itin-mini-grid--3day > .itin-mini-dayhead--col {
+		border-right: 1px solid #f0f2f5;
+	}
+
+	/* Time row: time + 3 day cells → vertical borders before last column */
+	.itin-mini-grid--3day > .itin-mini-cell:nth-child(4n + 6),
+	.itin-mini-grid--3day > .itin-mini-cell:nth-child(4n + 7) {
+		border-right: 1px solid #f0f2f5;
+	}
+
+	.itin-mini-corner {
+		background: #f8fafc;
+		border-right: 1px solid #f0f2f5;
+		border-bottom: 1px solid #f0f2f5;
+		min-height: 1.65rem;
+	}
+
+	.itin-mini-dayhead {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.1rem;
+		padding: 0.2rem 0.25rem;
+		background: #f8fafc;
+		border-bottom: 1px solid #f0f2f5;
+		min-height: 1.65rem;
+		box-sizing: border-box;
+	}
+
+	.itin-mini-daynum {
+		font-size: 0.6875rem;
+		font-weight: 800;
+		color: #1e293b;
+		line-height: 1;
+	}
+
+	.itin-mini-dow {
+		font-size: 0.4375rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		color: #94a3b8;
+		text-transform: uppercase;
+	}
+
+	.itin-mini-time {
+		padding: 0 0.15rem 0 0.2rem;
+		font-size: 0.5rem;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: -0.03em;
+		line-height: 1.1;
+		white-space: nowrap;
+		color: #94a3b8;
+		background: #f8fafc;
+		border-right: 1px solid #f0f2f5;
+		border-bottom: 1px solid #f0f2f5;
+		display: flex;
+		align-items: flex-start;
+		padding-top: 0.28rem;
+		box-sizing: border-box;
+	}
+
+	.itin-mini-cell {
+		border-bottom: 1px solid #f0f2f5;
+		padding: 0.14rem 0.2rem 0.12rem 0.18rem;
+		display: flex;
+		align-items: flex-start;
+		box-sizing: border-box;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	.itin-mini-cell--empty {
+		background: #fff;
+	}
+
+	.itin-mini-event {
+		position: relative;
+		width: 100%;
+		max-width: 100%;
+		border-radius: 5px;
+		padding: 0.15rem 0.28rem 0.18rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.04rem;
+		box-sizing: border-box;
+		overflow: hidden;
+		align-self: start;
+	}
+
+	.itin-mini-event--meal {
+		background: rgba(232, 93, 38, 0.12);
+		border: 1px solid #e85d26;
+	}
+
+	.itin-mini-event--meal .itin-mini-evt-title {
+		color: #7c2d12;
+	}
+
+	.itin-mini-event--meal .itin-mini-evt-time,
+	.itin-mini-event--meal .itin-mini-chef {
+		color: #c2410c;
+	}
+
+	.itin-mini-event--meal:has(.itin-mini-chef) {
+		padding-bottom: 0.42rem;
+	}
+
+	.itin-mini-event--activity {
+		background: rgba(74, 167, 91, 0.13);
+		border: 1px solid #3a9e53;
+	}
+
+	.itin-mini-event--activity .itin-mini-evt-title {
+		color: #14532d;
+	}
+
+	.itin-mini-event--activity .itin-mini-evt-time,
+	.itin-mini-event--activity .itin-mini-evt-pill {
+		color: #166534;
+	}
+
+	.itin-mini-evt-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.2rem;
+		margin-top: 0.02rem;
+		flex-wrap: nowrap;
+		min-width: 0;
+	}
+
+	.itin-mini-evt-title {
+		font-weight: 700;
+		font-size: 0.5rem;
+		line-height: 1.15;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+	}
+
+	.itin-mini-evt-time {
+		font-size: 0.4375rem;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: -0.02em;
+		line-height: 1.15;
+		white-space: nowrap;
+		flex-shrink: 0;
+		opacity: 0.9;
+	}
+
+	.itin-mini-chef {
+		position: absolute;
+		bottom: 0.1rem;
+		right: 0.2rem;
+		font-size: 0.375rem;
+		opacity: 0.88;
+		max-width: 55%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.itin-mini-evt-pill {
+		font-size: 0.4rem;
+		font-weight: 700;
+		opacity: 0.92;
+		flex-shrink: 0;
+	}
+
+	/* Games card · scavenger bingo preview: same chrome as trip Games board, bottom-left flush */
+	.games-unchecked-pane {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		overflow: hidden;
+	}
+
+	.games-unchecked-desc {
+		flex: 0 1 auto;
+		padding-right: 0.25rem;
+	}
+
+	.games-bingo-fade {
+		position: relative;
+		flex: 1;
+		min-height: 0;
+		align-self: stretch;
+		margin-left: -1.125rem;
+		margin-right: -1.125rem;
+		margin-bottom: -1rem;
+		padding: 0;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-end;
+		align-items: flex-start;
+		-webkit-mask-image: linear-gradient(
+			to top right,
+			#000 0%,
+			#000 40%,
+			rgba(0, 0, 0, 0.5) 72%,
+			transparent 100%
+		);
+		mask-image: linear-gradient(
+			to top right,
+			#000 0%,
+			#000 40%,
+			rgba(0, 0, 0, 0.5) 72%,
+			transparent 100%
+		);
+	}
+
+	.games-bingo-mock {
+		flex-shrink: 0;
+		width: min(29rem, 122%);
+		max-height: 108%;
+		margin: 0 0 -0.9rem 0;
+		line-height: normal;
+		opacity: 0.65;
+		filter: saturate(0.35);
+	}
+
+	/* Copied from trips/[tripId]/games bingo board, scoped + compact for card */
+	.games-bingo-mock .bingo-board-frame {
+		display: inline-block;
+		padding: 1.1rem 1.45rem;
+		border-radius: 1.25rem;
+		box-shadow: 0 6px 26px rgba(0, 0, 0, 0.09);
+		background:
+			radial-gradient(ellipse 120% 80% at 20% 30%, rgba(255, 182, 193, 0.35) 0%, transparent 50%),
+			radial-gradient(ellipse 100% 100% at 80% 20%, rgba(221, 160, 221, 0.3) 0%, transparent 50%),
+			radial-gradient(ellipse 90% 70% at 50% 80%, rgba(173, 216, 230, 0.35) 0%, transparent 50%),
+			linear-gradient(135deg, rgba(255, 218, 185, 0.25) 0%, rgba(230, 230, 250, 0.3) 50%, rgba(240, 248, 255, 0.25) 100%);
+	}
+
+	.games-bingo-mock .bingo-board-inner {
+		display: grid;
+		grid-template-columns: repeat(5, 1fr);
+		gap: 0.34rem;
+		width: 100%;
+		max-width: 26.5rem;
+	}
+
+	.games-bingo-mock .bingo-letter {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-family: 'Dancing Script', 'Brush Script MT', cursive;
+		font-size: 1.2rem;
+		font-weight: 600;
+		color: var(--text);
+		letter-spacing: 0.02em;
+		padding-bottom: 0.12rem;
+	}
+
+	.games-bingo-mock .bingo-cell {
+		aspect-ratio: 1;
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		border-radius: 0.52rem;
+		padding: 0.26rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		background: #fff;
+		position: relative;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+		overflow: hidden;
+		pointer-events: none;
+		cursor: default;
+	}
+
+	.games-bingo-mock .bingo-cell.has-photo .bingo-item-icon,
+	.games-bingo-mock .bingo-cell.has-photo .bingo-label {
+		display: none;
+	}
+
+	.games-bingo-mock .games-bingo-mock-snapshim {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		border-radius: calc(0.52rem - 1px);
+		background: linear-gradient(145deg, #a7f3d0 0%, #5eead4 42%, #fde68a 88%);
+	}
+
+	.games-bingo-mock .bingo-item-icon {
+		font-size: 1.15rem;
+		line-height: 1;
+		margin-bottom: 0.12rem;
+		position: relative;
+		z-index: 1;
+	}
+
+	.games-bingo-mock .bingo-cell .bingo-label {
+		position: relative;
+		z-index: 1;
+		text-shadow: 0 0 2px var(--surface, #fff);
+	}
+
+	.games-bingo-mock .bingo-label {
+		font-size: 0.52rem;
+		font-weight: 600;
+		line-height: 1.15;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
 	}
 
 	/* ── Checked pane ─────────────────────────────────────── */
@@ -1168,91 +1711,116 @@
 
 	/* ── Cost-sharing checked pane layout ────────────────── */
 	.cost-checked-pane {
-		gap: 0.5rem;
+		gap: 0.45rem;
 		overflow: visible;
 	}
 
 	.cost-input-label {
 		flex-shrink: 0;
-		white-space: nowrap;
 		margin: 0;
+		font-size: 0.8125rem;
+		text-align: left;
 	}
 
 	.cost-input {
 		width: 100%;
 	}
 
-	/* One row: Choose pricing model (left) · Total Trip Cost (right) */
+	/* Total cost: label left of field, note below; then pricing model header + table */
 	.cost-pricing-toolbar {
 		display: flex;
-		flex-direction: row;
-		justify-content: space-between;
-		align-items: center;
-		gap: 0.75rem;
-		flex-wrap: wrap;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.35rem;
 		flex-shrink: 0;
 	}
 
-	.pricing-toolbar-left {
-		display: flex;
-		flex-direction: row;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.5rem;
-		min-width: 0;
-		flex: 1 1 auto;
-	}
-
-	.pricing-toolbar-total {
+	.cost-total-block {
 		display: flex;
 		flex-direction: column;
 		align-items: flex-end;
 		gap: 0.12rem;
-		flex-shrink: 0;
+		width: 100%;
+		padding: 0;
 	}
 
-	.cost-input-inline {
+	.cost-total-inline {
 		display: flex;
 		flex-direction: row;
 		align-items: center;
 		justify-content: flex-end;
 		gap: 0.5rem;
-		flex-wrap: nowrap;
+		flex-wrap: wrap;
+		width: 100%;
 	}
 
-	.pricing-toolbar-total .currency-wrap {
-		width: 7rem;
+	.cost-total-block .cost-input-label {
+		justify-content: flex-end;
+		width: auto;
+	}
+
+	.cost-input-label--tip {
+		cursor: help;
+		text-decoration: underline dotted;
+		text-underline-offset: 0.15em;
+	}
+
+	.cost-total-block .currency-wrap {
+		width: 7.5rem;
+		max-width: 100%;
 		flex-shrink: 0;
 	}
 
-	.inline-note--total {
-		font-size: 0.625rem;
-		color: var(--muted);
-		line-height: 1.25;
+	.cost-total-block .cost-input {
 		text-align: right;
-		max-width: 16rem;
+		-moz-appearance: textfield;
+		appearance: textfield;
+	}
+
+	.cost-total-block .cost-input::-webkit-outer-spin-button,
+	.cost-total-block .cost-input::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+
+	.pricing-model-header {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.35rem 1rem;
+		min-width: 0;
+		width: 100%;
 	}
 
 	/* ── Pricing section ─────────────────────────────────── */
 	.pricing-section {
 		display: flex;
 		flex-direction: column;
-		gap: 0.375rem;
+		gap: 0.35rem;
 		flex: 1;
 		min-height: 0;
 	}
 
 	.pricing-table-title {
-		font-size: 1.25rem;
+		font-size: 1.05rem;
 		font-weight: 700;
 		color: var(--text);
 		letter-spacing: -0.02em;
 		line-height: 1.2;
+		flex: 1 1 auto;
+		min-width: 0;
 	}
 
 	.pricing-table-meta {
-		font-size: 0.6875rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
 		color: var(--muted);
+		line-height: 1.35;
+		text-align: right;
+		flex: 0 1 auto;
+		max-width: 100%;
 	}
 
 	.pricing-table-wrap {
@@ -1271,7 +1839,7 @@
 	}
 
 	.pricing-table th {
-		padding: 0.45rem 0.5rem;
+		padding: 0.35rem 0.4rem;
 		text-align: center;
 		font-size: 0.8125rem;
 		font-weight: 600;
@@ -1304,10 +1872,29 @@
 	}
 
 	.pricing-table td {
-		padding: 0.45rem 0.5rem;
+		padding: 0.38rem 0.45rem;
 		vertical-align: middle;
 		text-align: center;
 		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+	}
+
+	/* Compact rows; Per bed row grows with copy */
+	.pricing-table tbody .pt-row td {
+		padding-top: 1.05rem;
+		padding-bottom: 1.05rem;
+		box-sizing: border-box;
+		vertical-align: middle;
+	}
+
+	.pricing-table tbody .pt-row:nth-child(2) td {
+		padding-top: 1.05rem;
+		padding-bottom: 1.05rem;
+	}
+
+	/* Per bed: row height follows the tallest cell — radio + label were still 1.05rem */
+	.pricing-table tbody .pt-row:nth-child(3) td {
+		padding-top: 0.72rem;
+		padding-bottom: 0.72rem;
 	}
 
 	.pt-row {
@@ -1366,9 +1953,9 @@
 	.pt-val--bed-summary {
 		text-align: center;
 		vertical-align: middle;
-		padding: 0.45rem 0.5rem;
+		padding: 0.28rem 0.4rem;
 		font-weight: 400;
-		line-height: 1.45;
+		line-height: 1.35;
 	}
 
 	.bed-summary-copy {
@@ -1380,7 +1967,7 @@
 	.bed-summary-text {
 		margin: 0;
 		font-size: 0.8125rem;
-		line-height: 1.45;
+		line-height: 1.28;
 		color: var(--text);
 	}
 

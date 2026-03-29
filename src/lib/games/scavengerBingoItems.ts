@@ -1,0 +1,28 @@
+/** Squares for scavenger bingo (same board in trip Games and add-ons preview). */
+export const SCAVENGER_BINGO_ITEMS: { label: string; icon: string }[] = [
+	{ label: 'Sunset selfie', icon: '🌅' },
+	{ label: 'Pool float', icon: '🛟' },
+	{ label: 'Beach towel', icon: '🏖️' },
+	{ label: 'Someone napping', icon: '😴' },
+	{ label: 'Local snack', icon: '🥨' },
+	{ label: 'Palm tree', icon: '🌴' },
+	{ label: 'Souvenir shop', icon: '🛍️' },
+	{ label: 'Someone dancing', icon: '💃' },
+	{ label: 'Hotel key card', icon: '🗝️' },
+	{ label: 'Empty suitcase', icon: '🧳' },
+	{ label: 'Room key', icon: '🔑' },
+	{ label: 'View from balcony', icon: '🌆' },
+	{ label: 'Breakfast buffet', icon: '🥐' },
+	{ label: 'Beach umbrella', icon: '⛱️' },
+	{ label: 'Flip flops', icon: '👡' },
+	{ label: 'Someone snorkeling', icon: '🤿' },
+	{ label: 'Cocktail with umbrella', icon: '🍹' },
+	{ label: 'Flight boarding pass', icon: '✈️' },
+	{ label: 'Sunburn', icon: '🦞' },
+	{ label: 'Group selfie', icon: '🤳' },
+	{ label: 'Local wildlife', icon: '🦜' },
+	{ label: 'Street sign', icon: '🪧' },
+	{ label: 'Sunrise', icon: '🌄' },
+	{ label: 'Packed luggage', icon: '🧳' },
+	{ label: 'Vacation mode', icon: '😎' }
+];

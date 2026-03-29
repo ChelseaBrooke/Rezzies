@@ -19,7 +19,7 @@
 	// ── Grid constants ─────────────────────────────────────────────────────
 	const SLOT_HEIGHT = 60; // px per hour
 	const HEADER_HEIGHT = 58; // day-header row px
-	const TIME_COL_WIDTH = 64; // left time gutter px
+	const TIME_COL_WIDTH = 76; // left time gutter px (fits compact labels without wrapping)
 	const DEFAULT_DURATION_MEAL = 60; // minutes
 	const DEFAULT_DURATION_ACTIVITY = 90; // minutes
 	const MIN_DURATION = 30;
@@ -230,10 +230,14 @@
 	);
 
 	// ── Time slots (left axis) ─────────────────────────────────────────────
+	// Hour labels only (no “:00”) so the time gutter stays one line at narrow widths
 	const timeSlots = $derived(
 		Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => {
 			const h = HOUR_START + i;
-			return h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`;
+			if (h === 0) return '12 AM';
+			if (h < 12) return `${h} AM`;
+			if (h === 12) return '12 PM';
+			return `${h - 12} PM`;
 		})
 	);
 
@@ -788,7 +792,9 @@
 											height:{heightPx}px;
 											left:calc({colIdx} * (100% / {tripDays.length}) + {(col / totalCols) * 100}% / {tripDays.length} + 4px);
 											width:calc((100% / {tripDays.length}) / {totalCols} - 8px);
-										background:{style.bg};
+											z-index:{2 + col};
+											background:{style.bg};
+											border:1px solid {style.border};
 										"
 										onpointerdown={(e) => onEventPointerDown(e, ev, topPx, date)}
 										onclick={(e) => {
@@ -1132,11 +1138,26 @@
 	.day-name { font-size: .65rem; font-weight: 600; letter-spacing: .06em; color: #94a3b8; text-transform: uppercase; }
 	.grid-day-header.today .day-name { color: #E85D26; }
 	.grid-time-label {
-		padding: 0 .75rem; font-size: .68rem; font-weight: 500; color: #94a3b8;
-		display: flex; align-items: flex-start; padding-top: 6px;
-		background: #f8fafc; border-right: 1px solid #f0f2f5; border-bottom: 1px solid #f0f2f5;
-		height: var(--slot-h); box-sizing: border-box;
-		position: sticky; left: 0; z-index: 1;
+		padding: 0 0.4rem 0 0.45rem;
+		font-size: 0.65rem;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: -0.02em;
+		line-height: 1.15;
+		white-space: nowrap;
+		color: #94a3b8;
+		display: flex;
+		align-items: flex-start;
+		padding-top: 6px;
+		background: #f8fafc;
+		border-right: 1px solid #f0f2f5;
+		border-bottom: 1px solid #f0f2f5;
+		height: var(--slot-h);
+		min-width: var(--time-w);
+		box-sizing: border-box;
+		position: sticky;
+		left: 0;
+		z-index: 1;
 	}
 	.grid-cell { border-right: 1px solid #f0f2f5; border-bottom: 1px solid #f0f2f5; height: var(--slot-h); box-sizing: border-box; }
 
@@ -1173,8 +1194,11 @@
 	.event-block {
 		position: absolute;
 		border-radius: 10px;
-		padding: .45rem .6rem;
-		display: flex; flex-direction: column; gap: .1rem;
+		padding: .42rem .55rem;
+		display: flex;
+		flex-direction: column;
+		gap: .1rem;
+		min-width: 0;
 		overflow: hidden;
 		cursor: pointer;
 		transition: box-shadow .1s, transform .1s;
@@ -1186,10 +1210,24 @@
 	.event-block.is-dragging { opacity: .35; box-shadow: none; transform: none; }
 
 	.evt-title {
-		font-weight: 700; font-size: .78rem; line-height: 1.2;
-		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+		font-weight: 700;
+		font-size: .78rem;
+		line-height: 1.2;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
-	.evt-time { font-size: .68rem; font-weight: 500; opacity: .85; }
+	.evt-time {
+		font-size: .65rem;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: -0.02em;
+		line-height: 1.2;
+		white-space: nowrap;
+		flex-shrink: 0;
+		opacity: .9;
+	}
 	.evt-sub  { font-size: .68rem; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.evt-chef {
 		position: absolute; bottom: .3rem; right: .45rem;

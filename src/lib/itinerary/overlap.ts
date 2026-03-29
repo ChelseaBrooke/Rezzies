@@ -21,7 +21,7 @@ export interface PositionedEvent extends LayoutEvent {
  * Algorithm:
  *  1. Sort by start time (ties: longer event first).
  *  2. Walk through sorted events, grouping transitively-overlapping events.
- *  3. Within each group, count the maximum simultaneous events → totalCols.
+ *  3. Within each group, max concurrent depth (sweep line) seeds column count; grow if needed.
  *  4. Greedily assign each event to the first column whose last-end ≤ event.startMin.
  */
 export function computeOverlapLayout(events: LayoutEvent[]): PositionedEvent[] {
@@ -51,27 +51,47 @@ export function computeOverlapLayout(events: LayoutEvent[]): PositionedEvent[] {
 	const result: PositionedEvent[] = [];
 
 	for (const group of groups) {
-		const totalCols = maxSimultaneous(group);
 		// colEnds[c] = endMin of the last event assigned to column c
-		const colEnds = new Array<number>(totalCols).fill(-Infinity);
+		const colEnds: number[] = new Array(Math.max(1, maxSimultaneous(group))).fill(-Infinity);
+		const ordered = [...group].sort((a, b) => a.startMin - b.startMin);
+		const pending: PositionedEvent[] = [];
 
-		for (const ev of [...group].sort((a, b) => a.startMin - b.startMin)) {
+		for (const ev of ordered) {
 			let col = colEnds.findIndex((e) => e <= ev.startMin);
-			if (col === -1) col = 0; // safety fallback
+			if (col === -1) {
+				colEnds.push(-Infinity);
+				col = colEnds.length - 1;
+			}
 			colEnds[col] = ev.endMin;
-			result.push({ ...ev, col, totalCols });
+			pending.push({ ...ev, col, totalCols: 1 });
+		}
+		const finalCols = Math.max(1, colEnds.length);
+		for (const p of pending) {
+			result.push({ ...p, totalCols: finalCols });
 		}
 	}
 
 	return result;
 }
 
-/** Count the maximum number of events that are simultaneously active in a group. */
+/**
+ * True max concurrent depth (interval sweep). Ends at minute t are processed before
+ * starts at t so back-to-back events do not count as overlapping.
+ */
 function maxSimultaneous(group: LayoutEvent[]): number {
-	return group.reduce((max, ev) => {
-		const n = group.filter((o) => o.startMin < ev.endMin && o.endMin > ev.startMin).length;
-		return Math.max(max, n);
-	}, 1);
+	if (group.length <= 1) return Math.max(1, group.length);
+	const pts: { t: number; d: number }[] = [];
+	for (const ev of group) {
+		pts.push({ t: ev.startMin, d: 1 }, { t: ev.endMin, d: -1 });
+	}
+	pts.sort((a, b) => a.t - b.t || a.d - b.d);
+	let depth = 0;
+	let maxD = 0;
+	for (const p of pts) {
+		depth += p.d;
+		maxD = Math.max(maxD, depth);
+	}
+	return Math.max(1, maxD);
 }
 
 // ---------------------------------------------------------------------------
