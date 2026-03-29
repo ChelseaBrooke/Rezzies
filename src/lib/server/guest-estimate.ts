@@ -224,7 +224,7 @@ export async function computeGuestEstimateRange(
 			if (lowCents > highCents) [lowCents, highCents] = [highCents, lowCents];
 			displayCents = Math.max(lowCents, Math.min(highCents, displayCents));
 			explanationReason =
-				'Range shows how your bed share moves if others pick cheaper vs pricier beds first (simulated at expected headcount). Live amount uses current assignments.';
+				'Range reflects how your bed share can move; prices vary based on how guests share beds (simulated at expected headcount). Live amount uses current assignments.';
 		}
 	} else if (pricingModel === 'per_room') {
 		// Price at Hmax (more people) = lower share; at Hmin (fewer people) = higher share
@@ -436,7 +436,7 @@ export async function computeGuestEstimateWithOverrides(
 				if (lowCents > highCents) [lowCents, highCents] = [highCents, lowCents];
 				displayCents = Math.max(lowCents, Math.min(highCents, displayCents));
 				explanationReason =
-					'Range shows how your bed share moves if others pick cheaper vs pricier beds first (simulated at expected headcount). Live amount uses current assignments.';
+					'Range reflects how your bed share can move; prices vary based on how guests share beds (simulated at expected headcount). Live amount uses current assignments.';
 			}
 		} else if (pricingModel === 'per_room') {
 			const priceAtHmax = await calculateReservationPriceWithHeadcount(tripId, {

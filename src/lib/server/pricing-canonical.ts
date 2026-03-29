@@ -6,7 +6,8 @@ import { prisma } from './prisma.js';
 import {
 	perBedLowHighForUnit,
 	computePerBedRangeByBedId as computePerBedRangeByBedIdCore,
-	type PerBedSelectionUnit
+	type PerBedSelectionUnit,
+	type PerBedRange
 } from '$lib/pricing/per-bed-selection.js';
 
 export type PricingMode = 'PER_ROOM' | 'PER_PERSON' | 'PER_BED' | 'PER_PERSON_PER_NIGHT';
@@ -235,10 +236,16 @@ export interface PerBedInventoryUnit {
 	roomId: number;
 	bedType: string;
 	weight: number;
+	spotCount: number; // max occupants for this bed (capacitySlots / capacity)
 }
 
 export function buildPerBedInventoryUnits(
-	trip: { rooms: Array<{ id: number; beds: Array<{ id: string; bedType: string }> }> },
+	trip: {
+		rooms: Array<{
+			id: number;
+			beds: Array<{ id: string; bedType: string; capacitySlots?: number | null; capacity?: number | null }>;
+		}>;
+	},
 	bedWeights: BedWeights
 ): PerBedInventoryUnit[] {
 	const out: PerBedInventoryUnit[] = [];
@@ -246,35 +253,36 @@ export function buildPerBedInventoryUnits(
 		const roomPrivacy = getRoomEffectivePrivacy(room.beds);
 		for (const bed of room.beds) {
 			const w = getBedWeight(bedWeights, bed.bedType) * roomPrivacy;
-			out.push({ bedId: bed.id, roomId: room.id, bedType: bed.bedType, weight: w });
+			const spotCount = getSpotCount(bed);
+			out.push({ bedId: bed.id, roomId: room.id, bedType: bed.bedType, weight: w, spotCount });
 		}
 	}
 	return out;
 }
 
-export { perBedLowHighForUnit } from '$lib/pricing/per-bed-selection.js';
+export { perBedLowHighForUnit, type PerBedRange } from '$lib/pricing/per-bed-selection.js';
 
 export function computePerBedRangeByBedId(
 	totalCost: number,
 	expectedGuestCount: number,
 	units: PerBedInventoryUnit[]
-): Map<string, { low: number; high: number }> {
+): Map<string, PerBedRange> {
 	return computePerBedRangeByBedIdCore(totalCost, expectedGuestCount, units as PerBedSelectionUnit[]);
 }
 
 export function aggregatePerBedTypeRanges(
 	units: PerBedInventoryUnit[],
-	rangeByBedId: Map<string, { low: number; high: number }>
+	rangeByBedId: Map<string, PerBedRange>
 ): Record<string, { low: number; high: number }> {
 	const byType: Record<string, { low: number; high: number }> = {};
 	for (const u of units) {
 		const r = rangeByBedId.get(u.bedId);
 		if (!r) continue;
 		const key = normalizeBedType(u.bedType);
-		if (!byType[key]) byType[key] = { low: r.low, high: r.high };
+		if (!byType[key]) byType[key] = { low: r.lowBedPrice, high: r.highBedPrice };
 		else {
-			byType[key].low = Math.min(byType[key].low, r.low);
-			byType[key].high = Math.max(byType[key].high, r.high);
+			byType[key].low = Math.min(byType[key].low, r.lowBedPrice);
+			byType[key].high = Math.max(byType[key].high, r.highBedPrice);
 		}
 	}
 	return byType;
@@ -488,7 +496,7 @@ export async function computeRoomPricing(
 }
 
 export interface PerBedDisplayPrice {
-	/** Full-stay estimated total for this bed (best case vs others’ picks) */
+	/** Full-stay bed price range based on occupancy extremes */
 	low: number;
 	high: number;
 	/** Midpoint of low/high for compact UI */
@@ -497,25 +505,36 @@ export interface PerBedDisplayPrice {
 	perNightHigh: number;
 	/** Midpoint per night */
 	perNight: number;
+	/** Per-person price range (bed price / occupants under each scenario) */
+	lowPerPerson: number;
+	highPerPerson: number;
+	perNightLowPerPerson: number;
+	perNightHighPerPerson: number;
 }
 
 function fillPerBedDisplayFromRanges(
-	rangeByBedId: Map<string, { low: number; high: number }>,
+	rangeByBedId: Map<string, PerBedRange>,
 	totalNights: number
 ): Record<string, PerBedDisplayPrice> {
 	const bedPricing: Record<string, PerBedDisplayPrice> = {};
 	for (const [bedId, r] of rangeByBedId) {
-		const low = Math.round(r.low * 100) / 100;
-		const high = Math.round(r.high * 100) / 100;
+		const low = Math.round(r.lowBedPrice * 100) / 100;
+		const high = Math.round(r.highBedPrice * 100) / 100;
 		const total = Math.round(((low + high) / 2) * 100) / 100;
 		const perNightLow = totalNights > 0 ? Math.round((low / totalNights) * 100) / 100 : 0;
 		const perNightHigh = totalNights > 0 ? Math.round((high / totalNights) * 100) / 100 : 0;
 		const perNight = totalNights > 0 ? Math.round((total / totalNights) * 100) / 100 : 0;
-		bedPricing[bedId] = { low, high, total, perNightLow, perNightHigh, perNight };
+		const lowPerPerson = Math.round(r.lowPerPersonPrice * 100) / 100;
+		const highPerPerson = Math.round(r.highPerPersonPrice * 100) / 100;
+		const perNightLowPerPerson = totalNights > 0 ? Math.round((lowPerPerson / totalNights) * 100) / 100 : 0;
+		const perNightHighPerPerson = totalNights > 0 ? Math.round((highPerPerson / totalNights) * 100) / 100 : 0;
+		bedPricing[bedId] = {
+			low, high, total, perNightLow, perNightHigh, perNight,
+			lowPerPerson, highPerPerson, perNightLowPerPerson, perNightHighPerPerson
+		};
 	}
 	return bedPricing;
 }
-
 /**
  * PER_BED estimated price ranges per bed (selection simulation using expected guest count only).
  */
@@ -1010,8 +1029,8 @@ export function perBedSelectionRangeForTripBedIds(
 	for (const id of bedIds) {
 		const r = rangeByBedId.get(id);
 		if (r) {
-			low += r.low * f;
-			high += r.high * f;
+			low += r.lowBedPrice * f;
+			high += r.highBedPrice * f;
 		}
 	}
 	return { low, high };
@@ -1091,19 +1110,17 @@ export function computePerBedEstimateFromInputs(inputs: QCPerBedInputs): QCPerBe
 		room.beds.forEach((bed, bi) => {
 			const roomPrivacy = getRoomEffectivePrivacy(room.beds);
 			const w = getBedWeight(bedWeights, bed.bedType) * roomPrivacy;
-			const copies = Math.max(1, bed.spotCount);
-			for (let k = 0; k < copies; k++) {
-				units.push({
-					bedId: `qc-${ri}-${bi}-${k}`,
-					roomId: ri,
-					bedType: bed.bedType,
-					weight: w
-				});
-			}
+			units.push({
+				bedId: `qc-${ri}-${bi}`,
+				roomId: ri,
+				bedType: bed.bedType,
+				weight: w,
+				spotCount: Math.max(1, bed.spotCount)
+			});
 		});
 	});
 
-	const simCount = Math.min(Math.max(1, minExpectedGuests), Math.max(1, units.length));
+	const simCount = Math.min(Math.max(1, minExpectedGuests), Math.max(1, units.reduce((s, u) => s + u.spotCount, 0)));
 	const rangeByBedId = computePerBedRangeByBedId(inputs.totalTripCost, simCount, units);
 
 	let displayPrice = 0;
@@ -1122,16 +1139,13 @@ export function computePerBedEstimateFromInputs(inputs: QCPerBedInputs): QCPerBe
 		const spotsClaimed = Math.max(1, sel.spotsClaimed);
 		const stayFactor = totalTripNights > 0 ? nightsStayed / totalTripNights : 1;
 
-		let rowLow = 0;
-		let rowHigh = 0;
-		for (let k = 0; k < spotsClaimed; k++) {
-			const id = `qc-${sel.roomIndex}-${sel.bedIndex}-${k}`;
-			const r = rangeByBedId.get(id);
-			if (r) {
-				rowLow += r.low * stayFactor;
-				rowHigh += r.high * stayFactor;
-			}
-		}
+		const bedId = `qc-${sel.roomIndex}-${sel.bedIndex}`;
+		const r = rangeByBedId.get(bedId);
+		// Per-person share: bed price × (spotsClaimed / bed.spotCount)
+		const bedSpotCount = Math.max(1, bed.spotCount);
+		const occupantFraction = spotsClaimed / bedSpotCount;
+		const rowLow = r ? r.lowBedPrice * occupantFraction * stayFactor : 0;
+		const rowHigh = r ? r.highBedPrice * occupantFraction * stayFactor : 0;
 		const contribution = Math.round(((rowLow + rowHigh) / 2) * 100) / 100;
 
 		displayPrice += contribution;

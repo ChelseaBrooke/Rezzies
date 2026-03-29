@@ -20,7 +20,8 @@
 		onBack,
 		backHref,
 		previewLabel,
-		steps: stepsProp
+		steps: stepsProp,
+		hideStepperBack = false
 	}: {
 		currentStep: number;
 		children: any;
@@ -28,6 +29,8 @@
 		backHref?: string;
 		previewLabel?: string;
 		steps?: Step[];
+		/** When true, stepper header hides Back (e.g. trips/new — footer has Back). */
+		hideStepperBack?: boolean;
 	} = $props();
 
 	const steps = $derived(stepsProp ?? DEFAULT_STEPS);
@@ -49,7 +52,7 @@
 		{/if}
 		
 		<!-- Stepper inside card -->
-		<Stepper {steps} {currentStep} {onBack} {backHref} />
+		<Stepper {steps} {currentStep} {onBack} {backHref} hideBack={hideStepperBack} />
 		
 		<!-- Card Content -->
 		<div class="card-content">

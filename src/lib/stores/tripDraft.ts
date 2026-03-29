@@ -28,6 +28,8 @@ export interface MealsConfig {
 	fundConfig?: {
 		enabled: boolean;
 		contributionStyle: 'equal' | 'custom';
+		/** Total food-fund amount for the trip to split among guests (host enters in wizard). */
+		totalToSplit?: string;
 		suggestedContributionPerPerson?: number;
 		notes?: string;
 		managers: Array<{ name?: string; email?: string }>;
@@ -63,6 +65,7 @@ export function getDefaultMealsConfig(): MealsConfig {
 		fundConfig: {
 			enabled: false,
 			contributionStyle: 'equal',
+			totalToSplit: '',
 			managers: []
 		},
 		informalConfig: { createPlaceholderSlots: false, placeholderSlots: [] },
@@ -395,7 +398,14 @@ function createTripDraftStore() {
 				const meals = Array.isArray(parsed.meals)
 					? getDefaultMealsConfig()
 					: parsed.meals && typeof parsed.meals === 'object' && 'enabled' in parsed.meals
-						? { ...getDefaultMealsConfig(), ...parsed.meals }
+						? (() => {
+								const base = getDefaultMealsConfig();
+								const merged = { ...base, ...parsed.meals };
+								if (merged.fundConfig && base.fundConfig) {
+									merged.fundConfig = { ...base.fundConfig, ...merged.fundConfig };
+								}
+								return merged;
+							})()
 						: defaultDraft.meals;
 				// Normalize activities: if old array format, migrate to new shape
 				let activities = defaultDraft.activities;

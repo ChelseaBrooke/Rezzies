@@ -31,6 +31,7 @@ const mealsConfigSchema = z
 			.object({
 				enabled: z.boolean(),
 				contributionStyle: z.enum(['equal', 'custom']),
+				totalToSplit: z.string().optional(),
 				suggestedContributionPerPerson: z.number().optional(),
 				notes: z.string().optional(),
 				managers: z.array(z.object({ name: z.string().optional(), email: z.string().optional() }))

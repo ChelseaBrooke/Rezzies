@@ -10,6 +10,6 @@
 	});
 </script>
 
-<CreateTripShell currentStep={currentStep()} {data}>
+<CreateTripShell currentStep={currentStep()} {data} hideStepperBack>
 	{@render children()}
 </CreateTripShell>

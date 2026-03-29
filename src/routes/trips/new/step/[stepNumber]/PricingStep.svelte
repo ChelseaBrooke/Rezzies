@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
 
@@ -98,9 +98,17 @@
 	const perRoomPricePerPersonExpected = $derived(roomDenomExpected > 0 ? total / roomDenomExpected : 0);
 	const perRoomPricePerPersonMax = $derived(roomDenomMax > 0 ? total / roomDenomMax : 0);
 
-	// PER_BED: selection simulation (matches server / Add-Ons step)
+	const BED_SPOT_COUNTS_P: Record<string, number> = {
+		twin: 1, single: 1, bunk: 2, full: 2, double: 2,
+		queen: 2, king: 2, sofa: 2, sofa_bed: 2, air_mattress: 2, other: 1
+	};
+	function bedSpotCountP(type: string): number {
+		return BED_SPOT_COUNTS_P[type.toLowerCase().replace(/\s+/g, '_')] ?? 1;
+	}
+
+	// PER_BED: occupancy-based simulation (matches server / Add-Ons step)
 	const perBedSlotBreakdown = $derived.by(() => {
-		type U = { bedId: string; weight: number };
+		type U = { bedId: string; weight: number; spotCount: number };
 		const units: U[] = [];
 		rooms.forEach((room, ri) => {
 			const p = privacyFactor(room);
@@ -108,12 +116,13 @@
 				const w = bedWeight(bed.bedType) * p;
 				const count = Math.max(1, bed.count || 1);
 				for (let i = 0; i < count; i++) {
-					units.push({ bedId: `p-${ri}-${bi}-${i}`, weight: w });
+					units.push({ bedId: `p-${ri}-${bi}-${i}`, weight: w, spotCount: bedSpotCountP(bed.bedType) });
 				}
 			});
 		});
 		if (units.length === 0 || total <= 0) return [];
-		const sim = Math.min(expected, units.length);
+		const totalSpots = units.reduce((s, u) => s + u.spotCount, 0);
+		const sim = Math.min(expected, totalSpots);
 		const rangeMap = computePerBedRangeByBedId(total, sim, units);
 		const list: {
 			roomName: string;
@@ -123,6 +132,8 @@
 			high: number;
 			perNightLow: number;
 			perNightHigh: number;
+			lowPP: number;
+			highPP: number;
 		}[] = [];
 		rooms.forEach((room, ri) => {
 			const roomName = room.name || 'Room';
@@ -131,15 +142,17 @@
 				const typeLabel = bed.bedType.charAt(0).toUpperCase() + bed.bedType.slice(1).replace(/_/g, ' ');
 				for (let i = 0; i < count; i++) {
 					const id = `p-${ri}-${bi}-${i}`;
-					const r = rangeMap.get(id) ?? { low: 0, high: 0 };
+					const r = rangeMap.get(id);
 					list.push({
 						roomName,
 						bedType: bed.bedType,
 						label: count > 1 ? `${roomName}, ${typeLabel} ${i + 1}` : `${roomName}, ${typeLabel}`,
-						low: r.low,
-						high: r.high,
-						perNightLow: nights > 0 ? r.low / nights : 0,
-						perNightHigh: nights > 0 ? r.high / nights : 0
+						low: r?.lowBedPrice ?? 0,
+						high: r?.highBedPrice ?? 0,
+						perNightLow: nights > 0 ? (r?.lowBedPrice ?? 0) / nights : 0,
+						perNightHigh: nights > 0 ? (r?.highBedPrice ?? 0) / nights : 0,
+						lowPP: r?.lowPerPersonPrice ?? 0,
+						highPP: r?.highPerPersonPrice ?? 0
 					});
 				}
 			});
@@ -294,10 +307,11 @@
 													<strong>Per night:</strong> ${item.perNightLow.toFixed(2)}–${item.perNightHigh.toFixed(2)}
 												</p>
 											{/if}
+											<p class="per-night per-person-price">${item.lowPP.toFixed(2)}–${item.highPP.toFixed(2)}<span class="per-person-label">/person</span></p>
 										</li>
 									{/each}
 								</ul>
-								<p class="per-bed-col-note">Simulated at {expected} guest{expected !== 1 ? 's' : ''} (capped to bed count). Live price uses who actually books which bed.</p>
+								<p class="per-bed-col-note">Simulated at {expected} guest{expected !== 1 ? 's' : ''}. Prices vary based on how guests share beds; live price reflects who actually books which bed.</p>
 							{:else}
 								—
 							{/if}
@@ -308,7 +322,7 @@
 		</div>
 		{#if draft.pricingModel === 'per-bed'}
 			<p class="per-bed-note">
-				Each <strong>bed</strong> earns a share of the trip total from bed weight and room privacy. We show a <strong>low–high</strong> range for each bed by simulating which other beds get picked first at your expected headcount. After guests choose beds, <strong>live price</strong> splits each bed’s share among the people on that bed.
+				Each <strong>bed</strong> earns a share of the trip total from bed weight and room privacy. We show a <strong>low–high</strong> range for each bed at your expected headcount; prices vary based on how guests share beds. After guests choose beds, <strong>live price</strong> splits each bed’s share among the people on that bed.
 			</p>
 		{/if}
 		{#if draft.pricingModel === 'per-room'}
@@ -482,6 +496,17 @@
 	}
 	.bed-breakdown .per-night {
 		margin: 0.15rem 0 0 0;
+	}
+	.per-person-price {
+		font-weight: 700;
+		color: var(--primary, #1e3a8a);
+		font-size: 0.8125rem;
+	}
+	.per-person-label {
+		font-weight: 500;
+		font-size: 0.9em;
+		color: var(--muted);
+		margin-left: 0.1em;
 	}
 	.bed-by-room li {
 		display: flex;

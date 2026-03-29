@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
+	import { getDefaultMealsConfig } from '$lib/stores/tripDraft.js';
 	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
 
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
@@ -35,11 +36,24 @@
 		draft.gamesEnabled = !draft.gamesEnabled;
 		autosave();
 	}
+	function ensureMealsFundConfig() {
+		if (!draft.meals) return;
+		const d = getDefaultMealsConfig().fundConfig!;
+		draft.meals.fundConfig = {
+			...d,
+			...draft.meals.fundConfig,
+			contributionStyle: draft.meals.fundConfig?.contributionStyle ?? d.contributionStyle,
+			managers: draft.meals.fundConfig?.managers ?? d.managers,
+			totalToSplit: draft.meals.fundConfig?.totalToSplit ?? d.totalToSplit ?? ''
+		};
+	}
+
 	function setMealMode(mode: 'signups' | 'fund') {
 		if (!draft.meals) return;
 		draft.meals.modes.signups = mode === 'signups';
 		draft.meals.modes.fund = mode === 'fund';
 		draft.meals.modes.informal = false;
+		if (mode === 'fund') ensureMealsFundConfig();
 		autosave();
 	}
 	function toggleGame(gameId: string) {
@@ -74,8 +88,16 @@
 		queen: 1.2, king: 1.3, sofa: 0.85, sofa_bed: 0.85,
 		air_mattress: 0.75, other: 1.0
 	};
+	const BED_SPOT_COUNTS: Record<string, number> = {
+		twin: 1, single: 1, bunk: 2, full: 2, double: 2,
+		queen: 2, king: 2, sofa: 2, sofa_bed: 2,
+		air_mattress: 2, other: 1
+	};
 	function bedWeight(type: string): number {
 		return BED_WEIGHTS[type.toLowerCase().replace(/\s+/g, '_')] ?? 1.0;
+	}
+	function bedSpotCount(type: string): number {
+		return BED_SPOT_COUNTS[type.toLowerCase().replace(/\s+/g, '_')] ?? 1;
 	}
 	// Matches server getEffectivePrivacyFactor: 1 bed → 1.25, 2 → 1.125, 3+ → 1.0
 	function privacyFactor(room: { beds?: Array<{ count?: number }> }): number {
@@ -129,40 +151,43 @@
 	const prExpected = $derived(roomDenomExpected > 0 ? total / roomDenomExpected : 0);
 	const prMax      = $derived(roomDenomMax      > 0 ? total / roomDenomMax      : 0);
 
-	/** Selection-based PER_BED: expected sim + full occupancy (every bed taken). */
+	/** Selection-based PER_BED: occupancy-range sim at expected headcount + at full bed count. */
 	const perBedSelection = $derived.by(() => {
-		type U = { bedId: string; bedType: string; weight: number };
+		type U = { bedId: string; bedType: string; weight: number; spotCount: number };
 		const units: U[] = [];
 		rooms.forEach((room, ri) => {
 			const p = privacyFactor(room);
 			room.beds.forEach((bed, bi) => {
 				const w = bedWeight(bed.bedType) * p;
+				const sc = bedSpotCount(bed.bedType);
 				const count = Math.max(1, bed.count || 1);
 				for (let i = 0; i < count; i++) {
 					units.push({
 						bedId: `w-${ri}-${bi}-${i}`,
 						bedType: bed.bedType.toLowerCase(),
-						weight: w
+						weight: w,
+						spotCount: sc
 					});
 				}
 			});
 		});
 		type BedRow = { label: string; low: number; high: number };
 		type RoomGrp = { roomName: string; beds: BedRow[] };
-		const empty = {
-			groups: [] as RoomGrp[],
-			groupsFull: [] as RoomGrp[],
-			byType: [] as { type: string; low: number; high: number }[],
-			bedCount: 0
-		};
-		if (units.length === 0 || total <= 0) {
-			return empty;
-		}
-		const sim = Math.min(expected, units.length);
-		const rangeMap = computePerBedRangeByBedId(total, sim, units);
-		const rangeMapFull = computePerBedRangeByBedId(total, units.length, units);
+		const empty = { groups: [] as RoomGrp[], groupsFull: [] as RoomGrp[], bedCount: 0 };
+		if (units.length === 0 || total <= 0) return empty;
 
-		function buildGroups(map: Map<string, { low: number; high: number }>): RoomGrp[] {
+		// Expected-headcount table: range based on occupancy extremes
+		const totalSpots = units.reduce((s, u) => s + u.spotCount, 0);
+		const sim = Math.min(expected, totalSpots);
+		const rangeMap = computePerBedRangeByBedId(total, sim, units);
+
+		// Full-capacity table: deterministic — 1 guest per bed, all beds selected
+		const totalWeight = units.reduce((s, u) => s + u.weight, 0);
+		const fixedPriceById = new Map<string, number>(
+			units.map((u) => [u.bedId, totalWeight > 0 ? total * (u.weight / totalWeight) : 0])
+		);
+
+		function buildGroups(map: ReturnType<typeof computePerBedRangeByBedId>): RoomGrp[] {
 			const groups: RoomGrp[] = [];
 			rooms.forEach((room, ri) => {
 				const roomName = room.name?.trim() || `Room ${ri + 1}`;
@@ -172,11 +197,11 @@
 					const typeLabel = bed.bedType.charAt(0).toUpperCase() + bed.bedType.slice(1).replace(/_/g, ' ');
 					for (let i = 0; i < count; i++) {
 						const id = `w-${ri}-${bi}-${i}`;
-						const r = map.get(id) ?? { low: 0, high: 0 };
+						const r = map.get(id);
 						beds.push({
 							label: count > 1 ? `${typeLabel} ${i + 1}` : typeLabel,
-							low: r.low,
-							high: r.high
+							low: r?.lowBedPrice ?? 0,
+							high: r?.highBedPrice ?? 0
 						});
 					}
 				});
@@ -185,31 +210,34 @@
 			return groups;
 		}
 
-		const groups = buildGroups(rangeMap);
-		const groupsFull = buildGroups(rangeMapFull);
-
-		const byType: Record<string, { low: number; high: number }> = {};
-		for (const u of units) {
-			const r = rangeMap.get(u.bedId);
-			if (!r) continue;
-			if (!byType[u.bedType]) byType[u.bedType] = { low: r.low, high: r.high };
-			else {
-				byType[u.bedType].low = Math.min(byType[u.bedType].low, r.low);
-				byType[u.bedType].high = Math.max(byType[u.bedType].high, r.high);
-			}
+		function buildGroupsFull(): RoomGrp[] {
+			const groups: RoomGrp[] = [];
+			rooms.forEach((room, ri) => {
+				const roomName = room.name?.trim() || `Room ${ri + 1}`;
+				const beds: BedRow[] = [];
+				room.beds.forEach((bed, bi) => {
+					const count = Math.max(1, bed.count || 1);
+					const typeLabel = bed.bedType.charAt(0).toUpperCase() + bed.bedType.slice(1).replace(/_/g, ' ');
+					for (let i = 0; i < count; i++) {
+						const id = `w-${ri}-${bi}-${i}`;
+						const price = fixedPriceById.get(id) ?? 0;
+						beds.push({ label: count > 1 ? `${typeLabel} ${i + 1}` : typeLabel, low: price, high: price });
+					}
+				});
+				if (beds.length > 0) groups.push({ roomName, beds });
+			});
+			return groups;
 		}
-		const byTypeList = Object.entries(byType).map(([type, r]) => ({
-			type: type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' '),
-			low: r.low,
-			high: r.high
-		}));
-		return { groups, groupsFull, byType: byTypeList, bedCount: units.length };
+
+		const groups = buildGroups(rangeMap);
+		const groupsFull = buildGroupsFull();
+
+		return { groups, groupsFull, bedCount: units.length };
 	});
 
 	const perBedByRoom = $derived(perBedSelection.groups);
 	const perBedByRoomFull = $derived(perBedSelection.groupsFull);
 	const perBedBedCount = $derived(perBedSelection.bedCount);
-	const perBedTypeEstimates = $derived(perBedSelection.byType);
 
 	function formatBedPriceTotal(low: number, high: number): string {
 		const a = roundUsd(low);
@@ -217,14 +245,6 @@
 		if (a === b) return `$${a}`;
 		return `$${a}–$${b}`;
 	}
-	function formatBedPriceNight(low: number, high: number): string {
-		if (nights <= 0) return '';
-		const a = roundUsd(low / nights);
-		const b = roundUsd(high / nights);
-		if (a === b) return `$${a}/night`;
-		return `$${a}–$${b}/night`;
-	}
-
 	// ─── Games catalogue ─────────────────────────────────────────────────────────
 
 	const GAMES = [
@@ -278,7 +298,6 @@
 						</svg>
 					</span>
 					<span class="addon-title">Cost-sharing</span>
-					{#if costEnabled}<span class="header-badge">✓ Active</span>{/if}
 				</div>
 				<label class="addon-toggle" class:checked={costEnabled} onclick={(e) => e.stopPropagation()}>
 					<input
@@ -294,22 +313,9 @@
 			<div class="addon-body">
 				{#if !costEnabled}
 					<div class="addon-pane unchecked-pane">
-						<div class="addon-illustration cost-illustration">
-							<div class="illus-bg">
-								<svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-									<circle cx="30" cy="30" r="28" fill="rgba(30,58,138,0.08)"/>
-									<circle cx="30" cy="30" r="20" fill="rgba(30,58,138,0.12)"/>
-									<text x="30" y="38" text-anchor="middle" font-size="22" font-weight="700" fill="rgba(30,58,138,0.6)" font-family="sans-serif">$</text>
-								</svg>
-								<div class="illus-dots">
-									<span class="illus-dot"></span>
-									<span class="illus-dot"></span>
-									<span class="illus-dot"></span>
-								</div>
-							</div>
-						</div>
-						<p class="addon-desc">Automatically calculate what each guest pays based on your trip setup. Costs update dynamically as headcount changes.</p>
-						<p class="addon-cta-hint">Enable to configure →</p>
+						<p class="addon-desc">
+							Split the trip total fairly—per person, per room, or per bed. When guests RSVP <strong>Yes</strong>, they’ll see their share (or a clear estimate) on the RSVP flow so they know what to expect before they commit.
+						</p>
 					</div>
 				{:else}
 					<div class="addon-pane checked-pane cost-checked-pane" onclick={(e) => e.stopPropagation()} role="none">
@@ -319,7 +325,7 @@
 								<div class="pricing-toolbar-left">
 									<span class="pricing-table-title">Choose pricing model</span>
 									<span class="pricing-table-meta">
-										{expected} expected · {maxG} max · {nights > 0 ? `${nights}n` : 'dates not set'}
+										{expected} expected · {maxG} max · {nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : 'dates not set'}
 									</span>
 								</div>
 								<div class="pricing-toolbar-total">
@@ -342,15 +348,14 @@
 									<span class="inline-note inline-note--total">incl. fees &amp; taxes guests will split</span>
 								</div>
 							</div>
-
 							<div class="pricing-table-wrap">
 								<table class="pricing-table">
 									<thead>
 										<tr>
 											<th></th>
 											<th>Model</th>
-											<th>At {expected} guest{expected !== 1 ? 's' : ''}</th>
-											<th>At {maxG} guest{maxG !== 1 ? 's' : ''}</th>
+											<th>Total cost, at {expected} guest{expected !== 1 ? 's' : ''}</th>
+											<th>Total cost, at {maxG} guest{maxG !== 1 ? 's' : ''}</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -361,12 +366,12 @@
 											<td class="pt-model">Per Person</td>
 										<td class="pt-val">
 											{#if total > 0}
-												<span class="pt-amount">${roundUsd(ppExpected)}</span>{#if nights > 0}<span class="pt-night">${roundUsd(ppExpected / nights)}/night</span>{/if}
+												<span class="pt-amount">${roundUsd(ppExpected)}</span>
 											{:else}—{/if}
 										</td>
 										<td class="pt-val">
 											{#if total > 0}
-												<span class="pt-amount">${roundUsd(ppMax)}</span>{#if nights > 0}<span class="pt-night">${roundUsd(ppMax / nights)}/night</span>{/if}
+												<span class="pt-amount">${roundUsd(ppMax)}</span>
 											{:else}—{/if}
 										</td>
 										</tr>
@@ -377,12 +382,12 @@
 											<td class="pt-model">Per Room</td>
 										<td class="pt-val">
 											{#if totalRooms > 0 && total > 0}
-												<span class="pt-amount">${roundUsd(prExpected)}</span>{#if nights > 0}<span class="pt-night">${roundUsd(prExpected / nights)}/night</span>{/if}
+												<span class="pt-amount">${roundUsd(prExpected)}</span>
 											{:else}—{/if}
 										</td>
 										<td class="pt-val">
 											{#if totalRooms > 0 && total > 0}
-												<span class="pt-amount">${roundUsd(prMax)}</span>{#if nights > 0}<span class="pt-night">${roundUsd(prMax / nights)}/night</span>{/if}
+												<span class="pt-amount">${roundUsd(prMax)}</span>
 											{:else}—{/if}
 										</td>
 										</tr>
@@ -393,24 +398,17 @@
 											<td class="pt-model">Per Bed</td>
 											<td class="pt-val pt-val--bed-summary" colspan="2">
 												<div class="bed-summary-copy">
-													{#if perBedTypeEstimates.length > 0 && total > 0}
-														<div class="bed-type-est-list">
-															{#each perBedTypeEstimates as row}
-																<span class="bed-type-est"
-																	>{row.type}: ${roundUsd(row.low)}–${roundUsd(row.high)}</span
-																>
-															{/each}
-														</div>
-													{:else}
-														<span class="bed-summary-muted">Estimated price per bed (by type) after you add beds and cost.</span>
-													{/if}
-													<button
-														type="button"
-														class="bed-summary-link"
-														onclick={openBedBreakdownModal}
-													>
-														Room-by-room breakdown
-													</button>
+													<p class="bed-summary-text">
+														What each guest pays depends on <strong>which bed they choose</strong>. Open the{' '}
+														<button
+															type="button"
+															class="bed-summary-link bed-summary-link--inline"
+															onclick={openBedBreakdownModal}
+														>
+															room-by-room breakdown
+														</button>
+														{' '}for estimated ranges by room and bed.
+													</p>
 												</div>
 											</td>
 										</tr>
@@ -433,7 +431,6 @@
 						</svg>
 					</span>
 					<span class="addon-title">Activity-planning</span>
-					{#if activitiesEnabled}<span class="header-badge header-badge--teal">✓ Live</span>{/if}
 				</div>
 				<label class="addon-toggle" class:checked={activitiesEnabled} onclick={(e) => e.stopPropagation()}>
 					<input
@@ -449,22 +446,7 @@
 			<div class="addon-body">
 				{#if !activitiesEnabled}
 					<div class="addon-pane unchecked-pane">
-						<div class="addon-illustration activity-illustration">
-							<div class="illus-bg">
-								<svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-									<circle cx="30" cy="30" r="28" fill="rgba(47,119,120,0.08)"/>
-									<circle cx="30" cy="30" r="20" fill="rgba(47,119,120,0.12)"/>
-									<polygon points="30,18 36,26 44,27 38,33 40,41 30,37 20,41 22,33 16,27 24,26" stroke="rgba(47,119,120,0.6)" stroke-width="1.5" fill="none"/>
-								</svg>
-								<div class="illus-dots">
-									<span class="illus-dot" style="background: rgba(47,119,120,0.3)"></span>
-									<span class="illus-dot" style="background: rgba(47,119,120,0.3)"></span>
-									<span class="illus-dot" style="background: rgba(47,119,120,0.3)"></span>
-								</div>
-							</div>
-						</div>
 						<p class="addon-desc">Plan and organize what your group will do during the trip. Discover nearby places, build a shared itinerary, and let guests suggest ideas.</p>
-						<p class="addon-cta-hint">Enable to activate →</p>
 					</div>
 				{:else}
 				<div class="addon-pane checked-pane info-pane">
@@ -504,7 +486,6 @@
 						</svg>
 					</span>
 					<span class="addon-title">Meal-planning</span>
-					{#if mealsEnabled}<span class="header-badge header-badge--copper">✓ Added</span>{/if}
 				</div>
 				<label class="addon-toggle" class:checked={mealsEnabled} onclick={(e) => e.stopPropagation()}>
 					<input
@@ -520,57 +501,72 @@
 			<div class="addon-body">
 				{#if !mealsEnabled}
 					<div class="addon-pane unchecked-pane">
-						<div class="addon-illustration meal-illustration">
-							<div class="illus-bg">
-								<svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-									<circle cx="30" cy="30" r="28" fill="rgba(191,78,48,0.08)"/>
-									<circle cx="30" cy="30" r="20" fill="rgba(191,78,48,0.12)"/>
-									<path d="M24 20v6a6 6 0 0 0 12 0v-6M30 38v4M27 42h6" stroke="rgba(191,78,48,0.6)" stroke-width="2" stroke-linecap="round"/>
-								</svg>
-								<div class="illus-dots">
-									<span class="illus-dot" style="background: rgba(191,78,48,0.3)"></span>
-									<span class="illus-dot" style="background: rgba(191,78,48,0.3)"></span>
-									<span class="illus-dot" style="background: rgba(191,78,48,0.3)"></span>
-								</div>
-							</div>
-						</div>
 						<p class="addon-desc">Coordinate meals and food plans with your group. Sign-up sheets, shared funds, or just let everyone know what's happening.</p>
-						<p class="addon-cta-hint">Enable to configure →</p>
 					</div>
 			{:else}
-				<div class="addon-pane checked-pane" onclick={(e) => e.stopPropagation()} role="none">
-					<div class="config-row">
-							<label class="config-label">How will meals work?</label>
-							<div class="radio-stack">
-								<label class="radio-option" onclick={(e) => e.stopPropagation()} role="none">
-									<input
-										type="radio"
-										name="mealMode"
-										value="signups"
-										checked={mealMode === 'signups'}
-										onchange={() => setMealMode('signups')}
-									/>
-									<div class="radio-content">
-										<span class="radio-label">Meal Sign-ups</span>
-										<span class="radio-desc">Guests claim breakfast, lunch, or dinner slots</span>
+				<div class="addon-pane checked-pane meal-checked-pane" onclick={(e) => e.stopPropagation()} role="none">
+					<div class="config-row meal-config-row">
+						<div class="radio-stack">
+							<label class="radio-option" onclick={(e) => e.stopPropagation()} role="none">
+								<input
+									type="radio"
+									name="mealMode"
+									value="signups"
+									checked={mealMode === 'signups'}
+									onchange={() => setMealMode('signups')}
+								/>
+								<div class="radio-content">
+									<span class="radio-label">Meal Sign-ups</span>
+									<span class="radio-desc">Guests claim breakfast, lunch, or dinner slots</span>
+								</div>
+							</label>
+							<label
+								class="radio-option radio-option--fund-row"
+								onclick={(e) => e.stopPropagation()}
+								role="none"
+							>
+								<input
+									type="radio"
+									name="mealMode"
+									value="fund"
+									checked={mealMode === 'fund'}
+									onchange={() => setMealMode('fund')}
+								/>
+								<div class="radio-content">
+									<span class="radio-label">Shared Food Fund</span>
+									<span class="radio-desc">Everyone contributes to a collective budget</span>
+								</div>
+								{#if mealMode === 'fund'}
+									<div class="meal-fund-split" onclick={(e) => e.stopPropagation()} role="none">
+										<span class="meal-fund-field-label" id="foodFundTotalSplit-label">Total to split</span>
+										<div class="currency-wrap meal-fund-currency">
+											<span class="currency-sym">$</span>
+											<input
+												id="foodFundTotalSplit"
+												type="number"
+												class="config-input meal-fund-input"
+												required
+												min="0.01"
+												step="0.01"
+												placeholder="0.00"
+												aria-labelledby="foodFundTotalSplit-label"
+												value={draft.meals?.fundConfig?.totalToSplit ?? ''}
+												oninput={(e) => {
+													ensureMealsFundConfig();
+													const v = (e.target as HTMLInputElement).value;
+													if (draft.meals?.fundConfig) {
+														draft.meals.fundConfig.totalToSplit = v;
+														autosave();
+													}
+												}}
+											/>
+										</div>
 									</div>
-								</label>
-								<label class="radio-option" onclick={(e) => e.stopPropagation()} role="none">
-									<input
-										type="radio"
-										name="mealMode"
-										value="fund"
-										checked={mealMode === 'fund'}
-										onchange={() => setMealMode('fund')}
-									/>
-									<div class="radio-content">
-										<span class="radio-label">Shared Food Fund</span>
-										<span class="radio-desc">Everyone contributes to a collective budget</span>
-									</div>
-								</label>
-							</div>
+								{/if}
+							</label>
 						</div>
 					</div>
+				</div>
 				{/if}
 			</div>
 		</div>
@@ -589,7 +585,6 @@
 						</svg>
 					</span>
 					<span class="addon-title">Games</span>
-					{#if gamesEnabled}<span class="header-badge header-badge--purple">✓ Active</span>{/if}
 				</div>
 				<label class="addon-toggle" class:checked={gamesEnabled} onclick={(e) => e.stopPropagation()}>
 					<input
@@ -605,31 +600,12 @@
 			<div class="addon-body">
 				{#if !gamesEnabled}
 					<div class="addon-pane unchecked-pane">
-						<div class="addon-illustration game-illustration">
-							<div class="illus-bg">
-								<svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-									<circle cx="30" cy="30" r="28" fill="rgba(120,80,180,0.08)"/>
-									<circle cx="30" cy="30" r="20" fill="rgba(120,80,180,0.12)"/>
-									<rect x="18" y="24" width="24" height="14" rx="3" stroke="rgba(120,80,180,0.6)" stroke-width="1.5" fill="none"/>
-									<circle cx="24" cy="31" r="1.5" fill="rgba(120,80,180,0.6)"/>
-									<circle cx="30" cy="31" r="1.5" fill="rgba(120,80,180,0.6)"/>
-									<circle cx="36" cy="31" r="1.5" fill="rgba(120,80,180,0.6)"/>
-									<path d="M28 19h4m-2-2v4" stroke="rgba(120,80,180,0.6)" stroke-width="1.5" stroke-linecap="round"/>
-								</svg>
-								<div class="illus-dots">
-									<span class="illus-dot" style="background: rgba(120,80,180,0.3)"></span>
-									<span class="illus-dot" style="background: rgba(120,80,180,0.3)"></span>
-									<span class="illus-dot" style="background: rgba(120,80,180,0.3)"></span>
-								</div>
-							</div>
-						</div>
 						<p class="addon-desc">Add fun, interactive games for your group. Keep everyone entertained before and during the trip.</p>
-						<p class="addon-cta-hint">Enable to pick games →</p>
 					</div>
 				{:else}
 				<div class="addon-pane checked-pane" onclick={(e) => e.stopPropagation()} role="none">
 					<div class="config-row">
-							<label class="config-label">Choose your games <span class="optional-tag">optional</span></label>
+							<div class="config-label">Choose your games <span class="optional-tag">optional</span></div>
 							<div class="game-list">
 								{#each GAMES as game}
 									<label class="game-option" onclick={(e) => e.stopPropagation()} role="none">
@@ -668,34 +644,30 @@
 				<button type="button" class="bed-modal-close" onclick={closeBedBreakdownModal} aria-label="Close">×</button>
 			</div>
 			<div class="bed-modal-body">
-				<p class="bed-modal-lede">
-					<strong>Each bed gets a share of the total trip cost.</strong>
-					What you pay for a spot depends on bed type and whether the room feels more private or shared.
-				</p>
-				<ul class="bed-modal-bullets">
-					<li>
-						<strong>Bigger beds</strong> (i.e., king vs. twin) are weighted a little higher, so they can cost a bit more per spot.
-					</li>
-					<li>
-						<strong>Single-bed rooms</strong> get a privacy bump compared to rooms with several beds.
-					</li>
-				</ul>
-			<p class="bed-modal-follow">
-				<span class="bed-follow-mid">The left column assumes </span>
-				<span class="bed-follow-tag bed-follow-tag--exp">{expected} guest{expected !== 1 ? 's' : ''}</span>
-				<span class="bed-follow-mid">
-					booking beds (capped at bed count). <strong>Low</strong> = others take priciest beds first; <strong>high</strong> = cheapest first.
-					The right column is </span>
-				<span class="bed-follow-tag bed-follow-tag--max">full occupancy</span>
-				<span class="bed-follow-mid">
-					— every bed taken ({perBedBedCount} guest{perBedBedCount !== 1 ? 's' : ''}), so each bed’s share is a fixed slice of the total. After people pick beds, cost is split among who’s on each bed.</span>
-			</p>
+				<div class="bed-modal-intro">
+					<p class="bed-modal-intro-lead">
+						Each bed gets a share of the trip cost.
+						<span class="bed-modal-intro-dot" aria-hidden="true">·</span>
+						Bigger beds and more private rooms cost more.
+					</p>
+					<p class="bed-modal-amounts-scope">
+						Each price is that bed’s <strong>total for the whole trip</strong> (not per night). The left table can show a low–high range; the right table is a single amount per bed when every bed is filled.
+					</p>
+				</div>
+				<div class="bed-modal-table-labels">
+					<div class="bed-modal-table-label bed-modal-table-label--exp">
+						<span class="bed-label-tag">{expected} guest{expected !== 1 ? 's' : ''}</span>
+						<span class="bed-label-desc">may vary based on sharing</span>
+					</div>
+					<div class="bed-modal-table-label bed-modal-table-label--max">
+						<span class="bed-label-tag">all beds filled</span>
+						<span class="bed-label-desc">fixed per bed</span>
+					</div>
+				</div>
 
 				{#if perBedByRoom.length > 0 && total > 0}
 					<div class="bed-modal-columns">
 						<div class="bed-modal-col">
-							<h4 class="bed-modal-col-title">At expected headcount</h4>
-							<p class="bed-modal-col-sub bed-modal-col-sub--exp">{expected} guest{expected !== 1 ? 's' : ''} · low–high (full trip)</p>
 							<div class="bed-modal-table-shell bed-modal-table-shell--exp">
 								<table class="bed-mini-table bed-mini-table--modal">
 									<tbody>
@@ -706,10 +678,7 @@
 														<span class="bed-mini-room-name">{grp.roomName}</span><span class="bed-mini-dot" aria-hidden="true">·</span><span class="bed-mini-bed-label">{b.label}</span>
 													</td>
 													<td class="bed-mini-price-modal">
-														<div class="bed-price-stack">
-															<span class="bed-price-total">{formatBedPriceTotal(b.low, b.high)}</span>
-															{#if nights > 0}<span class="bed-price-night">{formatBedPriceNight(b.low, b.high)}</span>{/if}
-														</div>
+														<span class="bed-price-total">{formatBedPriceTotal(b.low, b.high)}</span>
 													</td>
 												</tr>
 											{/each}
@@ -719,8 +688,6 @@
 							</div>
 						</div>
 						<div class="bed-modal-col">
-							<h4 class="bed-modal-col-title">Full capacity</h4>
-							<p class="bed-modal-col-sub bed-modal-col-sub--max">Every bed taken · est. per bed</p>
 							<div class="bed-modal-table-shell bed-modal-table-shell--max">
 								<table class="bed-mini-table bed-mini-table--modal">
 									<tbody>
@@ -731,10 +698,7 @@
 														<span class="bed-mini-room-name">{grp.roomName}</span><span class="bed-mini-dot" aria-hidden="true">·</span><span class="bed-mini-bed-label bed-mini-bed-label--max">{b.label}</span>
 													</td>
 													<td class="bed-mini-price-modal">
-														<div class="bed-price-stack">
-															<span class="bed-price-total bed-price-total--max">{formatBedPriceTotal(b.low, b.high)}</span>
-															{#if nights > 0}<span class="bed-price-night">{formatBedPriceNight(b.low, b.high)}</span>{/if}
-														</div>
+														<span class="bed-price-total bed-price-total--max">{formatBedPriceTotal(b.low, b.high)}</span>
 													</td>
 												</tr>
 											{/each}
@@ -803,8 +767,8 @@
 
 	/* ── Card shell ───────────────────────────────────────── */
 	.addon-card {
-		background: white;
-		border: 1.5px solid var(--border);
+		background: #f3f4f6;
+		border: 1.5px solid rgba(15, 23, 42, 0.1);
 		border-radius: 1rem;
 		overflow: hidden;
 		cursor: pointer;
@@ -864,33 +828,6 @@
 		letter-spacing: -0.01em;
 	}
 
-	/* ── Header active badge ──────────────────────────────── */
-	.header-badge {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		color: var(--primary);
-		background: rgba(30, 58, 138, 0.1);
-		padding: 0.15rem 0.5rem;
-		border-radius: 999px;
-		white-space: nowrap;
-		flex-shrink: 0;
-	}
-
-	.header-badge--copper {
-		color: var(--copper, #bf4e30);
-		background: rgba(191, 78, 48, 0.1);
-	}
-
-	.header-badge--teal {
-		color: var(--slate, #2f7778);
-		background: rgba(47, 119, 120, 0.1);
-	}
-
-	.header-badge--purple {
-		color: #7850b4;
-		background: rgba(120, 80, 180, 0.1);
-	}
-
 	/* ── Toggle switch ────────────────────────────────────── */
 	.addon-toggle {
 		position: relative;
@@ -943,7 +880,7 @@
 
 	/* Shorter pair: meal-planning + activity-planning (same height) */
 	.addon-card--compact .addon-body {
-		height: 156px;
+		height: 140px;
 		overflow-y: auto;
 	}
 
@@ -967,29 +904,6 @@
 		opacity: 1;
 	}
 
-	.addon-illustration {
-		flex-shrink: 0;
-	}
-
-	.illus-bg {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.illus-dots {
-		display: flex;
-		gap: 0.25rem;
-		align-items: center;
-	}
-
-	.illus-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: rgba(30, 58, 138, 0.2);
-	}
-
 	.addon-desc {
 		font-size: 0.8125rem;
 		color: var(--muted);
@@ -998,42 +912,10 @@
 		flex: 1;
 	}
 
-	.addon-cta-hint {
-		font-size: 0.75rem;
-		color: var(--primary);
-		margin: 0;
-		font-weight: 500;
-		opacity: 0.7;
-	}
-
 	/* ── Checked pane ─────────────────────────────────────── */
 	.checked-pane {
 		gap: 0.75rem;
 		cursor: default;
-	}
-
-	.activated-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: var(--primary);
-		background: rgba(30, 58, 138, 0.08);
-		padding: 0.3rem 0.625rem;
-		border-radius: 999px;
-		flex-shrink: 0;
-		align-self: flex-start;
-	}
-
-	.activated-badge.teal {
-		color: var(--slate, #2f7778);
-		background: rgba(47, 119, 120, 0.08);
-	}
-
-	.activated-badge.purple {
-		color: #7850b4;
-		background: rgba(120, 80, 180, 0.08);
 	}
 
 	/* ── Config rows ──────────────────────────────────────── */
@@ -1105,45 +987,6 @@
 		box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
 	}
 
-	/* ── Segmented control (pricing model) ───────────────── */
-	.segment-control {
-		display: flex;
-		border: 1px solid var(--border);
-		border-radius: 0.5rem;
-		overflow: hidden;
-		background: var(--bg, #f8fafc);
-	}
-
-	.segment-btn {
-		flex: 1;
-		padding: 0.4rem 0.25rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		font-family: inherit;
-		background: transparent;
-		border: none;
-		color: var(--muted);
-		cursor: pointer;
-		transition: all 0.15s;
-		border-right: 1px solid var(--border);
-		white-space: nowrap;
-	}
-
-	.segment-btn:last-child {
-		border-right: none;
-	}
-
-	.segment-btn.selected {
-		background: var(--primary);
-		color: white;
-		font-weight: 600;
-	}
-
-	.segment-btn:hover:not(.selected) {
-		background: rgba(30, 58, 138, 0.05);
-		color: var(--text);
-	}
-
 	/* ── Radio options (meals) ────────────────────────────── */
 	.radio-stack {
 		display: flex;
@@ -1194,34 +1037,78 @@
 		line-height: 1.3;
 	}
 
+	.radio-option--fund-row {
+		flex-wrap: wrap;
+		align-items: flex-start;
+	}
+
+	.radio-option--fund-row .radio-content {
+		flex: 1;
+		min-width: 9rem;
+	}
+
+	.meal-fund-split {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		gap: 0.4rem;
+		margin-left: auto;
+		flex: 0 1 auto;
+		min-width: 0;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+
+	.meal-fund-field-label {
+		font-size: 0.65rem;
+		font-weight: 600;
+		color: var(--muted);
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+
+	.meal-fund-currency .meal-fund-input {
+		width: 6.75rem;
+	}
+
+	.meal-checked-pane {
+		padding-top: 0.65rem;
+	}
+
+	.meal-config-row {
+		margin-top: 0.3rem;
+	}
+
 	/* ── Activity info pane ───────────────────────────────── */
 	.info-pane {
 		gap: 0.5rem;
 	}
 
 	.info-intro {
-		font-size: 0.8125rem;
+		font-size: 0.9375rem;
+		font-weight: 500;
 		color: var(--muted);
 		margin: 0;
-		line-height: 1.4;
+		line-height: 1.45;
 	}
 
 	.feature-list {
 		list-style: none;
 		padding: 0;
 		margin: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.35rem 0.65rem;
 	}
 
 	.feature-list li {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: 0.375rem;
 		font-size: 0.8125rem;
 		color: var(--text);
 		font-weight: 500;
+		min-width: 0;
 	}
 
 	.feature-list li svg {
@@ -1356,9 +1243,11 @@
 	}
 
 	.pricing-table-title {
-		font-size: 0.75rem;
-		font-weight: 600;
+		font-size: 1.25rem;
+		font-weight: 700;
 		color: var(--text);
+		letter-spacing: -0.02em;
+		line-height: 1.2;
 	}
 
 	.pricing-table-meta {
@@ -1392,7 +1281,7 @@
 		white-space: nowrap;
 	}
 
-	/* Dividers only: Model | At X guests | At Y guests */
+	/* Dividers only: Model | Total cost at expected | Total cost at max */
 	.pricing-table th:nth-child(2),
 	.pricing-table td:nth-child(2),
 	.pricing-table th:nth-child(3),
@@ -1410,6 +1299,8 @@
 	.pricing-table th:nth-child(4) {
 		width: 41%;
 		text-align: center;
+		white-space: normal;
+		line-height: 1.25;
 	}
 
 	.pricing-table td {
@@ -1481,11 +1372,21 @@
 	}
 
 	.bed-summary-copy {
+		max-width: 36rem;
+		margin: 0 auto;
+		text-align: center;
+	}
+
+	.bed-summary-text {
 		margin: 0;
-		font-size: 0.875rem;
+		font-size: 0.8125rem;
 		line-height: 1.45;
 		color: var(--text);
-		display: block;
+	}
+
+	.bed-summary-link--inline {
+		vertical-align: baseline;
+		line-height: inherit;
 	}
 
 	.bed-summary-link {
@@ -1507,30 +1408,6 @@
 		color: var(--primary-dark, #152a66);
 	}
 
-	.bed-type-est-list {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.35rem 0.6rem;
-		justify-content: center;
-		margin-bottom: 0.35rem;
-	}
-
-	.bed-type-est {
-		font-size: 0.8125rem;
-		color: var(--text);
-	}
-
-	.bed-summary-muted {
-		font-size: 0.8125rem;
-		color: var(--muted);
-		display: block;
-		margin-bottom: 0.25rem;
-	}
-
-	.bed-modal-single {
-		margin-top: 0.75rem;
-	}
-
 	.bed-mini-table {
 		width: 100%;
 		border-collapse: collapse;
@@ -1548,15 +1425,6 @@
 		vertical-align: top;
 		border: none;
 		line-height: 1.35;
-	}
-
-	.pt-night {
-		display: block;
-		margin-top: 0.12rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: var(--muted);
-		line-height: 1.25;
 	}
 
 	/* ── Per-bed breakdown modal ──────────────────────────── */
@@ -1600,8 +1468,8 @@
 		justify-content: space-between;
 		gap: 0.75rem;
 		padding: 1rem 1.125rem;
-		border-bottom: 1px solid rgba(109, 40, 217, 0.15);
-		background: linear-gradient(110deg, rgba(109, 40, 217, 0.07) 0%, rgba(15, 118, 110, 0.08) 100%);
+		border-bottom: 1px solid var(--border);
+		background: #fff;
 		flex-shrink: 0;
 	}
 
@@ -1611,10 +1479,7 @@
 		font-weight: 800;
 		letter-spacing: -0.03em;
 		line-height: 1.2;
-		background: linear-gradient(120deg, var(--primary, #1e3a8a) 0%, var(--bed-violet) 55%, var(--bed-teal) 100%);
-		-webkit-background-clip: text;
-		background-clip: text;
-		color: transparent;
+		color: var(--text);
 	}
 
 	.bed-modal-close {
@@ -1645,96 +1510,76 @@
 		min-height: 0;
 	}
 
-	.bed-modal-lede {
+	.bed-modal-intro {
 		margin: 0 0 0.85rem;
-		font-size: 0.9375rem;
-		line-height: 1.6;
-		color: var(--text);
-		font-weight: 400;
 	}
 
-	.bed-modal-lede > strong:first-of-type {
-		display: block;
-		margin-bottom: 0.35rem;
-		font-weight: 700;
-		color: var(--text);
-		letter-spacing: -0.015em;
-	}
-
-	.bed-modal-bullets {
-		margin: 0 0 0.85rem;
-		padding: 0.65rem 0.85rem;
-		list-style: none;
+	.bed-modal-intro-lead {
+		margin: 0 0 0.45rem;
 		font-size: 0.875rem;
-		line-height: 1.55;
-		color: var(--text);
 		font-weight: 400;
-		background: rgba(255, 255, 255, 0.65);
-		border-radius: 0.65rem;
-		border: 1px solid rgba(15, 23, 42, 0.08);
-		box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+		color: var(--muted);
+		line-height: 1.45;
 	}
 
-	.bed-modal-bullets li {
-		margin-bottom: 0.55rem;
+	.bed-modal-intro-dot {
+		margin: 0 0.35rem;
+		color: var(--border);
+		font-weight: 600;
 	}
 
-	.bed-modal-bullets li:last-child {
-		margin-bottom: 0;
-	}
-
-	.bed-modal-bullets li strong {
-		font-weight: 700;
-		color: var(--text);
-	}
-
-	.bed-modal-follow {
-		margin: 0 0 1rem;
-		font-size: 0.875rem;
-		line-height: 1.6;
-		padding: 0;
-		color: var(--bed-slate);
-	}
-
-	.bed-follow-when {
-		font-weight: 700;
-		color: var(--text);
-	}
-
-	.bed-follow-mid {
+	.bed-modal-amounts-scope {
+		margin: 0.45rem 0 0;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		color: var(--muted);
 		font-weight: 450;
 	}
 
-	.bed-follow-drop {
-		font-weight: 900;
-		font-size: 1.02em;
-		color: var(--bed-teal);
-		letter-spacing: -0.02em;
+	.bed-modal-amounts-scope strong {
+		color: var(--text);
+		font-weight: 600;
 	}
 
-	.bed-follow-why {
-		font-weight: 450;
+	.bed-modal-table-labels {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0 1rem;
+		margin: 0 0 0.5rem;
 	}
 
-	.bed-follow-tag {
+	.bed-modal-table-label {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 0.15rem;
+	}
+
+	.bed-label-tag {
 		display: inline-block;
 		font-weight: 800;
 		font-size: 0.8125rem;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
-		padding: 0.12em 0.45em;
+		padding: 0.12em 0.5em;
 		border-radius: 0.3rem;
-		vertical-align: baseline;
 	}
 
-	.bed-follow-tag--exp {
+	.bed-modal-table-label--exp .bed-label-tag {
 		color: var(--bed-violet);
 		background: var(--bed-violet-soft);
 	}
 
-	.bed-follow-tag--max {
+	.bed-modal-table-label--max .bed-label-tag {
 		color: var(--bed-coral);
 		background: var(--bed-coral-soft);
+	}
+
+	.bed-label-desc {
+		font-size: 0.8rem;
+		font-weight: 450;
+		color: var(--muted);
 	}
 
 	.bed-modal-empty {
@@ -1753,33 +1598,6 @@
 
 	.bed-modal-col {
 		min-width: 0;
-	}
-
-	.bed-modal-col-title {
-		margin: 0 0 0.2rem;
-		font-size: 0.9375rem;
-		font-weight: 800;
-		color: var(--text);
-		text-align: center;
-		letter-spacing: -0.02em;
-	}
-
-	.bed-modal-col-sub {
-		margin: 0 0 0.55rem;
-		font-size: 0.72rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--muted);
-		text-align: center;
-	}
-
-	.bed-modal-col-sub--exp {
-		color: var(--bed-violet);
-	}
-
-	.bed-modal-col-sub--max {
-		color: var(--warm, #ce5612);
 	}
 
 	.bed-modal-table-shell {
@@ -1866,25 +1684,10 @@
 		padding-left: 0.35rem !important;
 	}
 
-	.bed-price-stack {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 0.08rem;
-		line-height: 1.2;
-	}
-
 	.bed-price-total {
 		font-weight: 800;
 		color: var(--text);
 		letter-spacing: -0.02em;
-		white-space: nowrap;
-	}
-
-	.bed-price-night {
-		font-weight: 600;
-		font-size: 0.78em;
-		color: var(--muted);
 		white-space: nowrap;
 	}
 
