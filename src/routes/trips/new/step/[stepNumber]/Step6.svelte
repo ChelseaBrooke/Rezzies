@@ -62,7 +62,7 @@
 				<span class="summary-label">Property:</span>
 				<span class="summary-value">
 					{draft.bedrooms || 0} bedrooms, {draft.bathrooms || 0} bathrooms, 
-					Max occupancy: {draft.maxOccupancy || 0}
+					Max headcount (capacity limit): {draft.maxOccupancy || 0}
 				</span>
 			</div>
 			<div class="summary-item">

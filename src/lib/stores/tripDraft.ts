@@ -1,5 +1,8 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
+import { effectiveMaxHeadcount, totalBedSpotCount } from '$lib/trip/headcount.js';
+
+export { totalBedSpotCount, effectiveMaxHeadcount };
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 
@@ -222,6 +225,13 @@ export interface TripDraft {
 	selectedGames: string[]; // e.g. ['caption-this']
 }
 
+/** Max headcount for pricing when host leaves trip max blank (uses bed spots in the background). */
+export function effectiveMaxForDraft(
+	draft: Pick<TripDraft, 'rooms' | 'maxOccupancy' | 'expectedGuestCount'>
+): number {
+	return effectiveMaxHeadcount(draft.expectedGuestCount, draft.maxOccupancy, draft.rooms);
+}
+
 const defaultDraft: TripDraft = {
 	name: '',
 	description: '',
@@ -304,6 +314,11 @@ export interface TripForDraft {
 	maxGuests?: number | null;
 	expectedPeopleCount?: number | null;
 	allowPartialStays?: boolean | null;
+	// Add-on flags (live trip)
+	costSharingEnabled?: boolean | null;
+	gamesEnabled?: boolean | null;
+	activitiesEnabled?: boolean | null;
+	mealPlan?: { enabled: boolean } | null;
 	rooms?: Array<{
 		id: number;
 		name: string;
@@ -378,8 +393,16 @@ export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
 			if (m === 'per_person_per_night' || m === 'per-person-per-night' || m === 'per-night') return 'per-person-per-night';
 			return 'per-person';
 		})() as TripDraft['pricingModel'],
-		meals: getDefaultMealsConfig(),
-		activities: getDefaultActivitiesConfig()
+		costSharingEnabled: trip.costSharingEnabled ?? false,
+		gamesEnabled: trip.gamesEnabled ?? false,
+		meals: {
+			...getDefaultMealsConfig(),
+			enabled: trip.mealPlan?.enabled ?? false
+		},
+		activities: {
+			...getDefaultActivitiesConfig(),
+			enabled: trip.activitiesEnabled ?? true
+		}
 	};
 }
 

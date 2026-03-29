@@ -182,7 +182,9 @@
 	}
 
 	let costCommitmentChecked = $state(false);
-	const canSubmitYes = $derived((isYes || needsReconfirm) && costCommitmentChecked);
+	const canSubmitYes = $derived(
+		(isYes || needsReconfirm) && (costSharingOn ? costCommitmentChecked : true)
+	);
 
 	function toDateKey(d: Date | string): string {
 		const date = typeof d === 'string' ? new Date(d) : d;
@@ -230,6 +232,10 @@
 		return start.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) + ' – ' + end.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 	});
 	const tripDestination = $derived((data.trip?.locationCity ?? data.trip?.location ?? '') || null);
+
+	// Add-on feature flags — default true so nothing breaks for existing trips
+	const costSharingOn = $derived(data.trip?.costSharingEnabled ?? true);
+	const mealPlanOn = $derived((data.trip?.mealPlan as { enabled: boolean } | null)?.enabled ?? false);
 </script>
 
 <div class="rsvp-page">
@@ -272,8 +278,8 @@
 						<option value="no">No</option>
 					</select>
 				</div>
-				{#if data.currentRsvp?.status === 'yes' && data.currentRsvp?.yesSubstatus === 'reconfirm_required'}
-					<div class="reconfirm-banner" role="alert">
+			{#if costSharingOn && data.currentRsvp?.status === 'yes' && data.currentRsvp?.yesSubstatus === 'reconfirm_required'}
+				<div class="reconfirm-banner" role="alert">
 						<strong>Your cost estimate changed.</strong> Please review and confirm to keep your YES RSVP.
 						{#if data.currentRsvp?.reconfirmDeadlineAt}
 							<span class="reconfirm-deadline">Please confirm by {new Date(data.currentRsvp.reconfirmDeadlineAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}.</span>
@@ -338,10 +344,10 @@
 				</form>
 			</section>
 
-		{#if isYes}
-		<section class="card-section dietary-section">
-			<h2 class="section-title">Dietary info</h2>
-			<p class="dietary-intro">This helps us plan meals for everyone. Any info you share is visible to the host.</p>
+	{#if isYes && mealPlanOn}
+	<section class="card-section dietary-section">
+		<h2 class="section-title">Dietary info</h2>
+		<p class="dietary-intro">This helps us plan meals for everyone. Any info you share is visible to the host.</p>
 			<form method="POST" action="?/updateDietary" use:enhance>
 				<div class="dietary-self">
 					<p class="dietary-person-label">Your info</p>
@@ -435,11 +441,11 @@
 															onchange={(e) => onBedChange((e.currentTarget as HTMLInputElement).checked, bed.id)}
 														/>
 														<span class="bed-type">{bed.bedType}</span>
-														{#if perNightLow > 0 && tripNights > 0}
-															<span class="bed-price"
-																>{formatDollars(perNightLow)}–{formatDollars(perNightHigh)}/night · {formatDollars(totalLow)}–{formatDollars(totalHigh)} est.</span
-															>
-														{/if}
+						{#if costSharingOn && perNightLow > 0 && tripNights > 0}
+								<span class="bed-price"
+									>{formatDollars(perNightLow)}–{formatDollars(perNightHigh)}/night · {formatDollars(totalLow)}–{formatDollars(totalHigh)} est.</span
+								>
+							{/if}
 														{#if isClaimedByOther}
 															<span class="claimed-badge">Claimed</span>
 														{/if}
@@ -454,11 +460,11 @@
 								<p class="helper-text">Select enough beds to cover {partySize} spot(s).</p>
 							{/if}
 						</form>
-						{#if tripNights > 0 && data.roomPricing && tripTotalCost > 0}
-							<p class="trip-total-line"><strong>Total Trip Cost:</strong> {formatDollars(tripTotalCost)} <span class="trip-total-note">(per-bed totals above are based on current {data.yesRsvpHeadcount ?? 0} guest{data.yesRsvpHeadcount === 1 ? '' : 's'})</span></p>
-						{/if}
-						{#if isYes || needsReconfirm}
-							<div id="cost-commitment" class="cost-commitment-module">
+					{#if costSharingOn && tripNights > 0 && data.roomPricing && tripTotalCost > 0}
+						<p class="trip-total-line"><strong>Total Trip Cost:</strong> {formatDollars(tripTotalCost)} <span class="trip-total-note">(per-bed totals above are based on current {data.yesRsvpHeadcount ?? 0} guest{data.yesRsvpHeadcount === 1 ? '' : 's'})</span></p>
+					{/if}
+					{#if costSharingOn && (isYes || needsReconfirm)}
+						<div id="cost-commitment" class="cost-commitment-module">
 								{#if guestEstimate}
 									<div class="estimate-lines">
 										<p class="estimate-range"><strong>My estimated share: {guestEstimate.displayCents != null ? formatCents(guestEstimate.displayCents) : formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
@@ -466,7 +472,7 @@
 											{#if guestEstimate.displayCents != null}
 												Range {formatRange(guestEstimate.lowCents, guestEstimate.highCents)} depending on final headcount.
 											{:else}
-												Least if {guestEstimate.hmax} guests attend (max capacity); most if {guestEstimate.hmin} attend (host's min expected). Final amount depends on the number of attendees.
+												Least if {guestEstimate.hmax} people attend (max headcount, capacity limit); most if {guestEstimate.hmin} attend (min headcount, realistic low). Final amount depends on the number of attendees.
 											{/if}
 										</p>
 									</div>
@@ -511,8 +517,26 @@
 								{/if}
 							</div>
 						{/if}
+					{#if !costSharingOn && isYes}
+						<form method="POST" action="?/updateRsvp" use:enhance={enhanceRsvpSubmit} class="submit-form">
+							<input type="hidden" name="status" value="yes" />
+							<input type="hidden" name="arrivalDate" value={arrivalDate} />
+							<input type="hidden" name="departureDate" value={departureDate} />
+							<input type="hidden" name="adultsCount" value={adultsCount} />
+							<input type="hidden" name="kidsCount" value={kidsCount} />
+							<input type="hidden" name="petsCount" value={petsCount} />
+							<div class="submit-row">
+								<button type="submit" class="btn btn-primary" disabled={!canSubmit}>
+									Submit
+								</button>
+								{#if !canSubmit}
+									<span class="validation-hint">Select bed(s) to cover your party before submitting.</span>
+								{/if}
+							</div>
+						</form>
 					{/if}
-				</section>
+				{/if}
+			</section>
 			{/if}
 		</div>
 	</div>

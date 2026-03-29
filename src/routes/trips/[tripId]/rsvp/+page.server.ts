@@ -32,6 +32,7 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
 		include: {
+			mealPlan: true,
 			rooms: {
 				include: {
 					beds: { where: { isAvailable: true } },

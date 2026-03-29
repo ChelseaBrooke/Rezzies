@@ -1,13 +1,18 @@
 <script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
-	import { getDefaultMealsConfig } from '$lib/stores/tripDraft.js';
+	import { getDefaultMealsConfig, effectiveMaxForDraft } from '$lib/stores/tripDraft.js';
 	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
 	import { SCAVENGER_BINGO_ITEMS } from '$lib/games/scavengerBingoItems.js';
 
 	/** Faux "photo" squares on the add-ons bingo preview (indices match SCAVENGER_BINGO_ITEMS). */
 	const GAMES_BINGO_MOCK_PHOTOS = new Set([0, 8, 19]);
 
-	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
+	let {
+		draft = $bindable(),
+		autosave,
+		/** When false, hide the page title row (e.g. edit trip — stepper already shows the step name). */
+		showHeader = true
+	}: { draft: TripDraft; autosave: () => void; showHeader?: boolean } = $props();
 
 	let bedBreakdownModalOpen = $state(false);
 
@@ -110,7 +115,7 @@
 	}
 
 	const expected = $derived(Math.max(1, Number(draft.expectedGuestCount) || 1));
-	const maxG     = $derived(Math.max(expected, Math.max(1, Number(draft.maxOccupancy) || 1)));
+	const maxG     = $derived(effectiveMaxForDraft(draft));
 
 	const nights = $derived.by(() => {
 		if (!draft.checkInDate || !draft.checkOutDate) return 0;
@@ -284,17 +289,118 @@
 	}}
 />
 
-<div class="addons-screen">
-	<div class="addons-header">
-		<h2 class="addons-title">Trip Add-Ons</h2>
-		<p class="addons-subtitle">Select the features you want for this trip.</p>
-	</div>
+<div class="addons-screen" class:addons-screen--compact-top={!showHeader}>
+	{#if showHeader}
+		<div class="addons-header">
+			<h2 class="addons-title">Trip Add-Ons<span class="addons-title-divider" aria-hidden="true">|</span><span class="addons-subtitle">Select the features you want for this trip.</span></h2>
+		</div>
+	{/if}
 
 	<div class="addons-grid">
 		<div class="addons-column">
 		<!-- ── Cost-sharing ─────────────────────────────────── -->
-		<div class="addon-card addon-card--cost addon-card--tall" class:active={costEnabled} onclick={toggleCostSharing} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleCostSharing()}>
-			<div class="addon-header">
+		<div
+			class="addon-card addon-card--cost addon-card--tall"
+			class:addon-card--fullmock-mock-end={!costEnabled}
+			class:active={costEnabled}
+			onclick={toggleCostSharing}
+			role="button"
+			tabindex="0"
+			onkeydown={(e) => e.key === 'Enter' && toggleCostSharing()}
+		>
+			{#if !costEnabled}
+				<div class="addon-fullmock-layer addon-fullmock-layer--end" aria-hidden="true">
+					<div class="cost-receipt-mock-fade">
+						<div class="cost-receipt-mock">
+							<header class="cost-receipt-mock-header">
+								<span class="cost-receipt-mock-brand">Divvi</span>
+								<span class="cost-receipt-mock-doc">Receipt preview</span>
+							</header>
+							<div class="cost-receipt-mock-trip">Lake house weekend · Mar 14–16</div>
+							<div class="cost-receipt-mock-meta">
+								<span class="cost-receipt-mock-guest">Alex Chen</span>
+								<span class="cost-receipt-mock-status">RSVP Yes</span>
+							</div>
+							<div class="cost-receipt-mock-ref-row">
+								<span class="cost-receipt-mock-ref-lbl">Confirmation</span>
+								<span class="cost-receipt-mock-ref-val">DV-48291 · Lake House</span>
+							</div>
+							<div class="cost-receipt-mock-divider" aria-hidden="true"></div>
+							<section class="cost-receipt-mock-block" aria-label="Room and beds">
+								<div class="cost-receipt-mock-kicker">Your assignment</div>
+								<div class="cost-receipt-mock-room">Oceanview primary</div>
+								<div class="cost-receipt-mock-bed-row">
+									<span class="cost-receipt-mock-bed-pill">Bed A</span>
+									<span class="cost-receipt-mock-bed-pill">King</span>
+									<span class="cost-receipt-mock-bed-pill cost-receipt-mock-bed-pill--soft">private bath</span>
+								</div>
+								<div class="cost-receipt-mock-bed-row">
+									<span class="cost-receipt-mock-bed-pill">Bed B</span>
+									<span class="cost-receipt-mock-bed-pill cost-receipt-mock-bed-pill--soft">Twin</span>
+									<span class="cost-receipt-mock-bed-pill cost-receipt-mock-bed-pill--soft">shared bath</span>
+								</div>
+							</section>
+							<div class="cost-receipt-mock-divider cost-receipt-mock-divider--light" aria-hidden="true"></div>
+							<div class="cost-receipt-mock-kicker cost-receipt-mock-kicker--lines">Charges (your share)</div>
+							<ul class="cost-receipt-mock-lines">
+								<li class="cost-receipt-mock-line">
+									<span class="cost-receipt-mock-line-label">
+										Lodging &amp; trip total
+										<span class="cost-receipt-mock-line-hint">per-bed split · 8 guests</span>
+									</span>
+									<span class="cost-receipt-mock-line-amt">$598.00</span>
+								</li>
+								<li class="cost-receipt-mock-line cost-receipt-mock-line--subtle">
+									<span class="cost-receipt-mock-line-label">
+										Cleaning &amp; fees
+										<span class="cost-receipt-mock-line-hint">group pool</span>
+									</span>
+									<span class="cost-receipt-mock-line-amt">$18.75</span>
+								</li>
+								<li class="cost-receipt-mock-line cost-receipt-mock-line--subtle">
+									<span class="cost-receipt-mock-line-label">
+										Taxes &amp; processing
+										<span class="cost-receipt-mock-line-hint">est.</span>
+									</span>
+									<span class="cost-receipt-mock-line-amt">$36.20</span>
+								</li>
+								<li class="cost-receipt-mock-line">
+									<span class="cost-receipt-mock-line-label">
+										Shared food fund
+										<span class="cost-receipt-mock-line-hint">meal-planning · your portion</span>
+									</span>
+									<span class="cost-receipt-mock-line-amt">$42.50</span>
+								</li>
+								<li class="cost-receipt-mock-line cost-receipt-mock-line--subtle">
+									<span class="cost-receipt-mock-line-label">
+										Activity kit
+										<span class="cost-receipt-mock-line-hint">optional add-on</span>
+									</span>
+									<span class="cost-receipt-mock-line-amt">$12.00</span>
+								</li>
+							</ul>
+							<div class="cost-receipt-mock-divider cost-receipt-mock-divider--light" aria-hidden="true"></div>
+							<div class="cost-receipt-mock-subtotal">
+								<span class="cost-receipt-mock-subtotal-lbl">Subtotal</span>
+								<span class="cost-receipt-mock-subtotal-amt">$707.45</span>
+							</div>
+							<div class="cost-receipt-mock-divider" aria-hidden="true"></div>
+							<div class="cost-receipt-mock-total-row">
+								<span class="cost-receipt-mock-total-lbl">Estimated total</span>
+								<span class="cost-receipt-mock-total-amt">$707.45</span>
+							</div>
+							<p class="cost-receipt-mock-foot">
+								Pricing model, headcount, and add-ons can change this summary. Not a final invoice.
+							</p>
+						</div>
+					</div>
+				</div>
+			{/if}
+
+			<div
+				class="addon-header addon-header--split"
+				class:addon-header--over-mock-end={!costEnabled}
+			>
 				<div class="addon-title-group">
 					<span class="addon-icon cost-icon">
 						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -312,12 +418,13 @@
 					/>
 					<span class="toggle-track"><span class="toggle-thumb"></span></span>
 				</label>
+				<span class="addon-mock-spacer-end" aria-hidden="true"></span>
 			</div>
 
-			<div class="addon-body">
+			<div class="addon-body" class:addon-body--over-mock-end={!costEnabled}>
 				{#if !costEnabled}
-					<div class="addon-pane unchecked-pane">
-						<p class="addon-desc">
+					<div class="addon-pane unchecked-pane cost-unchecked-pane addon-unchecked-pane-beside-mock--end">
+						<p class="addon-desc addon-unchecked-desc-beside-mock addon-unchecked-desc-beside-mock--end">
 							Split the trip total fairly—per person, per room, or per bed. When guests RSVP <strong>Yes</strong>, they’ll see their share (or a clear estimate) on the RSVP flow so they know what to expect before they commit.
 						</p>
 					</div>
@@ -354,7 +461,7 @@
 								<div class="pricing-model-header">
 									<span class="pricing-table-title">Choose pricing model</span>
 									<span class="pricing-table-meta">
-										{expected} expected guest{expected !== 1 ? 's' : ''} · {maxG} max guest{maxG !== 1 ? 's' : ''} · {nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : 'dates not set'}
+										{expected} min headcount (realistic low) · {maxG} max headcount (capacity) · {nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : 'dates not set'}
 									</span>
 								</div>
 							</div>
@@ -364,8 +471,8 @@
 										<tr>
 											<th></th>
 											<th>Model</th>
-											<th>Total cost, at {expected} guest{expected !== 1 ? 's' : ''}</th>
-											<th>Total cost, at {maxG} guest{maxG !== 1 ? 's' : ''}</th>
+											<th>Total cost at min headcount · {expected} {expected === 1 ? 'person' : 'people'}</th>
+											<th>Total cost at max headcount (capacity) · {maxG} {maxG === 1 ? 'person' : 'people'}</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -432,35 +539,19 @@
 		</div>
 
 		<!-- ── Activity-planning (left column, below cost) ──── -->
-		<div class="addon-card addon-card--compact" class:active={activitiesEnabled} onclick={toggleActivities} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleActivities()}>
-			<div class="addon-header">
-				<div class="addon-title-group">
-					<span class="addon-icon activity-icon">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<polygon points="3 11 22 2 13 21 11 13 3 11"/>
-						</svg>
-					</span>
-					<span class="addon-title">Activity-planning</span>
-				</div>
-				<label class="addon-toggle" class:checked={activitiesEnabled} onclick={(e) => e.stopPropagation()}>
-					<input
-						type="checkbox"
-						checked={activitiesEnabled}
-						onchange={toggleActivities}
-						aria-label="Enable activity-planning"
-					/>
-					<span class="toggle-track"><span class="toggle-thumb"></span></span>
-				</label>
-			</div>
-
-			<div class="addon-body">
-				{#if !activitiesEnabled}
-					<div class="addon-pane unchecked-pane activity-unchecked-pane">
-						<p class="addon-desc activity-unchecked-desc">
-							Plan and organize what your group will do during the trip. Discover nearby places, build a shared itinerary, and let guests suggest ideas.
-						</p>
-						<div class="activity-itin-fade" aria-hidden="true">
-							<div class="activity-itin-mock">
+		<div
+			class="addon-card addon-card--compact"
+			class:addon-card--fullmock-mock-end={!activitiesEnabled}
+			class:active={activitiesEnabled}
+			onclick={toggleActivities}
+			role="button"
+			tabindex="0"
+			onkeydown={(e) => e.key === 'Enter' && toggleActivities()}
+		>
+			{#if !activitiesEnabled}
+				<div class="addon-fullmock-layer addon-fullmock-layer--end" aria-hidden="true">
+					<div class="activity-itin-fade activity-itin-fade--fullmock" aria-hidden="true">
+						<div class="activity-itin-mock activity-itin-mock--fullmock">
 								<div class="itin-mini-grid itin-mini-grid--3day">
 									<div class="itin-mini-corner"></div>
 									<div class="itin-mini-dayhead itin-mini-dayhead--col">
@@ -537,7 +628,7 @@
 											<span class="itin-mini-chef">🍳 Sam</span>
 										</div>
 									</div>
-									<div class="itin-mini-time">2 PM</div>
+									<div class="itin-mini-time">12 PM</div>
 									<div class="itin-mini-cell">
 										<div class="itin-mini-event itin-mini-event--activity">
 											<span class="itin-mini-evt-title">Sunset walk</span>
@@ -562,6 +653,39 @@
 								</div>
 							</div>
 						</div>
+					</div>
+			{/if}
+
+			<div
+				class="addon-header addon-header--split"
+				class:addon-header--over-mock-end={!activitiesEnabled}
+			>
+				<div class="addon-title-group">
+					<span class="addon-icon activity-icon">
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<polygon points="3 11 22 2 13 21 11 13 3 11"/>
+						</svg>
+					</span>
+					<span class="addon-title">Activity-planning</span>
+				</div>
+				<label class="addon-toggle" class:checked={activitiesEnabled} onclick={(e) => e.stopPropagation()}>
+					<input
+						type="checkbox"
+						checked={activitiesEnabled}
+						onchange={toggleActivities}
+						aria-label="Enable activity-planning"
+					/>
+					<span class="toggle-track"><span class="toggle-thumb"></span></span>
+				</label>
+				<span class="addon-mock-spacer-end" aria-hidden="true"></span>
+			</div>
+
+			<div class="addon-body" class:addon-body--over-mock-end={!activitiesEnabled}>
+				{#if !activitiesEnabled}
+					<div class="addon-pane unchecked-pane activity-unchecked-pane addon-unchecked-pane-beside-mock--end">
+						<p class="addon-desc addon-unchecked-desc-beside-mock addon-unchecked-desc-beside-mock--end">
+							Plan and organize what your group will do during the trip. Discover nearby places, build a shared itinerary, and let guests suggest ideas.
+						</p>
 					</div>
 				{:else}
 				<div class="addon-pane checked-pane info-pane">
@@ -594,7 +718,7 @@
 		<!-- ── Meal-planning ────────────────────────────────── -->
 		<div
 			class="addon-card addon-card--compact"
-			class:addon-card--meal-fullmock={!mealsEnabled}
+			class:addon-card--fullmock-mock-start={!mealsEnabled}
 			class:active={mealsEnabled}
 			onclick={toggleMeals}
 			role="button"
@@ -602,7 +726,7 @@
 			onkeydown={(e) => e.key === 'Enter' && toggleMeals()}
 		>
 			{#if !mealsEnabled}
-				<div class="meal-fullcard-mock-layer" aria-hidden="true">
+				<div class="addon-fullmock-layer addon-fullmock-layer--start" aria-hidden="true">
 					<div class="meal-add-modal-fade">
 						<div class="meal-add-modal-mock">
 							<div class="meal-add-modal-mock-header">
@@ -649,14 +773,28 @@
 			{/if}
 
 			<div
-				class="addon-header addon-header--meal"
-				class:addon-header--meal-over-mock={!mealsEnabled}
+				class="addon-header addon-header--split"
+				class:addon-header--over-mock-start={!mealsEnabled}
 			>
-				<span class="meal-mock-header-spacer" aria-hidden="true"></span>
+				<span class="addon-mock-spacer-start" aria-hidden="true"></span>
 				<div class="addon-title-group">
 					<span class="addon-icon meal-icon">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M3 11l19-9-9 19-2-8-8-2z"/>
+						<svg
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<!-- Fork + knife (Lucide-style utensils) -->
+							<path d="M3 2v7c0 1.1.9 2 2 2h0c1.1 0 2-.9 2-2V2" />
+							<path d="M7 2v20" />
+							<path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h0" />
+							<path d="M21 15v7" />
 						</svg>
 					</span>
 					<span class="addon-title">Meal-planning</span>
@@ -672,10 +810,10 @@
 				</label>
 			</div>
 
-			<div class="addon-body" class:addon-body--meal-over-mock={!mealsEnabled}>
+			<div class="addon-body" class:addon-body--over-mock-start={!mealsEnabled}>
 				{#if !mealsEnabled}
-					<div class="addon-pane unchecked-pane meal-unchecked-pane meal-unchecked-pane--desc-only">
-						<p class="addon-desc meal-unchecked-desc">
+					<div class="addon-pane unchecked-pane meal-unchecked-pane addon-unchecked-pane-beside-mock--start">
+						<p class="addon-desc addon-unchecked-desc-beside-mock">
 							Coordinate meals and food plans with your group.
 						</p>
 					</div>
@@ -748,39 +886,20 @@
 		</div>
 
 		<!-- ── Games ────────────────────────────────────────── -->
-		<div class="addon-card addon-card--games addon-card--tall" class:active={gamesEnabled} onclick={toggleGames} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleGames()}>
-			<div class="addon-header">
-				<div class="addon-title-group">
-					<span class="addon-icon game-icon">
-						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<rect x="2" y="7" width="20" height="14" rx="2"/>
-							<path d="M16 3h-4m2-2v4"/>
-							<circle cx="8" cy="14" r="1" fill="currentColor"/>
-							<circle cx="12" cy="14" r="1" fill="currentColor"/>
-							<circle cx="16" cy="14" r="1" fill="currentColor"/>
-						</svg>
-					</span>
-					<span class="addon-title">Games</span>
-				</div>
-				<label class="addon-toggle" class:checked={gamesEnabled} onclick={(e) => e.stopPropagation()}>
-					<input
-						type="checkbox"
-						checked={gamesEnabled}
-						onchange={toggleGames}
-						aria-label="Enable games"
-					/>
-					<span class="toggle-track"><span class="toggle-thumb"></span></span>
-				</label>
-			</div>
-
-			<div class="addon-body">
-				{#if !gamesEnabled}
-					<div class="addon-pane unchecked-pane games-unchecked-pane">
-						<p class="addon-desc games-unchecked-desc">
-							Add fun, interactive games for your group. Keep everyone entertained before and during the trip.
-						</p>
-						<div class="games-bingo-fade" aria-hidden="true">
-							<div class="games-bingo-mock">
+		<div
+			class="addon-card addon-card--games addon-card--tall"
+			class:addon-card--fullmock-mock-start={!gamesEnabled}
+			class:active={gamesEnabled}
+			onclick={toggleGames}
+			role="button"
+			tabindex="0"
+			onkeydown={(e) => e.key === 'Enter' && toggleGames()}
+		>
+			{#if !gamesEnabled}
+				<div class="addon-fullmock-layer addon-fullmock-layer--start" aria-hidden="true">
+					<div class="games-bingo-fade games-bingo-fade--fullmock" aria-hidden="true">
+						<div class="games-dual-mock-stack">
+							<div class="games-bingo-mock games-bingo-mock--fullmock games-bingo-mock--stack-back">
 								<div class="bingo-board-frame">
 									<div class="bingo-board-inner">
 										<span class="bingo-letter">B</span>
@@ -803,7 +922,72 @@
 									</div>
 								</div>
 							</div>
+							<div class="games-trivia-mock games-trivia-mock--stack-front">
+								<div class="games-trivia-mock-card">
+									<div class="games-trivia-mock-head">
+										<span class="games-trivia-mock-badge">Trip trivia</span>
+										<span class="games-trivia-mock-pts">+50 pts</span>
+									</div>
+									<p class="games-trivia-mock-q">Closest grocery to the cabin?</p>
+									<div class="games-trivia-mock-opts">
+										<span class="games-trivia-mock-opt games-trivia-mock-opt--selected">Mountain Mart</span>
+										<span class="games-trivia-mock-opt">Lakeside Foods</span>
+										<span class="games-trivia-mock-opt">Route 9 Express</span>
+									</div>
+									<p class="games-trivia-mock-foot">Round 3 of 10 · Pinecone crew</p>
+								</div>
+							</div>
 						</div>
+					</div>
+				</div>
+			{/if}
+
+			<div
+				class="addon-header addon-header--split"
+				class:addon-header--over-mock-start={!gamesEnabled}
+			>
+				<span class="addon-mock-spacer-start" aria-hidden="true"></span>
+				<div class="addon-title-group">
+					<span class="addon-icon game-icon">
+						<!-- Same mark as TripNavItem iconName="games" (trip portal sidebar) -->
+						<svg
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<rect x="4" y="4" width="16" height="16" rx="2" />
+							<circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none" />
+							<circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none" />
+							<circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+							<circle cx="8" cy="16" r="1.2" fill="currentColor" stroke="none" />
+							<circle cx="16" cy="16" r="1.2" fill="currentColor" stroke="none" />
+						</svg>
+					</span>
+					<span class="addon-title">Games</span>
+				</div>
+				<label class="addon-toggle" class:checked={gamesEnabled} onclick={(e) => e.stopPropagation()}>
+					<input
+						type="checkbox"
+						checked={gamesEnabled}
+						onchange={toggleGames}
+						aria-label="Enable games"
+					/>
+					<span class="toggle-track"><span class="toggle-thumb"></span></span>
+				</label>
+			</div>
+
+			<div class="addon-body" class:addon-body--over-mock-start={!gamesEnabled}>
+				{#if !gamesEnabled}
+					<div class="addon-pane unchecked-pane games-unchecked-pane addon-unchecked-pane-beside-mock--start">
+						<p class="addon-desc addon-unchecked-desc-beside-mock">
+							Add fun, interactive games for your group. Keep everyone entertained before and during the trip.
+						</p>
 					</div>
 				{:else}
 				<div class="addon-pane checked-pane" onclick={(e) => e.stopPropagation()} role="none">
@@ -859,7 +1043,7 @@
 				</div>
 				<div class="bed-modal-table-labels">
 					<div class="bed-modal-table-label bed-modal-table-label--exp">
-						<span class="bed-label-tag">{expected} guest{expected !== 1 ? 's' : ''}</span>
+						<span class="bed-label-tag">Min headcount · {expected} {expected === 1 ? 'person' : 'people'}</span>
 						<span class="bed-label-desc">may vary based on sharing</span>
 					</div>
 					<div class="bed-modal-table-label bed-modal-table-label--max">
@@ -935,8 +1119,13 @@
 		gap: 1.5rem;
 	}
 
+	.addons-screen--compact-top {
+		gap: 0.5rem;
+		margin-top: -0.25rem;
+	}
+
 	.addons-header {
-		padding-bottom: 1rem;
+		padding-bottom: 0.75rem;
 		border-bottom: 1px solid var(--border);
 	}
 
@@ -944,14 +1133,27 @@
 		font-size: 1.375rem;
 		font-weight: 700;
 		color: var(--text);
-		margin: 0 0 0.25rem;
+		margin: 0;
 		letter-spacing: -0.02em;
+		display: flex;
+		align-items: baseline;
+		gap: 0;
+		flex-wrap: wrap;
 	}
 
-	.addons-subtitle {
+	.addons-title-divider {
+		margin: 0 0.55rem;
+		color: var(--border);
+		font-weight: 300;
+		font-size: 1rem;
+		line-height: 1;
+	}
+
+	.addons-title .addons-subtitle {
 		font-size: 0.875rem;
-		color: var(--muted);
-		margin: 0;
+		font-weight: 500;
+		color: var(--primary);
+		letter-spacing: 0;
 	}
 
 	/* Two independent columns: same vertical gap within each (meal→games matches cost→activity) */
@@ -960,6 +1162,7 @@
 		flex-direction: row;
 		align-items: flex-start;
 		gap: 1rem;
+		margin-top: 0.5rem;
 	}
 
 	.addons-column {
@@ -977,16 +1180,17 @@
 		border-radius: 1rem;
 		overflow: hidden;
 		cursor: pointer;
-		transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+		transition: border-color 0.25s ease, box-shadow 0.3s ease, background 0.25s ease;
 		user-select: none;
 	}
 
 	.addon-card:hover {
 		border-color: var(--primary);
-		box-shadow: 0 2px 12px rgba(30, 58, 138, 0.08);
+		box-shadow: 0 2px 12px rgba(47, 119, 120, 0.1);
 	}
 
-	.addon-card--meal-fullmock:hover {
+	/* Meal-planning (mock start): orange border glow */
+	.addon-card--fullmock-mock-start:hover:has(.meal-icon) {
 		border-color: transparent;
 		background:
 			linear-gradient(#f3f4f6, #f3f4f6) padding-box,
@@ -994,8 +1198,38 @@
 				to right,
 				transparent 0%,
 				transparent 34%,
-				rgba(30, 58, 138, 0.22) 48%,
+				rgba(249, 115, 22, 0.35) 48%,
+				#ea580c 56%
+			) border-box;
+		background-clip: padding-box, border-box;
+	}
+
+	/* Cost-sharing (mock end): teal border glow */
+	.addon-card--fullmock-mock-end:hover:has(.cost-icon) {
+		border-color: transparent;
+		background:
+			linear-gradient(#f3f4f6, #f3f4f6) padding-box,
+			linear-gradient(
+				to left,
+				transparent 0%,
+				transparent 34%,
+				rgba(47, 119, 120, 0.28) 48%,
 				var(--primary) 56%
+			) border-box;
+		background-clip: padding-box, border-box;
+	}
+
+	/* Activity-planning (mock end): blue border glow */
+	.addon-card--fullmock-mock-end:hover:has(.activity-icon) {
+		border-color: transparent;
+		background:
+			linear-gradient(#f3f4f6, #f3f4f6) padding-box,
+			linear-gradient(
+				to left,
+				transparent 0%,
+				transparent 34%,
+				rgba(30, 58, 138, 0.22) 48%,
+				#2563eb 56%
 			) border-box;
 		background-clip: padding-box, border-box;
 	}
@@ -1005,20 +1239,108 @@
 		outline-offset: 2px;
 	}
 
+	/* ── Active (toggled on) card glow ────────────────────── */
 	.addon-card.active {
-		border-color: var(--primary);
-		background: rgba(30, 58, 138, 0.025);
+		border-color: transparent;
+		background: rgba(47, 119, 120, 0.04);
+		box-shadow: 0 0 0 1.5px var(--active-glow-color, rgba(47, 119, 120, 0.5)), 0 0 18px rgba(47, 119, 120, 0.12);
+		transition: box-shadow 0.25s ease, background 0.25s ease;
 	}
 
-	.addon-card--meal-fullmock {
+	/* Cost-sharing – teal / primary (money = myrtle green) */
+	.addon-card--cost.active {
+		--active-glow-color: rgba(47, 119, 120, 0.65);
+		background: rgba(47, 119, 120, 0.045);
+		box-shadow:
+			0 0 0 1.5px rgba(47, 119, 120, 0.55),
+			0 0 14px rgba(47, 119, 120, 0.22),
+			0 0 30px rgba(47, 119, 120, 0.1);
+	}
+
+	/* Meal – warm orange */
+	.addon-card--meal.active,
+	.addon-card--compact.active:has(.meal-icon) {
+		background: rgba(249, 115, 22, 0.045);
+		box-shadow:
+			0 0 0 1.5px rgba(234, 88, 12, 0.55),
+			0 0 14px rgba(249, 115, 22, 0.22),
+			0 0 30px rgba(249, 115, 22, 0.1);
+	}
+
+	/* Activity-planning – blue (discover / itinerary) */
+	.addon-card--activity.active,
+	.addon-card--compact.active:has(.activity-icon) {
+		background: rgba(30, 58, 138, 0.045);
+		box-shadow:
+			0 0 0 1.5px rgba(59, 130, 246, 0.55),
+			0 0 14px rgba(59, 130, 246, 0.22),
+			0 0 30px rgba(59, 130, 246, 0.1);
+	}
+
+	/* Games – purple */
+	.addon-card--games.active {
+		background: rgba(120, 80, 180, 0.045);
+		box-shadow:
+			0 0 0 1.5px rgba(120, 80, 180, 0.6),
+			0 0 14px rgba(120, 80, 180, 0.22),
+			0 0 30px rgba(120, 80, 180, 0.1);
+	}
+
+	/* Mock on start (left): border weakens toward the mock */
+	.addon-card--fullmock-mock-start {
 		position: relative;
 		overflow: hidden;
-		/* Border fades out on the left where the mock meets the edge (no double line) */
 		border-color: transparent;
 		background:
 			linear-gradient(#f3f4f6, #f3f4f6) padding-box,
 			linear-gradient(
 				to right,
+				transparent 0%,
+				transparent 36%,
+				rgba(15, 23, 42, 0.05) 46%,
+				rgba(15, 23, 42, 0.1) 54%
+			) border-box;
+		background-clip: padding-box, border-box;
+	}
+
+	/* Games tall card: same fade, higher specificity so it always wins */
+	.addon-card--games.addon-card--fullmock-mock-start {
+		border-color: transparent;
+		background:
+			linear-gradient(#f3f4f6, #f3f4f6) padding-box,
+			linear-gradient(
+				to right,
+				transparent 0%,
+				transparent 36%,
+				rgba(15, 23, 42, 0.05) 46%,
+				rgba(15, 23, 42, 0.1) 54%
+			) border-box;
+		background-clip: padding-box, border-box;
+	}
+
+	.addon-card--games.addon-card--fullmock-mock-start:hover {
+		border-color: transparent;
+		background:
+			linear-gradient(#f3f4f6, #f3f4f6) padding-box,
+			linear-gradient(
+				to right,
+				transparent 0%,
+				transparent 34%,
+				rgba(120, 80, 180, 0.38) 48%,
+				#7850b4 56%
+			) border-box;
+		background-clip: padding-box, border-box;
+	}
+
+	/* Mock on end (right): mirrored border fade */
+	.addon-card--fullmock-mock-end {
+		position: relative;
+		overflow: hidden;
+		border-color: transparent;
+		background:
+			linear-gradient(#f3f4f6, #f3f4f6) padding-box,
+			linear-gradient(
+				to left,
 				transparent 0%,
 				transparent 36%,
 				rgba(15, 23, 42, 0.05) 46%,
@@ -1036,37 +1358,36 @@
 		border-bottom: 1px solid var(--border);
 	}
 
-	/* Meal card: same header chrome & layout on / off (spacer keeps title + toggle aligned) */
-	.addon-header--meal {
+	/* Fullmock add-ons: large title + toggle; spacer keeps alignment on / off */
+	.addon-header--split {
 		padding: 1.125rem 1.25rem 0.875rem;
-		/* Space mock → title and title group → toggle (toggle was flush against title) */
 		gap: 1.125rem;
 	}
 
-	.addon-header--meal .addon-title {
+	.addon-header--split .addon-title {
 		font-size: 1.125rem;
 		font-weight: 700;
 		letter-spacing: -0.025em;
 		line-height: 1.2;
 	}
 
-	.addon-header--meal .meal-icon {
+	.addon-header--split .addon-icon {
 		width: 34px;
 		height: 34px;
 		border-radius: 0.55rem;
 	}
 
-	.addon-header--meal .addon-title-group {
+	.addon-header--split .addon-title-group {
 		gap: 0.625rem;
 	}
 
-	.addon-header--meal .toggle-track {
+	.addon-header--split .toggle-track {
 		width: 46px;
 		height: 28px;
 		box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
 	}
 
-	.addon-header--meal .toggle-thumb {
+	.addon-header--split .toggle-thumb {
 		top: 4px;
 		left: 4px;
 		width: 20px;
@@ -1074,15 +1395,14 @@
 		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 	}
 
-	.addon-header--meal .addon-toggle.checked .toggle-thumb {
+	.addon-header--split .addon-toggle.checked .toggle-thumb {
 		transform: translateX(18px);
 	}
 
-	.addon-header--meal-over-mock {
+	.addon-header--over-mock-start {
 		position: relative;
 		z-index: 3;
 		border-bottom: none;
-		/* Same gray as .addon-card — not white, so off-state matches sibling cards */
 		background: linear-gradient(
 			to right,
 			transparent 0%,
@@ -1091,7 +1411,20 @@
 		);
 	}
 
-	.meal-mock-header-spacer {
+	.addon-header--over-mock-end {
+		position: relative;
+		z-index: 3;
+		border-bottom: none;
+		background: linear-gradient(
+			to left,
+			transparent 0%,
+			transparent 44%,
+			#f3f4f6 52%
+		);
+	}
+
+	.addon-mock-spacer-start,
+	.addon-mock-spacer-end {
 		flex: 1 1 auto;
 		min-width: 0.25rem;
 	}
@@ -1112,9 +1445,13 @@
 		flex-shrink: 0;
 	}
 
-	.cost-icon { background: rgba(30, 58, 138, 0.1); color: var(--primary); }
-	.meal-icon { background: rgba(191, 78, 48, 0.1); color: var(--copper, #bf4e30); }
-	.activity-icon { background: rgba(47, 119, 120, 0.1); color: var(--slate, #2f7778); }
+	.cost-icon { background: rgba(47, 119, 120, 0.12); color: var(--primary); }
+	/* Orange glyph on soft orange tile — matches food / meal-planning */
+	.meal-icon {
+		background: rgba(249, 115, 22, 0.14);
+		color: #ea580c;
+	}
+	.activity-icon { background: rgba(30, 58, 138, 0.1); color: #1e40af; }
 	.game-icon { background: rgba(120, 80, 180, 0.1); color: #7850b4; }
 
 	.addon-title {
@@ -1174,10 +1511,20 @@
 		overflow: hidden;
 	}
 
-	.addon-body--meal-over-mock {
+	.addon-body--over-mock-start {
 		z-index: 3;
 		background: linear-gradient(
 			to right,
+			transparent 0%,
+			transparent 44%,
+			#f3f4f6 52%
+		);
+	}
+
+	.addon-body--over-mock-end {
+		z-index: 3;
+		background: linear-gradient(
+			to left,
 			transparent 0%,
 			transparent 44%,
 			#f3f4f6 52%
@@ -1190,9 +1537,8 @@
 		overflow-y: auto;
 	}
 
-	/* Activity / meal unchecked: no scroll — clip faux previews at card edge */
-	.addon-card--compact:has(.activity-unchecked-pane) .addon-body,
-	.addon-card--compact:has(.meal-unchecked-pane) .addon-body {
+	/* Compact fullmock unchecked: no scroll */
+	.addon-card--compact:has(.addon-fullmock-layer) .addon-body {
 		overflow-y: hidden;
 	}
 
@@ -1202,7 +1548,7 @@
 		overflow-y: auto;
 	}
 
-	.addon-card--tall:has(.games-unchecked-pane) .addon-body {
+	.addon-card--tall:has(.addon-fullmock-layer) .addon-body {
 		overflow-y: hidden;
 	}
 
@@ -1243,6 +1589,15 @@
 		padding-right: 0.25rem;
 	}
 
+	.cost-unchecked-pane {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		overflow: hidden;
+	}
+
 	/* Meal card unchecked: full-card-height mock layer (z 2); header + body sit above on the right */
 	.meal-unchecked-pane {
 		flex: 1;
@@ -1253,13 +1608,19 @@
 		overflow: hidden;
 	}
 
-	.meal-unchecked-pane--desc-only {
+	.addon-unchecked-pane-beside-mock--start {
 		align-items: flex-end;
 		text-align: right;
 		padding-left: 46%;
 	}
 
-	.meal-unchecked-desc {
+	.addon-unchecked-pane-beside-mock--end {
+		align-items: flex-start;
+		text-align: left;
+		padding-right: 46%;
+	}
+
+	.addon-unchecked-desc-beside-mock {
 		flex: 0 1 auto;
 		width: 100%;
 		max-width: 13.5rem;
@@ -1274,15 +1635,560 @@
 		letter-spacing: -0.01em;
 	}
 
-	.meal-fullcard-mock-layer {
+	.addon-unchecked-desc-beside-mock--end {
+		text-align: left;
+	}
+
+	.addon-fullmock-layer {
 		position: absolute;
 		inset: 0;
 		z-index: 2;
 		pointer-events: none;
 		display: block;
+		/* One visual system for every add-on mock */
+		--addon-mock-opacity: 0.93;
+		--addon-mock-saturate: 0.88;
+		--addon-mock-surface: #ffffff;
+		--addon-mock-surface-subtle: #f1f3f5;
+		--addon-mock-border: rgba(15, 23, 42, 0.09);
+		--addon-mock-radius: 1rem;
+		--addon-mock-fade-mid: rgba(243, 244, 246, 0.5);
+		--addon-mock-fade-end: #f3f4f6;
 	}
 
-	.meal-fullcard-mock-layer .meal-add-modal-fade {
+	.addon-fullmock-layer--start .meal-add-modal-fade {
+		position: absolute;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: min(19.75rem, 64%);
+		min-width: 9.25rem;
+		margin: 0;
+		padding: 0 0.2rem 0 0;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		justify-content: stretch;
+		/* Tiny top-left peek of card gray; mock reads solid almost immediately */
+		-webkit-mask-image: linear-gradient(
+			to bottom right,
+			transparent 0%,
+			transparent 4%,
+			rgba(0, 0, 0, 0.28) 9%,
+			rgba(0, 0, 0, 0.82) 16%,
+			#000 22%,
+			#000 100%
+		);
+		mask-image: linear-gradient(
+			to bottom right,
+			transparent 0%,
+			transparent 4%,
+			rgba(0, 0, 0, 0.28) 9%,
+			rgba(0, 0, 0, 0.82) 16%,
+			#000 22%,
+			#000 100%
+		);
+	}
+
+	.addon-fullmock-layer--start .meal-add-modal-mock {
+		position: relative;
+		width: 100%;
+		max-width: 100%;
+		height: 100%;
+		min-height: 0;
+		flex: 1 1 auto;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		background: var(--addon-mock-surface);
+		border-radius: var(--addon-mock-radius);
+		box-shadow: none;
+		border: none;
+		overflow: hidden;
+		opacity: var(--addon-mock-opacity);
+		filter: saturate(var(--addon-mock-saturate));
+		pointer-events: none;
+		line-height: normal;
+		text-align: left;
+	}
+
+	.addon-fullmock-layer--start .meal-add-modal-mock::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 1;
+		background: linear-gradient(
+			to right,
+			transparent 0%,
+			transparent 46%,
+			var(--addon-mock-fade-mid) 72%,
+			var(--addon-mock-fade-end) 91%,
+			var(--addon-mock-fade-end) 100%
+		);
+	}
+
+	/* ── Cost card mock: Divvi receipt preview (right side) ─ */
+	.addon-fullmock-layer--end .cost-receipt-mock-fade {
+		position: absolute;
+		right: 0;
+		left: auto;
+		top: 0;
+		bottom: 0;
+		width: min(19.75rem, 64%);
+		min-width: 9.25rem;
+		margin: 0;
+		padding: 0 0 0 0.2rem;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		justify-content: stretch;
+		/* Tiny top-right peek of card gray; mock reads solid almost immediately */
+		-webkit-mask-image: linear-gradient(
+			to bottom left,
+			transparent 0%,
+			transparent 4%,
+			rgba(0, 0, 0, 0.28) 9%,
+			rgba(0, 0, 0, 0.82) 16%,
+			#000 22%,
+			#000 100%
+		);
+		mask-image: linear-gradient(
+			to bottom left,
+			transparent 0%,
+			transparent 4%,
+			rgba(0, 0, 0, 0.28) 9%,
+			rgba(0, 0, 0, 0.82) 16%,
+			#000 22%,
+			#000 100%
+		);
+	}
+
+	.cost-receipt-mock {
+		position: relative;
+		width: 100%;
+		height: 100%;
+		min-height: 0;
+		flex: 1 1 auto;
+		display: flex;
+		flex-direction: column;
+		gap: 0.26rem;
+		padding: 0.48rem 0.58rem 0.42rem;
+		background: var(--addon-mock-surface);
+		border-radius: var(--addon-mock-radius);
+		box-shadow: none;
+		border: none;
+		overflow: hidden;
+		/* Stronger than other mocks — reads like a solid receipt */
+		opacity: 0.98;
+		filter: saturate(0.82);
+		line-height: normal;
+		text-align: left;
+	}
+
+	.cost-receipt-mock::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 1;
+		background: linear-gradient(
+			to left,
+			transparent 0%,
+			transparent 68%,
+			rgba(243, 244, 246, 0.18) 84%,
+			rgba(243, 244, 246, 0.38) 95%,
+			rgba(243, 244, 246, 0.5) 100%
+		);
+	}
+
+	.cost-receipt-mock-header,
+	.cost-receipt-mock-trip,
+	.cost-receipt-mock-meta,
+	.cost-receipt-mock-ref-row,
+	.cost-receipt-mock-kicker,
+	.cost-receipt-mock-block,
+	.cost-receipt-mock-lines,
+	.cost-receipt-mock-subtotal,
+	.cost-receipt-mock-total-row,
+	.cost-receipt-mock-foot {
+		position: relative;
+		z-index: 2;
+	}
+
+	.cost-receipt-mock-header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.35rem;
+		flex-shrink: 0;
+	}
+
+	.cost-receipt-mock-brand {
+		font-size: 0.78rem;
+		font-weight: 800;
+		letter-spacing: -0.04em;
+		color: var(--primary);
+	}
+
+	.cost-receipt-mock-doc {
+		font-size: 0.44rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--muted);
+	}
+
+	.cost-receipt-mock-trip {
+		font-size: 0.46rem;
+		font-weight: 600;
+		color: var(--text);
+		line-height: 1.35;
+		margin-top: -0.08rem;
+	}
+
+	.cost-receipt-mock-meta {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+		margin-top: 0.04rem;
+	}
+
+	.cost-receipt-mock-guest {
+		font-size: 0.44rem;
+		font-weight: 600;
+		color: var(--text);
+	}
+
+	.cost-receipt-mock-status {
+		font-size: 0.4rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--primary);
+		padding: 0.1rem 0.28rem;
+		border-radius: 999px;
+		background: rgba(47, 119, 120, 0.12);
+	}
+
+	.cost-receipt-mock-ref-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.4rem;
+		font-size: 0.4rem;
+		color: var(--muted);
+	}
+
+	.cost-receipt-mock-ref-lbl {
+		font-weight: 600;
+		flex-shrink: 0;
+	}
+
+	.cost-receipt-mock-ref-val {
+		font-weight: 500;
+		text-align: right;
+		min-width: 0;
+	}
+
+	.cost-receipt-mock-kicker {
+		font-size: 0.38rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		color: var(--muted);
+		margin-bottom: -0.04rem;
+	}
+
+	.cost-receipt-mock-kicker--lines {
+		margin-top: 0.06rem;
+		margin-bottom: 0.02rem;
+	}
+
+	.cost-receipt-mock-divider {
+		position: relative;
+		z-index: 2;
+		height: 1px;
+		background: var(--addon-mock-border);
+		flex-shrink: 0;
+		margin: 0.02rem 0;
+	}
+
+	.cost-receipt-mock-divider--light {
+		background: rgba(15, 23, 42, 0.05);
+	}
+
+	.cost-receipt-mock-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.22rem;
+	}
+
+	.cost-receipt-mock-room {
+		font-size: 0.56rem;
+		font-weight: 700;
+		color: var(--text);
+		letter-spacing: -0.02em;
+	}
+
+	.cost-receipt-mock-bed-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.2rem;
+		align-items: center;
+	}
+
+	.cost-receipt-mock-bed-pill {
+		font-size: 0.44rem;
+		font-weight: 600;
+		padding: 0.14rem 0.32rem;
+		border-radius: 999px;
+		background: rgba(47, 119, 120, 0.1);
+		color: var(--primary);
+	}
+
+	.cost-receipt-mock-bed-pill--soft {
+		background: rgba(15, 23, 42, 0.06);
+		color: var(--muted);
+		font-weight: 500;
+	}
+
+	.cost-receipt-mock-lines {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		flex: 1 1 auto;
+		min-height: 0;
+	}
+
+	.cost-receipt-mock-line {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.4rem;
+		font-size: 0.45rem;
+		color: var(--text);
+	}
+
+	.cost-receipt-mock-line--subtle {
+		opacity: 0.88;
+	}
+
+	.cost-receipt-mock-line--subtle .cost-receipt-mock-line-amt {
+		font-weight: 600;
+	}
+
+	.cost-receipt-mock-line-label {
+		flex: 1;
+		min-width: 0;
+		font-weight: 500;
+		line-height: 1.35;
+	}
+
+	.cost-receipt-mock-line-hint {
+		display: block;
+		font-size: 0.36rem;
+		font-weight: 500;
+		color: var(--muted);
+		margin-top: 0.05rem;
+		text-transform: none;
+		letter-spacing: 0;
+	}
+
+	.cost-receipt-mock-line-amt {
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: -0.02em;
+		flex-shrink: 0;
+	}
+
+	.cost-receipt-mock-subtotal {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.45rem;
+		font-size: 0.46rem;
+	}
+
+	.cost-receipt-mock-subtotal-lbl {
+		font-weight: 600;
+		color: var(--muted);
+	}
+
+	.cost-receipt-mock-subtotal-amt {
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		color: var(--text);
+	}
+
+	.cost-receipt-mock-total-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+		padding-top: 0.06rem;
+	}
+
+	.cost-receipt-mock-total-lbl {
+		font-size: 0.52rem;
+		font-weight: 700;
+		color: var(--text);
+	}
+
+	.cost-receipt-mock-total-amt {
+		font-size: 0.68rem;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: -0.03em;
+		color: var(--primary);
+	}
+
+	.cost-receipt-mock-foot {
+		margin: 0;
+		font-size: 0.4rem;
+		line-height: 1.4;
+		color: var(--muted);
+		font-weight: 500;
+	}
+
+	/* ── Activity mock full-height (right) ──────────────── */
+	.addon-fullmock-layer--end .activity-itin-fade--fullmock {
+		position: absolute;
+		right: 0;
+		left: auto;
+		top: 0;
+		bottom: 0;
+		width: min(19.75rem, 64%);
+		min-width: 9.25rem;
+		margin: 0;
+		padding: 0 0 0 0.2rem;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		justify-content: stretch;
+		-webkit-mask-image: linear-gradient(
+			to top left,
+			#000 0%,
+			#000 40%,
+			rgba(0, 0, 0, 0.32) 74%,
+			transparent 100%
+		);
+		mask-image: linear-gradient(
+			to top left,
+			#000 0%,
+			#000 40%,
+			rgba(0, 0, 0, 0.32) 74%,
+			transparent 100%
+		);
+	}
+
+	.activity-itin-mock--fullmock {
+		width: 100%;
+		max-width: 100%;
+		height: 100%;
+		min-height: 0;
+		flex: 1 1 auto;
+		margin: 0;
+		position: relative;
+		background: var(--addon-mock-surface);
+		border: none;
+		border-radius: var(--addon-mock-radius);
+		box-shadow: none;
+		padding: 0;
+		overflow: hidden;
+		opacity: var(--addon-mock-opacity);
+		filter: saturate(var(--addon-mock-saturate));
+	}
+
+	.activity-itin-mock--fullmock::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		z-index: 1;
+		background: linear-gradient(
+			to left,
+			transparent 0%,
+			transparent 46%,
+			var(--addon-mock-fade-mid) 72%,
+			var(--addon-mock-fade-end) 91%,
+			var(--addon-mock-fade-end) 100%
+		);
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-grid {
+		position: relative;
+		z-index: 2;
+		height: 100%;
+		min-height: 0;
+	}
+
+	/* Itinerary mock: same neutrals as other previews (not loud green/orange) */
+	.activity-itin-mock--fullmock .itin-mini-corner,
+	.activity-itin-mock--fullmock .itin-mini-dayhead,
+	.activity-itin-mock--fullmock .itin-mini-time {
+		background: var(--addon-mock-surface-subtle);
+		border-color: var(--addon-mock-border);
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-grid--3day > .itin-mini-dayhead--col {
+		border-right-color: var(--addon-mock-border);
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-grid--3day > .itin-mini-cell:nth-child(4n + 6),
+	.activity-itin-mock--fullmock .itin-mini-grid--3day > .itin-mini-cell:nth-child(4n + 7) {
+		border-right-color: var(--addon-mock-border);
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-cell {
+		border-bottom-color: var(--addon-mock-border);
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-cell--empty {
+		background: var(--addon-mock-surface);
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-event--activity {
+		background: rgba(30, 58, 138, 0.08);
+		border: 1px solid rgba(30, 58, 138, 0.14);
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-event--activity .itin-mini-evt-title {
+		color: #1e293b;
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-event--activity .itin-mini-evt-time,
+	.activity-itin-mock--fullmock .itin-mini-event--activity .itin-mini-evt-pill {
+		color: #64748b;
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-event--meal {
+		background: rgba(30, 58, 138, 0.05);
+		border: 1px solid rgba(15, 23, 42, 0.12);
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-event--meal .itin-mini-evt-title {
+		color: #1e293b;
+	}
+
+	.activity-itin-mock--fullmock .itin-mini-event--meal .itin-mini-evt-time,
+	.activity-itin-mock--fullmock .itin-mini-event--meal .itin-mini-chef {
+		color: #64748b;
+	}
+
+	/* ── Games bingo full-height (left) ─────────────────── */
+	.addon-fullmock-layer--start .games-bingo-fade--fullmock {
 		position: absolute;
 		left: 0;
 		top: 0;
@@ -1299,58 +2205,221 @@
 		-webkit-mask-image: linear-gradient(
 			to top right,
 			#000 0%,
-			#000 38%,
-			rgba(0, 0, 0, 0.4) 72%,
+			#000 40%,
+			rgba(0, 0, 0, 0.32) 74%,
 			transparent 100%
 		);
 		mask-image: linear-gradient(
 			to top right,
 			#000 0%,
-			#000 38%,
-			rgba(0, 0, 0, 0.4) 72%,
+			#000 40%,
+			rgba(0, 0, 0, 0.32) 74%,
 			transparent 100%
 		);
 	}
 
-	.meal-fullcard-mock-layer .meal-add-modal-mock {
+	/* Bingo + trivia as two tilted “cards” in the stack */
+	.addon-fullmock-layer--start .games-dual-mock-stack {
+		position: relative;
+		flex: 1 1 auto;
+		min-height: 0;
+		width: 100%;
+		align-self: stretch;
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock {
 		position: relative;
 		width: 100%;
-		max-width: 100%;
 		height: 100%;
 		min-height: 0;
 		flex: 1 1 auto;
 		margin: 0;
+		max-height: none;
+		opacity: var(--addon-mock-opacity);
+		filter: saturate(0.88);
 		display: flex;
 		flex-direction: column;
-		background: var(--surfaceSolid, #fff);
-		border-radius: var(--radius-2xl, 1rem);
-		/* No outer glow — it sits outside the box and breaks the fade into the card */
-		box-shadow: none;
-		border: none;
+		line-height: normal;
+		border-radius: var(--addon-mock-radius);
 		overflow: hidden;
-		opacity: 0.8;
-		filter: saturate(0.92);
+		/* Match outer card: border fades out toward the left / mock edge */
+		border: 1.5px solid transparent;
+		background:
+			linear-gradient(180deg, var(--addon-mock-surface-subtle) 0%, #e8eaef 100%) padding-box,
+			linear-gradient(
+				to right,
+				transparent 0%,
+				transparent 34%,
+				rgba(15, 23, 42, 0.05) 46%,
+				rgba(15, 23, 42, 0.1) 56%
+			) border-box;
+		background-clip: padding-box, border-box;
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock::after {
+		content: '';
+		position: absolute;
+		inset: 0;
 		pointer-events: none;
+		z-index: 2;
+		border-radius: inherit;
+		background: linear-gradient(
+			to right,
+			transparent 0%,
+			transparent 46%,
+			var(--addon-mock-fade-mid) 72%,
+			var(--addon-mock-fade-end) 91%,
+			var(--addon-mock-fade-end) 100%
+		);
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock .bingo-board-frame {
+		position: relative;
+		z-index: 1;
+		box-shadow: none;
+		flex: 1 1 auto;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		padding: 0.55rem 0.65rem 0.6rem;
+		border-radius: calc(var(--addon-mock-radius) - 2px);
+		background: var(--addon-mock-surface);
+		border: 1px solid var(--addon-mock-border);
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock .bingo-board-inner {
+		flex: 1 1 auto;
+		min-height: 0;
+		max-width: 100%;
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock .bingo-letter {
+		color: var(--primary);
+		opacity: 0.88;
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock .bingo-cell {
+		background: rgba(255, 255, 255, 0.92);
+		border: 1px solid rgba(15, 23, 42, 0.09);
+		box-shadow: none;
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock .bingo-label {
+		color: #5c6570;
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock .bingo-item-icon {
+		filter: grayscale(0.25);
+		opacity: 0.78;
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock .bingo-cell.has-photo .games-bingo-mock-snapshim {
+		filter: grayscale(0.35) contrast(0.98);
+		opacity: 0.78;
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--fullmock.games-bingo-mock--stack-back {
+		position: absolute;
+		left: -1%;
+		top: 4%;
+		width: 94%;
+		height: 86%;
+		margin: 0;
+		flex: none;
+		transform: rotate(-2.4deg);
+		transform-origin: 42% 28%;
+		box-shadow: 0 6px 22px rgba(15, 23, 42, 0.09);
+	}
+
+	.addon-fullmock-layer--start .games-bingo-mock--stack-back .bingo-board-frame {
+		min-height: 0;
+		height: 100%;
+	}
+
+	.addon-fullmock-layer--start .games-trivia-mock--stack-front {
+		position: absolute;
+		z-index: 6;
+		right: 2%;
+		bottom: 7%;
+		width: 66%;
+		max-width: 11.25rem;
+		pointer-events: none;
+		transform: rotate(5.5deg) translateY(0.12rem);
+		transform-origin: 80% 90%;
+		filter: drop-shadow(0 5px 14px rgba(15, 23, 42, 0.12));
+	}
+
+	.addon-fullmock-layer--start .games-trivia-mock-card {
+		background: var(--addon-mock-surface);
+		border: 1px solid var(--addon-mock-border);
+		border-radius: 0.55rem;
+		padding: 0.4rem 0.48rem 0.38rem;
 		line-height: normal;
 		text-align: left;
 	}
 
-	/* White modal blends into meal card gray (#f3f4f6) on the right */
-	.meal-fullcard-mock-layer .meal-add-modal-mock::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		border-radius: inherit;
-		pointer-events: none;
-		z-index: 1;
-		background: linear-gradient(
-			to right,
-			transparent 0%,
-			transparent 48%,
-			rgba(243, 244, 246, 0.45) 72%,
-			#f3f4f6 92%,
-			#f3f4f6 100%
-		);
+	.addon-fullmock-layer--start .games-trivia-mock-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.35rem;
+		margin-bottom: 0.28rem;
+	}
+
+	.addon-fullmock-layer--start .games-trivia-mock-badge {
+		font-size: 0.38rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--primary);
+	}
+
+	.addon-fullmock-layer--start .games-trivia-mock-pts {
+		font-size: 0.36rem;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		color: var(--muted);
+	}
+
+	.addon-fullmock-layer--start .games-trivia-mock-q {
+		margin: 0 0 0.32rem;
+		font-size: 0.5rem;
+		font-weight: 600;
+		color: var(--text);
+		line-height: 1.35;
+		letter-spacing: -0.02em;
+	}
+
+	.addon-fullmock-layer--start .games-trivia-mock-opts {
+		display: flex;
+		flex-direction: column;
+		gap: 0.18rem;
+		margin-bottom: 0.3rem;
+	}
+
+	.addon-fullmock-layer--start .games-trivia-mock-opt {
+		font-size: 0.4rem;
+		font-weight: 500;
+		padding: 0.2rem 0.3rem;
+		border-radius: 0.3rem;
+		border: 1px solid var(--addon-mock-border);
+		background: var(--addon-mock-surface-subtle);
+		color: #475569;
+	}
+
+	.addon-fullmock-layer--start .games-trivia-mock-opt--selected {
+		border-color: rgba(30, 58, 138, 0.28);
+		background: rgba(30, 58, 138, 0.08);
+		color: var(--text);
+		font-weight: 600;
+	}
+
+	.addon-fullmock-layer--start .games-trivia-mock-foot {
+		margin: 0;
+		font-size: 0.34rem;
+		font-weight: 500;
+		color: var(--muted);
+		line-height: 1.3;
 	}
 
 	.meal-add-modal-mock-header {
@@ -1502,50 +2571,29 @@
 		border: 1px solid transparent;
 	}
 
-	.activity-itin-fade {
-		position: relative;
-		flex: 1;
-		min-height: 0;
-		align-self: stretch;
-		/* Cancel .addon-pane padding so the quadrant can hug the card body */
-		margin-left: -1.125rem;
-		margin-right: -1.125rem;
-		margin-bottom: -1rem;
-		padding: 0 0.15rem 0 0.25rem;
-		overflow: hidden;
-		display: flex;
-		flex-direction: column;
-		justify-content: flex-end;
-		align-items: flex-end;
-		-webkit-mask-image: linear-gradient(
-			to right,
-			#000 0%,
-			#000 58%,
-			rgba(0, 0, 0, 0.5) 80%,
-			transparent 100%
-		);
-		mask-image: linear-gradient(
-			to right,
-			#000 0%,
-			#000 58%,
-			rgba(0, 0, 0, 0.5) 80%,
-			transparent 100%
-		);
+	.addon-fullmock-layer--start .meal-add-modal-mock-header {
+		border-bottom: 1px solid var(--addon-mock-border);
 	}
 
-	.activity-itin-mock {
-		width: min(26.5rem, 100%);
-		max-height: 100%;
-		flex-shrink: 0;
-		margin-right: 1.65rem;
-		background: rgba(255, 255, 255, 0.38);
-		border: 1px solid rgba(226, 232, 240, 0.65);
-		border-radius: 0.5rem;
-		box-shadow: 0 1px 6px rgba(17, 24, 39, 0.04);
-		padding: 0;
-		overflow: hidden;
-		opacity: 0.62;
-		filter: saturate(0.38);
+	.addon-fullmock-layer--start .meal-add-modal-mock-inputish {
+		border-color: var(--addon-mock-border);
+		background: var(--addon-mock-surface);
+	}
+
+	.addon-fullmock-layer--start .meal-add-modal-mock-opt {
+		background: var(--addon-mock-surface-subtle);
+		border-color: var(--addon-mock-border);
+		color: var(--text);
+	}
+
+	.addon-fullmock-layer--start .meal-add-modal-mock-opt--selected {
+		border-color: rgba(30, 58, 138, 0.22);
+		background: rgba(30, 58, 138, 0.08);
+	}
+
+	.addon-fullmock-layer--start .meal-add-modal-mock-btn--secondary {
+		background: var(--addon-mock-surface-subtle);
+		border-color: var(--addon-mock-border);
 	}
 
 	/* Same palette as itinerary EVENT_STYLES */

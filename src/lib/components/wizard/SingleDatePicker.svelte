@@ -14,6 +14,27 @@
 
 	let open = $state(false);
 	let containerEl = $state<HTMLDivElement | null>(null);
+	let triggerBtn = $state<HTMLButtonElement | null>(null);
+	let popoverEl = $state<HTMLDivElement | null>(null);
+	let popoverPos = $state({ top: 0, left: 0 });
+
+	function syncPopoverPosition() {
+		if (!open || typeof window === 'undefined') return;
+		const btn = triggerBtn;
+		if (!btn) return;
+		const r = btn.getBoundingClientRect();
+		const gap = 6;
+		const vw = window.innerWidth;
+		const vh = window.innerHeight;
+		const popW = Math.min(280, vw - 16);
+		let left = Math.max(8, Math.min(r.left, vw - popW - 8));
+		const h = popoverEl?.offsetHeight ?? 300;
+		let top = r.bottom + gap;
+		if (top + h > vh - 8) {
+			top = Math.max(8, r.top - h - gap);
+		}
+		popoverPos = { top, left };
+	}
 
 	function toDateKey(d: Date): string {
 		const y = d.getFullYear();
@@ -100,6 +121,10 @@
 			viewYear = new Date().getFullYear();
 			viewMonth = new Date().getMonth();
 		}
+		queueMicrotask(() => {
+			syncPopoverPosition();
+			requestAnimationFrame(() => syncPopoverPosition());
+		});
 	}
 
 	function handleClickOutside(e: MouseEvent) {
@@ -123,6 +148,22 @@
 		}
 	});
 
+	$effect(() => {
+		if (!open) return;
+		syncPopoverPosition();
+		const id = requestAnimationFrame(() => syncPopoverPosition());
+		function onReposition() {
+			syncPopoverPosition();
+		}
+		window.addEventListener('scroll', onReposition, true);
+		window.addEventListener('resize', onReposition);
+		return () => {
+			cancelAnimationFrame(id);
+			window.removeEventListener('scroll', onReposition, true);
+			window.removeEventListener('resize', onReposition);
+		};
+	});
+
 	const monthTitle = $derived(new Date(viewYear, viewMonth, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }));
 	const cells = $derived(getMonthCells(viewYear, viewMonth));
 	const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -132,6 +173,7 @@
 	<button
 		type="button"
 		class="trigger-input"
+		bind:this={triggerBtn}
 		onclick={openDropdown}
 		aria-haspopup="dialog"
 		aria-expanded={open}
@@ -148,7 +190,13 @@
 		</span>
 	</button>
 	{#if open}
-		<div class="popover" role="dialog" aria-label="Date calendar">
+		<div
+			class="popover"
+			bind:this={popoverEl}
+			role="dialog"
+			aria-label="Date calendar"
+			style="top: {popoverPos.top}px; left: {popoverPos.left}px;"
+		>
 			<div class="calendar-inner">
 				<div class="calendar-header">
 					<button type="button" class="month-nav" onclick={prevMonth} aria-label="Previous month">‹</button>
@@ -248,16 +296,15 @@
 	}
 
 	.popover {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
-		z-index: 50;
+		position: fixed;
+		z-index: 10050;
 		background: white;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-md);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 		padding: 0.75rem;
 		min-width: 260px;
+		max-width: min(280px, calc(100vw - 16px));
 	}
 
 	.calendar-inner {

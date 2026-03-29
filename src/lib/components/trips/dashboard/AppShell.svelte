@@ -22,9 +22,12 @@
 		/** Trip dates for dashboard mode pill (Planning/Vacation/Recap) */
 		checkInDate?: Date | string | null;
 		checkOutDate?: Date | string | null;
+		/** Add-on flags — when false the corresponding nav item is hidden */
+		activitiesEnabled?: boolean;
+		gamesEnabled?: boolean;
 	}
 
-	let { tripId, user, children, onInvite, showToast, showGuestsTab = true, pollsBadgeCount = 0, tripLockedForRecap = false, checkInDate = null, checkOutDate = null }: Props = $props();
+	let { tripId, user, children, onInvite, showToast, showGuestsTab = true, pollsBadgeCount = 0, tripLockedForRecap = false, checkInDate = null, checkOutDate = null, activitiesEnabled = true, gamesEnabled = true }: Props = $props();
 
 	const modeFromDate = $derived.by((): DashboardMode => {
 		const checkIn = checkInDate ? new Date(checkInDate) : null;
@@ -70,6 +73,8 @@
 	});
 
 	const currentPath = $derived($page.url.pathname);
+	/** Hide global messages + notifications while editing trip settings */
+	const hideMessagesAndNotifications = $derived(currentPath.includes(`/trips/${tripId}/settings`));
 	const isDashboardPage = $derived(
 		currentPath === `/trips/${tripId}` || currentPath.replace(/\/$/, '') === `/trips/${tripId}`
 	);
@@ -80,7 +85,7 @@
 		return currentPath.startsWith(href);
 	}
 
-	const allNavItems = [
+	const baseNavItems = [
 		{ href: `/trips/${tripId}`, label: 'Dashboard', icon: 'dashboard' },
 		{ href: `/trips/${tripId}/guests`, label: 'Guests', icon: 'guests' },
 		{ href: `/trips/${tripId}/rooms`, label: 'Rooms', icon: 'rooms' },
@@ -90,7 +95,14 @@
 		{ href: `/trips/${tripId}/games`, label: 'Games', icon: 'games' },
 		{ href: `/trips/${tripId}/files`, label: 'Files', icon: 'files' }
 	];
-	const navItems = $derived(showGuestsTab ? allNavItems : allNavItems.filter((item) => item.icon !== 'guests'));
+	const navItems = $derived(
+		baseNavItems.filter((item) => {
+			if (item.icon === 'guests' && !showGuestsTab) return false;
+			if (item.icon === 'activities' && !activitiesEnabled) return false;
+			if (item.icon === 'games' && !gamesEnabled) return false;
+			return true;
+		})
+	);
 
 	let mainContentEl = $state<HTMLElement | null>(null);
 
@@ -166,14 +178,16 @@
 					/>
 				</div>
 			{/if}
-			<div class="top-actions-right">
-			<a href="/messages" class="top-action-btn" title="Messages" aria-label="Messages">
-				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
-			</a>
-			<span class="top-bell">
-				<NotificationTray />
-			</span>
-			</div>
+			{#if !hideMessagesAndNotifications}
+				<div class="top-actions-right">
+					<a href="/messages" class="top-action-btn" title="Messages" aria-label="Messages">
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
+					</a>
+					<span class="top-bell">
+						<NotificationTray />
+					</span>
+				</div>
+			{/if}
 		</div>
 		{#if children != null && typeof children === 'function'}
 			<div class="main-content-inner">
@@ -369,8 +383,9 @@
 	.main-content {
 		margin: 12px 12px 12px 84px;
 		height: calc(100vh - 24px);
-		overflow-y: auto;
-		overflow-x: hidden;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 		box-sizing: border-box;
 		min-width: 0;
 		padding: 0.5rem 2rem 2rem;
@@ -441,7 +456,12 @@
 	.main-content-inner {
 		width: 100%;
 		min-width: 0;
-		display: block;
+		min-height: 0;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		overflow-y: auto;
+		overflow-x: hidden;
 	}
 
 	@media (max-width: 1024px) {

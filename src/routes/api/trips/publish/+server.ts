@@ -51,6 +51,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	const isPublished = d.isPublished !== false; // default true, pass false to save as draft
 	const splitPlatformFee = d.splitCost === true;
 	const gamesEnabled = d.gamesEnabled === true;
+	const activitiesEnabled = d.activitiesEnabled !== false; // default true; only false when host explicitly disabled
 	const selectedGames = Array.isArray(d.selectedGames) ? (d.selectedGames as string[]) : [];
 	const VALID_GAME_IDS = ['caption-this', 'scavenger-bingo', 'alphabet-hunt', 'daily-trivia'];
 	const GAME_NAMES: Record<string, string> = {
@@ -60,9 +61,13 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		'daily-trivia': 'Daily Trivia'
 	};
 	const PLATFORM_FEE = 25;
-	const platformFeePerPerson = splitPlatformFee
-		? PLATFORM_FEE / Math.max(1, typeof d.expectedGuestCount === 'number' ? d.expectedGuestCount : 1)
-		: 0;
+	const discountCodeRaw = typeof d.discountCode === 'string' ? d.discountCode.trim() : '';
+	const waivePlatformFee = discountCodeRaw === 'BearsBestFriend#1';
+	const platformFeePerPerson = waivePlatformFee
+		? 0
+		: splitPlatformFee
+			? PLATFORM_FEE / Math.max(1, typeof d.expectedGuestCount === 'number' ? d.expectedGuestCount : 1)
+			: 0;
 
 	if (!name) {
 		return json({ error: 'Trip name is required' }, 400);
@@ -107,6 +112,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		return json({ error: 'Please add at least one photo (cover or room photo)' }, 400);
 	}
 
+	if (expectedGuestCount == null || expectedGuestCount < 1) {
+		return json({ error: 'Minimum headcount (realistic low) is required' }, 400);
+	}
+
+	/** Only persist a trip-level max when the host entered one; otherwise null (capacity from beds elsewhere). */
+	const maxGuestsToStore =
+		maxOccupancy != null && maxOccupancy > 0 ? maxOccupancy : null;
+
 	try {
 		const trip = await prisma.trip.create({
 			data: {
@@ -122,9 +135,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				pricingModel,
 			isPublished,
 			costSharingEnabled,
+			activitiesEnabled,
+			gamesEnabled,
 			platformFeePerPerson,
 				expectedPeopleCount: expectedGuestCount,
-				maxGuests: maxOccupancy,
+				maxGuests: maxGuestsToStore,
 				allowPartialStays: partialStayAllowed,
 				timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
 				location: propertyAddress || null,

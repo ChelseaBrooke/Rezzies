@@ -20,6 +20,7 @@
 		onBack,
 		backHref,
 		previewLabel,
+		stepperInlineLabel,
 		steps: stepsProp,
 		hideStepperBack = false
 	}: {
@@ -28,6 +29,8 @@
 		onBack?: () => void;
 		backHref?: string;
 		previewLabel?: string;
+		/** When set, replaces the back button with an inline label inside the stepper row */
+		stepperInlineLabel?: string;
 		steps?: Step[];
 		/** When true, stepper header hides Back (e.g. trips/new — footer has Back). */
 		hideStepperBack?: boolean;
@@ -38,21 +41,25 @@
 	const currentTitle = $derived(stepTitles[currentStep] || '');
 </script>
 
-<div class="create-trip-shell" class:contained={!!previewLabel}>
+<div
+	class="create-trip-shell"
+	class:contained={!!previewLabel || !!stepperInlineLabel}
+	class:contained-portal-edit={!!stepperInlineLabel}
+>
 	<!-- Background (hidden when contained in trip portal) -->
 	<div class="background"></div>
 	
 	<!-- Main Card - starts at top of screen -->
 	<div class="main-card">
-		<!-- Top Bar or preview label -->
+		<!-- Top Bar or preview label (only when standalone, not portal-contained) -->
 		{#if previewLabel}
 			<div class="preview-label">{previewLabel}</div>
-		{:else}
+		{:else if !stepperInlineLabel}
 			<TopBar />
 		{/if}
 		
 		<!-- Stepper inside card -->
-		<Stepper {steps} {currentStep} {onBack} {backHref} hideBack={hideStepperBack} />
+		<Stepper {steps} {currentStep} {onBack} {backHref} hideBack={hideStepperBack} inlineLabel={stepperInlineLabel} />
 		
 		<!-- Card Content -->
 		<div class="card-content">
@@ -81,7 +88,18 @@
 		background: transparent;
 		flex: 1;
 		display: flex;
+		flex-direction: column;
 		overflow: hidden;
+		width: 100%;
+	}
+
+	/* Edit trip in portal: use more horizontal space + room for add-on glows */
+	.create-trip-shell.contained-portal-edit {
+		margin-left: -1.25rem;
+		margin-right: -1.25rem;
+		width: calc(100% + 2.5rem);
+		max-width: calc(100% + 2.5rem);
+		box-sizing: border-box;
 	}
 	.create-trip-shell.contained .background {
 		display: none;
@@ -91,9 +109,17 @@
 		min-height: 0;
 		flex: 1;
 		align-self: stretch;
+		height: auto;
 		border-radius: var(--radius-xl);
 		box-shadow: var(--shadow-md);
 		border: 1px solid var(--border);
+		overflow: hidden;
+		max-height: calc(100% - 0.75rem);
+		box-sizing: border-box;
+	}
+
+	.create-trip-shell.contained-portal-edit .main-card {
+		max-height: calc(100% - 1.25rem);
 	}
 	
 	.background {
@@ -135,12 +161,12 @@
 		width: 100%;
 		max-width: 85%;
 		margin: 0;
-		min-height: 100vh;
+		height: 100dvh;
 		overflow-y: auto;
 		flex: 1;
 		align-self: center;
 	}
-	
+
 	.card-header {
 		padding: 1rem 2.5rem;
 		border-bottom: 1px solid var(--border);
@@ -172,7 +198,20 @@
 		display: flex;
 		flex-direction: column;
 	}
-	
+
+	.create-trip-shell.contained .card-content {
+		min-height: 0;
+		overflow: hidden;
+		padding-top: 1rem;
+		padding-bottom: 0;
+		flex: 1;
+	}
+
+	.create-trip-shell.contained-portal-edit .card-content {
+		padding-left: 2.75rem;
+		padding-right: 2.75rem;
+	}
+
 	@media (max-width: 1024px) {
 		.main-card {
 			max-width: 100%;
@@ -181,12 +220,40 @@
 		.card-content {
 			padding: 1.5rem 2rem 2rem;
 		}
+
+		.create-trip-shell.contained .card-content {
+			padding-bottom: 0;
+		}
+
+		.create-trip-shell.contained-portal-edit {
+			margin-left: -0.75rem;
+			margin-right: -0.75rem;
+			width: calc(100% + 1.5rem);
+			max-width: calc(100% + 1.5rem);
+		}
+
+		.create-trip-shell.contained-portal-edit .card-content {
+			padding-left: 1.5rem;
+			padding-right: 1.5rem;
+		}
 	}
 	
 	@media (max-width: 768px) {
 		.card-header,
 		.card-content {
 			padding: 1rem 1.5rem;
+		}
+
+		.create-trip-shell.contained-portal-edit {
+			margin-left: 0;
+			margin-right: 0;
+			width: 100%;
+			max-width: 100%;
+		}
+
+		.create-trip-shell.contained-portal-edit .card-content {
+			padding-left: 1rem;
+			padding-right: 1rem;
 		}
 		
 		.card-title {

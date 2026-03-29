@@ -51,6 +51,10 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	const expectedGuestCount = typeof d.expectedGuestCount === 'number' ? d.expectedGuestCount : null;
 	const maxOccupancy = typeof d.maxOccupancy === 'number' ? d.maxOccupancy : null;
 	const partialStayAllowed = d.partialStayAllowed === true;
+	const costSharingEnabled = d.costSharingEnabled === true;
+	const gamesEnabled = d.gamesEnabled === true;
+	const activitiesEnabled = d.activitiesEnabled !== false; // default true
+	const mealsEnabled = d.mealsEnabled === true;
 
 	if (!name) {
 		return json({ error: 'Trip name is required' }, 400);
@@ -58,8 +62,11 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	if (!checkInDateStr || !checkOutDateStr) {
 		return json({ error: 'Check-in and check-out dates are required' }, 400);
 	}
-	const totalCost = parseFloat(totalTripCostStr.replace(/[$,]/g, ''));
-	if (isNaN(totalCost) || totalCost <= 0) {
+	// Total cost validation is conditional: required and positive only when cost sharing is on
+	const totalCost = costSharingEnabled
+		? parseFloat(totalTripCostStr.replace(/[$,]/g, ''))
+		: 0;
+	if (costSharingEnabled && (isNaN(totalCost) || totalCost <= 0)) {
 		return json({ error: 'Total trip cost must be a positive number' }, 400);
 	}
 	const checkInDate = new Date(checkInDateStr);
@@ -80,15 +87,25 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 		return json({ error: 'At least one room is required' }, 400);
 	}
 
-	const hasPhotos =
-		!!coverPhoto ||
-		(Array.isArray(d.galleryPhotos) && d.galleryPhotos.length > 0) ||
-		rooms.some(
-			(r: { photos?: string[] }) => Array.isArray(r?.photos) && r.photos.length > 0
-		);
-	if (!hasPhotos) {
-		return json({ error: 'Please add at least one photo (cover or room photo)' }, 400);
+	if (typeof expectedGuestCount === 'number' && expectedGuestCount < 1) {
+		return json({ error: 'Minimum headcount must be at least 1' }, 400);
 	}
+
+	const tripForHeadcount = await prisma.trip.findUnique({
+		where: { id: tripId },
+		select: { expectedPeopleCount: true }
+	});
+	const expForMax = Math.max(
+		1,
+		typeof expectedGuestCount === 'number' && expectedGuestCount >= 1
+			? expectedGuestCount
+			: tripForHeadcount?.expectedPeopleCount ?? 1
+	);
+	const resolvedMaxGuests = effectiveMaxHeadcount(
+		expForMax,
+		typeof maxOccupancy === 'number' ? maxOccupancy : 0,
+		rooms as RoomLike[]
+	);
 
 	try {
 		await prisma.trip.update({
@@ -104,12 +121,22 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 				totalCost,
 				pricingModel,
 				expectedPeopleCount: expectedGuestCount,
-				maxGuests: maxOccupancy,
+				maxGuests: maxGuestsToStore,
 				allowPartialStays: partialStayAllowed,
+				costSharingEnabled,
+				gamesEnabled,
+				activitiesEnabled,
 				location: fullAddressPayload ?? propertyAddress ?? null,
 				fullAddress: fullAddressPayload ?? propertyAddress ?? null,
 				locationCity: locationCityPayload ?? null
 			}
+		});
+
+		// Upsert MealPlan.enabled for this trip
+		await prisma.mealPlan.upsert({
+			where: { tripId },
+			create: { tripId, enabled: mealsEnabled },
+			update: { enabled: mealsEnabled }
 		});
 
 		// Fetch the existing trip so we can do a structural diff before touching rooms.

@@ -11,8 +11,8 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 	if (stepNumber < 1) {
 		throw redirect(303, `/trips/${params.tripId}/settings/step/1`);
 	}
-	if (stepNumber > 2) {
-		throw redirect(303, `/trips/${params.tripId}/settings/step/2`);
+	if (stepNumber > 3) {
+		throw redirect(303, `/trips/${params.tripId}/settings/step/3`);
 	}
 
 	return {

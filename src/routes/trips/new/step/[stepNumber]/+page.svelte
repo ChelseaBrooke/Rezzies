@@ -57,6 +57,9 @@
 			if (!draft.name || !draft.checkInDate || !draft.checkOutDate || draft.rooms.length === 0) {
 				return false;
 			}
+			if (!(Number(draft.expectedGuestCount) >= 1)) {
+				return false;
+			}
 			const hasPhotos =
 				(draft.galleryPhotos && draft.galleryPhotos.length > 0) ||
 				draft.rooms.some((room) => room.photos && room.photos.length > 0);
@@ -75,7 +78,15 @@
 			const hasPhotos =
 				(draft.galleryPhotos && draft.galleryPhotos.length > 0) ||
 				draft.rooms.some((room) => room.photos && room.photos.length > 0);
-			if (draft.name && draft.checkInDate && draft.checkOutDate && draft.rooms.length > 0 && !hasPhotos) {
+			if (
+				draft.name &&
+				draft.checkInDate &&
+				draft.checkOutDate &&
+				draft.rooms.length > 0 &&
+				!(Number(draft.expectedGuestCount) >= 1)
+			) {
+				validationError = 'Please enter a minimum headcount (realistic low).';
+			} else if (draft.name && draft.checkInDate && draft.checkOutDate && draft.rooms.length > 0 && !hasPhotos) {
 				validationError = 'Please upload at least one photo before continuing.';
 			} else {
 				validationError = null;
@@ -99,16 +110,18 @@
 </script>
 
 <!-- Step Content -->
-{#if stepNumber() === 1}
-	{#if validationError}
-		<div class="validation-error">{validationError}</div>
+<div class="step-wrapper" class:step-wrapper--grow={stepNumber() === 1}>
+	{#if stepNumber() === 1}
+		{#if validationError}
+			<div class="validation-error">{validationError}</div>
+		{/if}
+		<Step1 bind:draft {autosave} {prevStep} {handleNextStep} {canProceed} />
+	{:else if stepNumber() === 2}
+		<AddOnsStep bind:draft {autosave} />
+	{:else if stepNumber() === 3}
+		<Step4 {draft} />
 	{/if}
-	<Step1 bind:draft {autosave} {prevStep} {handleNextStep} {canProceed} />
-{:else if stepNumber() === 2}
-	<AddOnsStep bind:draft {autosave} />
-{:else if stepNumber() === 3}
-	<Step4 bind:draft />
-{/if}
+</div>
 
 <!-- Footer Actions -->
 {#if validationError}
@@ -137,27 +150,40 @@
 				class="btn-publish"
 				onclick={handleProceedToPublish}
 			>
-				Continue to Publish →
+				Publish
 			</button>
 		{/if}
 	</div>
 </div>
 
 <style>
+	.step-wrapper {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.step-wrapper--grow {
+		flex: 1;
+		min-height: 0;
+	}
+
 	.card-footer {
+		position: sticky;
+		bottom: 0;
+		z-index: 10;
 		margin-top: auto;
-		padding-top: 2rem;
+		padding: 1rem 0 1.25rem;
 		border-top: 1px solid var(--border);
+		background: white;
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 	}
 
-	/* Trip Add-Ons (step 2): no divider line; sit closer to grid (not pushed to card bottom) */
+	/* Trip Add-Ons (step 2): no divider line; sit closer to grid */
 	.card-footer--addons {
 		border-top: none;
 		padding-top: 0.5rem;
-		margin-top: 0.75rem;
 	}
 	
 	.footer-right {

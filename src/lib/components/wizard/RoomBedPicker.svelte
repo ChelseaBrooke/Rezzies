@@ -6,7 +6,7 @@
 	import bunkBedIconUrl from '$lib/assets/images/beds/bunk.svg.svg?url';
 	import sofaBedIconUrl from '$lib/assets/images/beds/sofabed.svg.svg?url';
 	
-	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
+	let { draft = $bindable(), autosave }: { draft: TripDraft; autosave: () => void } = $props();
 	
 	let draggedPhoto: { url: string } | null = $state(null);
 	let draggedOverRoomId: string | null = $state(null);
@@ -139,16 +139,6 @@
 		newRoomBedTypesArray = [];
 		newRoomCustomDesc = '';
 		isBedTypesDropdownOpen = false;
-	}
-	
-	function toggleBedTypeInDropdown(bedType: string) {
-		const existing = newRoomBedTypesArray.find(b => b.bedType === bedType);
-		if (existing) {
-			newRoomBedTypesArray = newRoomBedTypesArray.filter(b => b.bedType !== bedType);
-		} else {
-			newRoomBedTypesArray = [...newRoomBedTypesArray, { bedType, quantity: 0 }];
-		}
-		newRoomBedTypesArray = [...newRoomBedTypesArray];
 	}
 	
 	function getBedQuantity(bedType: string): number {
@@ -429,7 +419,7 @@
 								onmousedown={(e) => e.stopPropagation()}
 							>
 								{#each bedTypeOptions as bedOption}
-									<div class="bed-type-checkbox-row">
+									<div class="bed-type-row">
 										<div class="bed-quantity-controls">
 											<button
 												type="button"
@@ -447,12 +437,7 @@
 												↓
 											</button>
 										</div>
-										<label class="bed-checkbox-label">
-											<input
-												type="checkbox"
-												checked={getBedQuantity(bedOption.value) > 0}
-												onchange={() => toggleBedTypeInDropdown(bedOption.value)}
-											/>
+										<div class="bed-type-row-main">
 											{#if bedOption.iconUrl}
 												<img class="bed-icon-img" src={bedOption.iconUrl} alt="" />
 											{:else}
@@ -462,7 +447,7 @@
 											{#if getBedQuantity(bedOption.value) > 0}
 												<span class="bed-quantity-display">{getBedQuantity(bedOption.value)}</span>
 											{/if}
-										</label>
+										</div>
 									</div>
 								{/each}
 							</div>
@@ -532,7 +517,7 @@
 									onmousedown={(e) => e.stopPropagation()}
 								>
 									{#each bedTypeOptions as bedOption}
-										<div class="bed-type-checkbox-row">
+										<div class="bed-type-row">
 											<div class="bed-quantity-controls">
 												<button
 													type="button"
@@ -550,12 +535,7 @@
 													↑
 												</button>
 											</div>
-											<label class="bed-checkbox-label">
-												<input
-													type="checkbox"
-													checked={getBedQuantity(bedOption.value) > 0}
-													onchange={() => toggleBedTypeInDropdown(bedOption.value)}
-												/>
+											<div class="bed-type-row-main">
 												{#if bedOption.iconUrl}
 													<img class="bed-icon-img" src={bedOption.iconUrl} alt="" />
 												{:else}
@@ -565,7 +545,7 @@
 												{#if getBedQuantity(bedOption.value) > 0}
 													<span class="bed-quantity-display">{getBedQuantity(bedOption.value)}</span>
 												{/if}
-											</label>
+											</div>
 										</div>
 									{/each}
 								</div>
@@ -917,18 +897,6 @@
 		color: #111;
 	}
 	
-	.bed-checkbox-label {
-		color: #111;
-	}
-	
-	.bed-checkbox-label .bed-label {
-		color: #111;
-	}
-	
-	.bed-quantity-display {
-		color: #111;
-	}
-	
 	.room-description-input-inline {
 		width: 100%;
 		padding: 0.5rem 0.75rem;
@@ -1191,7 +1159,7 @@
 		overflow: visible;
 	}
 	
-	.bed-type-checkbox-row {
+	.bed-type-row {
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
@@ -1236,11 +1204,10 @@
 		cursor: not-allowed;
 	}
 	
-	.bed-checkbox-label {
+	.bed-type-row-main {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		cursor: pointer;
 		flex: 1;
 		color: var(--text);
 		font-size: 0.875rem;
@@ -1249,7 +1216,7 @@
 		overflow: visible;
 	}
 	
-	.bed-checkbox-label .bed-label {
+	.bed-type-row-main .bed-label {
 		white-space: nowrap;
 		flex: 1;
 	}
@@ -1259,13 +1226,6 @@
 		color: var(--text);
 		margin-left: auto;
 		flex-shrink: 0;
-	}
-	
-	.bed-checkbox-label input[type="checkbox"] {
-		width: 1.125rem;
-		height: 1.125rem;
-		cursor: pointer;
-		accent-color: var(--primary);
 	}
 	
 	.bed-icon {

@@ -13,13 +13,16 @@
 		currentStep,
 		backHref,
 		onBack,
-		hideBack = false
+		hideBack = false,
+		inlineLabel
 	}: {
 		steps: Step[];
 		currentStep: number;
 		backHref?: string;
 		onBack?: () => void;
 		hideBack?: boolean;
+		/** Optional label rendered on the left in place of the back button */
+		inlineLabel?: string;
 	} = $props();
 	
 	function prevStep() {
@@ -38,8 +41,10 @@
 </script>
 
 <div class="stepper">
-	<div class="stepper-content">
-		{#if !hideBack}
+	<div class="stepper-content" class:stepper-content--inline-title={!!inlineLabel}>
+		{#if inlineLabel}
+			<span class="stepper-inline-label">{inlineLabel}</span>
+		{:else if !hideBack}
 			{#if currentStep > 0 || backHref || onBack}
 				{#if onBack}
 					<button type="button" class="stepper-back-btn" onclick={onBack}>
@@ -78,6 +83,7 @@
 
 <style>
 	.stepper {
+		flex-shrink: 0;
 		padding: 1.25rem 0;
 		background: white;
 		overflow-x: auto;
@@ -96,6 +102,15 @@
 		margin: 0 auto;
 		position: relative;
 	}
+
+	/* Title flush left, full width row; steps centered in remaining space */
+	.stepper-content--inline-title {
+		justify-content: flex-start;
+		width: 100%;
+		max-width: none;
+		margin: 0;
+		box-sizing: border-box;
+	}
 	
 	.stepper-back-btn {
 		background: transparent;
@@ -111,6 +126,29 @@
 	
 	.stepper-back-btn:hover {
 		color: var(--text);
+	}
+
+	/* Theme display font (same as global h1/h2 — Fraunces in app.css) */
+	.stepper-inline-label {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.625rem;
+		font-weight: 600;
+		color: var(--text);
+		white-space: nowrap;
+		margin-right: auto;
+		flex-shrink: 0;
+		text-align: left;
+		letter-spacing: -0.02em;
+		line-height: 1.15;
+	}
+
+	.stepper-content--inline-title .stepper-inline-label {
+		margin-right: 0;
+	}
+
+	.stepper-content--inline-title .stepper-steps {
+		justify-content: center;
+		min-width: 0;
 	}
 	
 	.stepper-steps {
@@ -227,6 +265,10 @@
 		
 		.step-label {
 			font-size: 0.75rem;
+		}
+
+		.stepper-inline-label {
+			font-size: 1.35rem;
 		}
 		
 		.step-connector {

@@ -35,6 +35,8 @@
 		tripLockedForRecap={tripLockedForRecap}
 		checkInDate={data.trip?.checkInDate ?? null}
 		checkOutDate={data.trip?.checkOutDate ?? null}
+		activitiesEnabled={data.trip?.activitiesEnabled ?? true}
+		gamesEnabled={data.trip?.gamesEnabled ?? true}
 	>
 	{#snippet children()}
 		{#if safeChildren}

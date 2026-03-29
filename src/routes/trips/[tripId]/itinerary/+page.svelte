@@ -26,9 +26,10 @@
 
 
 	// ── Server data refs ───────────────────────────────────────────────────
-	const tripDays    = $derived(data.tripDays ?? []);
-	const goingUsers  = $derived(data.goingUsers ?? []);
-	const mealPlanOn  = $derived((data.mealPlan as { enabled: boolean } | null)?.enabled === true);
+	const tripDays         = $derived(data.tripDays ?? []);
+	const goingUsers       = $derived(data.goingUsers ?? []);
+	const mealPlanOn       = $derived((data.mealPlan as { enabled: boolean } | null)?.enabled === true);
+	const activitiesEnabled = $derived((data.trip as { activitiesEnabled?: boolean } | null)?.activitiesEnabled ?? true);
 
 	// Set of "date|mealType" keys for existing meal slots (used by placeholders)
 	// data.mealSlots is a flat array from the server
@@ -672,9 +673,11 @@
 							<span class="skip-toggle-label">Hide events I'm skipping</span>
 						</label>
 					</div>
-				<div class="schedule-header-right">
+			<div class="schedule-header-right">
+					{#if activitiesEnabled}
 						<button class="btn-add-activity" onclick={openAddActivity}>+ Custom Activity</button>
-					</div>
+					{/if}
+				</div>
 				</div>
 
 				<!-- Calendar grid -->
@@ -856,32 +859,44 @@
 					</div>
 				</div>
 
-					<!-- Footer -->
-				<div class="schedule-footer">
-					<button
-						class="footer-btn"
-						class:footer-btn-active={filterType === 'meal'}
-						onclick={() => (filterType = filterType === 'meal' ? 'all' : 'meal')}
-					>
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v21M3 9h18M3 15h18"/></svg>
-						Meals
-					</button>
-					<button
-						class="footer-btn"
-						class:footer-btn-active={filterType === 'activity'}
-						onclick={() => (filterType = filterType === 'activity' ? 'all' : 'activity')}
-					>
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
-						Activities
-					</button>
-				</div>
+				<!-- Footer -->
+			<div class="schedule-footer">
+				{#if mealPlanOn}
+				<button
+					class="footer-btn"
+					class:footer-btn-active={filterType === 'meal'}
+					onclick={() => (filterType = filterType === 'meal' ? 'all' : 'meal')}
+				>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v21M3 9h18M3 15h18"/></svg>
+					Meals
+				</button>
+				{/if}
+				{#if activitiesEnabled}
+				<button
+					class="footer-btn"
+					class:footer-btn-active={filterType === 'activity'}
+					onclick={() => (filterType = filterType === 'activity' ? 'all' : 'activity')}
+				>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
+					Activities
+				</button>
+				{/if}
+				{#if !activitiesEnabled || !mealPlanOn}
+				<p class="itinerary-addon-hint">
+					<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+					Want to plan {!activitiesEnabled && !mealPlanOn ? 'activities or meals' : !activitiesEnabled ? 'activities' : 'meals'}? Turn on
+					{!activitiesEnabled && !mealPlanOn ? 'Activity or Meal Planning' : !activitiesEnabled ? 'Activity Planning' : 'Meal Planning'}
+					in <a href="/trips/{(data.trip as { id: string }).id}/settings" class="itinerary-addon-hint-link">Trip Settings</a>.
+				</p>
+				{/if}
+			</div>
 			</div>
 		</div>
 	{/if}
 </div>
 
 <!-- Add Custom Activity Modal -->
-{#if showAddActivity}
+{#if activitiesEnabled && showAddActivity}
 	<div
 		class="modal-backdrop"
 		role="presentation"
@@ -1273,9 +1288,28 @@
 		border-top: 1px solid #f0f2f5;
 		display: flex;
 		align-items: center;
+		flex-wrap: wrap;
 		gap: .5rem;
 		justify-content: flex-end;
 		margin-top: .5rem;
+	}
+	.itinerary-addon-hint {
+		display: inline-flex;
+		align-items: center;
+		gap: .3rem;
+		margin: 0;
+		margin-right: auto;
+		font-size: .75rem;
+		color: var(--muted, #6b7280);
+	}
+	.itinerary-addon-hint svg {
+		flex-shrink: 0;
+		color: var(--muted, #6b7280);
+	}
+	.itinerary-addon-hint-link {
+		color: var(--primary, #2f7778);
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 	.footer-btn {
 		display: inline-flex; align-items: center; gap: .375rem;

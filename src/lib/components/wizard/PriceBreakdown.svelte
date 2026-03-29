@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
+	import { effectiveMaxForDraft } from '$lib/stores/tripDraft.js';
 	
 	let { draft }: { draft: TripDraft } = $props();
 	
@@ -77,17 +78,20 @@
 		return subtotal() / totalRooms();
 	});
 	
-	// Per Person: Simple division with max occupancy note
+	// Per Person: division at min headcount, with max headcount (capacity) comparison when higher
 	const perPersonCost = $derived(() => {
 		const expectedGuests = draft.expectedGuestCount || 1;
 		if (expectedGuests === 0) return 0;
 		return subtotal() / expectedGuests;
 	});
 	
+	const minHeadcount = $derived(() => Math.max(1, Number(draft.expectedGuestCount) || 1));
+	const effectiveMaxHeadcount = $derived(() => effectiveMaxForDraft(draft));
+
 	const perPersonAtMaxOccupancy = $derived(() => {
-		const maxOccupancy = draft.maxOccupancy || 1;
-		if (maxOccupancy === 0) return 0;
-		return subtotal() / maxOccupancy;
+		const cap = effectiveMaxHeadcount();
+		if (cap === 0) return 0;
+		return subtotal() / cap;
 	});
 	
 	// Per Bed: Weighted calculation
@@ -157,12 +161,16 @@
 			<div class="breakdown-section">
 				<div class="section-label">Cost Per Person</div>
 				<div class="breakdown-item nested">
-					<span class="item-label">Per Guest ({draft.expectedGuestCount} {draft.expectedGuestCount === 1 ? 'guest' : 'guests'})</span>
+					<span class="item-label"
+						>At min headcount ({draft.expectedGuestCount} {draft.expectedGuestCount === 1 ? 'person' : 'people'})</span
+					>
 					<span class="item-value">${perPersonCost().toFixed(2)}</span>
 				</div>
-				{#if draft.maxOccupancy > draft.expectedGuestCount}
+				{#if effectiveMaxHeadcount() > minHeadcount()}
 					<div class="breakdown-item nested note">
-						<span class="item-label">If max occupancy reached ({draft.maxOccupancy} {draft.maxOccupancy === 1 ? 'guest' : 'guests'})</span>
+						<span class="item-label"
+							>If max headcount (capacity) is reached ({effectiveMaxHeadcount()} {effectiveMaxHeadcount() === 1 ? 'person' : 'people'})</span
+						>
 						<span class="item-value">${perPersonAtMaxOccupancy().toFixed(2)} per person</span>
 					</div>
 				{/if}

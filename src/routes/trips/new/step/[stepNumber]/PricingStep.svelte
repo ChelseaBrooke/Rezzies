@@ -1,5 +1,6 @@
-﻿<script lang="ts">
+<script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
+	import { effectiveMaxForDraft } from '$lib/stores/tripDraft.js';
 	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
 
 	// Universal bed weights (see PRICING_MATH.md); privacy from room type or inferred from slot count
@@ -34,7 +35,7 @@
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
 
 	const expected = $derived(Math.max(1, Number(draft.expectedGuestCount) || 1));
-	const max = $derived(Math.max(expected, Math.max(1, Number(draft.maxOccupancy) || 1)));
+	const max = $derived(effectiveMaxForDraft(draft));
 
 	const nights = $derived.by(() => {
 		if (!draft.checkInDate || !draft.checkOutDate) return 0;
@@ -173,13 +174,21 @@
 <div class="step-content pricing-step">
 	<div class="step-header">
 		<h1 class="step-title">Pricing</h1>
-		<p class="step-subtitle">Set guest counts and compare how each pricing model affects cost per person or per room.</p>
+		<p class="step-subtitle">
+			Set your minimum headcount (realistic low) and maximum headcount (capacity limit), then compare how each pricing model affects cost per person or per room.
+		</p>
 	</div>
 
 	<div class="pricing-inputs section-box">
 		<div class="input-row">
 			<div class="form-group">
-				<label for="expectedGuestCount" class="form-label">Expected guest count (minimum)</label>
+				<label for="expectedGuestCount" class="form-label form-label--stacked">
+					<span class="form-label-line">Minimum Headcount <span class="req">*</span></span>
+					<span class="form-label-sub">(Realistic Low)</span>
+				</label>
+				<p class="form-hint" id="pricing-expectedGuestCount-hint">
+					Your conservative estimate. The fewest people you realistically expect will attend.
+				</p>
 				<input
 					type="number"
 					id="expectedGuestCount"
@@ -187,19 +196,28 @@
 					bind:value={draft.expectedGuestCount}
 					oninput={autosave}
 					min="1"
+					required
 					placeholder="e.g. 6"
+					aria-describedby="pricing-expectedGuestCount-hint"
 				/>
 			</div>
 			<div class="form-group">
-				<label for="maxOccupancy" class="form-label">Max occupancy (if everyone RSVPs)</label>
+				<label for="maxOccupancy" class="form-label form-label--stacked">
+					<span class="form-label-line">Maximum Headcount</span>
+					<span class="form-label-sub">(Capacity Limit)</span>
+				</label>
+				<p class="form-hint" id="pricing-maxOccupancy-hint">
+					The most the trip can accommodate (based on beds, rules, or the property listing).
+				</p>
 				<input
 					type="number"
 					id="maxOccupancy"
 					class="form-input"
 					bind:value={draft.maxOccupancy}
 					oninput={autosave}
-					min="1"
-					placeholder="e.g. 10"
+					min="0"
+					placeholder="Optional"
+					aria-describedby="pricing-maxOccupancy-hint"
 				/>
 			</div>
 		</div>
@@ -207,15 +225,15 @@
 	</div>
 
 	<div class="comparison section-box">
-		<p class="section-header-with-caption"><strong>Compare pricing models</strong> <span class="separator">|</span> Choose how you want to split the total cost. Costs update based on expected vs. max headcount where applicable.</p>
+		<p class="section-header-with-caption"><strong>Compare pricing models</strong> <span class="separator">|</span> Choose how you want to split the total cost. Costs update based on minimum vs. maximum headcount where applicable.</p>
 		<div class="comparison-table-wrapper">
 			<table class="comparison-table">
 				<thead>
 					<tr>
 						<th class="col-select">Choose</th>
 						<th class="col-model">Model</th>
-						<th class="col-scenario">At {expected} guest{expected !== 1 ? 's' : ''} (expected)</th>
-						<th class="col-scenario">At {max} guest{max !== 1 ? 's' : ''} (max RSVPs)</th>
+						<th class="col-scenario">At min headcount · {expected} {expected === 1 ? 'person' : 'people'}</th>
+						<th class="col-scenario">At max headcount (capacity) · {max} {max === 1 ? 'person' : 'people'}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -311,7 +329,7 @@
 										</li>
 									{/each}
 								</ul>
-								<p class="per-bed-col-note">Simulated at {expected} guest{expected !== 1 ? 's' : ''}. Prices vary based on how guests share beds; live price reflects who actually books which bed.</p>
+								<p class="per-bed-col-note">Simulated at min headcount ({expected} {expected === 1 ? 'person' : 'people'}). Prices vary based on how guests share beds; live price reflects who actually books which bed.</p>
 							{:else}
 								—
 							{/if}
@@ -322,11 +340,11 @@
 		</div>
 		{#if draft.pricingModel === 'per-bed'}
 			<p class="per-bed-note">
-				Each <strong>bed</strong> earns a share of the trip total from bed weight and room privacy. We show a <strong>low–high</strong> range for each bed at your expected headcount; prices vary based on how guests share beds. After guests choose beds, <strong>live price</strong> splits each bed’s share among the people on that bed.
+				Each <strong>bed</strong> earns a share of the trip total from bed weight and room privacy. We show a <strong>low–high</strong> range for each bed at your minimum headcount (realistic low); prices vary based on how guests share beds. After guests choose beds, <strong>live price</strong> splits each bed’s share among the people on that bed.
 			</p>
 		{/if}
 		{#if draft.pricingModel === 'per-room'}
-			<p class="formula-note"><strong>Formula:</strong> Price per person = Total cost × (room privacy) ÷ denominator. Denominator = sum of (room privacy × people in that room) for occupied rooms, with a floor of guest count. More guests → larger denominator → lower price per person.</p>
+			<p class="formula-note"><strong>Formula:</strong> Price per person = Total cost × (room privacy) ÷ denominator. Denominator = sum of (room privacy × people in that room) for occupied rooms, with a floor of headcount. More people → larger denominator → lower price per person.</p>
 		{/if}
 	</div>
 </div>
@@ -378,6 +396,28 @@
 		font-size: 0.875rem;
 		font-weight: 500;
 		color: var(--text);
+	}
+	.form-label--stacked {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.2rem;
+		line-height: 1.3;
+	}
+	.form-label--stacked .form-label-sub {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--muted);
+	}
+	.form-label .req {
+		color: var(--danger, #b91c1c);
+		font-weight: 700;
+	}
+	.form-hint {
+		margin: 0 0 0.35rem;
+		font-size: 0.8125rem;
+		line-height: 1.45;
+		color: var(--muted);
 	}
 	.form-input {
 		padding: 0.5rem 0.75rem;

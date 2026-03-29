@@ -43,7 +43,7 @@
 	<div class="cs" class:cs--risk={atRisk}>
 		<div class="cs-inner">
 			<!-- Bar -->
-			<div class="cs-bar-wrap" role="img" aria-label="{confirmedCount} confirmed, {pendingCount} pending of {capacity} capacity">
+			<div class="cs-bar-wrap" role="img" aria-label="{confirmedCount} confirmed, {pendingCount} pending of {capacity} max headcount (capacity limit)">
 				<!-- Track (open capacity) -->
 				<div class="cs-track">
 					<!-- Confirmed fill -->
@@ -58,7 +58,7 @@
 					<!-- Target marker -->
 					{#if targetPct !== null}
 						<div class="cs-target-marker" style="left: {targetPct}%" aria-hidden="true">
-							<span class="cs-target-label">target</span>
+							<span class="cs-target-label">min headcount</span>
 						</div>
 					{/if}
 				</div>
@@ -80,14 +80,14 @@
 					{/if}
 					{#if hasCapacity}
 						<span class="cs-sep" aria-hidden="true">·</span>
-						<span class="cs-label cs-label--capacity">Capacity {capacity}</span>
+						<span class="cs-label cs-label--capacity">Max headcount {capacity}</span>
 					{/if}
 				</div>
 
 				{#if atRisk}
 					<span class="cs-risk-pill">
 						<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-						Pending guests could exceed capacity
+						Pending guests could exceed max headcount (capacity)
 					</span>
 				{:else if openSlots !== null && openSlots > 0}
 					<span class="cs-open-pill">{openSlots} open {openSlots === 1 ? 'slot' : 'slots'}</span>
