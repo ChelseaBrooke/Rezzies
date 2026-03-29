@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { Prisma } from '@prisma/client';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
@@ -7,12 +8,34 @@ import { prisma } from '$lib/server/prisma.js';
 function mapPricingModel(
 	model: string
 ): 'PER_ROOM' | 'PER_BED' | 'PER_PERSON' | 'PER_PERSON_PER_NIGHT' {
-	const m = (model || 'per-person').toLowerCase();
+	const m = (model || 'per-person').toLowerCase().replace(/_/g, '-');
 	if (m === 'per-room') return 'PER_ROOM';
 	if (m === 'per-bed') return 'PER_BED';
 	if (m === 'per-person') return 'PER_PERSON';
-	if (m === 'per-person_per_night' || m === 'per-night') return 'PER_PERSON_PER_NIGHT';
+	if (m === 'per-person-per-night' || m === 'per-night') return 'PER_PERSON_PER_NIGHT';
 	return 'PER_PERSON';
+}
+
+function parseOptionalInt(v: unknown): number | null {
+	if (v == null || v === '') return null;
+	if (typeof v === 'number' && Number.isFinite(v)) return Math.trunc(v);
+	if (typeof v === 'string') {
+		const t = v.trim();
+		if (t === '') return null;
+		const n = parseInt(t, 10);
+		return Number.isFinite(n) ? n : null;
+	}
+	return null;
+}
+
+function logTripUpdateError(tripId: string, phase: string, err: unknown) {
+	console.error(`[api/trips/update] tripId=${tripId} phase=${phase}`, err);
+	if (err instanceof Prisma.PrismaClientKnownRequestError) {
+		console.error(`[api/trips/update] Prisma code=${err.code} meta=${JSON.stringify(err.meta)}`);
+	}
+	if (err instanceof Error && err.stack) {
+		console.error('[api/trips/update] stack:', err.stack);
+	}
 }
 
 export const PUT: RequestHandler = async ({ request, cookies, params }) => {
@@ -30,7 +53,8 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	let body: unknown;
 	try {
 		body = await request.json();
-	} catch {
+	} catch (e) {
+		logTripUpdateError(tripId, 'json_parse', e);
 		return json({ error: 'Invalid JSON body' }, 400);
 	}
 
@@ -48,8 +72,10 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	const locationCityPayload = typeof d.locationCity === 'string' ? d.locationCity.trim() || null : null;
 	const coverPhoto = typeof d.coverPhoto === 'string' ? d.coverPhoto : null;
 	const pricingModel = mapPricingModel(typeof d.pricingModel === 'string' ? d.pricingModel : 'per-person');
-	const expectedGuestCount = typeof d.expectedGuestCount === 'number' ? d.expectedGuestCount : null;
-	const maxOccupancy = typeof d.maxOccupancy === 'number' ? d.maxOccupancy : null;
+	const expectedGuestCount = parseOptionalInt(d.expectedGuestCount);
+	const maxOccupancy = parseOptionalInt(d.maxOccupancy);
+	/** Persist trip-level max only when host entered a positive value (same as publish). */
+	const maxGuestsToStore = maxOccupancy != null && maxOccupancy > 0 ? maxOccupancy : null;
 	const partialStayAllowed = d.partialStayAllowed === true;
 	const costSharingEnabled = d.costSharingEnabled === true;
 	const gamesEnabled = d.gamesEnabled === true;
@@ -87,27 +113,12 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 		return json({ error: 'At least one room is required' }, 400);
 	}
 
-	if (typeof expectedGuestCount === 'number' && expectedGuestCount < 1) {
+	if (expectedGuestCount != null && expectedGuestCount < 1) {
 		return json({ error: 'Minimum headcount must be at least 1' }, 400);
 	}
 
-	const tripForHeadcount = await prisma.trip.findUnique({
-		where: { id: tripId },
-		select: { expectedPeopleCount: true }
-	});
-	const expForMax = Math.max(
-		1,
-		typeof expectedGuestCount === 'number' && expectedGuestCount >= 1
-			? expectedGuestCount
-			: tripForHeadcount?.expectedPeopleCount ?? 1
-	);
-	const resolvedMaxGuests = effectiveMaxHeadcount(
-		expForMax,
-		typeof maxOccupancy === 'number' ? maxOccupancy : 0,
-		rooms as RoomLike[]
-	);
-
 	try {
+		console.info(`[api/trips/update] start tripId=${tripId} userId=${user.id} rooms=${rooms.length} costSharing=${costSharingEnabled}`);
 		await prisma.trip.update({
 			where: { id: tripId },
 			data: {
@@ -180,8 +191,9 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 				const roomName = typeof room.name === 'string' ? room.name : 'Room';
 				const roomPhotos = Array.isArray(room.photos) ? room.photos : [];
 				const roomBeds = Array.isArray(room.beds) ? room.beds : [];
-				const maxOccupancyRoom =
-					typeof room.maxOccupants === 'number' ? room.maxOccupants : null;
+				const maxOccupancyRoom = parseOptionalInt(
+					(room as { maxOccupants?: unknown }).maxOccupants
+				);
 
 				const createdRoom = await prisma.room.create({
 					data: {
@@ -201,7 +213,8 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 
 				for (const bed of roomBeds) {
 					const bedType = typeof bed.bedType === 'string' ? bed.bedType : 'other';
-					const count = typeof bed.count === 'number' && bed.count > 0 ? bed.count : 1;
+					const countRaw = parseOptionalInt((bed as { count?: unknown }).count);
+					const count = countRaw != null && countRaw > 0 ? countRaw : 1;
 					for (let i = 0; i < count; i++) {
 						await prisma.bed.create({
 							data: {
@@ -223,8 +236,9 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 				);
 				if (!existingRoom) continue;
 				const roomPhotos = Array.isArray(room.photos) ? room.photos : [];
-				const maxOccupancyRoom =
-					typeof room.maxOccupants === 'number' ? room.maxOccupants : null;
+				const maxOccupancyRoom = parseOptionalInt(
+					(room as { maxOccupants?: unknown }).maxOccupants
+				);
 				await prisma.room.update({
 					where: { id: existingRoom.id },
 					data: {
@@ -241,12 +255,11 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 			}
 		}
 
+		console.info(`[api/trips/update] success tripId=${tripId}`);
 		return json({ success: true, tripId });
 	} catch (err) {
-		console.error('Update trip error:', err);
-		return json(
-			{ error: err instanceof Error ? err.message : 'Failed to update trip' },
-			500
-		);
+		logTripUpdateError(tripId, 'transaction', err);
+		const message = err instanceof Error ? err.message : 'Failed to update trip';
+		return json({ error: message }, 500);
 	}
 };

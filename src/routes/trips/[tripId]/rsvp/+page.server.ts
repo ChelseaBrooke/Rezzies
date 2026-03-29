@@ -73,11 +73,18 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	const currentRsvp = trip.rsvps[0] || null;
 	const currentProfile = trip.guestProfiles[0] || null;
 	const allAssignments = trip.rooms.flatMap((r) => r.roomAssignments);
+	const isPerRoomPricing = (trip.pricingModel ?? '').toLowerCase() === 'per_room';
 	const myAssignmentIds = new Set(
 		allAssignments.filter((a) => a.userId === user.id && a.bedId).map((a) => a.bedId as string)
 	);
 	const claimedBedIdsByOther = new Set(
 		allAssignments.filter((a) => a.userId !== user.id && a.bedId).map((a) => a.bedId as string)
+	);
+	const myClaimedRoomIds = allAssignments
+		.filter((a) => a.userId === user.id && a.bedId == null)
+		.map((a) => a.roomId);
+	const claimedWholeRoomIdsByOther = new Set(
+		allAssignments.filter((a) => a.userId !== user.id && a.bedId == null).map((a) => a.roomId)
 	);
 	const selectedActivities = trip.activities.filter((a) => a.participants.length > 0);
 
@@ -126,8 +133,11 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		trip,
 		currentRsvp,
 		currentProfile,
+		isPerRoomPricing,
 		myClaimedBedIds: Array.from(myAssignmentIds),
 		claimedBedIdsByOther: Array.from(claimedBedIdsByOther),
+		myClaimedRoomIds,
+		claimedWholeRoomIdsByOther: Array.from(claimedWholeRoomIdsByOther),
 		selectedActivities,
 		guestEstimate,
 		guestEstimateError,
@@ -360,6 +370,96 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	/** Whole-room claim for PER_ROOM pricing (one room per party; bedId null). */
+	claimRooms: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+
+		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) throw error(403, 'You must be a member of this trip');
+
+		const formData = await request.formData();
+		const roomIdsRaw = formData.getAll('roomIds');
+		const roomIds = Array.isArray(roomIdsRaw)
+			? (roomIdsRaw as string[]).map((id) => parseInt(String(id), 10)).filter((n) => Number.isFinite(n))
+			: [];
+		const partySizeRaw = Number(formData.get('partySize'));
+		const rsvp = await prisma.rSVP.findUnique({
+			where: { tripId_userId: { tripId, userId: user.id } }
+		});
+		const partySize = Math.min(
+			99,
+			Math.max(1, Number.isFinite(partySizeRaw) && partySizeRaw > 0 ? partySizeRaw : (rsvp?.adultsCount ?? 1))
+		);
+
+		const trip = await prisma.trip.findUnique({
+			where: { id: tripId },
+			include: { rooms: { include: { beds: true } } }
+		});
+		if (!trip) return fail(404, { claimBedsError: 'Trip not found' });
+		if ((trip.pricingModel ?? '').toLowerCase() !== 'per_room') {
+			return fail(400, { claimBedsError: 'Whole-room selection is only for per-room priced trips.' });
+		}
+		if (roomIds.length !== 1) {
+			return fail(400, { claimBedsError: 'Select exactly one room for your party.' });
+		}
+		const roomId = roomIds[0];
+		const room = trip.rooms.find((r) => r.id === roomId);
+		if (!room) return fail(400, { claimBedsError: 'Invalid room.' });
+
+		function roomCapacity(r: (typeof trip.rooms)[0]): number {
+			const fromBeds = r.beds.reduce((s, b) => s + (b.capacitySlots ?? b.capacity ?? 1), 0);
+			return Math.max(1, r.maxOccupancy ?? fromBeds || 1);
+		}
+		const cap = roomCapacity(room);
+		if (partySize > cap) {
+			return fail(400, {
+				claimBedsError: `Your party (${partySize}) is larger than this room's capacity (${cap}). Choose a larger room or reduce party size.`
+			});
+		}
+
+		const taken = await prisma.roomAssignment.findFirst({
+			where: {
+				tripId,
+				roomId,
+				bedId: null,
+				userId: { not: user.id }
+			}
+		});
+		if (taken) {
+			return fail(409, {
+				bedClaimConflict: true,
+				claimBedsError: 'That room was just claimed by someone else. Pick another.'
+			});
+		}
+
+		try {
+			await prisma.$transaction(async (tx) => {
+				await tx.roomAssignment.deleteMany({ where: { tripId, userId: user.id } });
+				await tx.roomAssignment.create({
+					data: {
+						tripId,
+						roomId,
+						userId: user.id,
+						bedId: null,
+						partySize
+					}
+				});
+			});
+		} catch (e: unknown) {
+			if (isPrismaUniqueConflict(e)) {
+				return fail(409, { bedClaimConflict: true, claimBedsError: 'That room was just claimed. Pick another.' });
+			}
+			throw e;
+		}
+
+		const { createInvoiceForUser } = await import('$lib/server/invoice-calculator.js');
+		await createInvoiceForUser(tripId, user.id).catch(() => {});
+		await checkAndSetReconfirmRequired(tripId);
+		return { claimBedsSuccess: true };
+	},
+
 	/** Guest claims beds. Party size must be covered by total spots of selected beds. One bed = one guest (unique). */
 	claimBeds: async ({ request, params, cookies }) => {
 		const user = await getSessionUser(cookies);
@@ -384,6 +484,11 @@ export const actions: Actions = {
 			include: { rooms: { include: { beds: true } } }
 		});
 		if (!trip) return fail(404, { claimBedsError: 'Trip not found' });
+		if ((trip.pricingModel ?? '').toLowerCase() === 'per_room') {
+			return fail(400, {
+				claimBedsError: 'This trip prices by whole room. Select a room above instead of individual beds.'
+			});
+		}
 
 		const allBeds = trip.rooms.flatMap((r) => r.beds);
 		const bedsById = new Map(allBeds.map((b) => [b.id, b]));
@@ -445,12 +550,17 @@ export const actions: Actions = {
 		const adultsCount = Math.max(1, Number(formData.get('adultsCount')) || 1);
 		const bedIdsRaw = formData.getAll('bedIds');
 		const bedIds = Array.isArray(bedIdsRaw) ? (bedIdsRaw as string[]).filter((id) => typeof id === 'string' && id.trim() !== '') : [];
+		const roomIdsRaw = formData.getAll('roomIds');
+		const roomIds = Array.isArray(roomIdsRaw)
+			? (roomIdsRaw as string[]).map((id) => parseInt(String(id), 10)).filter((n) => Number.isFinite(n))
+			: [];
 
 		const estimate = await computeGuestEstimateWithOverrides(tripId, user.id, {
 			...(arrivalDate && { arrivalDate }),
 			...(departureDate && { departureDate }),
 			adultsCount,
-			bedIds
+			bedIds,
+			...(roomIds.length > 0 ? { roomIds } : {})
 		});
 		return { getEstimate: estimate ?? undefined };
 	},

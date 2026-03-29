@@ -69,11 +69,30 @@ export async function calculateInvoiceForUser(tripId: string, userId: string): P
 		total: 0
 	};
 
-	// Calculate room costs (one line per assigned bed)
+	const pricingModel = (trip.pricingModel || '').toLowerCase();
+
+	// Calculate room costs (per-bed line items, or one line per whole-room claim for PER_ROOM)
 	for (const roomAssignment of roomAssignments) {
 		const startDate = roomAssignment.startDate || trip.checkInDate;
 		const endDate = roomAssignment.endDate || trip.checkOutDate;
 		const nights = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+		if (pricingModel === 'per_room' && roomAssignment.bedId == null) {
+			const priceCalculation = await calculateReservationPrice({
+				tripId,
+				roomId: roomAssignment.roomId,
+				numberOfSlots: roomAssignment.partySize || 1,
+				checkInDate: startDate,
+				checkOutDate: endDate
+			});
+			breakdown.rooms.push({
+				roomId: roomAssignment.roomId,
+				roomName: roomAssignment.room.name,
+				amount: priceCalculation.totalPrice,
+				nights
+			});
+			continue;
+		}
 
 		const bed = roomAssignment.bedId
 			? roomAssignment.room.beds.find((b) => b.id === roomAssignment.bedId)

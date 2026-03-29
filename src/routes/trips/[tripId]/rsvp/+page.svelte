@@ -62,6 +62,8 @@
 	const partySize = $derived(adultsCount);
 	const myClaimedSet = $derived(new Set(data.myClaimedBedIds ?? []));
 	const claimedByOtherSet = $derived(new Set(data.claimedBedIdsByOther ?? []));
+	const isPerRoomPricing = $derived(data.isPerRoomPricing ?? false);
+	const wholeRoomClaimedByOtherSet = $derived(new Set(data.claimedWholeRoomIdsByOther ?? []));
 
 	let selectedBedIds = $state<string[]>([]);
 	let claimBedsFormEl = $state<HTMLFormElement | null>(null);
@@ -88,6 +90,37 @@
 		if (result.type === 'success') await invalidateAll();
 	}
 
+	let selectedRoomId = $state<number | null>(null);
+	let claimRoomsFormEl = $state<HTMLFormElement | null>(null);
+	$effect(() => {
+		if (!data.isPerRoomPricing) return;
+		const ids = data.myClaimedRoomIds ?? [];
+		selectedRoomId = ids.length > 0 ? ids[0]! : null;
+	});
+	function roomCapacityForRoom(room: { maxOccupancy: number | null; beds?: { capacitySlots?: number | null; capacity?: number | null }[] }): number {
+		const fromBeds = (room.beds ?? []).reduce((s, b) => s + (b.capacitySlots ?? b.capacity ?? 1), 0);
+		return Math.max(1, room.maxOccupancy ?? fromBeds || 1);
+	}
+	async function onRoomSelect(roomId: number) {
+		const prev = data.myClaimedRoomIds?.[0] ?? null;
+		selectedRoomId = roomId;
+		await tick();
+		const form = claimRoomsFormEl;
+		if (!form) return;
+		const fd = new FormData(form);
+		fd.set('roomIds', String(roomId));
+		fd.set('partySize', String(adultsCount));
+		const actionUrl = `${$page.url.pathname}?/claimRooms`;
+		const res = await fetch(actionUrl, { method: 'POST', body: fd });
+		const result = deserialize(await res.text());
+		await applyAction(result);
+		if (result.type === 'success') {
+			await invalidateAll();
+		} else {
+			selectedRoomId = prev;
+		}
+	}
+
 	const rooms = $derived(data.trip?.rooms ?? []);
 	const spotsSelected = $derived.by(() => {
 		let total = 0;
@@ -98,8 +131,24 @@
 		}
 		return total;
 	});
-	const canSubmit = $derived(spotsSelected >= partySize);
-	const spotsShortfall = $derived(Math.max(0, partySize - spotsSelected));
+	const selectedRoomCapacity = $derived.by(() => {
+		if (selectedRoomId == null) return 0;
+		const room = rooms.find((r) => r.id === selectedRoomId);
+		if (!room) return 0;
+		return roomCapacityForRoom(room);
+	});
+	const canSubmit = $derived(
+		isPerRoomPricing
+			? selectedRoomId != null && partySize <= selectedRoomCapacity
+			: spotsSelected >= partySize
+	);
+	const spotsShortfall = $derived(
+		isPerRoomPricing
+			? selectedRoomId != null
+				? Math.max(0, partySize - selectedRoomCapacity)
+				: 0
+			: Math.max(0, partySize - spotsSelected)
+	);
 
 	let rsvpStatus = $state('yes');
 	$effect(() => {
@@ -129,13 +178,19 @@
 		const d = departureDate;
 		const adults = adultsCount;
 		const beds = [...selectedBedIds];
+		const roomForEstimate = selectedRoomId;
+		const perRoom = data.isPerRoomPricing ?? false;
 		const pathname = $page.url.pathname;
 		const t = setTimeout(async () => {
 			const fd = new FormData();
 			if (a) fd.set('arrivalDate', a);
 			if (d) fd.set('departureDate', d);
 			fd.set('adultsCount', String(adults));
-			beds.forEach((id) => fd.append('bedIds', id));
+			if (perRoom && roomForEstimate != null) {
+				fd.append('roomIds', String(roomForEstimate));
+			} else {
+				beds.forEach((id) => fd.append('bedIds', id));
+			}
 			const actionUrl = `${pathname}?/getEstimate`;
 			try {
 				const res = await fetch(actionUrl, { method: 'POST', body: fd });
@@ -202,9 +257,13 @@
 
 	const tripNights = $derived(data.roomPricing?.totalNights ?? 0);
 	const pricingByRoomId = $derived.by(() => {
-		const map = new Map<number, { slotPricePerNight: number; roomPricePerNight: number }>();
+		const map = new Map<number, { slotPricePerNight: number; roomPricePerNight: number; roomPriceFullStay: number }>();
 		for (const r of data.roomPricing?.roomPricing ?? []) {
-			map.set(r.roomId, { slotPricePerNight: r.slotPricePerNight, roomPricePerNight: r.roomPricePerNight });
+			map.set(r.roomId, {
+				slotPricePerNight: r.slotPricePerNight,
+				roomPricePerNight: r.roomPricePerNight,
+				roomPriceFullStay: r.roomPriceFullStay
+			});
 		}
 		return map;
 	});
@@ -395,6 +454,73 @@
 					{/if}
 					{#if data.trip.rooms.length === 0}
 						<p class="no-rooms">No rooms available yet. The host will add rooms soon.</p>
+					{:else if data.isPerRoomPricing}
+						<p class="room-pricing-intro helper-text">
+							This trip splits the total evenly by room. Reserve one whole room for your party (one reservation per room).
+						</p>
+						<div class="spots-counter">
+							<span>Party size: <strong>{partySize}</strong></span>
+							{#if selectedRoomId != null}
+								<span>Room capacity: <strong>{selectedRoomCapacity}</strong></span>
+							{/if}
+							{#if spotsShortfall > 0}
+								<span class="spots-warn">Your party needs more capacity than this room allows—pick another room or reduce adults.</span>
+							{/if}
+						</div>
+						<form bind:this={claimRoomsFormEl} method="POST" action="?/claimRooms" use:enhance>
+							<input type="hidden" name="partySize" value={adultsCount} />
+							<div class="rooms-grid hotel-rooms">
+								{#each rooms as room}
+									{@const cap = roomCapacityForRoom(room)}
+									{@const taken = wholeRoomClaimedByOtherSet.has(room.id)}
+									{@const rp = pricingByRoomId.get(room.id)}
+									{@const wholeTotal = rp?.roomPriceFullStay ?? roomPricePerNight(room.id) * tripNights}
+									{@const wholePerNight = rp?.roomPricePerNight ?? roomPricePerNight(room.id)}
+									<div class="hotel-room-card" class:room-unavailable={taken}>
+										<div class="hotel-room-photo">
+											{#if room.photoUrls?.length > 0}
+												<img src={room.photoUrls[0]} alt="" />
+											{:else}
+												<div class="hotel-room-photo-placeholder">
+													<span>{room.name}</span>
+												</div>
+											{/if}
+										</div>
+										<div class="hotel-room-body">
+											<h3 class="hotel-room-name">{room.name}</h3>
+											<p class="hotel-room-capacity">Up to {cap} guest{cap === 1 ? '' : 's'}</p>
+											{#if room.description}
+												<p class="hotel-room-desc">{room.description}</p>
+											{/if}
+											<label class="bed-option hotel-bed whole-room-option" class:disabled={taken} class:selected={selectedRoomId === room.id}>
+												<input
+													type="radio"
+													name="roomIds"
+													value={String(room.id)}
+													checked={selectedRoomId === room.id}
+													disabled={taken}
+													onchange={() => onRoomSelect(room.id)}
+												/>
+												<span class="bed-type">Reserve this room</span>
+												{#if costSharingOn && wholePerNight > 0 && tripNights > 0}
+													<span class="bed-price"
+														>{formatDollars(wholePerNight)}/night · {formatDollars(wholeTotal)} for full stay (your share of trip total)</span
+													>
+												{/if}
+												{#if taken}
+													<span class="claimed-badge">Claimed</span>
+												{/if}
+											</label>
+										</div>
+									</div>
+								{/each}
+							</div>
+							{#if !canSubmit && selectedRoomId != null}
+								<p class="helper-text">Choose a room that fits at least {partySize} guest{partySize === 1 ? '' : 's'}, or lower your party size.</p>
+							{:else if !canSubmit && selectedRoomId == null}
+								<p class="helper-text">Select a room for your party.</p>
+							{/if}
+						</form>
 					{:else}
 						<div class="spots-counter">
 							<span>Spots needed: <strong>{partySize}</strong></span>
@@ -460,8 +586,18 @@
 								<p class="helper-text">Select enough beds to cover {partySize} spot(s).</p>
 							{/if}
 						</form>
+					{/if}
 					{#if costSharingOn && tripNights > 0 && data.roomPricing && tripTotalCost > 0}
-						<p class="trip-total-line"><strong>Total Trip Cost:</strong> {formatDollars(tripTotalCost)} <span class="trip-total-note">(per-bed totals above are based on current {data.yesRsvpHeadcount ?? 0} guest{data.yesRsvpHeadcount === 1 ? '' : 's'})</span></p>
+						<p class="trip-total-line">
+							<strong>Total Trip Cost:</strong> {formatDollars(tripTotalCost)}
+							<span class="trip-total-note">
+								{#if data.isPerRoomPricing}
+									(each room pays an equal share of this total; your dates prorate the amount)
+								{:else}
+									(per-bed totals above are based on current {data.yesRsvpHeadcount ?? 0} guest{data.yesRsvpHeadcount === 1 ? '' : 's'})
+								{/if}
+							</span>
+						</p>
 					{/if}
 					{#if costSharingOn && (isYes || needsReconfirm)}
 						<div id="cost-commitment" class="cost-commitment-module">
@@ -469,7 +605,9 @@
 									<div class="estimate-lines">
 										<p class="estimate-range"><strong>My estimated share: {guestEstimate.displayCents != null ? formatCents(guestEstimate.displayCents) : formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
 										<p class="estimate-secondary">
-											{#if guestEstimate.displayCents != null}
+											{#if data.isPerRoomPricing}
+												Each room pays an equal share of the trip total; your dates prorate that amount.
+											{:else if guestEstimate.displayCents != null}
 												Range {formatRange(guestEstimate.lowCents, guestEstimate.highCents)} depending on final headcount.
 											{:else}
 												Least if {guestEstimate.hmax} people attend (max headcount, capacity limit); most if {guestEstimate.hmin} attend (min headcount, realistic low). Final amount depends on the number of attendees.
@@ -512,7 +650,13 @@
 											{/if}
 										</p>
 									{:else}
-										<p class="helper-text">For per-bed trips, you’ll see your estimate after you pick your bed(s) above.</p>
+										<p class="helper-text">
+											{#if data.isPerRoomPricing}
+												Select a room above to confirm your share of the trip total.
+											{:else}
+												For per-bed trips, you’ll see your estimate after you pick your bed(s) above.
+											{/if}
+										</p>
 									{/if}
 								{/if}
 							</div>
@@ -530,7 +674,13 @@
 									Submit
 								</button>
 								{#if !canSubmit}
-									<span class="validation-hint">Select bed(s) to cover your party before submitting.</span>
+									<span class="validation-hint">
+										{#if data.isPerRoomPricing}
+											Select a room that fits your party before submitting.
+										{:else}
+											Select bed(s) to cover your party before submitting.
+										{/if}
+									</span>
 								{/if}
 							</div>
 						</form>
@@ -1010,6 +1160,14 @@
 		font-weight: 600;
 		color: #2c2419;
 		margin: 0 0 0.35rem 0;
+	}
+	.hotel-room-capacity {
+		font-size: 0.85rem;
+		color: #6b5f54;
+		margin: 0 0 0.5rem 0;
+	}
+	.hotel-room-card.room-unavailable {
+		opacity: 0.72;
 	}
 	.hotel-room-desc {
 		font-size: 0.9rem;

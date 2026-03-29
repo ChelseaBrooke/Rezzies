@@ -12,18 +12,26 @@
 		steps,
 		currentStep,
 		backHref,
+		backLabel,
 		onBack,
 		hideBack = false,
-		inlineLabel
+		inlineLabel,
+		hideSteps = false
 	}: {
 		steps: Step[];
 		currentStep: number;
 		backHref?: string;
+		/** Overrides default "← Back to trip" when using backHref */
+		backLabel?: string;
 		onBack?: () => void;
 		hideBack?: boolean;
 		/** Optional label rendered on the left in place of the back button */
 		inlineLabel?: string;
+		/** When true, only the back row is shown (no step indicators) */
+		hideSteps?: boolean;
 	} = $props();
+
+	const backLinkText = $derived(backLabel ?? '← Back to trip');
 	
 	function prevStep() {
 		if (onBack) {
@@ -41,17 +49,21 @@
 </script>
 
 <div class="stepper">
-	<div class="stepper-content" class:stepper-content--inline-title={!!inlineLabel}>
-		{#if inlineLabel}
+	<div
+		class="stepper-content"
+		class:stepper-content--inline-title={!!inlineLabel}
+		class:stepper-content--back-only={hideSteps}
+	>
+			{#if inlineLabel}
 			<span class="stepper-inline-label">{inlineLabel}</span>
 		{:else if !hideBack}
 			{#if currentStep > 0 || backHref || onBack}
 				{#if onBack}
 					<button type="button" class="stepper-back-btn" onclick={onBack}>
-						{currentStep === 0 ? '← Back to trip' : '← Back'}
+						{currentStep === 0 ? backLinkText : '← Back'}
 					</button>
 				{:else if backHref}
-					<a href={backHref} class="stepper-back-btn">← Back to trip</a>
+					<a href={backHref} class="stepper-back-btn">{backLinkText}</a>
 				{:else}
 					<button type="button" class="stepper-back-btn" onclick={prevStep}>
 						← Back
@@ -59,25 +71,27 @@
 				{/if}
 			{/if}
 		{/if}
-		<div class="stepper-steps">
-			{#each steps as step, index}
-				<div class="step-item" class:completed={index < currentStep} class:current={index === currentStep}>
-					<div class="step-circle" class:completed={index < currentStep} class:current={index === currentStep}>
-						{#if index < currentStep}
-							<span class="checkmark">✓</span>
-						{:else if index === currentStep}
-							<span class="step-number">{step.number}</span>
-						{:else}
-							<span class="step-number">{step.number}</span>
+		{#if !hideSteps}
+			<div class="stepper-steps">
+				{#each steps as step, index}
+					<div class="step-item" class:completed={index < currentStep} class:current={index === currentStep}>
+						<div class="step-circle" class:completed={index < currentStep} class:current={index === currentStep}>
+							{#if index < currentStep}
+								<span class="checkmark">✓</span>
+							{:else if index === currentStep}
+								<span class="step-number">{step.number}</span>
+							{:else}
+								<span class="step-number">{step.number}</span>
+							{/if}
+						</div>
+						<span class="step-label">{step.label}</span>
+						{#if index < steps.length - 1}
+							<div class="step-connector" class:completed={index < currentStep}></div>
 						{/if}
 					</div>
-					<span class="step-label">{step.label}</span>
-					{#if index < steps.length - 1}
-						<div class="step-connector" class:completed={index < currentStep}></div>
-					{/if}
-				</div>
-			{/each}
-		</div>
+				{/each}
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -101,6 +115,10 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		position: relative;
+	}
+
+	.stepper-content--back-only:not(.stepper-content--inline-title) {
+		justify-content: flex-start;
 	}
 
 	/* Title flush left, full width row; steps centered in remaining space */

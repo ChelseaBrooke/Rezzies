@@ -37,14 +37,6 @@
 	const expected = $derived(Math.max(1, Number(draft.expectedGuestCount) || 1));
 	const max = $derived(effectiveMaxForDraft(draft));
 
-	const nights = $derived.by(() => {
-		if (!draft.checkInDate || !draft.checkOutDate) return 0;
-		const checkIn = new Date(draft.checkInDate);
-		const checkOut = new Date(draft.checkOutDate);
-		const diff = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-		return diff > 0 ? diff : 0;
-	});
-
 	const customItemsTotal = $derived(
 		draft.customLineItems?.length
 			? draft.customLineItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
@@ -70,34 +62,6 @@
 	const perRoomCost = $derived(totalRooms > 0 ? total / totalRooms : 0);
 	const perPersonAtMin = $derived(expected > 0 ? total / expected : 0);
 	const perPersonAtMax = $derived(max > 0 ? total / max : 0);
-
-	// Per-room: denominator = sum of (room privacy × people in room). We don't have assignments in preview, so approximate: assume guests fill rooms (by maxOccupancy). Then denominator = sum over rooms of (privacy × min(people in room, capacity)).
-	const roomDenomExpected = $derived.by(() => {
-		let remaining = expected;
-		let sum = 0;
-		for (const room of rooms) {
-			const cap = Math.max(1, room.maxOccupants ?? 1);
-			const people = Math.min(cap, remaining);
-			if (people <= 0) break;
-			sum += privacyFactor(room) * people;
-			remaining -= people;
-		}
-		return Math.max(sum, expected);
-	});
-	const roomDenomMax = $derived.by(() => {
-		let remaining = max;
-		let sum = 0;
-		for (const room of rooms) {
-			const cap = Math.max(1, room.maxOccupants ?? 1);
-			const people = Math.min(cap, remaining);
-			if (people <= 0) break;
-			sum += privacyFactor(room) * people;
-			remaining -= people;
-		}
-		return Math.max(sum, max);
-	});
-	const perRoomPricePerPersonExpected = $derived(roomDenomExpected > 0 ? total / roomDenomExpected : 0);
-	const perRoomPricePerPersonMax = $derived(roomDenomMax > 0 ? total / roomDenomMax : 0);
 
 	const BED_SPOT_COUNTS_P: Record<string, number> = {
 		twin: 1, single: 1, bunk: 2, full: 2, double: 2,
@@ -131,8 +95,6 @@
 			label: string;
 			low: number;
 			high: number;
-			perNightLow: number;
-			perNightHigh: number;
 			lowPP: number;
 			highPP: number;
 		}[] = [];
@@ -150,8 +112,6 @@
 						label: count > 1 ? `${roomName}, ${typeLabel} ${i + 1}` : `${roomName}, ${typeLabel}`,
 						low: r?.lowBedPrice ?? 0,
 						high: r?.highBedPrice ?? 0,
-						perNightLow: nights > 0 ? (r?.lowBedPrice ?? 0) / nights : 0,
-						perNightHigh: nights > 0 ? (r?.highBedPrice ?? 0) / nights : 0,
 						lowPP: r?.lowPerPersonPrice ?? 0,
 						highPP: r?.highPerPersonPrice ?? 0
 					});
@@ -160,10 +120,6 @@
 		});
 		return list;
 	});
-
-	const perPersonAtMinPerNight = $derived(nights > 0 ? perPersonAtMin / nights : 0);
-	const perPersonAtMaxPerNight = $derived(nights > 0 ? perPersonAtMax / nights : 0);
-	const perRoomCostPerNight = $derived(nights > 0 ? perRoomCost / nights : 0);
 
 	function selectModel(value: PricingModelOption) {
 		draft.pricingModel = value;
@@ -175,7 +131,7 @@
 	<div class="step-header">
 		<h1 class="step-title">Pricing</h1>
 		<p class="step-subtitle">
-			Set your minimum headcount (realistic low) and maximum headcount (capacity limit), then compare how each pricing model affects cost per person or per room.
+			Set your minimum headcount (realistic low) and maximum headcount (capacity limit). Per-person pricing uses both bounds; per-room is an equal share per room; per-bed depends on bed choice.
 		</p>
 	</div>
 
@@ -225,15 +181,14 @@
 	</div>
 
 	<div class="comparison section-box">
-		<p class="section-header-with-caption"><strong>Compare pricing models</strong> <span class="separator">|</span> Choose how you want to split the total cost. Costs update based on minimum vs. maximum headcount where applicable.</p>
+		<p class="section-header-with-caption"><strong>Compare pricing models</strong> <span class="separator">|</span> Choose how you want to split the total cost.</p>
 		<div class="comparison-table-wrapper">
 			<table class="comparison-table">
 				<thead>
 					<tr>
 						<th class="col-select">Choose</th>
 						<th class="col-model">Model</th>
-						<th class="col-scenario">At min headcount · {expected} {expected === 1 ? 'person' : 'people'}</th>
-						<th class="col-scenario">At max headcount (capacity) · {max} {max === 1 ? 'person' : 'people'}</th>
+						<th class="col-cost">Cost</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -251,17 +206,18 @@
 							</label>
 						</td>
 						<td class="col-model">Per Person</td>
-						<td class="col-scenario">
-							<span>${perPersonAtMin.toFixed(2)} per person</span>
-							{#if nights > 0}
-								<p class="per-night"><strong>Per night:</strong> ${perPersonAtMinPerNight.toFixed(2)}</p>
-							{/if}
-						</td>
-						<td class="col-scenario">
-							<span>${perPersonAtMax.toFixed(2)} per person</span>
-							{#if nights > 0}
-								<p class="per-night"><strong>Per night:</strong> ${perPersonAtMaxPerNight.toFixed(2)}</p>
-							{/if}
+						<td class="col-cost col-cost--dual">
+							<div class="cost-dual-block">
+								<div class="cost-dual-line">
+									<span class="cost-dual-label">Min · {expected} {expected === 1 ? 'person' : 'people'}</span>
+									<span>${perPersonAtMin.toFixed(2)} per person</span>
+								</div>
+								<div class="cost-dual-divider" aria-hidden="true"></div>
+								<div class="cost-dual-line">
+									<span class="cost-dual-label">Max · {max} {max === 1 ? 'person' : 'people'}</span>
+									<span>${perPersonAtMax.toFixed(2)} per person</span>
+								</div>
+							</div>
 						</td>
 					</tr>
 					<tr class="model-row" class:selected={draft.pricingModel === 'per-room'} role="button" tabindex="0" onclick={() => selectModel('per-room')} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectModel('per-room'); } }}>
@@ -278,22 +234,10 @@
 							</label>
 						</td>
 						<td class="col-model">Per Room</td>
-						<td class="col-scenario">
+						<td class="col-cost">
 							{#if totalRooms > 0}
-								<span>${perRoomPricePerPersonExpected.toFixed(2)} per person</span>
-								{#if nights > 0}
-									<p class="per-night"><strong>Per night:</strong> ${(perRoomPricePerPersonExpected / nights).toFixed(2)}</p>
-								{/if}
-							{:else}
-								—
-							{/if}
-						</td>
-						<td class="col-scenario">
-							{#if totalRooms > 0}
-								<span>${perRoomPricePerPersonMax.toFixed(2)} per person</span>
-								{#if nights > 0}
-									<p class="per-night"><strong>Per night:</strong> ${(perRoomPricePerPersonMax / nights).toFixed(2)}</p>
-								{/if}
+								<span>${perRoomCost.toFixed(2)} per room</span>
+								<p class="per-room-note">Trip total ÷ {totalRooms} room{totalRooms === 1 ? '' : 's'} (guests RSVP for a whole room)</p>
 							{:else}
 								—
 							{/if}
@@ -313,19 +257,14 @@
 							</label>
 						</td>
 						<td class="col-model">Per Bed</td>
-						<td class="col-scenario" colspan="2">
+						<td class="col-cost">
 							{#if perBedSlotBreakdown.length > 0}
 								<ul class="bed-breakdown bed-by-room">
 									{#each perBedSlotBreakdown as item, i (item.roomName + '-' + item.bedType + '-' + i)}
 										<li>
 											<span class="bed-slot-label">{item.label}</span>
 											<span class="bed-slot-price">${item.low.toFixed(2)}–${item.high.toFixed(2)}</span>
-											{#if nights > 0}
-												<p class="per-night">
-													<strong>Per night:</strong> ${item.perNightLow.toFixed(2)}–${item.perNightHigh.toFixed(2)}
-												</p>
-											{/if}
-											<p class="per-night per-person-price">${item.lowPP.toFixed(2)}–${item.highPP.toFixed(2)}<span class="per-person-label">/person</span></p>
+											<p class="per-person-line per-person-price">${item.lowPP.toFixed(2)}–${item.highPP.toFixed(2)}<span class="per-person-label">/person</span></p>
 										</li>
 									{/each}
 								</ul>
@@ -344,7 +283,7 @@
 			</p>
 		{/if}
 		{#if draft.pricingModel === 'per-room'}
-			<p class="formula-note"><strong>Formula:</strong> Price per person = Total cost × (room privacy) ÷ denominator. Denominator = sum of (room privacy × people in that room) for occupied rooms, with a floor of headcount. More people → larger denominator → lower price per person.</p>
+			<p class="formula-note"><strong>Formula:</strong> Each room pays the same share: trip total ÷ number of rooms, prorated to each guest’s stay dates. Capacity per room still limits how many people can claim that room.</p>
 		{/if}
 	</div>
 </div>
@@ -483,18 +422,10 @@
 	.comparison-table tbody tr {
 		height: 9rem;
 	}
-	.comparison-table tbody td.col-scenario {
+	.comparison-table tbody td.col-cost {
 		height: 9rem;
 		max-height: 9rem;
 		overflow-y: auto;
-	}
-	.per-night {
-		margin: 0.35rem 0 0 0;
-		font-size: 0.8125rem;
-		color: var(--text);
-	}
-	.per-night strong {
-		font-weight: 700;
 	}
 	.comparison-table thead th {
 		font-weight: 600;
@@ -518,9 +449,52 @@
 		min-width: 8rem;
 		font-weight: 500;
 	}
-	.col-scenario {
-		min-width: 10rem;
+	.col-cost {
+		min-width: 12rem;
+		color: var(--text);
+	}
+	.col-cost--dual {
+		vertical-align: top;
+	}
+	.cost-dual-block {
+		display: flex;
+		flex-direction: row;
+		align-items: stretch;
+		justify-content: center;
+		gap: 0.75rem;
+		width: 100%;
+		max-width: 28rem;
+		margin: 0 auto;
+	}
+	.cost-dual-divider {
+		flex: 0 0 1px;
+		align-self: stretch;
+		min-height: 2.5rem;
+		background: var(--border);
+	}
+	.cost-dual-line {
+		flex: 1;
+		min-width: 0;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		align-items: center;
+		text-align: center;
+		font-size: 0.9375rem;
+		color: var(--text);
+	}
+	.cost-dual-label {
+		font-size: 0.8125rem;
+		font-weight: 600;
 		color: var(--muted);
+		line-height: 1.3;
+	}
+	.per-room-note {
+		margin: 0.35rem 0 0;
+		font-size: 0.8125rem;
+		color: var(--muted);
+		line-height: 1.35;
 	}
 	.bed-breakdown {
 		margin: 0;
@@ -534,8 +508,9 @@
 	.bed-breakdown li:last-child {
 		margin-bottom: 0;
 	}
-	.bed-breakdown .per-night {
+	.per-person-line {
 		margin: 0.15rem 0 0 0;
+		width: 100%;
 	}
 	.per-person-price {
 		font-weight: 700;

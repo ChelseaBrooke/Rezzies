@@ -7,12 +7,25 @@ import { prisma } from '$lib/server/prisma.js';
 function mapPricingModel(
 	model: string
 ): 'PER_ROOM' | 'PER_BED' | 'PER_PERSON' | 'PER_PERSON_PER_NIGHT' {
-	const m = (model || 'per-person').toLowerCase();
+	const m = (model || 'per-person').toLowerCase().replace(/_/g, '-');
 	if (m === 'per-room') return 'PER_ROOM';
 	if (m === 'per-bed') return 'PER_BED';
 	if (m === 'per-person') return 'PER_PERSON';
-	if (m === 'per-person_per_night' || m === 'per-night') return 'PER_PERSON_PER_NIGHT';
+	if (m === 'per-person-per-night' || m === 'per-night') return 'PER_PERSON_PER_NIGHT';
 	return 'PER_PERSON';
+}
+
+/** JSON from the wizard often has counts as strings (inputs / localStorage). Prisma Int fields require numbers. */
+function parseOptionalInt(v: unknown): number | null {
+	if (v == null || v === '') return null;
+	if (typeof v === 'number' && Number.isFinite(v)) return Math.trunc(v);
+	if (typeof v === 'string') {
+		const t = v.trim();
+		if (t === '') return null;
+		const n = parseInt(t, 10);
+		return Number.isFinite(n) ? n : null;
+	}
+	return null;
 }
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
@@ -44,8 +57,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	const pricingModel = mapPricingModel(
 		typeof d.pricingModel === 'string' ? d.pricingModel : 'per-person'
 	);
-	const expectedGuestCount = typeof d.expectedGuestCount === 'number' ? d.expectedGuestCount : null;
-	const maxOccupancy = typeof d.maxOccupancy === 'number' ? d.maxOccupancy : null;
+	const expectedGuestCount = parseOptionalInt(d.expectedGuestCount);
+	const maxOccupancy = parseOptionalInt(d.maxOccupancy);
 	const partialStayAllowed = d.partialStayAllowed === true;
 	const costSharingEnabled = d.costSharingEnabled === true; // explicit opt-in; default false
 	const isPublished = d.isPublished !== false; // default true, pass false to save as draft
@@ -66,7 +79,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	const platformFeePerPerson = waivePlatformFee
 		? 0
 		: splitPlatformFee
-			? PLATFORM_FEE / Math.max(1, typeof d.expectedGuestCount === 'number' ? d.expectedGuestCount : 1)
+			? PLATFORM_FEE / Math.max(1, expectedGuestCount != null && expectedGuestCount >= 1 ? expectedGuestCount : 1)
 			: 0;
 
 	if (!name) {
@@ -165,8 +178,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			const roomName = rawName || `Room ${ri + 1}`;
 			const roomPhotos = Array.isArray(room.photos) ? room.photos : [];
 			const roomBeds = Array.isArray(room.beds) ? room.beds : [];
-			const maxOccupancyRoom =
-				typeof room.maxOccupants === 'number' ? room.maxOccupants : null;
+			const maxOccupancyRoom = parseOptionalInt(
+				(room as { maxOccupants?: unknown }).maxOccupants
+			);
 
 			const createdRoom = await prisma.room.create({
 				data: {
@@ -186,7 +200,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
 			for (const bed of roomBeds) {
 				const bedType = typeof bed.bedType === 'string' ? bed.bedType : 'other';
-				const count = typeof bed.count === 'number' && bed.count > 0 ? bed.count : 1;
+				const countRaw = parseOptionalInt((bed as { count?: unknown }).count);
+				const count = countRaw != null && countRaw > 0 ? countRaw : 1;
 				for (let i = 0; i < count; i++) {
 					await prisma.bed.create({
 						data: {

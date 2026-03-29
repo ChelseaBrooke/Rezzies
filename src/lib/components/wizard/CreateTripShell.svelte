@@ -19,21 +19,30 @@
 		children,
 		onBack,
 		backHref,
+		backLabel,
 		previewLabel,
 		stepperInlineLabel,
 		steps: stepsProp,
-		hideStepperBack = false
+		hideStepperBack = false,
+		/** Hide wizard TopBar (emoji bell/profile) — e.g. trip editor publish */
+		hideTopBar = false,
+		/** Hide step circles; keep only back link when applicable */
+		hideStepIndicators = false
 	}: {
 		currentStep: number;
 		children: any;
 		onBack?: () => void;
 		backHref?: string;
+		/** Text for back link/button when using backHref or step 0 + onBack */
+		backLabel?: string;
 		previewLabel?: string;
 		/** When set, replaces the back button with an inline label inside the stepper row */
 		stepperInlineLabel?: string;
 		steps?: Step[];
 		/** When true, stepper header hides Back (e.g. trips/new — footer has Back). */
 		hideStepperBack?: boolean;
+		hideTopBar?: boolean;
+		hideStepIndicators?: boolean;
 	} = $props();
 
 	const steps = $derived(stepsProp ?? DEFAULT_STEPS);
@@ -54,12 +63,21 @@
 		<!-- Top Bar or preview label (only when standalone, not portal-contained) -->
 		{#if previewLabel}
 			<div class="preview-label">{previewLabel}</div>
-		{:else if !stepperInlineLabel}
+		{:else if !stepperInlineLabel && !hideTopBar}
 			<TopBar />
 		{/if}
 		
 		<!-- Stepper inside card -->
-		<Stepper {steps} {currentStep} {onBack} {backHref} hideBack={hideStepperBack} inlineLabel={stepperInlineLabel} />
+		<Stepper
+			{steps}
+			{currentStep}
+			{onBack}
+			{backHref}
+			{backLabel}
+			hideBack={hideStepperBack}
+			inlineLabel={stepperInlineLabel}
+			hideSteps={hideStepIndicators}
+		/>
 		
 		<!-- Card Content -->
 		<div class="card-content">

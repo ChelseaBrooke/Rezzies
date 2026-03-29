@@ -127,12 +127,18 @@
 			});
 			const result = await res.json().catch(() => ({}));
 			if (!res.ok) {
+				console.error('[trip settings save] update failed', {
+					tripId,
+					status: res.status,
+					result
+				});
 				saveError = result.error || `Save failed (${res.status})`;
 				return;
 			}
 			await invalidateAll();
 			goto(`/trips/${tripId}`);
 		} catch (e) {
+			console.error('[trip settings save] network or parse error', { tripId, error: e });
 			saveError = e instanceof Error ? e.message : 'Failed to save trip';
 		} finally {
 			isSaving = false;
@@ -151,12 +157,21 @@
 			});
 			const result = await res.json().catch(() => ({}));
 			if (!res.ok) {
+				console.error('[trip settings save] update failed (publish path)', {
+					tripId,
+					status: res.status,
+					result
+				});
 				saveError = result.error || `Save failed (${res.status})`;
 				return;
 			}
 			await invalidateAll();
 			goto(`/trips/${tripId}/publish`);
 		} catch (e) {
+			console.error('[trip settings save] network or parse error (publish path)', {
+				tripId,
+				error: e
+			});
 			saveError = e instanceof Error ? e.message : 'Failed to save trip';
 		} finally {
 			isSaving = false;

@@ -11,7 +11,7 @@ import {
 	perBedSelectionRangeForTripBedIds,
 	buildPerBedOccupancyMap,
 	computePerBedLivePriceForBed,
-	getRoomEffectivePrivacy
+	perRoomShareFullTrip
 } from './pricing-canonical.js';
 import { createHash } from 'crypto';
 
@@ -154,15 +154,25 @@ export async function computeGuestEstimateRange(
 		if (pricingModel === 'per_bed') {
 			throw new Error('Guest has not selected a bed yet');
 		}
-		const firstRoom = trip.rooms.find((r) => (r.beds?.length ?? 0) > 0) ?? trip.rooms[0];
-		if (!firstRoom) throw new Error('Trip has no rooms');
-		const firstBed = firstRoom.beds?.[0];
-		if (!firstBed) throw new Error('Trip has no beds configured');
-		roomId = firstRoom.id;
-		bedId = firstBed.id;
-		numberOfSlots = guestPartySize;
-		checkInDate = trip.checkInDate;
-		checkOutDate = trip.checkOutDate;
+		if (pricingModel === 'per_room') {
+			const firstRoom = trip.rooms[0];
+			if (!firstRoom) throw new Error('Trip has no rooms');
+			roomId = firstRoom.id;
+			bedId = undefined;
+			numberOfSlots = guestPartySize;
+			checkInDate = trip.checkInDate;
+			checkOutDate = trip.checkOutDate;
+		} else {
+			const firstRoom = trip.rooms.find((r) => (r.beds?.length ?? 0) > 0) ?? trip.rooms[0];
+			if (!firstRoom) throw new Error('Trip has no rooms');
+			const firstBed = firstRoom.beds?.[0];
+			if (!firstBed) throw new Error('Trip has no beds configured');
+			roomId = firstRoom.id;
+			bedId = firstBed.id;
+			numberOfSlots = guestPartySize;
+			checkInDate = trip.checkInDate;
+			checkOutDate = trip.checkOutDate;
+		}
 	}
 
 	// For PER_PERSON and PER_PERSON_PER_NIGHT, price doesn't vary by headcount in the same way; use capacity.
@@ -227,26 +237,19 @@ export async function computeGuestEstimateRange(
 				'Range reflects how your bed share can move; prices vary based on how guests share beds (simulated at expected headcount). Live amount uses current assignments.';
 		}
 	} else if (pricingModel === 'per_room') {
-		// Price at Hmax (more people) = lower share; at Hmin (fewer people) = higher share
-		const priceAtHmax = await calculateReservationPriceWithHeadcount(tripId, {
+		const pr = await calculateReservationPrice({
+			tripId,
 			roomId,
-			bedId,
 			numberOfSlots,
 			checkInDate,
 			checkOutDate,
-			overrideHeadcount: hmax
+			...(bedId ? { bedId } : {})
 		});
-		const priceAtHmin = await calculateReservationPriceWithHeadcount(tripId, {
-			roomId,
-			bedId,
-			numberOfSlots,
-			checkInDate,
-			checkOutDate,
-			overrideHeadcount: hmin
-		});
-		lowCents = Math.round(priceAtHmax * 100);
-		highCents = Math.round(priceAtHmin * 100);
-		if (hmin < hmax) explanationReason = 'Fewer guests confirmed; final amount depends on headcount.';
+		const cents = Math.round(pr.totalPrice * 100);
+		lowCents = cents;
+		highCents = cents;
+		displayCents = cents;
+		explanationReason = 'Each room pays an equal share of the trip total (prorated to your stay).';
 	} else if (pricingModel !== 'per_bed') {
 		// PER_PERSON / PER_PERSON_PER_NIGHT: use capacity-based single price; range = same or slight variance
 		const single = await calculateReservationPrice({
@@ -286,6 +289,8 @@ export interface GuestEstimateOverrides {
 	departureDate?: string;
 	adultsCount: number;
 	bedIds: string[];
+	/** PER_ROOM: selected room ids (whole-room claim); each adds one equal share of trip total */
+	roomIds?: number[];
 }
 
 /**
@@ -340,7 +345,13 @@ export async function computeGuestEstimateWithOverrides(
 	let roomId: number;
 	let bedId: string | undefined;
 
-	if (pricingModel === 'per_bed' && overrides.bedIds.length > 0) {
+	if (pricingModel === 'per_room') {
+		const ids = overrides.roomIds?.filter((id) => Number.isFinite(id)) ?? [];
+		const pick = ids.length > 0 ? trip.rooms.find((r) => r.id === ids[0]) : trip.rooms[0];
+		if (!pick) return null;
+		roomId = pick.id;
+		bedId = undefined;
+	} else if (pricingModel === 'per_bed' && overrides.bedIds.length > 0) {
 		for (const bid of overrides.bedIds) {
 			for (const room of trip.rooms) {
 				const bed = room.beds?.find((b) => b.id === bid);
@@ -360,6 +371,7 @@ export async function computeGuestEstimateWithOverrides(
 		roomId = perBedSelections[0].roomId;
 		bedId = perBedSelections[0].bedId;
 	} else {
+		// per_person, per_person_per_night, etc. (per_bed with no bedIds returned above)
 		const firstRoom = trip.rooms.find((r) => (r.beds?.length ?? 0) > 0) ?? trip.rooms[0];
 		const firstBed = firstRoom?.beds?.[0];
 		if (!firstRoom || !firstBed) return null;
@@ -439,25 +451,17 @@ export async function computeGuestEstimateWithOverrides(
 					'Range reflects how your bed share can move; prices vary based on how guests share beds (simulated at expected headcount). Live amount uses current assignments.';
 			}
 		} else if (pricingModel === 'per_room') {
-			const priceAtHmax = await calculateReservationPriceWithHeadcount(tripId, {
-				roomId,
-				bedId,
-				numberOfSlots,
-				checkInDate,
-				checkOutDate,
-				overrideHeadcount: hmax
-			});
-			const priceAtHmin = await calculateReservationPriceWithHeadcount(tripId, {
-				roomId,
-				bedId,
-				numberOfSlots,
-				checkInDate,
-				checkOutDate,
-				overrideHeadcount: hmin
-			});
-			lowCents = Math.round(priceAtHmax * 100);
-			highCents = Math.round(priceAtHmin * 100);
-			if (hmin < hmax) explanationReason = 'Fewer guests confirmed; final amount depends on headcount.';
+			const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
+			const stayNights = calculateNights(checkInDate, checkOutDate);
+			const stayFactor = totalNights > 0 ? stayNights / totalNights : 1;
+			const share = perRoomShareFullTrip(trip);
+			const roomCount = Math.max(1, overrides.roomIds?.length ?? 1);
+			const total = share * roomCount * stayFactor;
+			const cents = Math.round(total * 100);
+			lowCents = cents;
+			highCents = cents;
+			displayCents = cents;
+			explanationReason = 'Each selected room is an equal share of the trip total (prorated to your stay).';
 		} else if (pricingModel !== 'per_bed') {
 			const single = await calculateReservationPrice({
 				tripId,
@@ -489,58 +493,6 @@ export async function computeGuestEstimateWithOverrides(
 		explanationReason,
 		...(displayCents != null && { displayCents })
 	};
-}
-
-/**
- * Calculate reservation price with an overridden headcount (PER_ROOM preview range).
- */
-async function calculateReservationPriceWithHeadcount(
-	tripId: string,
-	params: {
-		roomId: number;
-		bedId?: string;
-		numberOfSlots: number;
-		checkInDate: Date;
-		checkOutDate: Date;
-		overrideHeadcount: number;
-	}
-): Promise<number> {
-	const trip = await prisma.trip.findUnique({
-		where: { id: tripId },
-		include: {
-			rooms: { include: { beds: true } },
-			roomAssignments: { include: { room: true } }
-		}
-	});
-	if (!trip) throw new Error('Trip not found');
-
-	const { roomId, bedId, numberOfSlots, checkInDate, checkOutDate, overrideHeadcount } = params;
-	const totalNights = calculateNights(trip.checkInDate, trip.checkOutDate);
-	const stayNights = calculateNights(checkInDate, checkOutDate);
-	const stayFactor = totalNights > 0 ? stayNights / totalNights : 1;
-	const room = trip.rooms.find((r) => r.id === roomId);
-	if (!room) throw new Error('Room not found');
-	const privacyFactor = getRoomEffectivePrivacy(room.beds);
-	const pricingModel = (trip.pricingModel || 'per_person').toLowerCase();
-
-	if (pricingModel === 'per_room') {
-		const avgPrivacy =
-			trip.rooms.reduce((s, r) => s + getRoomEffectivePrivacy(r.beds), 0) / trip.rooms.length || 1;
-		const denominator = Math.max(overrideHeadcount * avgPrivacy, 1);
-		const pricePerPersonFullStay = (trip.totalCost * privacyFactor) / denominator;
-		return pricePerPersonFullStay * stayFactor;
-	}
-
-	// Fallback: use standard calc
-	const result = await calculateReservationPrice({
-		tripId,
-		roomId,
-		bedId,
-		numberOfSlots,
-		checkInDate,
-		checkOutDate
-	});
-	return result.totalPrice;
 }
 
 /** Accepted range + assumptions as stored on RSVP */

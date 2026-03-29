@@ -130,35 +130,12 @@
 	const rooms      = $derived(draft.rooms ?? []);
 	const totalRooms = $derived(rooms.length);
 
-	// Per-person
+	// Per-person (flat split — min vs max headcount)
 	const ppExpected = $derived(expected > 0 ? total / expected : 0);
-	const ppMax      = $derived(maxG     > 0 ? total / maxG     : 0);
+	const ppMax = $derived(maxG > 0 ? total / maxG : 0);
 
-	// Per-room (privacy-weighted per-person)
-	const roomDenomExpected = $derived.by(() => {
-		let rem = expected, sum = 0;
-		for (const room of rooms) {
-			const cap = Math.max(1, (room as any).maxOccupants ?? 1);
-			const people = Math.min(cap, rem);
-			if (people <= 0) break;
-			sum += privacyFactor(room) * people;
-			rem -= people;
-		}
-		return Math.max(sum, expected);
-	});
-	const roomDenomMax = $derived.by(() => {
-		let rem = maxG, sum = 0;
-		for (const room of rooms) {
-			const cap = Math.max(1, (room as any).maxOccupants ?? 1);
-			const people = Math.min(cap, rem);
-			if (people <= 0) break;
-			sum += privacyFactor(room) * people;
-			rem -= people;
-		}
-		return Math.max(sum, maxG);
-	});
-	const prExpected = $derived(roomDenomExpected > 0 ? total / roomDenomExpected : 0);
-	const prMax      = $derived(roomDenomMax      > 0 ? total / roomDenomMax      : 0);
+	// Per-room: equal share of trip total per room (matches server / RSVP)
+	const perRoomShare = $derived(totalRooms > 0 && total > 0 ? total / totalRooms : 0);
 
 	/** Selection-based PER_BED: occupancy-range sim at expected headcount + at full bed count. */
 	const perBedSelection = $derived.by(() => {
@@ -433,6 +410,9 @@
 						<!-- Pricing model comparison table -->
 						<div class="pricing-section">
 							<div class="cost-pricing-toolbar">
+								<div class="pricing-model-header">
+									<span class="pricing-table-title">Choose pricing model</span>
+								</div>
 								<div class="cost-total-block">
 									<div class="cost-total-inline">
 										<label
@@ -458,12 +438,6 @@
 										</div>
 									</div>
 								</div>
-								<div class="pricing-model-header">
-									<span class="pricing-table-title">Choose pricing model</span>
-									<span class="pricing-table-meta">
-										{expected} min headcount (realistic low) · {maxG} max headcount (capacity) · {nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : 'dates not set'}
-									</span>
-								</div>
 							</div>
 							<div class="pricing-table-wrap">
 								<table class="pricing-table">
@@ -471,8 +445,7 @@
 										<tr>
 											<th></th>
 											<th>Model</th>
-											<th>Total cost at min headcount · {expected} {expected === 1 ? 'person' : 'people'}</th>
-											<th>Total cost at max headcount (capacity) · {maxG} {maxG === 1 ? 'person' : 'people'}</th>
+											<th>Cost</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -481,39 +454,44 @@
 											onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectModel('per-person')}>
 											<td class="pt-radio"><span class="radio-dot" class:radio-dot-on={draft.pricingModel === 'per-person'}></span></td>
 											<td class="pt-model">Per Person</td>
-										<td class="pt-val">
-											{#if total > 0}
-												<span class="pt-amount">${roundUsd(ppExpected)}</span>
-											{:else}—{/if}
-										</td>
-										<td class="pt-val">
-											{#if total > 0}
-												<span class="pt-amount">${roundUsd(ppMax)}</span>
-											{:else}—{/if}
-										</td>
+											<td class="pt-val pt-val--dual">
+												{#if total > 0}
+													<div class="pt-cost-dual">
+														<div class="pt-cost-line">
+															<span class="pt-cost-label">Min ({expected} {expected === 1 ? 'person' : 'people'})</span>
+															<span class="pt-amount">${roundUsd(ppExpected)} <span class="pt-cost-unit">per person</span></span>
+														</div>
+														<div class="pt-cost-dual-divider" aria-hidden="true"></div>
+														<div class="pt-cost-line">
+															<span class="pt-cost-label">Max ({maxG} {maxG === 1 ? 'person' : 'people'})</span>
+															<span class="pt-amount">${roundUsd(ppMax)} <span class="pt-cost-unit">per person</span></span>
+														</div>
+													</div>
+												{:else}
+													—
+												{/if}
+											</td>
 										</tr>
 										<tr class="pt-row" class:pt-selected={draft.pricingModel === 'per-room'}
 											onclick={() => selectModel('per-room')} role="button" tabindex="0"
 											onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectModel('per-room')}>
 											<td class="pt-radio"><span class="radio-dot" class:radio-dot-on={draft.pricingModel === 'per-room'}></span></td>
 											<td class="pt-model">Per Room</td>
-										<td class="pt-val">
-											{#if totalRooms > 0 && total > 0}
-												<span class="pt-amount">${roundUsd(prExpected)}</span>
-											{:else}—{/if}
-										</td>
-										<td class="pt-val">
-											{#if totalRooms > 0 && total > 0}
-												<span class="pt-amount">${roundUsd(prMax)}</span>
-											{:else}—{/if}
-										</td>
+											<td class="pt-val pt-val--single">
+												{#if totalRooms > 0 && total > 0}
+													<span class="pt-amount">${roundUsd(perRoomShare)} per room</span>
+													<p class="pt-cost-sub">Trip total ÷ {totalRooms} room{totalRooms === 1 ? '' : 's'} (whole-room RSVP)</p>
+												{:else}
+													—
+												{/if}
+											</td>
 										</tr>
 										<tr class="pt-row" class:pt-selected={draft.pricingModel === 'per-bed'}
 											onclick={() => selectModel('per-bed')} role="button" tabindex="0"
 											onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectModel('per-bed')}>
 											<td class="pt-radio"><span class="radio-dot" class:radio-dot-on={draft.pricingModel === 'per-bed'}></span></td>
 											<td class="pt-model">Per Bed</td>
-											<td class="pt-val pt-val--bed-summary" colspan="2">
+											<td class="pt-val pt-val--bed-summary">
 												<div class="bed-summary-copy">
 													<p class="bed-summary-text">
 														What each guest pays depends on <strong>which bed they choose</strong>. Open the{' '}
@@ -3196,13 +3174,16 @@
 		width: 100%;
 	}
 
-	/* Total cost: label left of field, note below; then pricing model header + table */
+	/* Toolbar: pricing title (left) and total cost field (right), same row; wraps on narrow widths */
 	.cost-pricing-toolbar {
 		display: flex;
-		flex-direction: column;
-		align-items: stretch;
-		gap: 0.35rem;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 0.5rem 1rem;
 		flex-shrink: 0;
+		width: 100%;
 	}
 
 	.cost-total-block {
@@ -3210,8 +3191,10 @@
 		flex-direction: column;
 		align-items: flex-end;
 		gap: 0.12rem;
-		width: 100%;
+		width: auto;
+		max-width: 100%;
 		padding: 0;
+		flex-shrink: 0;
 	}
 
 	.cost-total-inline {
@@ -3221,12 +3204,12 @@
 		justify-content: flex-end;
 		gap: 0.5rem;
 		flex-wrap: wrap;
-		width: 100%;
+		width: auto;
 	}
 
 	.cost-total-block .cost-input-label {
-		justify-content: flex-end;
 		width: auto;
+		white-space: nowrap;
 	}
 
 	.cost-input-label--tip {
@@ -3257,11 +3240,11 @@
 		display: flex;
 		flex-direction: row;
 		flex-wrap: wrap;
-		align-items: baseline;
-		justify-content: space-between;
+		align-items: center;
+		justify-content: flex-start;
 		gap: 0.35rem 1rem;
 		min-width: 0;
-		width: 100%;
+		flex: 1 1 auto;
 	}
 
 	/* ── Pricing section ─────────────────────────────────── */
@@ -3271,6 +3254,8 @@
 		gap: 0.35rem;
 		flex: 1;
 		min-height: 0;
+		/* Space below cost-sharing toggle / pane top — new trip + trip settings both use this component */
+		margin-top: 0.875rem;
 	}
 
 	.pricing-table-title {
@@ -3279,18 +3264,8 @@
 		color: var(--text);
 		letter-spacing: -0.02em;
 		line-height: 1.2;
-		flex: 1 1 auto;
 		min-width: 0;
-	}
-
-	.pricing-table-meta {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: var(--muted);
-		line-height: 1.35;
-		text-align: right;
-		flex: 0 1 auto;
-		max-width: 100%;
+		margin: 0;
 	}
 
 	.pricing-table-wrap {
@@ -3319,11 +3294,9 @@
 		white-space: nowrap;
 	}
 
-	/* Dividers only: Model | Total cost at expected | Total cost at max */
+	/* Dividers: radio | Model | Cost */
 	.pricing-table th:nth-child(2),
-	.pricing-table td:nth-child(2),
-	.pricing-table th:nth-child(3),
-	.pricing-table td:nth-child(3) {
+	.pricing-table td:nth-child(2) {
 		border-right: 1px solid rgba(0, 0, 0, 0.07);
 	}
 
@@ -3331,11 +3304,10 @@
 		width: 1.5rem;
 	}
 	.pricing-table th:nth-child(2) {
-		width: 18%;
+		width: 22%;
 	}
-	.pricing-table th:nth-child(3),
-	.pricing-table th:nth-child(4) {
-		width: 41%;
+	.pricing-table th:nth-child(3) {
+		width: auto;
 		text-align: center;
 		white-space: normal;
 		line-height: 1.25;
@@ -3348,23 +3320,11 @@
 		border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 	}
 
-	/* Compact rows; Per bed row grows with copy */
+	/* Uniform cell padding for all pricing model rows (height follows content) */
 	.pricing-table tbody .pt-row td {
-		padding-top: 1.05rem;
-		padding-bottom: 1.05rem;
+		padding: 0.72rem 0.45rem;
 		box-sizing: border-box;
 		vertical-align: middle;
-	}
-
-	.pricing-table tbody .pt-row:nth-child(2) td {
-		padding-top: 1.05rem;
-		padding-bottom: 1.05rem;
-	}
-
-	/* Per bed: row height follows the tallest cell — radio + label were still 1.05rem */
-	.pricing-table tbody .pt-row:nth-child(3) td {
-		padding-top: 0.72rem;
-		padding-bottom: 0.72rem;
 	}
 
 	.pt-row {
@@ -3414,6 +3374,61 @@
 		line-height: 1.45;
 	}
 
+	.pt-val--dual {
+		text-align: left;
+		vertical-align: middle;
+	}
+
+	.pt-cost-dual {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		gap: 0.65rem;
+		width: 100%;
+		max-width: 28rem;
+		margin: 0 auto;
+	}
+
+	.pt-cost-dual-divider {
+		flex: 0 0 1px;
+		align-self: stretch;
+		min-height: 2.25rem;
+		max-height: 4.5rem;
+		background: rgba(0, 0, 0, 0.1);
+	}
+
+	.pt-cost-line {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		align-items: center;
+		text-align: center;
+	}
+
+	.pt-cost-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--muted);
+		line-height: 1.25;
+	}
+
+	.pt-cost-unit {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--muted);
+	}
+
+	.pt-cost-sub {
+		margin: 0.2rem 0 0;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--muted);
+		line-height: 1.3;
+	}
+
 	.pt-amount {
 		display: block;
 		font-weight: 600;
@@ -3423,7 +3438,6 @@
 	.pt-val--bed-summary {
 		text-align: center;
 		vertical-align: middle;
-		padding: 0.28rem 0.4rem;
 		font-weight: 400;
 		line-height: 1.35;
 	}

@@ -45,6 +45,11 @@
 		discountInput = '';
 	}
 
+	/**
+	 * Card capture is not integrated yet (no Stripe/Checkout in this repo).
+	 * Returning true allows publish to proceed; replace with a real payment
+	 * flow when you have a processor, and return false if the charge fails.
+	 */
 	async function processPayment(_amount: number): Promise<boolean> {
 		return true;
 	}

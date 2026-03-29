@@ -2,19 +2,15 @@
 	import CreateTripShell from '$lib/components/wizard/CreateTripShell.svelte';
 
 	let { children, data } = $props();
-
-	const STEPS = [
-		{ number: 1, label: 'Basics & Rooms' },
-		{ number: 2, label: 'Trip Add-Ons', optional: true },
-		{ number: 3, label: 'Review' },
-		{ number: 4, label: 'Publish' }
-	];
 </script>
 
 <CreateTripShell
-	currentStep={3}
-	steps={STEPS}
+	currentStep={0}
+	steps={[]}
+	hideTopBar
+	hideStepIndicators
 	backHref={`/trips/${data.trip.id}/settings/step/3`}
+	backLabel="← Back to trip editor"
 >
 	{@render children()}
 </CreateTripShell>
