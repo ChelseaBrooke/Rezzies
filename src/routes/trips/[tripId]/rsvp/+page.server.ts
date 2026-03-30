@@ -3,7 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripMember } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
-import { totalSpotsForBeds, hasEnoughSpots, isPrismaUniqueConflict } from '$lib/server/bed-spot-validation.js';
+import { totalSpotsForBeds, hasEnoughSpots, isPrismaUniqueConflict } from '$lib/bed-spot-validation.js';
 import {
 	computeGuestEstimateRange,
 	computeGuestEstimateWithOverrides,

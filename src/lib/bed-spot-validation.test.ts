@@ -21,11 +21,14 @@ describe('totalSpotsForBeds', () => {
 		expect(totalSpotsForBeds(map, ['b1'])).toBe(2);
 	});
 
-	it('defaults to 1 spot when both missing', () => {
-		const map = new Map([
-			['b1', { id: 'b1' }]
-		]);
+	it('defaults to 1 spot when both missing and type unknown', () => {
+		const map = new Map([['b1', { id: 'b1' }]]);
 		expect(totalSpotsForBeds(map, ['b1'])).toBe(1);
+	});
+
+	it('queen with legacy capacity 1 still counts as 2 spots', () => {
+		const map = new Map([['b1', { id: 'b1', bedType: 'queen', capacitySlots: 1, capacity: 1 }]]);
+		expect(totalSpotsForBeds(map, ['b1'])).toBe(2);
 	});
 
 	it('ignores unknown bed ids', () => {

@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { normalizeRoomTypeFromWizard } from '$lib/room-type-display.js';
 
 export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
@@ -28,11 +29,13 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 		typeof d.privacyFactor === 'number' && d.privacyFactor >= 1 && d.privacyFactor <= 2
 			? d.privacyFactor
 			: 1.0;
+	const roomType = normalizeRoomTypeFromWizard(d.roomType);
 
 	const room = await prisma.room.create({
 		data: {
 			tripId,
 			name,
+			roomType,
 			maxOccupancy,
 			photoUrls,
 			privacyFactor,

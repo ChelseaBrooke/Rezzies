@@ -7,6 +7,8 @@ import {
 	shouldWaivePlatformFee
 } from '$lib/server/platform-publish-fee.js';
 import { isStripeConfigured, verifyPublishPaymentIntent } from '$lib/server/stripe.js';
+import { capacityFieldsForNewBed } from '$lib/bed-spot-validation.js';
+import { normalizeRoomTypeFromWizard } from '$lib/room-type-display.js';
 
 /** Map draft pricingModel to Prisma enum-style string */
 function mapPricingModel(
@@ -204,6 +206,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				data: {
 					tripId: trip.id,
 					name: roomName,
+					roomType: normalizeRoomTypeFromWizard((room as { roomType?: unknown }).roomType),
 					description:
 						typeof room.notes === 'string' && room.notes
 							? room.notes
@@ -220,13 +223,15 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				const bedType = typeof bed.bedType === 'string' ? bed.bedType : 'other';
 				const countRaw = parseOptionalInt((bed as { count?: unknown }).count);
 				const count = countRaw != null && countRaw > 0 ? countRaw : 1;
+				const bt = bedType.toLowerCase();
+				const { capacity, capacitySlots } = capacityFieldsForNewBed(bt);
 				for (let i = 0; i < count; i++) {
 					await prisma.bed.create({
 						data: {
 							roomId: createdRoom.id,
-							bedType: bedType.toLowerCase(),
-							capacity: 1,
-							capacitySlots: 1,
+							bedType: bt,
+							capacity,
+							capacitySlots,
 							isAvailable: true
 						}
 					});

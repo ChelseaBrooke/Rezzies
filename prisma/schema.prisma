@@ -88,6 +88,8 @@ model Room {
   id               Int      @id @default(autoincrement())
   tripId           String
   name             String
+  /// Wizard room kind: bedroom, living-room, master-bedroom, etc. (optional; used in UI when no photo)
+  roomType         String?
   description      String?
   baseRateModifier Float    @default(1.0)
   photoUrls        String[] // Array of photo URLs

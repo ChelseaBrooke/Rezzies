@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { capacityFieldsForNewBed } from '$lib/bed-spot-validation.js';
 
 const roomIdNum = (id: string) => {
 	const n = parseInt(id, 10);
@@ -38,12 +39,13 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	let bedType = typeof d.bedType === 'string' ? d.bedType.trim().toLowerCase().replace(/\s+/g, '_') : 'queen';
 	if (!BED_TYPES.includes(bedType)) bedType = 'other';
 
+	const { capacity, capacitySlots } = capacityFieldsForNewBed(bedType);
 	const bed = await prisma.bed.create({
 		data: {
 			roomId,
 			bedType,
-			capacity: 1,
-			capacitySlots: 1,
+			capacity,
+			capacitySlots,
 			isAvailable: true
 		}
 	});

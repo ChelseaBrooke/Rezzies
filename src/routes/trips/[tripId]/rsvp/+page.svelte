@@ -3,8 +3,9 @@
 	import { enhance, deserialize, applyAction } from '$app/forms';
 	import { invalidateAll, goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import DateRangePicker from '$lib/components/wizard/DateRangePicker.svelte';
 	import type { PageData } from './$types';
+	import { effectiveSleepSlots } from '$lib/bed-spot-validation.js';
+	import { roomTypeDisplayLabel, roomTypeCssSlug } from '$lib/room-type-display.js';
 
 	let { data, form }: { data: PageData; form: any } = $props();
 
@@ -55,9 +56,15 @@
 		if (d == null) return '';
 		return new Date(d).toISOString().slice(0, 10);
 	}
-	let arrivalDate = $state('');
-	let departureDate = $state('');
 	let noNotes = $state('');
+
+	/** Full trip stay only — no partial dates on RSVP */
+	const fullStayArrival = $derived(
+		data.trip?.checkInDate != null ? tripDateKey(data.trip.checkInDate as Date | string) : ''
+	);
+	const fullStayDeparture = $derived(
+		data.trip?.checkOutDate != null ? tripDateKey(data.trip.checkOutDate as Date | string) : ''
+	);
 
 	const partySize = $derived(adultsCount);
 	const myClaimedSet = $derived(new Set(data.myClaimedBedIds ?? []));
@@ -97,9 +104,12 @@
 		const ids = data.myClaimedRoomIds ?? [];
 		selectedRoomId = ids.length > 0 ? ids[0]! : null;
 	});
-	function roomCapacityForRoom(room: { maxOccupancy: number | null; beds?: { capacitySlots?: number | null; capacity?: number | null }[] }): number {
-		const fromBeds = (room.beds ?? []).reduce((s, b) => s + (b.capacitySlots ?? b.capacity ?? 1), 0);
-		return Math.max(1, room.maxOccupancy ?? fromBeds || 1);
+	function roomCapacityForRoom(room: {
+		maxOccupancy: number | null;
+		beds?: { id: string; bedType?: string | null; capacitySlots?: number | null; capacity?: number | null }[];
+	}): number {
+		const fromBeds = (room.beds ?? []).reduce((s, b) => s + effectiveSleepSlots(b), 0);
+      return Math.max(1, room.maxOccupancy ?? (fromBeds || 1));
 	}
 	async function onRoomSelect(roomId: number) {
 		const prev = data.myClaimedRoomIds?.[0] ?? null;
@@ -126,7 +136,7 @@
 		let total = 0;
 		for (const room of rooms) {
 			for (const bed of room.beds ?? []) {
-				if (selectedBedIds.includes(bed.id)) total += bed.capacitySlots ?? bed.capacity ?? 1;
+				if (selectedBedIds.includes(bed.id)) total += effectiveSleepSlots(bed);
 			}
 		}
 		return total;
@@ -158,13 +168,15 @@
 		if (data.currentRsvp?.adultsCount != null) adultsCount = data.currentRsvp.adultsCount;
 		if (data.currentRsvp?.kidsCount != null) kidsCount = data.currentRsvp.kidsCount;
 		if (data.currentRsvp?.petsCount != null) petsCount = data.currentRsvp.petsCount;
-		arrivalDate = data.currentRsvp?.arrivalDatetime ? new Date(data.currentRsvp.arrivalDatetime).toISOString().slice(0, 10) : (tripDateKey(data.trip?.checkInDate) || '');
-		departureDate = data.currentRsvp?.departureDatetime ? new Date(data.currentRsvp.departureDatetime).toISOString().slice(0, 10) : (tripDateKey(data.trip?.checkOutDate) || '');
 		noNotes = data.currentRsvp?.status === 'no' ? (data.currentRsvp?.notes ?? '') : '';
 		if (data.currentProfile?.dietaryRestrictions != null) myDietary = data.currentProfile.dietaryRestrictions;
 		if (data.currentProfile?.allergies != null) myAllergies = data.currentProfile.allergies;
 	});
 	const isYes = $derived(rsvpStatus === 'yes');
+	// Add-on feature flags — default true so nothing breaks for existing trips
+	const costSharingOn = $derived(data.trip?.costSharingEnabled ?? true);
+	const mealPlanOn = $derived((data.trip?.mealPlan as { enabled: boolean } | null)?.enabled ?? false);
+
 	const guestEstimateFromServer = $derived(data.guestEstimate ?? null);
 	let liveEstimate = $state<{ lowCents: number; highCents: number; hmin: number; hmax: number } | null>(null);
 	const guestEstimate = $derived(liveEstimate ?? guestEstimateFromServer);
@@ -174,8 +186,8 @@
 			liveEstimate = null;
 			return;
 		}
-		const a = arrivalDate;
-		const d = departureDate;
+		const a = fullStayArrival;
+		const d = fullStayDeparture;
 		const adults = adultsCount;
 		const beds = [...selectedBedIds];
 		const roomForEstimate = selectedRoomId;
@@ -241,20 +253,6 @@
 		(isYes || needsReconfirm) && (costSharingOn ? costCommitmentChecked : true)
 	);
 
-	function toDateKey(d: Date | string): string {
-		const date = typeof d === 'string' ? new Date(d) : d;
-		const y = date.getFullYear();
-		const m = String(date.getMonth() + 1).padStart(2, '0');
-		const day = String(date.getDate()).padStart(2, '0');
-		return `${y}-${m}-${day}`;
-	}
-	const tripMinDate = $derived(
-		data.trip?.checkInDate != null ? toDateKey(data.trip.checkInDate as Date | string) : undefined
-	);
-	const tripMaxDate = $derived(
-		data.trip?.checkOutDate != null ? toDateKey(data.trip.checkOutDate as Date | string) : undefined
-	);
-
 	const tripNights = $derived(data.roomPricing?.totalNights ?? 0);
 	const pricingByRoomId = $derived.by(() => {
 		const map = new Map<number, { slotPricePerNight: number; roomPricePerNight: number; roomPriceFullStay: number }>();
@@ -291,10 +289,6 @@
 		return start.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) + ' – ' + end.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 	});
 	const tripDestination = $derived((data.trip?.locationCity ?? data.trip?.location ?? '') || null);
-
-	// Add-on feature flags — default true so nothing breaks for existing trips
-	const costSharingOn = $derived(data.trip?.costSharingEnabled ?? true);
-	const mealPlanOn = $derived((data.trip?.mealPlan as { enabled: boolean } | null)?.enabled ?? false);
 </script>
 
 <div class="rsvp-page">
@@ -330,13 +324,29 @@
 			</div>
 
 			<section class="card-section rsvp-section">
-				<div class="rsvp-yes-no-row">
-					<h2 class="section-title">Will you join us?</h2>
-					<select id="status" name="status" required bind:value={rsvpStatus} class="yes-no-select" form="rsvp-form">
-						<option value="yes">Yes</option>
-						<option value="no">No</option>
-					</select>
+			<div class="rsvp-yes-no-row">
+				<h2 class="section-title">Will you join us?</h2>
+				<div class="rsvp-choice-btns" role="group" aria-label="RSVP response">
+					<button
+						type="button"
+						class="rsvp-choice-btn"
+						class:selected={rsvpStatus === 'yes'}
+						aria-pressed={rsvpStatus === 'yes'}
+						onclick={() => (rsvpStatus = 'yes')}
+					>
+						Going
+					</button>
+					<button
+						type="button"
+						class="rsvp-choice-btn rsvp-choice-btn-decline"
+						class:selected={rsvpStatus === 'no'}
+						aria-pressed={rsvpStatus === 'no'}
+						onclick={() => (rsvpStatus = 'no')}
+					>
+						Can't make it
+					</button>
 				</div>
+			</div>
 			{#if costSharingOn && data.currentRsvp?.status === 'yes' && data.currentRsvp?.yesSubstatus === 'reconfirm_required'}
 				<div class="reconfirm-banner" role="alert">
 						<strong>Your cost estimate changed.</strong> Please review and confirm to keep your YES RSVP.
@@ -353,24 +363,11 @@
 					<div class="error-message" role="alert">{form.error}</div>
 				{/if}
 				<form id="rsvp-form" method="POST" action="?/updateRsvp" use:enhance={enhanceRsvpSubmit}>
+					<input type="hidden" name="status" value={rsvpStatus} />
 					{#if isYes}
+					<input type="hidden" name="arrivalDate" value={fullStayArrival} />
+					<input type="hidden" name="departureDate" value={fullStayDeparture} />
 					<div class="form-row form-row-single-line">
-						<div class="form-group date-range-form-group">
-							<label class="form-label">Arrival – Departure</label>
-							<DateRangePicker
-								checkInDate={arrivalDate}
-								checkOutDate={departureDate}
-								placeholder="Select your dates"
-								minDate={tripMinDate}
-								maxDate={tripMaxDate}
-								onRangeChange={(checkIn, checkOut) => {
-									arrivalDate = checkIn;
-									departureDate = checkOut;
-								}}
-							/>
-							<input type="hidden" name="arrivalDate" value={arrivalDate} />
-							<input type="hidden" name="departureDate" value={departureDate} />
-						</div>
 						<div class="form-group">
 							<label for="adultsCount">Adults</label>
 							<input type="number" id="adultsCount" name="adultsCount" bind:value={adultsCount} min="1" max="99" required title="Adults (you + plus-ones). Kids don’t count toward sleeping spots." />
@@ -404,7 +401,7 @@
 			</section>
 
 	{#if isYes && mealPlanOn}
-	<section class="card-section dietary-section">
+		<section class="card-section dietary-section">
 		<h2 class="section-title">Dietary info</h2>
 		<p class="dietary-intro">This helps us plan meals for everyone. Any info you share is visible to the host.</p>
 			<form method="POST" action="?/updateDietary" use:enhance>
@@ -444,7 +441,9 @@
 				<button type="submit" class="btn btn-secondary dietary-save">Save dietary info</button>
 			</form>
 		</section>
+	{/if}
 
+	{#if isYes}
 		<section class="card-section room-section">
 			<h2 class="section-title">Choose your room</h2>
 					{#if form?.claimBedsError && !form.claimBedsError.includes('You need at least')}
@@ -481,8 +480,19 @@
 											{#if room.photoUrls?.length > 0}
 												<img src={room.photoUrls[0]} alt="" />
 											{:else}
-												<div class="hotel-room-photo-placeholder">
-													<span>{room.name}</span>
+												{@const rtpLabel = roomTypeDisplayLabel(room)}
+												{@const rtpSlug = roomTypeCssSlug(room.roomType)}
+												<div
+													class="hotel-room-photo-placeholder hotel-room-photo-placeholder--{rtpSlug}"
+													role="img"
+													aria-label="{rtpLabel} — {room.name}, no photo"
+												>
+													<div class="room-placeholder-grid" aria-hidden="true"></div>
+													<div class="room-placeholder-inner">
+														<span class="room-placeholder-type">{rtpLabel}</span>
+														<span class="room-placeholder-name">{room.name}</span>
+														<span class="room-placeholder-hint">No photo yet</span>
+													</div>
 												</div>
 											{/if}
 										</div>
@@ -538,8 +548,19 @@
 											{#if room.photoUrls?.length > 0}
 												<img src={room.photoUrls[0]} alt="" />
 											{:else}
-												<div class="hotel-room-photo-placeholder">
-													<span>{room.name}</span>
+												{@const rtpLabel = roomTypeDisplayLabel(room)}
+												{@const rtpSlug = roomTypeCssSlug(room.roomType)}
+												<div
+													class="hotel-room-photo-placeholder hotel-room-photo-placeholder--{rtpSlug}"
+													role="img"
+													aria-label="{rtpLabel} — {room.name}, no photo"
+												>
+													<div class="room-placeholder-grid" aria-hidden="true"></div>
+													<div class="room-placeholder-inner">
+														<span class="room-placeholder-type">{rtpLabel}</span>
+														<span class="room-placeholder-name">{room.name}</span>
+														<span class="room-placeholder-hint">No photo yet</span>
+													</div>
 												</div>
 											{/if}
 										</div>
@@ -550,7 +571,7 @@
 											{/if}
 											<div class="beds-list beds-checkboxes">
 												{#each (room.beds ?? []) as bed}
-													{@const spots = bed.capacitySlots ?? bed.capacity ?? 1}
+													{@const spots = effectiveSleepSlots(bed)}
 													{@const isClaimedByOther = claimedByOtherSet.has(bed.id)}
 													{@const bp = data.bedPricing?.[bed.id]}
 													{@const perNightLow = bp ? bp.perNightLow : bedPricePerNight(room.id, spots)}
@@ -626,8 +647,8 @@
 
 									<form id="yes-confirm-form" method="POST" action="?/updateRsvp" use:enhance={enhanceRsvpSubmit} class="submit-form">
 										<input type="hidden" name="status" value="yes" />
-										<input type="hidden" name="arrivalDate" value={arrivalDate} />
-										<input type="hidden" name="departureDate" value={departureDate} />
+										<input type="hidden" name="arrivalDate" value={fullStayArrival} />
+										<input type="hidden" name="departureDate" value={fullStayDeparture} />
 										<input type="hidden" name="adultsCount" value={adultsCount} />
 										<input type="hidden" name="kidsCount" value={kidsCount} />
 										<input type="hidden" name="petsCount" value={petsCount} />
@@ -664,8 +685,8 @@
 					{#if !costSharingOn && isYes}
 						<form method="POST" action="?/updateRsvp" use:enhance={enhanceRsvpSubmit} class="submit-form">
 							<input type="hidden" name="status" value="yes" />
-							<input type="hidden" name="arrivalDate" value={arrivalDate} />
-							<input type="hidden" name="departureDate" value={departureDate} />
+							<input type="hidden" name="arrivalDate" value={fullStayArrival} />
+							<input type="hidden" name="departureDate" value={fullStayDeparture} />
 							<input type="hidden" name="adultsCount" value={adultsCount} />
 							<input type="hidden" name="kidsCount" value={kidsCount} />
 							<input type="hidden" name="petsCount" value={petsCount} />
@@ -685,7 +706,6 @@
 							</div>
 						</form>
 					{/if}
-				{/if}
 			</section>
 			{/if}
 		</div>
@@ -693,12 +713,12 @@
 </div>
 
 <style>
-	@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Plus+Jakarta+Sans:wght@400;700&display=swap');
+	@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
 
 	.rsvp-page {
 		min-height: calc(100vh - 80px);
-		padding: var(--spacing-xl) var(--spacing-md);
-		background: linear-gradient(160deg, #fdf8f3 0%, #f5ebe0 50%, #efe6dc 100%);
+		padding: 2rem 1rem 3rem;
+		background: var(--bg, #f6f4f1);
 	}
 
 	.rsvp-toast {
@@ -709,72 +729,63 @@
 		z-index: 100;
 		background: #166534;
 		color: white;
-		padding: 0.75rem 1.25rem;
-		border-radius: var(--radius-md, 8px);
-		font-size: 0.9375rem;
+		padding: 0.7rem 1.25rem;
+		border-radius: 99px;
+		font-size: 0.9rem;
 		font-weight: 500;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 		animation: rsvp-toast-in 0.25s ease-out;
 	}
 	@keyframes rsvp-toast-in {
-		from {
-			opacity: 0;
-			transform: translateX(-50%) translateY(0.5rem);
-		}
-		to {
-			opacity: 1;
-			transform: translateX(-50%) translateY(0);
-		}
+		from { opacity: 0; transform: translateX(-50%) translateY(0.5rem); }
+		to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 	}
 
 	.container {
-		max-width: 960px;
+		max-width: 580px;
 		margin: 0 auto;
+		padding: 0;
 	}
 
+	/* ── Card chrome ──────────────────────────────────────────────── */
 	.rsvp-card {
-		background: #fefdfb;
-		padding: 2.5rem 2rem;
-		border-radius: 12px;
-		box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
-		border: 1px solid rgba(180, 160, 140, 0.25);
+		background: #fff;
+		border-radius: 18px;
+		border: 1px solid rgba(0,0,0,0.07);
+		box-shadow: 0 8px 40px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+		overflow: hidden;
 	}
 
+	/* ── Invite header ────────────────────────────────────────────── */
 	.card-invite {
 		position: relative;
 		text-align: center;
-		margin: -2.5rem -2rem 1.25rem -2rem;
-		padding: 2.5rem 2rem 1.5rem;
-		min-height: 220px;
-		border-radius: 12px 12px 0 0;
+		margin: 0;
+		padding: 1.75rem 1.5rem 1.25rem;
+		min-height: 160px;
+		border-radius: 0;
 		overflow: hidden;
+		box-shadow: none;
 	}
-	/* Photo layer only – no gradient */
 	.card-invite-photo {
 		position: absolute;
 		inset: 0;
 		background-image: var(--trip-photo, none);
 		background-size: cover;
 		background-position: center;
-		background-repeat: no-repeat;
-		background-color: #e8e0d8;
+		background-color: #ede8e0;
 	}
-	/* Gradient overlay – extends past bottom so no seam */
 	.card-invite-gradient {
 		position: absolute;
-		left: 0;
-		right: 0;
-		top: 0;
-		bottom: -8px;
+		inset: 0;
+		bottom: -2px;
 		background: linear-gradient(
 			to bottom,
-			rgba(254, 253, 251, 0.08) 0%,
-			rgba(254, 253, 251, 0.12) 30%,
-			rgba(254, 253, 251, 0.18) 55%,
-			rgba(254, 253, 251, 0.32) 72%,
-			rgba(254, 253, 251, 0.55) 85%,
-			rgba(254, 253, 251, 0.82) 95%,
-			#fefdfb 100%
+			rgba(255,255,255,0.04) 0%,
+			rgba(255,255,255,0.18) 40%,
+			rgba(255,255,255,0.65) 72%,
+			rgba(255,255,255,0.96) 94%,
+			#fff 100%
 		);
 		pointer-events: none;
 	}
@@ -784,461 +795,453 @@
 	}
 	.invite-line {
 		font-family: 'Great Vibes', cursive;
-		font-size: 2.25rem;
-		letter-spacing: 0.08em;
+		font-size: 1.85rem;
+		letter-spacing: 0.06em;
 		color: #2c2419;
 		font-weight: 400;
-		margin: 0 0 0.5rem 0;
-		/* Soft glow so cursive reads on both light and dark parts of the photo */
+		margin: 0 0 0.3rem;
 		text-shadow:
-			0 0 20px rgba(254, 253, 251, 0.9),
-			0 0 40px rgba(254, 253, 251, 0.6),
-			0 1px 2px rgba(0, 0, 0, 0.15);
+			0 0 18px rgba(255,255,255,0.9),
+			0 0 36px rgba(255,255,255,0.5),
+			0 1px 2px rgba(0,0,0,0.12);
 	}
 	.invite-divider {
-		width: 48px;
+		width: 36px;
 		height: 1px;
-		background: linear-gradient(90deg, transparent, rgba(180, 160, 140, 0.5) 20%, rgba(180, 160, 140, 0.5) 80%, transparent);
-		margin: 0 auto 1.5rem;
+		background: linear-gradient(90deg, transparent, rgba(15,23,42,0.15) 20%, rgba(15,23,42,0.15) 80%, transparent);
+		margin: 0 auto 0.9rem;
 	}
 	.trip-title {
-		font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-		font-size: clamp(2rem, 5vw, 2.75rem);
+		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		font-size: clamp(1.5rem, 5vw, 2.1rem);
 		font-weight: 700;
-		color: #2c2419;
+		color: #1e1a15;
 		margin: 0;
-		letter-spacing: 0.02em;
-		line-height: 1.25;
+		letter-spacing: 0.01em;
+		line-height: 1.2;
 	}
 	.invite-meta {
-		margin-top: 0.35rem;
-		font-size: 0.95rem;
+		margin-top: 0.3rem;
+		font-size: 0.85rem;
 		color: #5c5248;
 		font-style: italic;
-		letter-spacing: 0.02em;
+		letter-spacing: 0.01em;
 	}
-	.invite-meta-sep {
-		margin: 0 0.5rem;
-		opacity: 0.7;
-	}
-	.trip-dates,
-	.trip-destination {
-		margin: 0;
-	}
-	.trip-destination {
-		font-style: italic;
-	}
+	.invite-meta-sep { margin: 0 0.4rem; opacity: 0.6; }
+	.trip-dates, .trip-destination { margin: 0; }
+	.trip-destination { font-style: italic; }
 
+	/* ── Sections ─────────────────────────────────────────────────── */
 	.card-section {
-		margin-bottom: 2rem;
-	}
-	.rsvp-section.card-section {
-		margin-bottom: 0.75rem;
-	}
-	.card-section:last-of-type {
+		padding: 1.1rem 1.5rem;
 		margin-bottom: 0;
 	}
+	.card-section + .card-section {
+		border-top: 1px solid #f0ece7;
+	}
+	.rsvp-section.card-section {
+		padding-top: 1.25rem;
+		padding-bottom: 1.25rem;
+	}
+
 	.section-title {
 		font-family: Georgia, 'Times New Roman', serif;
-		font-size: 1.25rem;
+		font-size: 1.05rem;
 		font-weight: 400;
 		color: #2c2419;
 		margin: 0;
 	}
 
+	/* ── Yes / No pill toggle ─────────────────────────────────────── */
 	.rsvp-yes-no-row {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: var(--spacing-md);
-		margin-bottom: var(--spacing-lg);
+		gap: 1rem;
+		margin-bottom: 1rem;
 		flex-wrap: nowrap;
 	}
 	.rsvp-yes-no-row .section-title {
 		flex: 0 1 auto;
-		margin: 0;
 		white-space: nowrap;
 	}
-	.yes-no-select {
-		flex: 0 0 auto;
-		width: 15rem;
-		min-width: unset;
-		padding: var(--spacing-sm) 0.5rem;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		font-size: 1rem;
-		background: white;
-		color: var(--color-text);
+	.rsvp-choice-btns {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-shrink: 0;
+	}
+	.rsvp-choice-btn {
+		appearance: none;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		margin: 0;
+		padding: 0.5rem 1rem;
+		font-family: inherit;
+		font-size: 0.875rem;
+		font-weight: 600;
+		line-height: 1.2;
+		color: #5c534c;
+		background: #fff;
+		border: 1.5px solid #ddd9d2;
+		border-radius: 10px;
+		cursor: pointer;
+		transition: border-color 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
+		white-space: nowrap;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+	}
+	.rsvp-choice-btn:hover:not(.selected) {
+		border-color: #c4bcb3;
+		background: #faf9f7;
+	}
+	.rsvp-choice-btn:focus-visible {
+		outline: 2px solid #8b7355;
+		outline-offset: 2px;
+	}
+	.rsvp-choice-btn.selected {
+		background: #1e1a15;
+		border-color: #1e1a15;
+		color: #fff;
+		box-shadow: 0 2px 8px rgba(30, 26, 21, 0.2);
+	}
+	.rsvp-choice-btn-decline.selected {
+		background: #4a4540;
+		border-color: #4a4540;
+		box-shadow: 0 2px 8px rgba(74, 69, 64, 0.22);
+	}
+	@media (max-width: 420px) {
+		.rsvp-yes-no-row {
+			flex-wrap: wrap;
+		}
+		.rsvp-choice-btns {
+			width: 100%;
+			justify-content: stretch;
+		}
+		.rsvp-choice-btn {
+			flex: 1;
+			justify-content: center;
+		}
 	}
 
-	.rsvp-section h2 {
-		margin: 0 0 var(--spacing-lg) 0;
-	}
-
+	/* ── Form elements ────────────────────────────────────────────── */
 	.form-group {
-		margin-bottom: var(--spacing-md);
+		margin-bottom: 0.75rem;
 	}
-
 	.form-group label {
 		display: block;
-		margin-bottom: var(--spacing-xs);
+		margin-bottom: 0.25rem;
 		font-weight: 500;
+		font-size: 0.875rem;
+		color: #3d3631;
 	}
-
 	.form-group input,
 	.form-group select,
 	.form-group textarea {
 		width: 100%;
-		padding: var(--spacing-sm);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		font-size: 1rem;
-	}
-
-	.date-range-form-group :global(.date-range-picker) {
-		width: 100%;
-	}
-	.date-range-form-group :global(.date-range-picker .trigger-input) {
-		width: 100%;
-		padding: var(--spacing-sm);
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		font-size: 1rem;
+		padding: 0.45rem 0.6rem;
+		border: 1.5px solid #ddd9d2;
+		border-radius: 8px;
+		font-size: 0.9375rem;
+		background: #faf9f7;
 		color: var(--color-text);
-		background: white;
+		transition: border-color 0.15s;
 	}
-	.date-range-form-group :global(.date-range-picker .trigger-input:hover) {
-		border-color: var(--color-border);
-	}
-	.date-range-form-group :global(.date-range-picker .trigger-input:focus) {
+	.form-group input:focus,
+	.form-group select:focus,
+	.form-group textarea:focus {
 		outline: none;
-		border-color: var(--color-primary);
-		box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
-	}
-	.date-range-form-group :global(.date-range-picker .trigger-text.placeholder) {
-		color: var(--color-text-light);
-	}
-	.date-range-form-group :global(.date-range-picker .trigger-icon) {
-		color: var(--color-text-light);
+		border-color: #8b7355;
+		background: #fff;
 	}
 	.form-hint {
 		display: block;
-		margin-top: 0.25rem;
-		font-size: 0.85rem;
+		margin-top: 0.2rem;
+		font-size: 0.8rem;
 		color: var(--color-text-light);
 	}
-
 	.form-row {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: var(--spacing-md);
+		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+		gap: 0.75rem;
 	}
 	.form-row-single-line {
-		grid-template-columns: 1.5fr 80px 80px 80px;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		align-items: end;
 	}
-	.rsvp-section .form-row-single-line .form-group {
-		margin-bottom: var(--spacing-xs);
-	}
-	@media (max-width: 700px) {
-		.form-row-single-line {
-			grid-template-columns: 1fr 1fr;
-		}
-	}
-	.rooms-grid,
-	.activities-list,
-	.extras-list {
-		display: grid;
-		gap: var(--spacing-md);
+	.rsvp-section .form-row-single-line .form-group { margin-bottom: 0; }
+	@media (max-width: 480px) {
+		.form-row-single-line { grid-template-columns: 1fr 1fr; }
 	}
 
-	.room-card,
-	.activity-card,
-	.extra-card {
-		padding: var(--spacing-md);
-		border: 2px solid var(--color-border);
-		border-radius: var(--radius-sm);
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: var(--spacing-md);
-	}
-
-	.room-card.selected,
-	.activity-card.participating {
-		border-color: var(--color-primary);
-		background: rgba(102, 126, 234, 0.05);
-	}
-
-	.beds-list {
-		display: flex;
-		gap: var(--spacing-xs);
-		flex-wrap: wrap;
-		margin: var(--spacing-sm) 0;
-	}
-
-	.bed-badge {
-		background: var(--color-bg-light);
-		padding: 0.25rem 0.5rem;
-		border-radius: var(--radius-sm);
-		font-size: 0.875rem;
-	}
-
-	.activity-info,
-	.extra-info {
-		flex: 1;
-	}
-
-	.quantity-input {
-		width: 80px;
-		margin-right: var(--spacing-sm);
-	}
-
+	/* ── Messages ─────────────────────────────────────────────────── */
 	.success-message {
-		background: rgba(34, 197, 94, 0.1);
+		background: rgba(34,197,94,0.08);
 		color: #16a34a;
-		padding: var(--spacing-sm);
-		border-radius: var(--radius-sm);
-		margin-bottom: var(--spacing-md);
+		padding: 0.6rem 0.75rem;
+		border-radius: 8px;
+		margin-bottom: 0.75rem;
 		border-left: 3px solid #16a34a;
+		font-size: 0.9rem;
 	}
-
 	.error-message {
-		background: rgba(239, 68, 68, 0.1);
+		background: rgba(239,68,68,0.08);
 		color: #b91c1c;
-		padding: var(--spacing-sm);
-		border-radius: var(--radius-sm);
-		margin-bottom: var(--spacing-md);
+		padding: 0.6rem 0.75rem;
+		border-radius: 8px;
+		margin-bottom: 0.75rem;
 		border-left: 3px solid #b91c1c;
+		font-size: 0.9rem;
 	}
 	.error-message.conflict { font-weight: 600; }
 
+	/* ── Spots counter ────────────────────────────────────────────── */
 	.spots-counter {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--spacing-md);
-		margin-bottom: var(--spacing-sm);
-		font-size: 1rem;
-	}
-	.spots-warn { color: var(--color-warning, #b45309); }
-	.helper-text {
-		color: var(--color-text-light);
-		font-size: 0.9rem;
-		margin-bottom: var(--spacing-md);
-	}
-	.trip-total-line {
-		margin: var(--spacing-md) 0 0;
-		font-size: 1rem;
-		color: var(--color-text);
-	}
-	.trip-total-note {
-		font-weight: normal;
-		color: var(--color-text-light);
+		gap: 0.75rem;
+		margin-bottom: 0.6rem;
 		font-size: 0.9rem;
 	}
-	.beds-claim .room-card { flex-direction: column; align-items: stretch; }
-	.beds-checkboxes { display: flex; flex-direction: column; gap: 0.5rem; }
-	.bed-option {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		cursor: pointer;
-	}
-	.bed-option.disabled { opacity: 0.6; cursor: not-allowed; }
-	.bed-option input { margin: 0; }
-	.claimed-badge {
-		font-size: 0.75rem;
-		background: var(--color-bg-light);
-		padding: 0.15rem 0.4rem;
-		border-radius: var(--radius-sm);
-		margin-left: auto;
-	}
-	.beds-form-actions {
-		display: flex;
-		align-items: center;
-		gap: var(--spacing-md);
-		flex-wrap: wrap;
-		margin-top: var(--spacing-lg);
-	}
-	.validation-hint { color: var(--color-text-light); font-size: 0.9rem; }
-	.summary-hint { margin-top: var(--spacing-sm); font-size: 0.9rem; color: var(--color-text-light); }
+	.spots-warn { color: var(--color-warning, #b45309); font-size: 0.875rem; }
+	.helper-text { color: var(--color-text-light); font-size: 0.85rem; margin-bottom: 0.75rem; }
+	.trip-total-line { margin: 0.75rem 0 0; font-size: 0.9rem; color: var(--color-text); }
+	.trip-total-note { font-weight: normal; color: var(--color-text-light); font-size: 0.85rem; }
+	.no-rooms { color: var(--muted, #64748b); margin: 0; font-size: 0.9rem; }
 
-	.btn-sm {
-		padding: var(--spacing-xs) var(--spacing-md);
-		font-size: 0.875rem;
-	}
-	.date-range {
-		display: grid;
-		grid-template-columns: 1fr auto 1fr;
-		align-items: center;
-		gap: var(--spacing-sm);
-	}
-	.date-range-sep { color: var(--color-text-light); }
-
-	.reconfirm-banner {
-		background: #fef3c7;
-		border: 1px solid #f59e0b;
-		border-radius: var(--radius-md);
-		padding: var(--spacing-md);
-		margin-bottom: var(--spacing-md);
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: var(--spacing-sm);
-	}
-	.reconfirm-deadline { font-size: 0.9rem; color: #92400e; }
-	.reconfirm-hint { display: block; margin-top: 0.5rem; font-size: 0.9rem; }
-	.dietary-section { margin-top: var(--spacing-xl); padding-top: var(--spacing-lg); border-top: 1px solid rgba(180, 160, 140, 0.3); }
-	.dietary-intro { font-size: .875rem; color: #78716c; margin: 0 0 1rem; }
-	.dietary-self, .dietary-plusone { margin-bottom: 1.25rem; }
-	.dietary-person-label { font-size: .8rem; font-weight: 700; color: #57534e; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 .5rem; }
-	.dietary-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-	.dietary-row-3 { grid-template-columns: 1fr 1fr 1fr; }
-	@media (max-width: 600px) { .dietary-row, .dietary-row-3 { grid-template-columns: 1fr; } }
-	.label-opt { font-weight: 400; color: #a8a29e; }
-	.dietary-save { margin-top: .5rem; }
-	.room-section { margin-top: var(--spacing-xl); padding-top: var(--spacing-lg); border-top: 1px solid rgba(180, 160, 140, 0.3); }
-	.room-section-footer { margin-top: var(--spacing-lg); }
-
-	.no-rooms { color: #5c5248; margin: 0; }
+	/* ── Room grid ────────────────────────────────────────────────── */
+	.rooms-grid { display: grid; gap: 0.875rem; }
 	.hotel-rooms {
-		display: grid;
 		grid-template-columns: repeat(2, 1fr);
-		gap: 1.5rem;
-		align-items: stretch;
 	}
-	@media (max-width: 700px) {
+	@media (max-width: 500px) {
 		.hotel-rooms { grid-template-columns: 1fr; }
 	}
 	.hotel-room-card {
 		display: grid;
 		grid-template-columns: 1fr;
-		grid-template-rows: 180px auto;
-		gap: 0;
+		grid-template-rows: 120px auto;
 		background: #fff;
 		border-radius: 10px;
 		overflow: hidden;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-		border: 1px solid rgba(180, 160, 140, 0.2);
+		border: 1.5px solid #e8e4df;
+		transition: box-shadow 0.15s;
 	}
+	.hotel-room-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+	.hotel-room-card.room-unavailable { opacity: 0.65; }
 	.hotel-room-photo {
-		background: #e8e0d8;
+		background: #ede8e0;
 		overflow: hidden;
-		height: 180px;
+		height: 120px;
 		display: flex;
 	}
 	.hotel-room-photo img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-		flex: 1;
-		min-height: 0;
+		width: 100%; height: 100%; object-fit: cover; display: block; flex: 1; min-height: 0;
 	}
 	.hotel-room-photo-placeholder {
+		--rtp-tint: 212, 196, 176;
+		position: relative;
 		width: 100%;
 		height: 100%;
 		min-height: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 0.85rem;
-		color: #8a7f75;
 		text-align: center;
-		padding: 0.5rem;
+		padding: 0.5rem 0.65rem;
+		overflow: hidden;
+		background: linear-gradient(
+			145deg,
+			rgba(var(--rtp-tint), 0.55) 0%,
+			rgba(var(--rtp-tint), 0.28) 42%,
+			rgba(255, 255, 255, 0.35) 100%
+		);
 	}
-	.hotel-room-body {
-		padding: 0.75rem 1rem;
+	.hotel-room-photo-placeholder--bedroom,
+	.hotel-room-photo-placeholder--master-bedroom,
+	.hotel-room-photo-placeholder--guest-room {
+		--rtp-tint: 196, 175, 155;
+	}
+	.hotel-room-photo-placeholder--living-room {
+		--rtp-tint: 168, 182, 198;
+	}
+	.hotel-room-photo-placeholder--kitchen {
+		--rtp-tint: 200, 188, 160;
+	}
+	.hotel-room-photo-placeholder--bathroom {
+		--rtp-tint: 175, 198, 208;
+	}
+	.hotel-room-photo-placeholder--dining-room {
+		--rtp-tint: 188, 168, 148;
+	}
+	.hotel-room-photo-placeholder--office {
+		--rtp-tint: 178, 172, 198;
+	}
+	.hotel-room-photo-placeholder--other,
+	.hotel-room-photo-placeholder--unknown {
+		--rtp-tint: 190, 184, 176;
+	}
+	.room-placeholder-grid {
+		position: absolute;
+		inset: 0;
+		opacity: 0.22;
+		background-image:
+			linear-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(255, 255, 255, 0.5) 1px, transparent 1px);
+		background-size: 14px 14px;
+	}
+	.room-placeholder-inner {
+		position: relative;
+		z-index: 1;
 		display: flex;
 		flex-direction: column;
-		min-width: 0;
-		min-height: 0;
-	}
-	.hotel-room-name {
-		font-size: 1.1rem;
-		font-weight: 600;
-		color: #2c2419;
-		margin: 0 0 0.35rem 0;
-	}
-	.hotel-room-capacity {
-		font-size: 0.85rem;
-		color: #6b5f54;
-		margin: 0 0 0.5rem 0;
-	}
-	.hotel-room-card.room-unavailable {
-		opacity: 0.72;
-	}
-	.hotel-room-desc {
-		font-size: 0.9rem;
-		color: #5c5248;
-		margin: 0 0 0.5rem 0;
-		line-height: 1.4;
-	}
-	.hotel-bed {
-		display: flex;
 		align-items: center;
-		flex-wrap: wrap;
-		gap: 0.35rem 0.75rem;
-		padding: 0.6rem 0.75rem;
-		border-radius: 8px;
-		border: 2px solid rgba(180, 160, 140, 0.25);
-		transition: border-color 0.2s, background 0.2s;
+		gap: 0.28rem;
+		max-width: 100%;
+	}
+	.room-placeholder-type {
+		display: inline-block;
+		font-size: 0.62rem;
+		font-weight: 700;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: #3d3631;
+		padding: 0.2rem 0.55rem;
+		border-radius: 99px;
+		background: rgba(255, 255, 255, 0.72);
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+	}
+	.room-placeholder-name {
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: #2a2520;
+		line-height: 1.25;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+	.room-placeholder-hint {
+		font-size: 0.68rem;
+		font-weight: 500;
+		color: rgba(45, 40, 35, 0.45);
+		letter-spacing: 0.02em;
+	}
+	.hotel-room-body {
+		padding: 0.65rem 0.85rem;
+		display: flex; flex-direction: column; min-width: 0;
+	}
+	.hotel-room-name { font-size: 0.95rem; font-weight: 600; color: #1e1a15; margin: 0 0 0.2rem; }
+	.hotel-room-capacity { font-size: 0.8rem; color: #7a6f65; margin: 0 0 0.4rem; }
+	.hotel-room-desc { font-size: 0.82rem; color: #7a6f65; margin: 0 0 0.4rem; line-height: 1.4; }
+
+	/* ── Bed options ─────────────────────────────────────────────── */
+	.beds-checkboxes { display: flex; flex-direction: column; gap: 0.4rem; }
+	.bed-option {
+		display: flex; align-items: center; gap: 0.35rem; cursor: pointer;
+	}
+	.bed-option.disabled { opacity: 0.55; cursor: not-allowed; }
+	.bed-option input { margin: 0; }
+	.hotel-bed {
+		display: flex; align-items: center; flex-wrap: wrap;
+		gap: 0.3rem 0.6rem;
+		padding: 0.5rem 0.65rem;
+		border-radius: 7px;
+		border: 1.5px solid #e8e4df;
+		transition: border-color 0.18s, background 0.18s;
 	}
 	.hotel-bed.selected {
-		border-color: var(--color-primary);
-		background: rgba(102, 126, 234, 0.06);
+		border-color: #8b7355;
+		background: rgba(139,115,85,0.06);
 	}
-	.hotel-bed .bed-type { font-weight: 500; text-transform: capitalize; }
-	.hotel-bed .bed-price { margin-left: auto; font-size: 0.85rem; color: #5c5248; }
+	.hotel-bed .bed-type { font-weight: 500; text-transform: capitalize; font-size: 0.9rem; }
+	.hotel-bed .bed-price { margin-left: auto; font-size: 0.8rem; color: #7a6f65; }
+	.claimed-badge {
+		font-size: 0.72rem; background: #f0ece7;
+		padding: 0.12rem 0.4rem; border-radius: 99px; margin-left: auto; color: #7a6f65;
+	}
 
+	/* ── Cost commitment ─────────────────────────────────────────── */
 	.cost-commitment-module {
-		margin: var(--spacing-lg) 0;
-		padding: 1.25rem;
-		background: rgba(255, 255, 255, 0.7);
+		margin: 0.875rem 0;
+		padding: 1rem 1.1rem;
+		background: #faf9f7;
 		border-radius: 10px;
-		border: 1px solid rgba(180, 160, 140, 0.25);
+		border: 1.5px solid #e8e4df;
 	}
-	.estimate-lines {
-		text-align: center;
-		margin-bottom: 0.5rem;
-	}
-	.estimate-lines .estimate-range { margin: 0 0 0.15rem 0; }
-	.estimate-lines .estimate-secondary { margin: 0; font-size: 0.9rem; color: var(--color-text-light); }
-	.estimate-range { margin: 0 0 0.25rem 0; }
-	.estimate-headcount { margin: 0; font-size: 0.9rem; color: var(--color-text-light); }
-	.estimate-microcopy { margin: 0 0 0.5rem 0; font-size: 0.85rem; color: var(--color-text-light); }
-	.submit-form { margin-top: 1.25rem; }
+	.estimate-lines { text-align: center; margin-bottom: 0.5rem; }
+	.estimate-lines .estimate-range { margin: 0 0 0.1rem; font-size: 0.975rem; }
+	.estimate-lines .estimate-secondary { margin: 0; font-size: 0.82rem; color: var(--color-text-light); }
+	.estimate-range { margin: 0 0 0.2rem; }
+	.estimate-headcount { margin: 0; font-size: 0.85rem; color: var(--color-text-light); }
+	.estimate-microcopy { margin: 0 0 0.4rem; font-size: 0.82rem; color: var(--color-text-light); }
+	.submit-form { margin-top: 1rem; }
 	.submit-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem; }
-	.estimate-warning { margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--color-warning, #b45309); }
-	.commitment-checkbox { margin-top: 1rem; margin-bottom: 0; }
+	.estimate-warning { margin: 0.2rem 0 0; font-size: 0.82rem; color: var(--color-warning, #b45309); }
+	.commitment-checkbox { margin-top: 0.75rem; margin-bottom: 0; }
 	.commitment-checkbox.form-group { margin-bottom: 0; }
-	.commitment-label { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-weight: normal; }
+	.commitment-label { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; cursor: pointer; font-weight: normal; }
 	.commitment-line-one {
-		display: flex;
-		flex-direction: row;
-		flex-wrap: nowrap;
-		align-items: center;
-		gap: 0.5rem;
-		width: fit-content;
+		display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 0.45rem; width: fit-content;
 	}
-	.commitment-line-one > span { white-space: nowrap; }
+	.commitment-line-one > span { white-space: nowrap; font-size: 0.9rem; }
 	.commitment-label .commitment-checkbox-input {
-		flex-shrink: 0;
-		margin: 0;
-		vertical-align: middle;
-		width: 1rem;
-		height: 1rem;
-		min-width: 1rem;
-		min-height: 1rem;
+		flex-shrink: 0; margin: 0; vertical-align: middle;
+		width: 1rem; height: 1rem; min-width: 1rem; min-height: 1rem;
 	}
 	.commitment-rest {
-		display: block;
-		font-size: 0.9rem;
-		line-height: 1.45;
-		color: var(--color-text-light);
-		margin: 0;
+		display: block; font-size: 0.82rem; line-height: 1.45;
+		color: var(--color-text-light); margin: 0;
 	}
-	.commitment-text { font-size: 0.9rem; line-height: 1.45; }
-	.validation-hint { display: inline-block; margin-left: 0.5rem; font-size: 0.85rem; color: var(--color-text-light); }
+	.commitment-text { font-size: 0.875rem; line-height: 1.45; }
+	.validation-hint { display: inline-block; margin-left: 0.5rem; font-size: 0.82rem; color: var(--color-text-light); }
+
+	/* ── Reconfirm banner ────────────────────────────────────────── */
+	.reconfirm-banner {
+		background: #fef3c7; border: 1px solid #f59e0b;
+		border-radius: 8px; padding: 0.75rem 1rem;
+		margin-bottom: 0.75rem;
+		display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+		font-size: 0.875rem;
+	}
+	.reconfirm-deadline { font-size: 0.85rem; color: #92400e; }
+	.reconfirm-hint { display: block; margin-top: 0.25rem; font-size: 0.85rem; }
+
+	/* ── Dietary section ─────────────────────────────────────────── */
+	.dietary-section { border-top: 1px solid #f0ece7; }
+	.dietary-intro { font-size: 0.825rem; color: #78716c; margin: 0 0 0.75rem; }
+	.dietary-self, .dietary-plusone { margin-bottom: 1rem; }
+	.dietary-person-label { font-size: 0.75rem; font-weight: 700; color: #57534e; text-transform: uppercase; letter-spacing: .05em; margin: 0 0 0.4rem; }
+	.dietary-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+	.dietary-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+	@media (max-width: 480px) { .dietary-row, .dietary-row-3 { grid-template-columns: 1fr; } }
+	.label-opt { font-weight: 400; color: #a8a29e; }
+	.dietary-save { margin-top: 0.4rem; }
+
+	/* ── Room section ────────────────────────────────────────────── */
+	.room-section { border-top: 1px solid #f0ece7; }
+	.room-section-footer { margin-top: 1rem; }
+	.room-pricing-intro { font-size: 0.85rem; }
+
+	/* ── Misc ────────────────────────────────────────────────────── */
+	.beds-claim .room-card { flex-direction: column; align-items: stretch; }
+	.beds-form-actions {
+		display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem;
+	}
+	.btn-sm { padding: 0.3rem 0.75rem; font-size: 0.875rem; }
+	.summary-hint { margin-top: 0.5rem; font-size: 0.85rem; color: var(--color-text-light); }
+	.room-card, .activity-card, .extra-card {
+		padding: 0.75rem; border: 1.5px solid #e8e4df; border-radius: 8px;
+		display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;
+	}
+	.room-card.selected, .activity-card.participating {
+		border-color: #8b7355; background: rgba(139,115,85,0.05);
+	}
+	.activities-list, .extras-list { display: grid; gap: 0.75rem; }
+	.bed-badge { background: #f5f2ef; padding: 0.2rem 0.45rem; border-radius: 6px; font-size: 0.8rem; }
+	.activity-info, .extra-info { flex: 1; }
+	.quantity-input { width: 75px; margin-right: 0.5rem; }
+	.beds-list { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.5rem 0; }
 </style>

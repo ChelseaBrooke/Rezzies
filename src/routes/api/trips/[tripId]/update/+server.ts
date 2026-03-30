@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { capacityFieldsForNewBed } from '$lib/bed-spot-validation.js';
+import { normalizeRoomTypeFromWizard } from '$lib/room-type-display.js';
 
 function mapPricingModel(
 	model: string
@@ -215,13 +217,15 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 					const bedType = typeof bed.bedType === 'string' ? bed.bedType : 'other';
 					const countRaw = parseOptionalInt((bed as { count?: unknown }).count);
 					const count = countRaw != null && countRaw > 0 ? countRaw : 1;
+					const bt = bedType.toLowerCase();
+					const { capacity, capacitySlots } = capacityFieldsForNewBed(bt);
 					for (let i = 0; i < count; i++) {
 						await prisma.bed.create({
 							data: {
 								roomId: createdRoom.id,
-								bedType: bedType.toLowerCase(),
-								capacity: 1,
-								capacitySlots: 1,
+								bedType: bt,
+								capacity,
+								capacitySlots,
 								isAvailable: true
 							}
 						});
@@ -242,6 +246,7 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 				await prisma.room.update({
 					where: { id: existingRoom.id },
 					data: {
+						roomType: normalizeRoomTypeFromWizard((room as { roomType?: unknown }).roomType) ?? undefined,
 						description:
 							typeof room.notes === 'string' && room.notes
 								? room.notes
