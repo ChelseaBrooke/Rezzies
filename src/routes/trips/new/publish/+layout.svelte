@@ -11,6 +11,6 @@
 	];
 </script>
 
-<CreateTripShell currentStep={3} steps={STEPS} {data} hideStepperBack>
+<CreateTripShell currentStep={3} steps={STEPS} {data} hideStepperBack hideTopBar>
 	{@render children()}
 </CreateTripShell>

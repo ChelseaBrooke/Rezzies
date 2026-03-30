@@ -410,7 +410,7 @@ export const actions: Actions = {
 
 		function roomCapacity(r: (typeof trip.rooms)[0]): number {
 			const fromBeds = r.beds.reduce((s, b) => s + (b.capacitySlots ?? b.capacity ?? 1), 0);
-			return Math.max(1, r.maxOccupancy ?? fromBeds || 1);
+			return Math.max(1, r.maxOccupancy ?? (fromBeds || 1));
 		}
 		const cap = roomCapacity(room);
 		if (partySize > cap) {

@@ -14,7 +14,11 @@
 		return unsubscribe;
 	});
 
-	async function handlePublish(opts: { splitCost: boolean; discountWaived: boolean }) {
+	async function handlePublish(opts: {
+		splitCost: boolean;
+		discountWaived: boolean;
+		paymentIntentId?: string;
+	}) {
 		const res = await fetch('/api/trips/publish', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -22,7 +26,8 @@
 				...draft,
 				isPublished: true,
 				splitCost: opts.splitCost,
-				...(opts.discountWaived ? { discountCode: DISCOUNT_CODE } : {})
+				...(opts.discountWaived ? { discountCode: DISCOUNT_CODE } : {}),
+				...(opts.paymentIntentId ? { paymentIntentId: opts.paymentIntentId } : {})
 			})
 		});
 		const data = await res.json().catch(() => ({}));

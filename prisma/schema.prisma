@@ -31,6 +31,7 @@ model Trip {
   activitiesEnabled     Boolean @default(true) // When false, hides Activities nav + itinerary activity creation
   gamesEnabled          Boolean @default(true) // When false, hides Games nav
   platformFeePerPerson  Float   @default(0)  // Per-guest share of the Divvi fee (set when host splits the cost)
+  publishFeePaymentIntentId String? @unique // Stripe PI id for one-time publish fee (prevents reuse across trips)
 
   // Trip info / house rules (editable on dashboard)
   fullAddress       String?  // Full address for maps; auto-populated from creation address

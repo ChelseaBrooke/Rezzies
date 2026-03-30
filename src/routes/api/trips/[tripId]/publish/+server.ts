@@ -3,9 +3,8 @@ import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
-
-const DISCOUNT_CODE = 'BearsBestFriend#1';
-const PLATFORM_FEE = 25;
+import { PLATFORM_PUBLISH_FEE_USD, shouldWaivePlatformFee } from '$lib/server/platform-publish-fee.js';
+import { isStripeConfigured, verifyPublishPaymentIntent } from '$lib/server/stripe.js';
 
 export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
@@ -28,7 +27,8 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 
 	const splitCost = body.splitCost === true;
 	const discountCodeRaw = typeof body.discountCode === 'string' ? body.discountCode.trim() : '';
-	const waivePlatformFee = discountCodeRaw === DISCOUNT_CODE;
+	const waivePlatformFee = shouldWaivePlatformFee(discountCodeRaw);
+	const paymentIntentId = typeof body.paymentIntentId === 'string' ? body.paymentIntentId.trim() : '';
 
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
@@ -42,18 +42,29 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 		return json({ error: 'Trip is already published' }, 400);
 	}
 
+	if (!waivePlatformFee && isStripeConfigured()) {
+		if (!paymentIntentId) {
+			return json({ error: 'Payment is required before publishing' }, 400);
+		}
+		const verified = await verifyPublishPaymentIntent(paymentIntentId, user.id);
+		if (!verified.ok) {
+			return json({ error: verified.reason }, 400);
+		}
+	}
+
 	const expected = Math.max(1, trip.expectedPeopleCount ?? 1);
 	const platformFeePerPerson = waivePlatformFee
 		? 0
 		: splitCost
-			? PLATFORM_FEE / expected
+			? PLATFORM_PUBLISH_FEE_USD / expected
 			: 0;
 
 	await prisma.trip.update({
 		where: { id: tripId },
 		data: {
 			isPublished: true,
-			platformFeePerPerson
+			platformFeePerPerson,
+			...(paymentIntentId ? { publishFeePaymentIntentId: paymentIntentId } : {})
 		}
 	});
 

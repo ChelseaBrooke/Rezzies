@@ -6,15 +6,17 @@
 	const DISCOUNT_CODE = 'BearsBestFriend#1';
 
 	let {
+		open = false,
 		expectedGuests = 1,
 		showSaveAsDraft = true,
 		tripId = undefined,
 		onPublish,
-		onSaveDraft
+		onSaveDraft,
+		onClose
 	}: {
+		open?: boolean;
 		expectedGuests?: number;
 		showSaveAsDraft?: boolean;
-		/** When publishing an existing draft from the trip editor */
 		tripId?: string;
 		onPublish: (opts: {
 			splitCost: boolean;
@@ -22,6 +24,7 @@
 			paymentIntentId?: string;
 		}) => Promise<void>;
 		onSaveDraft?: (opts: { splitCost: boolean }) => Promise<void>;
+		onClose?: () => void;
 	} = $props();
 
 	let discountInput = $state('');
@@ -32,12 +35,10 @@
 	let publishError = $state<string | null>(null);
 
 	let paymentElementContainer = $state<HTMLDivElement | null>(null);
-	/** Not $state: assigning a Stripe instance was retriggering $effect and spamming create-intent / loadStripe */
 	let stripeUi: { stripe: Stripe; elements: StripeElements } | null = null;
 	let paymentReady = $state(false);
 	let stripeDisabled = $state(false);
 	let intentLoading = $state(false);
-	/** Bumps on effect cleanup so stale async work never leaves intentLoading stuck true */
 	let stripeSetupGeneration = 0;
 
 	const finalPrice = $derived(discountApplied ? 0 : BASE_PRICE);
@@ -55,6 +56,12 @@
 	}
 
 	$effect(() => {
+		if (!open) {
+			teardownStripeUI();
+			intentLoading = false;
+			return;
+		}
+
 		if (typeof window === 'undefined') return;
 
 		const container = paymentElementContainer;
@@ -116,12 +123,8 @@
 					return;
 				}
 				const elements = stripe.elements({ clientSecret });
-				// In dev, Link often pre-selects a saved bank/card that fails until verified; use plain card + test numbers.
 				const paymentElement = elements.create('payment', {
-					layout: {
-						type: 'accordion',
-						defaultCollapsed: false
-					},
+					layout: { type: 'accordion', defaultCollapsed: false },
 					...(dev ? { wallets: { link: 'never' } } : {})
 				});
 				paymentElement.mount(container);
@@ -178,9 +181,7 @@
 						typeof window !== 'undefined' ? window.location.href.split('#')[0] : undefined;
 					const { error, paymentIntent } = await stripeUi.stripe.confirmPayment({
 						elements: stripeUi.elements,
-						confirmParams: {
-							return_url: returnUrl ?? window.location.origin
-						},
+						confirmParams: { return_url: returnUrl ?? window.location.origin },
 						redirect: 'if_required'
 					});
 					if (error) throw new Error(error.message);
@@ -223,88 +224,72 @@
 	});
 
 	const publishDisabled = $derived(
-		isProcessing ||
-			(finalPrice > 0 && !stripeDisabled && (intentLoading || !paymentReady))
+		isProcessing || (finalPrice > 0 && !stripeDisabled && (intentLoading || !paymentReady))
 	);
+
+	function handleBackdropClick(e: MouseEvent) {
+		if (e.target === e.currentTarget) onClose?.();
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape') onClose?.();
+	}
 </script>
 
-<div class="publish-screen">
-	<div class="content-grid">
-		<div class="left-col">
-			<header class="sales-hero">
-				<p class="sales-eyebrow">Almost there</p>
-				<h1 class="sales-title">Your group trip, finally under control.</h1>
-				<p class="sales-lead">
-					One link to share. Everyone RSVPs, picks a room, votes on the itinerary, and pays their share — all in one place. You stay in charge from the first invite to the last night.
-				</p>
-			</header>
-
-			<div class="fee-highlight">
-				<div class="fee-highlight-left">
-					<p class="fee-highlight-label">One-time trip fee</p>
-					<div class="fee-highlight-price">
+{#if open}
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+	<div
+		class="modal-backdrop"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Publish trip"
+		onclick={handleBackdropClick}
+		onkeydown={handleKeydown}
+	>
+		<div class="modal-panel">
+			<div class="modal-header">
+				<div class="modal-header-left">
+					<p class="modal-eyebrow">One-time trip fee</p>
+					<div class="modal-price-row">
 						{#if discountApplied}
-							<span class="fee-strike">${BASE_PRICE.toFixed(2)}</span>
-							<span class="fee-amount free">$0</span>
+							<span class="modal-price-strike">${BASE_PRICE.toFixed(2)}</span>
+							<span class="modal-price free">$0</span>
 						{:else}
-							<span class="fee-amount">${BASE_PRICE.toFixed(2)}</span>
+							<span class="modal-price">${finalPrice.toFixed(2)}</span>
 						{/if}
 					</div>
-					<p class="fee-highlight-sub">No subscription. No per-guest fees. One trip, one charge.</p>
 				</div>
-				<div class="fee-highlight-badges">
-					<span class="fee-badge">🔒 Host approval</span>
-					<span class="fee-badge">📊 Live headcount</span>
-					<span class="fee-badge">🛏 Room splits</span>
-				</div>
+				{#if onClose}
+					<button class="modal-close" type="button" onclick={onClose} aria-label="Close">
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+							<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+						</svg>
+					</button>
+				{/if}
 			</div>
 
-			<div class="perks-grid">
-				<div class="perk-card">
-					<span class="perk-icon">✅</span>
-					<div>
-						<p class="perk-title">RSVPs you can trust</p>
-						<p class="perk-body">Guests confirm, not just "maybe." You see real headcount before you commit to anything.</p>
-					</div>
-				</div>
-				<div class="perk-card">
-					<span class="perk-icon">🛏</span>
-					<div>
-						<p class="perk-title">No more room drama</p>
-						<p class="perk-body">Everyone picks their own bed. Pricing updates live as more guests fill in.</p>
-					</div>
-				</div>
-				<div class="perk-card">
-					<span class="perk-icon">🗳</span>
-					<div>
-						<p class="perk-title">Group decisions, made easy</p>
-						<p class="perk-body">Run polls on activities, meals, or anything. No more chasing replies in group chat.</p>
-					</div>
-				</div>
-				<div class="perk-card">
-					<span class="perk-icon">💸</span>
-					<div>
-						<p class="perk-title">Fair cost splitting</p>
-						<p class="perk-body">Room costs, shared fees, add-ons — everyone sees exactly what they owe and why.</p>
-					</div>
-				</div>
-			</div>
+			<div class="modal-body">
+				<!-- Stripe Payment Element -->
+				{#if finalPrice > 0 && !stripeDisabled}
+					<div
+						class="payment-element-mount"
+						bind:this={paymentElementContainer}
+						data-testid="stripe-payment-element"
+					></div>
+				{:else if finalPrice > 0 && stripeDisabled}
+					<p class="stripe-dev-note">
+						Add <code>STRIPE_SECRET_KEY</code> and <code>STRIPE_PUBLISHABLE_KEY</code> to <code>.env</code> and restart dev.
+					</p>
+				{/if}
 
-			<div class="social-proof">
-				<p class="social-proof-text">"Finally, a way to organize a group trip that doesn't end in a group chat meltdown."</p>
-				<p class="social-proof-attr">— A relieved trip host</p>
-			</div>
-		</div>
+				{#if publishError}
+					<div class="publish-error">{publishError}</div>
+				{/if}
 
-		<div class="right-col checkout-rail">
-			<div class="checkout-panel">
-				<div class="checkout-top">
-					<span class="checkout-heading">Pay to publish</span>
-				</div>
-
+				<!-- Discount -->
 				<div class="checkout-discount">
 					<div class="discount-label">
-						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 							<path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
 							<line x1="7" y1="7" x2="7.01" y2="7"/>
 						</svg>
@@ -314,14 +299,10 @@
 					{#if discountApplied}
 						<div class="discount-applied-row">
 							<div class="discount-success">
-								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-									<polyline points="20 6 9 17 4 12"/>
-								</svg>
-								Discount applied, trip fee is free!
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+								Fee waived!
 							</div>
-							<button type="button" class="btn-remove-discount" onclick={removeDiscount}>
-								Remove
-							</button>
+							<button type="button" class="btn-remove-discount" onclick={removeDiscount}>Remove</button>
 						</div>
 					{:else}
 						<div class="discount-input-row">
@@ -348,34 +329,19 @@
 					{/if}
 				</div>
 
-				{#if finalPrice > 0 && !stripeDisabled}
-					<div
-						class="payment-element-mount"
-						bind:this={paymentElementContainer}
-						data-testid="stripe-payment-element"
-					></div>
-				{:else if finalPrice > 0 && stripeDisabled}
-					<p class="stripe-dev-note">
-						Add <code>STRIPE_SECRET_KEY</code> and <code>STRIPE_PUBLISHABLE_KEY</code> to <code>.env</code>,
-						restart dev, or publish without card in this environment.
-					</p>
-				{/if}
-
-				{#if publishError}
-					<div class="publish-error">{publishError}</div>
-				{/if}
-
+				<!-- Split fee toggle -->
 				<label class="checkout-split-inline">
 					<div class="checkbox-wrapper">
 						<input type="checkbox" bind:checked={splitCost} />
 						<span class="checkbox-custom"></span>
 					</div>
 					<span class="checkout-split-text">
-						Split this invoice with your guests (est., {perPersonShare.toFixed(2)} per guest, if {safeExpected}
+						Split this invoice with your guests (est., ${perPersonShare.toFixed(2)} per guest, if {safeExpected}
 						{safeExpected === 1 ? 'guest' : 'guests'})
 					</span>
 				</label>
 
+				<!-- CTAs -->
 				<div class="cta-stack">
 					<button
 						type="button"
@@ -398,311 +364,132 @@
 						>
 							Save as Draft
 						</button>
-
 					{/if}
 				</div>
 			</div>
 		</div>
 	</div>
-</div>
+{/if}
 
 <style>
-	.publish-screen {
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 1000;
+		background: rgba(15, 23, 42, 0.55);
+		backdrop-filter: blur(3px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1.5rem;
+	}
+
+	.modal-panel {
+		background: white;
+		border-radius: 1.125rem;
+		box-shadow:
+			0 4px 6px rgba(15, 23, 42, 0.04),
+			0 24px 60px rgba(15, 23, 42, 0.15);
+		width: 100%;
+		max-width: 420px;
+		max-height: calc(100dvh - 3rem);
+		overflow-y: auto;
 		display: flex;
 		flex-direction: column;
-		gap: 0;
-		padding-bottom: 2rem;
 	}
 
-	.content-grid {
-		display: grid;
-		grid-template-columns: minmax(0, 1.2fr) minmax(252px, 320px);
-		gap: 2.25rem;
-		align-items: start;
-	}
-
-	.left-col,
-	.right-col {
-		display: flex;
-		flex-direction: column;
-		gap: 1.25rem;
-	}
-
-	.checkout-rail {
-		position: relative;
-	}
-
-	/* ── Left column: hero ── */
-	.sales-hero {
-		padding-bottom: 0.25rem;
-	}
-
-	.sales-eyebrow {
-		font-size: 0.75rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: var(--primary, #2563eb);
-		margin: 0 0 0.6rem;
-	}
-
-	.sales-title {
-		font-family: 'Fraunces', Georgia, serif;
-		font-size: clamp(1.85rem, 3.2vw, 2.55rem);
-		font-weight: 700;
-		color: var(--text);
-		margin: 0 0 1rem;
-		letter-spacing: -0.035em;
-		line-height: 1.12;
-	}
-
-	.sales-lead {
-		font-size: 1.0625rem;
-		line-height: 1.7;
-		color: var(--muted);
-		margin: 0;
-		max-width: 36rem;
-	}
-
-	/* ── Fee highlight block ── */
-	.fee-highlight {
+	.modal-header {
 		display: flex;
 		align-items: flex-start;
 		justify-content: space-between;
-		gap: 1.5rem;
-		padding: 1.25rem 1.5rem;
+		gap: 1rem;
+		padding: 1.35rem 1.35rem 1.1rem;
+		border-bottom: 1px solid rgba(15, 23, 42, 0.07);
 		background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%);
-		border: 1px solid rgba(99, 102, 241, 0.18);
-		border-radius: 1rem;
+		border-radius: 1.125rem 1.125rem 0 0;
 	}
 
-	.fee-highlight-left {
+	.modal-header-left {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.2rem;
 	}
 
-	.fee-highlight-label {
-		font-size: 0.75rem;
+	.modal-eyebrow {
+		font-size: 0.7rem;
 		font-weight: 700;
 		text-transform: uppercase;
-		letter-spacing: 0.07em;
+		letter-spacing: 0.1em;
 		color: #6366f1;
 		margin: 0;
 	}
 
-	.fee-highlight-price {
+	.modal-price-row {
 		display: flex;
 		align-items: baseline;
 		gap: 0.5rem;
 	}
 
-	.fee-strike {
-		font-size: 1.25rem;
-		color: var(--muted);
-		text-decoration: line-through;
-	}
-
-	.fee-amount {
+	.modal-price {
 		font-family: 'Fraunces', Georgia, serif;
-		font-size: 2.6rem;
+		font-size: 2.75rem;
 		font-weight: 800;
 		letter-spacing: -0.04em;
 		color: var(--text);
 		line-height: 1;
 	}
 
-	.fee-amount.free {
+	.modal-price.free {
 		color: #16a34a;
 	}
 
-	.fee-highlight-sub {
-		font-size: 0.8125rem;
+	.modal-price-strike {
+		font-size: 1.1rem;
 		color: var(--muted);
-		margin: 0;
-		line-height: 1.5;
+		text-decoration: line-through;
+		align-self: center;
 	}
 
-	.fee-highlight-badges {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-		align-items: flex-end;
-		flex-shrink: 0;
-	}
-
-	.fee-badge {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #3730a3;
-		background: rgba(99, 102, 241, 0.1);
-		border: 1px solid rgba(99, 102, 241, 0.18);
-		padding: 0.25rem 0.55rem;
-		border-radius: 99px;
-		white-space: nowrap;
-	}
-
-	/* ── Perks grid ── */
-	.perks-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.875rem;
-	}
-
-	.perk-card {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.75rem;
-		padding: 1rem 1.1rem;
-		background: white;
-		border: 1px solid var(--border);
-		border-radius: 0.875rem;
-		box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-		transition: box-shadow 0.15s, border-color 0.15s;
-	}
-
-	.perk-card:hover {
-		border-color: rgba(99, 102, 241, 0.3);
-		box-shadow: 0 3px 12px rgba(99, 102, 241, 0.08);
-	}
-
-	.perk-icon {
-		font-size: 1.35rem;
-		line-height: 1;
-		flex-shrink: 0;
-		margin-top: 0.1rem;
-	}
-
-	.perk-title {
-		font-size: 0.9rem;
-		font-weight: 700;
-		color: var(--text);
-		margin: 0 0 0.25rem;
-		line-height: 1.3;
-	}
-
-	.perk-body {
-		font-size: 0.8125rem;
-		color: var(--muted);
-		margin: 0;
-		line-height: 1.5;
-	}
-
-	/* ── Social proof ── */
-	.social-proof {
-		padding: 1.1rem 1.35rem;
-		background: rgba(248, 250, 252, 0.8);
-		border-left: 3px solid var(--primary, #2563eb);
-		border-radius: 0 0.75rem 0.75rem 0;
-	}
-
-	.social-proof-text {
-		font-size: 0.9375rem;
-		font-style: italic;
-		color: var(--text);
-		margin: 0 0 0.4rem;
-		line-height: 1.55;
-	}
-
-	.social-proof-attr {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: var(--muted);
-		margin: 0;
-	}
-
-	.checkout-panel {
-		position: sticky;
-		top: 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.875rem;
-		padding: 1.1rem 1.1rem 1rem;
-		background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
-		border: 1px solid var(--border);
-		border-radius: 1rem;
-		box-shadow:
-			0 1px 2px rgba(15, 23, 42, 0.04),
-			0 16px 36px rgba(15, 23, 42, 0.07);
-	}
-
-	.checkout-top {
+	.modal-close {
+		width: 2rem;
+		height: 2rem;
 		display: flex;
 		align-items: center;
-		padding-bottom: 0.65rem;
-		border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-	}
-
-	.checkout-heading {
-		font-family: 'Fraunces', Georgia, serif;
-		font-size: 1.125rem;
-		font-weight: 700;
-		letter-spacing: -0.02em;
-		color: var(--text);
-	}
-
-	.checkout-discount {
-		padding-bottom: 0.15rem;
-	}
-
-	.checkout-discount .discount-label {
-		margin-bottom: 0.5rem;
-		font-size: 0.8125rem;
-	}
-
-	.checkout-discount .discount-input-row {
-		flex-direction: column;
-		align-items: stretch;
-		gap: 0.5rem;
-	}
-
-	.checkout-discount .btn-apply {
-		width: 100%;
-	}
-
-	.checkout-discount .discount-applied-row {
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 0.5rem;
-	}
-
-	.checkout-split-inline {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.65rem;
-		cursor: pointer;
-		margin: 0.25rem 0 0;
-		padding: 0.35rem 0 0;
-		font-size: 0.8125rem;
-		line-height: 1.45;
-		color: var(--text);
-	}
-
-	.checkout-split-text {
-		font-weight: 500;
+		justify-content: center;
+		border: none;
+		background: transparent;
 		color: var(--muted);
+		cursor: pointer;
+		border-radius: 0.375rem;
+		transition: background 0.15s, color 0.15s;
 	}
 
-	.payment-element-mount {
-		min-height: 2.5rem;
-		margin: 0 -0.15rem;
+	.modal-close:hover {
+		background: var(--bg, #f8fafc);
+		color: var(--text);
 	}
 
-	.card {
-		background: white;
-		border: 1px solid var(--border);
-		border-radius: 0.875rem;
-		padding: 1.25rem 1.5rem;
+	.modal-body {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		padding: 1.25rem 1.35rem 1.5rem;
+	}
+
+	/* Discount section */
+	.checkout-discount {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
 	}
 
 	.discount-label {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.875rem;
+		gap: 0.4rem;
+		font-size: 0.8125rem;
 		font-weight: 600;
 		color: var(--text);
-		margin-bottom: 0.875rem;
 	}
 
 	.discount-input-row {
@@ -712,10 +499,10 @@
 
 	.discount-input {
 		flex: 1;
-		padding: 0.625rem 0.875rem;
+		padding: 0.55rem 0.75rem;
 		border: 1px solid var(--border);
 		border-radius: 0.5rem;
-		font-size: 0.9375rem;
+		font-size: 0.9rem;
 		font-family: inherit;
 		color: var(--text);
 		background: var(--bg, #fafafa);
@@ -733,7 +520,7 @@
 	}
 
 	.btn-apply {
-		padding: 0.625rem 1.125rem;
+		padding: 0.55rem 1rem;
 		background: var(--primary);
 		color: white;
 		border: none;
@@ -756,23 +543,22 @@
 	}
 
 	.discount-error {
-		font-size: 0.8125rem;
+		font-size: 0.8rem;
 		color: var(--danger, #ef4444);
-		margin: 0.5rem 0 0;
+		margin: 0;
 	}
 
 	.discount-applied-row {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
+		gap: 0.75rem;
 	}
 
 	.discount-success {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.9rem;
+		gap: 0.4rem;
+		font-size: 0.875rem;
 		font-weight: 600;
 		color: #16a34a;
 	}
@@ -793,53 +579,10 @@
 		color: var(--text);
 	}
 
-	.checkbox-wrapper {
-		position: relative;
-		flex-shrink: 0;
-		margin-top: 2px;
-	}
-
-	.checkbox-wrapper input[type='checkbox'] {
-		position: absolute;
-		opacity: 0;
-		width: 0;
-		height: 0;
-	}
-
-	.checkbox-custom {
-		display: block;
-		width: 18px;
-		height: 18px;
-		border: 2px solid var(--border);
-		border-radius: 4px;
-		background: white;
-		transition: all 0.15s;
-		cursor: pointer;
-	}
-
-	.checkbox-wrapper input[type='checkbox']:checked + .checkbox-custom {
-		background: var(--primary);
-		border-color: var(--primary);
-	}
-
-	.checkbox-wrapper input[type='checkbox']:checked + .checkbox-custom::after {
-		content: '';
-		display: block;
-		width: 10px;
-		height: 6px;
-		border-left: 2px solid white;
-		border-bottom: 2px solid white;
-		transform: rotate(-45deg) translate(2px, 1px);
-	}
-
-	.publish-error {
-		padding: 0.55rem 0.65rem;
-		background: rgba(239, 68, 68, 0.08);
-		border: 1px solid rgba(239, 68, 68, 0.2);
-		border-radius: 0.45rem;
-		font-size: 0.8125rem;
-		line-height: 1.4;
-		color: var(--danger, #ef4444);
+	/* Stripe element */
+	.payment-element-mount {
+		min-height: 2.5rem;
+		margin: 0 -0.1rem;
 	}
 
 	.stripe-dev-note {
@@ -857,6 +600,72 @@
 		font-size: 0.75rem;
 	}
 
+	/* Split toggle */
+	.checkout-split-inline {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6rem;
+		cursor: pointer;
+		font-size: 0.8125rem;
+		line-height: 1.45;
+		color: var(--text);
+	}
+
+	.checkout-split-text {
+		font-weight: 500;
+		color: var(--muted);
+	}
+
+	.checkbox-wrapper {
+		position: relative;
+		flex-shrink: 0;
+		margin-top: 1px;
+	}
+
+	.checkbox-wrapper input[type='checkbox'] {
+		position: absolute;
+		opacity: 0;
+		width: 0;
+		height: 0;
+	}
+
+	.checkbox-custom {
+		display: block;
+		width: 17px;
+		height: 17px;
+		border: 2px solid var(--border);
+		border-radius: 4px;
+		background: white;
+		transition: all 0.15s;
+		cursor: pointer;
+	}
+
+	.checkbox-wrapper input[type='checkbox']:checked + .checkbox-custom {
+		background: var(--primary);
+		border-color: var(--primary);
+	}
+
+	.checkbox-wrapper input[type='checkbox']:checked + .checkbox-custom::after {
+		content: '';
+		display: block;
+		width: 9px;
+		height: 5px;
+		border-left: 2px solid white;
+		border-bottom: 2px solid white;
+		transform: rotate(-45deg) translate(2px, 1px);
+	}
+
+	/* CTAs */
+	.publish-error {
+		padding: 0.55rem 0.65rem;
+		background: rgba(239, 68, 68, 0.08);
+		border: 1px solid rgba(239, 68, 68, 0.2);
+		border-radius: 0.45rem;
+		font-size: 0.8125rem;
+		line-height: 1.4;
+		color: var(--danger, #ef4444);
+	}
+
 	.cta-stack {
 		display: flex;
 		flex-direction: column;
@@ -865,7 +674,7 @@
 
 	.btn-publish {
 		width: 100%;
-		padding: 0.85rem 1.15rem;
+		padding: 0.875rem 1.15rem;
 		background: var(--primary);
 		color: white;
 		border: none;
@@ -926,42 +735,5 @@
 	.btn-draft:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
-	}
-
-	@media (max-width: 900px) {
-		.content-grid {
-			grid-template-columns: 1fr;
-			gap: 1.75rem;
-		}
-
-		.checkout-panel {
-			position: static;
-			top: auto;
-		}
-	}
-
-	@media (max-width: 640px) {
-		.sales-title {
-			font-size: 1.6rem;
-		}
-
-		.fee-amount {
-			font-size: 2rem;
-		}
-
-		.fee-highlight {
-			flex-direction: column;
-			gap: 1rem;
-		}
-
-		.fee-highlight-badges {
-			flex-direction: row;
-			flex-wrap: wrap;
-			align-items: flex-start;
-		}
-
-		.perks-grid {
-			grid-template-columns: 1fr;
-		}
 	}
 </style>

@@ -5,7 +5,10 @@
 	import Step1 from './Step1.svelte';
 	import AddOnsStep from './AddOnsStep.svelte';
 	import Step4 from './Step4.svelte';
-	
+	import PublishPaymentModal from '$lib/components/wizard/PublishPaymentModal.svelte';
+
+	const DISCOUNT_CODE = 'BearsBestFriend#1';
+
 	let { data } = $props();
 	
 	const stepNumber = $derived(() => {
@@ -14,6 +17,7 @@
 	});
 	
 	let draft = $state({ ...$tripDraft });
+	let publishModalOpen = $state(false);
 	
 	$effect(() => {
 		const unsubscribe = tripDraft.subscribe((value) => {
@@ -34,10 +38,6 @@
 	function nextStep() {
 		if (stepNumber() < 3) {
 			goto(`/trips/new/step/${stepNumber() + 1}`);
-		} else {
-			// Step 3 (review) → proceed to publish/payment screen
-			tripDraft.save(draft);
-			goto('/trips/new/publish');
 		}
 	}
 	
@@ -103,9 +103,49 @@
 		}
 	}
 
-	function handleProceedToPublish() {
+	function openPublishModal() {
 		tripDraft.save(draft);
-		goto('/trips/new/publish');
+		publishModalOpen = true;
+	}
+
+	async function handlePublish(opts: {
+		splitCost: boolean;
+		discountWaived: boolean;
+		paymentIntentId?: string;
+	}) {
+		const res = await fetch('/api/trips/publish', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				...draft,
+				isPublished: true,
+				splitCost: opts.splitCost,
+				...(opts.discountWaived ? { discountCode: DISCOUNT_CODE } : {}),
+				...(opts.paymentIntentId ? { paymentIntentId: opts.paymentIntentId } : {})
+			})
+		});
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+		if (!data.tripId) throw new Error(data.error || 'Failed to create trip');
+		tripDraft.clear();
+		goto(`/trips/${data.tripId}`);
+	}
+
+	async function handleSaveDraft(opts: { splitCost: boolean }) {
+		const res = await fetch('/api/trips/publish', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				...draft,
+				isPublished: false,
+				splitCost: opts.splitCost
+			})
+		});
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+		if (!data.tripId) throw new Error(data.error || 'Failed to save draft');
+		tripDraft.clear();
+		goto(`/trips/${data.tripId}`);
 	}
 </script>
 
@@ -144,17 +184,26 @@
 			>
 				Next
 			</button>
-		{:else}
-			<button
-				type="button"
-				class="btn-publish"
-				onclick={handleProceedToPublish}
-			>
-				Publish
-			</button>
-		{/if}
+	{:else}
+		<button
+			type="button"
+			class="btn-publish"
+			onclick={openPublishModal}
+		>
+			Publish
+		</button>
+	{/if}
 	</div>
 </div>
+
+<PublishPaymentModal
+	open={publishModalOpen}
+	expectedGuests={Math.max(1, draft.expectedGuestCount || 1)}
+	showSaveAsDraft={true}
+	onPublish={handlePublish}
+	onSaveDraft={handleSaveDraft}
+	onClose={() => (publishModalOpen = false)}
+/>
 
 <style>
 	.step-wrapper {

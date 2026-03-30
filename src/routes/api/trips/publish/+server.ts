@@ -2,6 +2,11 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
+import {
+	PLATFORM_PUBLISH_FEE_USD,
+	shouldWaivePlatformFee
+} from '$lib/server/platform-publish-fee.js';
+import { isStripeConfigured, verifyPublishPaymentIntent } from '$lib/server/stripe.js';
 
 /** Map draft pricingModel to Prisma enum-style string */
 function mapPricingModel(
@@ -73,13 +78,14 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		'alphabet-hunt': 'Alphabet Hunt',
 		'daily-trivia': 'Daily Trivia'
 	};
-	const PLATFORM_FEE = 25;
 	const discountCodeRaw = typeof d.discountCode === 'string' ? d.discountCode.trim() : '';
-	const waivePlatformFee = discountCodeRaw === 'BearsBestFriend#1';
+	const waivePlatformFee = shouldWaivePlatformFee(discountCodeRaw);
+	const paymentIntentId = typeof d.paymentIntentId === 'string' ? d.paymentIntentId.trim() : '';
 	const platformFeePerPerson = waivePlatformFee
 		? 0
 		: splitPlatformFee
-			? PLATFORM_FEE / Math.max(1, expectedGuestCount != null && expectedGuestCount >= 1 ? expectedGuestCount : 1)
+			? PLATFORM_PUBLISH_FEE_USD /
+				Math.max(1, expectedGuestCount != null && expectedGuestCount >= 1 ? expectedGuestCount : 1)
 			: 0;
 
 	if (!name) {
@@ -129,6 +135,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		return json({ error: 'Minimum headcount (realistic low) is required' }, 400);
 	}
 
+	if (isPublished && !waivePlatformFee && isStripeConfigured()) {
+		if (!paymentIntentId) {
+			return json({ error: 'Payment is required before publishing' }, 400);
+		}
+		const verified = await verifyPublishPaymentIntent(paymentIntentId, user.id);
+		if (!verified.ok) {
+			return json({ error: verified.reason }, 400);
+		}
+	}
+
 	/** Only persist a trip-level max when the host entered one; otherwise null (capacity from beds elsewhere). */
 	const maxGuestsToStore =
 		maxOccupancy != null && maxOccupancy > 0 ? maxOccupancy : null;
@@ -151,6 +167,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			activitiesEnabled,
 			gamesEnabled,
 			platformFeePerPerson,
+				publishFeePaymentIntentId:
+					isPublished && !waivePlatformFee && paymentIntentId ? paymentIntentId : null,
 				expectedPeopleCount: expectedGuestCount,
 				maxGuests: maxGuestsToStore,
 				allowPartialStays: partialStayAllowed,
