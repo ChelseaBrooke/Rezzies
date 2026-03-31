@@ -1,5 +1,7 @@
 import { prisma } from './prisma.js';
-import { sendTemplateEmail } from './email/sendgrid.js';
+import { sendHtmlEmail } from './email/resend.js';
+import { TEMPLATE_KEYS } from './email/templates.js';
+import { renderTripInviteHtml } from './email/render/trip-invite.js';
 
 /**
  * When someone signs up (or we discover them) with an email that was already invited,
@@ -126,7 +128,8 @@ export async function createInvite(
 					name: true,
 					checkInDate: true,
 					checkOutDate: true,
-					location: true
+					location: true,
+					locationCity: true
 				}
 			},
 			invitedBy: {
@@ -164,25 +167,39 @@ export async function createInvite(
 
 async function sendInviteEmail(email: string, invite: any, inviteUrl: string) {
 	try {
-		// Use SendGrid to send invite email
-		// For now, use a simple email template
 		const hostName = invite.invitedBy.name || invite.invitedBy.email;
 		const tripName = invite.trip.name;
-		const checkIn = invite.trip.checkInDate.toLocaleDateString();
-		const checkOut = invite.trip.checkOutDate.toLocaleDateString();
+		const checkIn = invite.trip.checkInDate.toLocaleDateString(undefined, {
+			weekday: 'short',
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
+		const checkOut = invite.trip.checkOutDate.toLocaleDateString(undefined, {
+			weekday: 'short',
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
+		const destination =
+			(typeof invite.trip.locationCity === 'string' && invite.trip.locationCity.trim()) ||
+			(typeof invite.trip.location === 'string' && invite.trip.location.trim()) ||
+			'';
 
-		// TODO: Create a proper SendGrid template for invites
-		// For now, use a simple text email
-		await sendTemplateEmail({
+		const html = renderTripInviteHtml({
+			hostName,
+			tripName,
+			checkIn,
+			checkOut,
+			inviteUrl,
+			destination
+		});
+		await sendHtmlEmail({
 			to: email,
-			templateKey: 'TRIP_INVITE',
-			dynamicTemplateData: {
-				hostName,
-				tripName,
-				checkIn,
-				checkOut,
-				inviteUrl
-			}
+			subject: `${hostName} invited you to ${tripName}`,
+			html,
+			templateKey: TEMPLATE_KEYS.TRIP_INVITE,
+			tags: [{ name: 'category', value: 'trip-invite' }]
 		});
 	} catch (error) {
 		console.error('Failed to send invite email:', error);

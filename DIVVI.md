@@ -20,7 +20,7 @@ This document describes everything Divvi does: pages, flows, API endpoints, form
 - **Auth:** Session cookie (`user_session`); no JWT in normal browser flows.
 - **DB:** PostgreSQL via Prisma.
 - **Storage:** Supabase Storage for images and trip files (optional; uploads fail gracefully if not configured).
-- **Email:** SendGrid templates (e.g. guest confirmation, invites); optional.
+- **Email:** Resend (HTML rendered in-app: guest confirmation, trip invites); optional.
 - **APIs:** REST-style under `/api/`. Form actions use `?/actionName` on page URLs.
 
 ---
@@ -327,6 +327,6 @@ This document describes everything Divvi does: pages, flows, API endpoints, form
 ## 21. Environment / Config (for Test Setup)
 
 - **Session:** Cookie-based; ensure `user_session` is sent on API and form requests when testing as logged-in user.
-- **Optional:** `DATABASE_URL`, `DIRECT_URL`, Supabase (storage), SendGrid (email), `DIVVI_EVENTS_API_BASE_URL`, `DIVVI_EVENTS_API_KEY`, `APP_BASE_URL` (for confirmation links). Internal `POST /api/submit` requires API key (see `requireInternalApiKey`).
+- **Optional:** `DATABASE_URL`, `DIRECT_URL`, Supabase (storage), Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`), `DIVVI_EVENTS_API_BASE_URL`, `DIVVI_EVENTS_API_KEY`, `APP_BASE_URL` (for confirmation links). Internal `POST /api/submit` requires API key (see `requireInternalApiKey`).
 
 This document should be sufficient for an AI test bot to drive all main flows, forms, and APIs in Divvi.

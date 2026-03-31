@@ -7,7 +7,7 @@ A consumer-friendly web application that allows trip organizers to fairly split 
 - **Framework**: SvelteKit (TypeScript)
 - **Database**: Supabase (PostgreSQL)
 - **ORM**: Prisma
-- **Email**: SendGrid
+- **Email**: Resend
 - **Hosting**: Vercel
 - **Package Manager**: npm
 
@@ -19,14 +19,14 @@ A consumer-friendly web application that allows trip organizers to fairly split 
 - **Invite Code Access**: Secure trip access via unique invite codes
 - **Guest Reservations**: Simple reservation flow for guests with automatic price calculation
 - **Host Dashboard**: View reservations, manage trips, and export ledger data
-- **Email Confirmations**: Automated confirmation emails via SendGrid
+- **Email Confirmations**: Automated confirmation emails via Resend
 - **Double-booking Prevention**: Automatic conflict detection
 
 ## Prerequisites
 
 - Node.js 18+ and npm
 - Supabase account and project
-- SendGrid account with API key
+- Resend account with API key
 - Vercel account (for deployment)
 
 ## Installation
@@ -73,10 +73,9 @@ npm run db:dev
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (server-only, never expose to client)
 - `DATABASE_URL` - PostgreSQL connection string (use **Connection pooling** in Supabase, port **6543**). Append `?pgbouncer=true` so Prisma works with the pooler (e.g. `...6543/postgres?pgbouncer=true`). Without this you may see "connection forcibly closed" (10054) or timeouts.
 - `DIRECT_URL` - PostgreSQL direct connection string (Supabase **Direct** connection, port **5432**; used for migrations only)
-- `SENDGRID_API_KEY` - SendGrid API key
-- `SENDGRID_FROM_EMAIL` - Email address to send from
-- `SENDGRID_FROM_NAME` - Display name for sender (optional)
-- `SENDGRID_TEMPLATE_GUEST_CONFIRMATION` - SendGrid template ID for guest confirmation emails
+- `RESEND_API_KEY` - Resend API key (`re_...`)
+- `RESEND_FROM_EMAIL` - Verified sender address (use `onboarding@resend.dev` for testing)
+- `RESEND_FROM_NAME` - Display name for sender (optional)
 - `INTERNAL_API_KEY` - Secret key for protecting write endpoints
 - `APP_BASE_URL` - Base URL of your app (e.g., https://your-app.vercel.app)
 - `NODE_ENV` - Environment (development, production)
@@ -170,7 +169,7 @@ src/
 │   │   ├── validation.ts # Zod schemas
 │   │   ├── auth.ts      # Admin authentication
 │   │   ├── api-protection.ts # API key protection
-│   │   └── email/        # SendGrid integration
+│   │   └── email/        # Resend + HTML renderers
 │   └── components/      # UI components
 ├── routes/
 │   ├── +page.svelte     # Welcome page
@@ -237,20 +236,9 @@ After deployment:
 - Never expose `SUPABASE_SERVICE_ROLE_KEY` or `INTERNAL_API_KEY` to the client
 - Database access is server-only via Prisma
 
-## SendGrid Templates
+## Email (Resend)
 
-You need to create a SendGrid Dynamic Transactional Template for guest confirmations. The template should use these variables:
-
-- `guestName`
-- `roomName`
-- `bedType`
-- `checkInDate`
-- `checkOutDate`
-- `nights`
-- `totalPrice`
-- `confirmationUrl`
-
-Set the template ID in `SENDGRID_TEMPLATE_GUEST_CONFIRMATION`.
+Transactional HTML is built in code: trip invites (`src/lib/server/email/render/trip-invite.ts`) and guest confirmations (`render/guest-confirmation.ts`). Configure `RESEND_API_KEY` and a verified `RESEND_FROM_EMAIL`.
 
 ## Troubleshooting
 
@@ -263,9 +251,8 @@ Run `npm run prisma:generate`
 - Check Supabase connection pooling settings
 
 ### Email not sending
-- Verify `SENDGRID_API_KEY` is correct
-- Check SendGrid template ID matches
-- Review email logs in database (`EmailLog` table)
+- Verify `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (domain must be verified in Resend for production)
+- Review the `EmailLog` table for failures
 
 ## License
 

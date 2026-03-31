@@ -4,8 +4,9 @@ import { requireInternalApiKey } from '$lib/server/api-protection.js';
 import { guestSubmissionSchema, createErrorResponse, createSuccessResponse } from '$lib/server/validation.js';
 import { prisma } from '$lib/server/prisma.js';
 import { calculatePrice } from '$lib/server/pricing.js';
-import { sendTemplateEmail } from '$lib/server/email/sendgrid.js';
+import { sendHtmlEmail } from '$lib/server/email/resend.js';
 import { TEMPLATE_KEYS } from '$lib/server/email/templates.js';
+import { renderGuestConfirmationHtml } from '$lib/server/email/render/guest-confirmation.js';
 
 export const POST: RequestHandler = async (event) => {
 	// Verify API key
@@ -92,21 +93,23 @@ export const POST: RequestHandler = async (event) => {
 			}
 		});
 
-		// Send confirmation email
-		await sendTemplateEmail({
+		const confirmationUrl = `${process.env.APP_BASE_URL || 'http://localhost:5173'}/confirmation/${submission.id}`;
+		const guestHtml = renderGuestConfirmationHtml({
+			guestName: data.name,
+			roomName: bed.room.name,
+			bedType: bed.bedType,
+			checkInDate: data.checkInDate.toISOString().split('T')[0],
+			checkOutDate: data.checkOutDate.toISOString().split('T')[0],
+			nights: priceCalculation.nights,
+			totalPrice: priceCalculation.totalPrice.toFixed(2),
+			confirmationUrl
+		});
+		await sendHtmlEmail({
 			to: data.email,
-			templateId: TEMPLATE_KEYS.GUEST_CONFIRMATION,
-			dynamicTemplateData: {
-				guestName: data.name,
-				roomName: bed.room.name,
-				bedType: bed.bedType,
-				checkInDate: data.checkInDate.toISOString().split('T')[0],
-				checkOutDate: data.checkOutDate.toISOString().split('T')[0],
-				nights: priceCalculation.nights,
-				totalPrice: priceCalculation.totalPrice.toFixed(2),
-				confirmationUrl: `${process.env.APP_BASE_URL || 'http://localhost:5173'}/confirmation/${submission.id}`
-			},
-			categories: ['guest-confirmation']
+			subject: `You’re booked — ${bed.room.name}`,
+			html: guestHtml,
+			templateKey: TEMPLATE_KEYS.GUEST_CONFIRMATION,
+			tags: [{ name: 'category', value: 'guest-confirmation' }]
 		});
 
 		return json(createSuccessResponse(submission), 201);
