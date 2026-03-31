@@ -8,6 +8,7 @@ import { notifyExistingUserOfInvite } from '$lib/server/invite-service.js';
 import { createInvoiceForUser } from '$lib/server/invoice-calculator.js';
 import { hashPassword } from '$lib/server/auth.js';
 import { checkAndSetReconfirmRequired } from '$lib/server/guest-estimate.js';
+import { handleSpotOpened } from '$lib/server/waitlist-service.js';
 import { z } from 'zod';
 
 const PENDING_INVITE_STATUSES = ['sent', 'opened'];
@@ -21,7 +22,7 @@ export type GuestRow = {
 	name: string;
 	email: string;
 	avatarUrl?: string | null;
-	rsvpStatus: 'yes' | 'no' | null;
+	rsvpStatus: 'yes' | 'no' | 'waitlisted' | 'invited_to_rsvp' | null;
 	rsvpUpdatedAt: string | null;
 	yesSubstatus: 'confirmed' | 'reconfirm_required' | null;
 	reconfirmDeadlineAt: string | null;
@@ -158,7 +159,12 @@ export const load: PageServerLoad = async ({ parent }) => {
 		const assignments = uid ? (assignmentsByUserId.get(uid) ?? []) : [];
 		const firstAssignment = assignments[0] ?? null;
 		const profile = uid ? profileByUserId.get(uid) : null;
-		const status = rsvp?.status === 'yes' ? 'yes' : rsvp?.status === 'no' ? 'no' : null;
+		const status =
+			rsvp?.status === 'yes' ? 'yes' :
+			rsvp?.status === 'no' ? 'no' :
+			rsvp?.status === 'waitlisted' ? 'waitlisted' :
+			rsvp?.status === 'invited_to_rsvp' ? 'invited_to_rsvp' :
+			null;
 		const totalPartySize = assignments.reduce((s, a) => s + (a.partySize || 1), 0);
 		if (status === 'yes') {
 			goingCount++;
@@ -283,6 +289,48 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const roomSum = trip?.rooms?.reduce((sum, r) => sum + (r.maxOccupancy ?? 0), 0) ?? 0;
 	const maxOccupancy = trip?.maxGuests ?? (roomSum > 0 ? roomSum : null);
 
+	// Waitlist data (only fetch for hosts/co-hosts)
+	type WaitlistEntry = {
+		userId: string;
+		name: string;
+		email: string;
+		avatarUrl: string | null;
+		waitlistPosition: number | null;
+		waitlistJoinedAt: string | null;
+		status: 'waitlisted' | 'invited_to_rsvp';
+		claimWindowExpiresAt: string | null;
+	};
+	let waitlistEntries: WaitlistEntry[] = [];
+	let waitlistCount = 0;
+	let activeClaimUserId: string | null = null;
+	if (canManageGuests && tripId) {
+		const waitlisted = await prisma.rSVP.findMany({
+			where: { tripId, status: { in: ['waitlisted', 'invited_to_rsvp'] } },
+			orderBy: [{ waitlistPosition: 'asc' }, { waitlistJoinedAt: 'asc' }],
+			select: {
+				userId: true,
+				status: true,
+				waitlistPosition: true,
+				waitlistJoinedAt: true,
+				claimWindowExpiresAt: true,
+				user: { select: { name: true, email: true, avatarUrl: true } }
+			}
+		});
+		waitlistCount = waitlisted.length;
+		waitlistEntries = waitlisted.map((w) => ({
+			userId: w.userId,
+			name: w.user?.name ?? '—',
+			email: w.user?.email ?? '—',
+			avatarUrl: w.user?.avatarUrl ?? null,
+			waitlistPosition: w.waitlistPosition,
+			waitlistJoinedAt: w.waitlistJoinedAt?.toISOString() ?? null,
+			status: w.status as 'waitlisted' | 'invited_to_rsvp',
+			claimWindowExpiresAt: w.claimWindowExpiresAt?.toISOString() ?? null
+		}));
+		const active = waitlisted.find((w) => w.status === 'invited_to_rsvp');
+		activeClaimUserId = active?.userId ?? null;
+	}
+
 	let legacyReservations: { id: string; name: string; email: string; roomName: string; bedType: string | null; checkInDate: string; checkOutDate: string; nights: number; numberOfGuests: number; calculatedPrice: number; submittedAt: string }[] = [];
 	let legacyStats: { totalReservations: number; totalRevenue: number; totalNights: number; averagePrice: number } | null = null;
 	if (canManageGuests && tripId) {
@@ -339,7 +387,12 @@ export const load: PageServerLoad = async ({ parent }) => {
 		isHost,
 		canManageGuests,
 		legacyReservations,
-		legacyStats
+		legacyStats,
+		// Waitlist
+		waitlistCount,
+		waitlistEntries,
+		activeClaimUserId,
+		maxCapacity: (trip as { maxCapacity?: number | null } | null)?.maxCapacity ?? null
 	};
 };
 
@@ -500,6 +553,23 @@ export const actions: Actions = {
 			where: { tripId_userId: { tripId, userId } },
 			data: { inviteStatus: 'denied' }
 		});
+
+		// If the removed user had RSVP yes, a spot just opened
+		const removedRsvp = await prisma.rSVP.findUnique({
+			where: { tripId_userId: { tripId, userId } },
+			select: { status: true }
+		});
+		if (removedRsvp?.status === 'yes') {
+			await handleSpotOpened(tripId).catch(console.error);
+		}
+		// If they were waitlisted, remove from queue so positions stay clean
+		if (removedRsvp?.status === 'waitlisted' || removedRsvp?.status === 'invited_to_rsvp') {
+			await prisma.rSVP.update({
+				where: { tripId_userId: { tripId, userId } },
+				data: { status: 'no', waitlistPosition: null, claimWindowExpiresAt: null }
+			});
+		}
+
 		return { removeGuestSuccess: true };
 	},
 

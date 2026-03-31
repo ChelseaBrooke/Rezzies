@@ -160,6 +160,32 @@
 			: Math.max(0, partySize - spotsSelected)
 	);
 
+	// Waitlist derived state
+	const isWaitlisted = $derived(data.isWaitlisted ?? false);
+	const hasClaimWindow = $derived(data.hasClaimWindow ?? false);
+	const claimWindowExpiresAt = $derived(
+		data.claimWindowExpiresAt ? new Date(data.claimWindowExpiresAt) : null
+	);
+	const waitlistPosition = $derived(data.waitlistPosition ?? null);
+	const claimWindowExpired = $derived(data.claimWindowExpired ?? false);
+
+	// Countdown timer for the claim window
+	let claimCountdown = $state('');
+	$effect(() => {
+		if (!hasClaimWindow || !claimWindowExpiresAt) { claimCountdown = ''; return; }
+		function tick() {
+			const diff = claimWindowExpiresAt!.getTime() - Date.now();
+			if (diff <= 0) { claimCountdown = 'Expired'; return; }
+			const h = Math.floor(diff / 3600000);
+			const m = Math.floor((diff % 3600000) / 60000);
+			const s = Math.floor((diff % 60000) / 1000);
+			claimCountdown = h > 0 ? `${h}h ${m}m` : `${m}m ${s}s`;
+		}
+		tick();
+		const id = setInterval(tick, 1000);
+		return () => clearInterval(id);
+	});
+
 	let rsvpStatus = $state('yes');
 	$effect(() => {
 		// Sync from server after submits
@@ -324,29 +350,79 @@
 			</div>
 
 			<section class="card-section rsvp-section">
-			<div class="rsvp-yes-no-row">
-				<h2 class="section-title">Will you join us?</h2>
-				<div class="rsvp-choice-btns" role="group" aria-label="RSVP response">
-					<button
-						type="button"
-						class="rsvp-choice-btn"
-						class:selected={rsvpStatus === 'yes'}
-						aria-pressed={rsvpStatus === 'yes'}
-						onclick={() => (rsvpStatus = 'yes')}
-					>
-						Going
-					</button>
-					<button
-						type="button"
-						class="rsvp-choice-btn rsvp-choice-btn-decline"
-						class:selected={rsvpStatus === 'no'}
-						aria-pressed={rsvpStatus === 'no'}
-						onclick={() => (rsvpStatus = 'no')}
-					>
-						Can't make it
-					</button>
+			{#if isWaitlisted}
+				<!-- ── Waitlisted banner ───────────────────────────────────────── -->
+				<div class="waitlist-banner waitlist-banner--waiting" role="status">
+					<div class="waitlist-banner-icon" aria-hidden="true">⏳</div>
+					<div class="waitlist-banner-body">
+						<p class="waitlist-banner-title">You're on the waitlist</p>
+						{#if waitlistPosition != null}
+							<p class="waitlist-banner-sub">Position <strong>#{waitlistPosition}</strong> — we'll notify you when a spot opens.</p>
+						{:else}
+							<p class="waitlist-banner-sub">We'll notify you when a spot opens up.</p>
+						{/if}
+					</div>
 				</div>
-			</div>
+			{:else if hasClaimWindow && !claimWindowExpired}
+				<!-- ── Claim window banner ────────────────────────────────────── -->
+				<div class="waitlist-banner waitlist-banner--claim" role="alert">
+					<div class="waitlist-banner-icon" aria-hidden="true">🎉</div>
+					<div class="waitlist-banner-body">
+						<p class="waitlist-banner-title">A spot just opened for you!</p>
+						<p class="waitlist-banner-sub">
+							Claim it before your window closes.
+							{#if claimCountdown}
+								<span class="claim-countdown">{claimCountdown} remaining</span>
+							{/if}
+						</p>
+						{#if claimWindowExpiresAt}
+							<p class="waitlist-banner-expires">
+								Expires {claimWindowExpiresAt.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+							</p>
+						{/if}
+					</div>
+				</div>
+				<div class="rsvp-yes-no-row">
+					<h2 class="section-title">Will you join us?</h2>
+					<div class="rsvp-choice-btns" role="group" aria-label="RSVP response">
+						<button type="button" class="rsvp-choice-btn" class:selected={rsvpStatus === 'yes'} aria-pressed={rsvpStatus === 'yes'} onclick={() => (rsvpStatus = 'yes')}>Going</button>
+						<button type="button" class="rsvp-choice-btn rsvp-choice-btn-decline" class:selected={rsvpStatus === 'no'} aria-pressed={rsvpStatus === 'no'} onclick={() => (rsvpStatus = 'no')}>Can't make it</button>
+					</div>
+				</div>
+			{:else if hasClaimWindow && claimWindowExpired}
+				<!-- ── Expired window banner ──────────────────────────────────── -->
+				<div class="waitlist-banner waitlist-banner--expired" role="alert">
+					<div class="waitlist-banner-icon" aria-hidden="true">⏰</div>
+					<div class="waitlist-banner-body">
+						<p class="waitlist-banner-title">Your claim window expired</p>
+						<p class="waitlist-banner-sub">You've been returned to the waitlist. Hang tight — the next spot is yours if one opens.</p>
+					</div>
+				</div>
+			{:else}
+				<div class="rsvp-yes-no-row">
+					<h2 class="section-title">Will you join us?</h2>
+					<div class="rsvp-choice-btns" role="group" aria-label="RSVP response">
+						<button
+							type="button"
+							class="rsvp-choice-btn"
+							class:selected={rsvpStatus === 'yes'}
+							aria-pressed={rsvpStatus === 'yes'}
+							onclick={() => (rsvpStatus = 'yes')}
+						>
+							Going
+						</button>
+						<button
+							type="button"
+							class="rsvp-choice-btn rsvp-choice-btn-decline"
+							class:selected={rsvpStatus === 'no'}
+							aria-pressed={rsvpStatus === 'no'}
+							onclick={() => (rsvpStatus = 'no')}
+						>
+							Can't make it
+						</button>
+					</div>
+				</div>
+			{/if}
 			{#if costSharingOn && data.currentRsvp?.status === 'yes' && data.currentRsvp?.yesSubstatus === 'reconfirm_required'}
 				<div class="reconfirm-banner" role="alert">
 						<strong>Your cost estimate changed.</strong> Please review and confirm to keep your YES RSVP.
@@ -362,6 +438,7 @@
 				{#if form?.error}
 					<div class="error-message" role="alert">{form.error}</div>
 				{/if}
+				{#if !isWaitlisted && !(hasClaimWindow && claimWindowExpired)}
 				<form id="rsvp-form" method="POST" action="?/updateRsvp" use:enhance={enhanceRsvpSubmit}>
 					<input type="hidden" name="status" value={rsvpStatus} />
 					{#if isYes}
@@ -398,6 +475,7 @@
 						<button type="submit" class="btn btn-primary">Submit</button>
 					{/if}
 				</form>
+				{/if}
 			</section>
 
 	{#if isYes && mealPlanOn}
@@ -1208,6 +1286,43 @@
 	}
 	.reconfirm-deadline { font-size: 0.85rem; color: #92400e; }
 	.reconfirm-hint { display: block; margin-top: 0.25rem; font-size: 0.85rem; }
+
+	/* ── Waitlist banners ────────────────────────────────────────── */
+	.waitlist-banner {
+		display: flex; align-items: flex-start; gap: 0.875rem;
+		border-radius: 12px; padding: 1rem 1.125rem;
+		margin-bottom: 1.25rem;
+		border: 1.5px solid;
+	}
+	.waitlist-banner--waiting {
+		background: #f0f4ff; border-color: #bfcfee;
+	}
+	.waitlist-banner--claim {
+		background: #f0fbf5; border-color: #a8d8b8;
+		animation: pulse-claim 2s ease-in-out infinite;
+	}
+	.waitlist-banner--expired {
+		background: #fff8f0; border-color: #f0cfa0;
+	}
+	@keyframes pulse-claim {
+		0%, 100% { box-shadow: 0 0 0 0 rgba(26, 74, 46, 0.0); }
+		50% { box-shadow: 0 0 0 4px rgba(26, 74, 46, 0.08); }
+	}
+	.waitlist-banner-icon { font-size: 1.5rem; line-height: 1; flex-shrink: 0; margin-top: 0.05rem; }
+	.waitlist-banner-body { flex: 1; min-width: 0; }
+	.waitlist-banner-title {
+		font-size: 0.95rem; font-weight: 700; margin: 0 0 0.25rem;
+		color: #1e1a15;
+	}
+	.waitlist-banner-sub {
+		font-size: 0.825rem; color: #57534e; margin: 0 0 0.2rem; line-height: 1.5;
+	}
+	.waitlist-banner-expires { font-size: 0.78rem; color: #78716c; margin: 0; }
+	.claim-countdown {
+		display: inline-block; background: #1a4a2e; color: #fff;
+		font-size: 0.75rem; font-weight: 700; padding: 1px 7px; border-radius: 99px;
+		margin-left: 0.4rem; letter-spacing: 0.02em;
+	}
 
 	/* ── Dietary section ─────────────────────────────────────────── */
 	.dietary-section { border-top: 1px solid #f0ece7; }

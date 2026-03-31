@@ -11,6 +11,7 @@ import {
 	checkAndSetReconfirmRequired
 } from '$lib/server/guest-estimate.js';
 import { computeRoomPricing, computePerBedPricingAtHeadcount } from '$lib/server/pricing-canonical.js';
+import { checkAndHandleCapacity, handleSpotOpened } from '$lib/server/waitlist-service.js';
 import { z } from 'zod';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
@@ -128,6 +129,18 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		if (perBed) bedPricing = perBed.bedPricing;
 	}
 
+	// Waitlist state for this user
+	const waitlistStatus = currentRsvp?.status ?? null;
+	const isWaitlisted = waitlistStatus === 'waitlisted';
+	const hasClaimWindow = waitlistStatus === 'invited_to_rsvp';
+	const claimWindowExpiresAt = currentRsvp?.claimWindowExpiresAt ?? null;
+	const waitlistPosition = currentRsvp?.waitlistPosition ?? null;
+	const claimWindowExpired =
+		hasClaimWindow && claimWindowExpiresAt ? claimWindowExpiresAt < new Date() : false;
+
+	// Count of yes RSVPs for capacity display
+	const yesCount = await prisma.rSVP.count({ where: { tripId, status: 'yes' } });
+
 	return {
 		user,
 		trip,
@@ -144,7 +157,15 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		reconfirmPolicy,
 		roomPricing,
 		bedPricing,
-		yesRsvpHeadcount
+		yesRsvpHeadcount,
+		// Waitlist
+		isWaitlisted,
+		hasClaimWindow,
+		claimWindowExpiresAt: claimWindowExpiresAt?.toISOString() ?? null,
+		claimWindowExpired,
+		waitlistPosition,
+		maxCapacity: trip.maxCapacity ?? null,
+		yesCount
 	};
 };
 
@@ -199,6 +220,23 @@ export const actions: Actions = {
 		}
 		const notesForStatus = validation.data.status === 'no' ? (data.notes ?? undefined) : undefined;
 
+		// Waitlist guard: only allow YES if the user is not on the waitlist (or has an active claim window)
+		if (validation.data.status === 'yes') {
+			const existingRsvp = await prisma.rSVP.findUnique({
+				where: { tripId_userId: { tripId, userId: user.id } },
+				select: { status: true, claimWindowExpiresAt: true }
+			});
+			if (existingRsvp?.status === 'waitlisted') {
+				return fail(403, { error: 'You are on the waitlist. Wait until a spot opens and you receive your invite.' });
+			}
+			if (existingRsvp?.status === 'invited_to_rsvp') {
+				const expired = existingRsvp.claimWindowExpiresAt && existingRsvp.claimWindowExpiresAt < new Date();
+				if (expired) {
+					return fail(403, { error: 'Your claim window has expired. You have been returned to the waitlist.' });
+				}
+			}
+		}
+
 		// YES requires cost commitment: server recomputes estimate and persists accepted range
 		if (validation.data.status === 'yes') {
 			if (!costCommitmentAccepted) {
@@ -250,12 +288,14 @@ export const actions: Actions = {
 					latestEstimateUpdatedAt: now
 				}
 			});
-			await checkAndSetReconfirmRequired(tripId);
-			return { success: true };
-		}
+		await checkAndSetReconfirmRequired(tripId);
+		// Check if the trip just became full and enqueue not-responded guests
+		await checkAndHandleCapacity(tripId).catch(console.error);
+		return { success: true };
+	}
 
-		// No or Maybe: clear cost commitment fields
-		await prisma.rSVP.upsert({
+	// No or Maybe: clear cost commitment fields
+	await prisma.rSVP.upsert({
 			where: { tripId_userId: { tripId, userId: user.id } },
 			create: {
 				tripId,
@@ -286,6 +326,8 @@ export const actions: Actions = {
 			await prisma.roomAssignment.deleteMany({
 				where: { tripId, userId: user.id }
 			});
+			// A spot just opened; promote the next waitlisted user
+			await handleSpotOpened(tripId).catch(console.error);
 		}
 
 		await checkAndSetReconfirmRequired(tripId);

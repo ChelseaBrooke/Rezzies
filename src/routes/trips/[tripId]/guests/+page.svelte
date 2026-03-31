@@ -304,6 +304,44 @@
 		data.maxOccupancy != null && data.maxOccupancy > 0 ? data.maxOccupancy : totalBedCapacity
 	);
 
+	// Capacity settings state
+	let capacitySettingsOpen = $state(false);
+	let capacityDraft = $state<number | ''>(data.maxCapacity ?? '');
+	let claimWindowDraft = $state<number>(12);
+	let capacitySaving = $state(false);
+	let capacitySaveError = $state<string | null>(null);
+	let capacitySaveOk = $state(false);
+
+	async function saveCapacitySettings() {
+		capacitySaving = true; capacitySaveError = null; capacitySaveOk = false;
+		try {
+			const tripId = data.trip?.id;
+			if (!tripId) throw new Error('No trip ID');
+			const body: Record<string, unknown> = {};
+			if (capacityDraft === '' || capacityDraft === 0) {
+				body.maxCapacity = null;
+			} else {
+				body.maxCapacity = Number(capacityDraft);
+			}
+			body.waitlistClaimWindowHours = Number(claimWindowDraft);
+			const res = await fetch(`/api/trips/${tripId}/capacity`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({}));
+				throw new Error((err as { error?: string }).error ?? 'Save failed');
+			}
+			capacitySaveOk = true;
+			setTimeout(() => { capacitySettingsOpen = false; capacitySaveOk = false; }, 1200);
+		} catch (e) {
+			capacitySaveError = e instanceof Error ? e.message : 'Unknown error';
+		} finally {
+			capacitySaving = false;
+		}
+	}
+
 	const rsvpVisual = $derived.by(() => {
 		const going = data.summary?.goingPartySize ?? 0;
 		const notGoing = data.summary?.notGoingCount ?? 0;
@@ -547,6 +585,109 @@
 			declinedCount={rsvpVisual.notGoing}
 			invitedTotal={rsvpVisual.total}
 		/>
+	{/if}
+
+	<!-- ── CAPACITY SETTINGS (host/co-host only) ───────────────────────── -->
+	{#if data.canManageGuests}
+		<div class="gp-card gp-capacity-card">
+			<button
+				type="button"
+				class="gp-capacity-toggle"
+				onclick={() => (capacitySettingsOpen = !capacitySettingsOpen)}
+				aria-expanded={capacitySettingsOpen}
+			>
+				<span class="gp-capacity-label">
+					Capacity &amp; Waitlist Settings
+					{#if data.maxCapacity}
+						<span class="gp-capacity-current">Cap: {data.maxCapacity}</span>
+					{/if}
+				</span>
+				<span class="gp-capacity-caret">{capacitySettingsOpen ? '▲' : '▼'}</span>
+			</button>
+			{#if capacitySettingsOpen}
+				<div class="gp-capacity-body">
+					<p class="gp-capacity-hint">
+						Set a maximum number of confirmed yes-RSVPs. Once the cap is reached, new guests are automatically waitlisted.
+						Leave blank to allow unlimited RSVPs.
+					</p>
+					<div class="gp-capacity-fields">
+						<div class="gp-capacity-field">
+							<label class="gp-capacity-field-label" for="maxCapacity">Max capacity</label>
+							<input
+								id="maxCapacity"
+								type="number"
+								min="1"
+								step="1"
+								placeholder="Unlimited"
+								bind:value={capacityDraft}
+								class="gp-capacity-input"
+							/>
+						</div>
+						<div class="gp-capacity-field">
+							<label class="gp-capacity-field-label" for="claimWindow">Claim window (hours)</label>
+							<input
+								id="claimWindow"
+								type="number"
+								min="1"
+								max="168"
+								step="1"
+								bind:value={claimWindowDraft}
+								class="gp-capacity-input"
+							/>
+							<span class="gp-capacity-field-hint">How long a promoted guest has to RSVP yes before their spot is offered to the next person.</span>
+						</div>
+					</div>
+					{#if capacitySaveError}
+						<p class="gp-capacity-error">{capacitySaveError}</p>
+					{/if}
+					{#if capacitySaveOk}
+						<p class="gp-capacity-ok">Saved!</p>
+					{/if}
+					<div class="gp-capacity-actions">
+						<button type="button" class="btn btn-primary btn-sm" onclick={saveCapacitySettings} disabled={capacitySaving}>
+							{capacitySaving ? 'Saving…' : 'Save'}
+						</button>
+						<button type="button" class="btn btn-ghost btn-sm" onclick={() => (capacitySettingsOpen = false)}>Cancel</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- ── WAITLIST PANEL (host/co-host only) ───────────────────────────── -->
+	{#if data.canManageGuests && (data.waitlistCount ?? 0) > 0}
+		{@const waitlistEntries = data.waitlistEntries ?? []}
+		{@const activeClaimUserId = data.activeClaimUserId ?? null}
+		<div class="gp-card gp-waitlist-card">
+			<div class="gp-waitlist-header">
+				<span class="gp-waitlist-title">Waitlist</span>
+				<span class="gp-waitlist-badge">{data.waitlistCount}</span>
+				{#if data.maxCapacity}
+					<span class="gp-waitlist-cap">Cap: {data.maxCapacity}</span>
+				{/if}
+			</div>
+			<div class="gp-waitlist-list" role="list">
+				{#each waitlistEntries as entry, i (entry.userId)}
+					{@const isActive = entry.status === 'invited_to_rsvp'}
+					{@const expiresAt = entry.claimWindowExpiresAt ? new Date(entry.claimWindowExpiresAt) : null}
+					<div class="gp-waitlist-row" class:gp-waitlist-row--active={isActive} role="listitem">
+						<span class="gp-waitlist-pos">{isActive ? '★' : `#${entry.waitlistPosition ?? i + 1}`}</span>
+						<div class="gp-waitlist-info">
+							<span class="gp-waitlist-name">{entry.name}</span>
+							<span class="gp-waitlist-email">{entry.email}</span>
+						</div>
+						{#if isActive}
+							<div class="gp-waitlist-claim-badge">
+								<span class="gp-waitlist-claim-label">Claim window open</span>
+								{#if expiresAt}
+									<span class="gp-waitlist-claim-exp">Expires {expiresAt.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</div>
 	{/if}
 
 	<!-- ── NEEDS ATTENTION (host only) ───────────────────────────────────── -->
@@ -1621,6 +1762,78 @@
 	}
 	.gp-empty { color: var(--muted); font-size: 0.875rem; padding: 1.5rem 1.25rem; margin: 0; }
 	.gp-inline-form { display: inline; }
+
+	/* ── Capacity settings card ── */
+	.gp-capacity-card { overflow: visible; }
+	.gp-capacity-toggle {
+		width: 100%; display: flex; align-items: center; justify-content: space-between;
+		padding: 0.875rem 1.25rem; background: none; border: none; cursor: pointer;
+		font-size: 0.875rem; font-weight: 600; color: var(--text); text-align: left;
+	}
+	.gp-capacity-toggle:hover { background: var(--surface2); }
+	.gp-capacity-label { display: flex; align-items: center; gap: 0.625rem; }
+	.gp-capacity-current {
+		font-size: 0.75rem; font-weight: 500; color: var(--muted);
+		background: var(--surface2); border-radius: 6px; padding: 1px 8px;
+	}
+	.gp-capacity-caret { font-size: 0.7rem; color: var(--muted); }
+	.gp-capacity-body { padding: 0 1.25rem 1.125rem; border-top: 1px solid var(--border-soft); }
+	.gp-capacity-hint { font-size: 0.8125rem; color: var(--muted); margin: 0.75rem 0; line-height: 1.5; }
+	.gp-capacity-fields { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.875rem; }
+	.gp-capacity-field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 140px; }
+	.gp-capacity-field-label { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+	.gp-capacity-field-hint { font-size: 0.75rem; color: var(--muted); line-height: 1.4; }
+	.gp-capacity-input {
+		width: 120px; padding: 0.375rem 0.625rem;
+		border: 1px solid var(--border-soft); border-radius: 6px;
+		font-size: 0.875rem; background: var(--surfaceSolid); color: var(--text);
+	}
+	.gp-capacity-actions { display: flex; gap: 0.5rem; align-items: center; }
+	.gp-capacity-error { font-size: 0.8125rem; color: #b91c1c; margin: 0 0 0.5rem; }
+	.gp-capacity-ok { font-size: 0.8125rem; color: #15803d; font-weight: 600; margin: 0 0 0.5rem; }
+
+	/* ── Waitlist panel ── */
+	.gp-waitlist-card { padding: 1rem 1.25rem; }
+	.gp-waitlist-header {
+		display: flex; align-items: center; gap: 0.625rem;
+		margin-bottom: 0.875rem;
+	}
+	.gp-waitlist-title {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 0.95rem; font-weight: 600; color: var(--text);
+	}
+	.gp-waitlist-badge {
+		background: #1a3a4a; color: #fff;
+		font-size: 0.72rem; font-weight: 700;
+		border-radius: 99px; padding: 1px 8px;
+	}
+	.gp-waitlist-cap {
+		font-size: 0.75rem; color: var(--muted);
+		background: var(--surface2); border-radius: 6px; padding: 1px 8px;
+	}
+	.gp-waitlist-list { display: flex; flex-direction: column; gap: 0.375rem; }
+	.gp-waitlist-row {
+		display: flex; align-items: center; gap: 0.75rem;
+		background: var(--surface2); border-radius: 8px; padding: 0.5rem 0.75rem;
+		border: 1px solid var(--border-soft);
+	}
+	.gp-waitlist-row--active {
+		background: #f0fbf5; border-color: #a8d8b8;
+	}
+	.gp-waitlist-pos {
+		font-size: 0.825rem; font-weight: 700; color: #1a3a4a;
+		min-width: 2rem; text-align: center;
+	}
+	.gp-waitlist-info { flex: 1; min-width: 0; }
+	.gp-waitlist-name { font-size: 0.875rem; font-weight: 600; color: var(--text); display: block; }
+	.gp-waitlist-email { font-size: 0.775rem; color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.gp-waitlist-claim-badge { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; flex-shrink: 0; }
+	.gp-waitlist-claim-label {
+		font-size: 0.72rem; font-weight: 700; color: #1a4a2e;
+		background: #d1f0e0; border-radius: 6px; padding: 1px 8px;
+		white-space: nowrap;
+	}
+	.gp-waitlist-claim-exp { font-size: 0.7rem; color: #5a7a63; }
 
 	/* ── Section header (legacy / removed) ── */
 	.gp-section-header {

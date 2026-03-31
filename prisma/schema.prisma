@@ -49,6 +49,10 @@ model Trip {
   // New pricing fields
   expectedPeopleCount Int? // Expected number of people (for PER_PERSON mode)
   maxGuests           Int? // Max guests from property listing
+
+  // Waitlist / capacity control
+  maxCapacity              Int? // Hard cap on rsvp_yes count; null = unlimited
+  waitlistClaimWindowHours Int  @default(12) // Hours a promoted user has to claim their spot
   allowPartialStays   Boolean @default(false) // Toggle for partial stay reservations
 
   // Pricing settings (stored as JSON for flexibility)
@@ -527,7 +531,7 @@ model RSVP {
   id                String    @id @default(uuid())
   tripId            String
   userId            String
-  status            String // "yes" | "no" | "maybe"
+  status            String // "yes" | "no" | "maybe" | "waitlisted" | "invited_to_rsvp"
   arrivalDatetime   DateTime?
   departureDatetime DateTime?
   adultsCount       Int       @default(1)
@@ -553,12 +557,19 @@ model RSVP {
   latestEstimateHighCents  Int?
   latestEstimateUpdatedAt  DateTime?
 
+  // Waitlist fields
+  waitlistPosition     Int?      // FIFO position in the waitlist queue (null when not waitlisted)
+  waitlistJoinedAt     DateTime? // When this user was placed on the waitlist (for ordering)
+  claimWindowExpiresAt DateTime? // When the invited_to_rsvp claim window expires
+
   trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([tripId, userId])
   @@index([tripId])
   @@index([userId])
+  @@index([tripId, status])          // waitlist queries filter by trip + status
+  @@index([tripId, waitlistPosition]) // promote-next query
 }
 
 // Guest Profiles (trip-scoped)
