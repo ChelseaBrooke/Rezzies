@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { enhance } from '$app/forms';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import LeaderboardPanel from '$lib/components/games/caption-this/LeaderboardPanel.svelte';
 	import PhotoSubmitBox from '$lib/components/games/caption-this/PhotoSubmitBox.svelte';
 	import ResultsPanel from '$lib/components/games/caption-this/ResultsPanel.svelte';
@@ -209,15 +210,15 @@
 				<div class="past-captions-list">
 					<h3 class="past-captions-title">Captions</h3>
 					<ul class="past-captions-ul" role="list">
-						{#each selectedPastRound.captions as c}
-							<li class="past-caption-row">
-								<span class="past-caption-avatar">
-									{#if c.userAvatarUrl}
-										<img src={c.userAvatarUrl} alt="" />
-									{:else}
-										<span class="past-caption-initial">{ (c.userName ?? '?').charAt(0).toUpperCase() }</span>
-									{/if}
-								</span>
+					{#each selectedPastRound.captions as c}
+						<li class="past-caption-row">
+							<button type="button" class="past-caption-avatar past-caption-avatar--btn" title={c.userName ?? ''} onclick={() => openProfileCard(c.userId)}>
+								{#if c.userAvatarUrl}
+									<img src={c.userAvatarUrl} alt="" />
+								{:else}
+									<span class="past-caption-initial">{ (c.userName ?? '?').charAt(0).toUpperCase() }</span>
+								{/if}
+							</button>
 								<span class="past-caption-text">"{c.text}"</span>
 								{#if c.voteCount > 0}
 									<span class="past-caption-votes">{c.voteCount} vote{c.voteCount !== 1 ? 's' : ''}</span>
@@ -505,6 +506,16 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+	}
+	.past-caption-avatar--btn {
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		transition: outline 120ms ease;
+	}
+	.past-caption-avatar--btn:hover {
+		outline: 2px solid var(--copper, #bf4e30);
+		outline-offset: 2px;
 	}
 	.past-caption-avatar img {
 		width: 100%;

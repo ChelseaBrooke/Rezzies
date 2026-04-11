@@ -490,7 +490,7 @@
 		left: 0;
 		right: 0;
 		z-index: 10;
-		min-height: calc(100% + 14rem);
+		min-height: calc(100% + 22rem);
 		display: flex;
 		flex-direction: column;
 	}
@@ -576,22 +576,21 @@
 		flex-direction: column;
 	}
 
-	/* Progress / Your RSVP: orange gradient, white text */
+	/* Progress / Your RSVP: deep teal card */
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
 		flex: 1;
 		width: 100%;
 		overflow: hidden;
 		padding: 1rem 1.125rem;
 		background:
-			radial-gradient(ellipse at 15% 10%, rgba(247, 170, 41, 0.28) 0%, transparent 55%),
-			radial-gradient(ellipse at 85% 90%, rgba(165, 68, 14, 0.35) 0%, transparent 50%),
+			radial-gradient(ellipse at 20% 0%, rgba(122, 206, 211, 0.18) 0%, transparent 55%),
 			linear-gradient(
-				158deg,
-				rgba(206, 86, 18, 0.62) 0%,
-				rgba(206, 86, 18, 0.72) 55%,
-				rgba(165, 68, 14, 0.80) 100%
+				155deg,
+				#1d4d4e 0%,
+				#2a6263 55%,
+				#1a4041 100%
 			);
-		box-shadow: var(--shadow-soft);
+		box-shadow: 0 8px 32px rgba(29, 77, 78, 0.35);
 	}
 
 	.sticky-card-wrapper :global(.card-header) {
@@ -611,7 +610,7 @@
 		min-height: 0;
 	}
 
-	/* Progress / RSVP, white text and UI on orange */
+	/* Progress / RSVP, white text and UI on dark teal */
 	.sticky-card-wrapper :global(.card-title) { color: white; }
 	.sticky-card-wrapper :global(.pin-circle) { background: rgba(255, 255, 255, 0.22); }
 	.sticky-card-wrapper :global(.pin-svg) { color: white; stroke: white; }
@@ -625,20 +624,28 @@
 		border-color: rgba(255, 255, 255, 0.4);
 	}
 
-	/* TripGoalsCombined */
-	.sticky-card-wrapper :global(.overall-label) { color: rgba(255, 255, 255, 0.72); }
-	.sticky-card-wrapper :global(.overall-pct) { color: white; }
-	.sticky-card-wrapper :global(.overall-track) { background: rgba(255, 255, 255, 0.22); }
-	.sticky-card-wrapper :global(.overall-fill) { background: white; opacity: 0.85; }
-	.sticky-card-wrapper :global(.overall-fill.complete) { opacity: 1; }
-	.sticky-card-wrapper :global(.stat-icon) { color: rgba(255, 255, 255, 0.8); opacity: 1; }
-	.sticky-card-wrapper :global(.stat-label) { color: rgba(255, 255, 255, 0.92); }
-	.sticky-card-wrapper :global(.stat-value) { color: white; }
-	.sticky-card-wrapper :global(.stat-check) { color: white; }
-	.sticky-card-wrapper :global(.bar-track) { background: rgba(255, 255, 255, 0.22); }
-	.sticky-card-wrapper :global(.bar-fill) { background: white; opacity: 0.65; }
-	.sticky-card-wrapper :global(.bar-fill.done) { background: white; opacity: 1; }
-	.sticky-card-wrapper :global(.stat-row:hover) { background: rgba(255, 255, 255, 0.1); }
+	/* TripGoalsCombined — sticky dark card overrides */
+	.sticky-card-wrapper :global(.readiness) { flex: 1; }
+	.sticky-card-wrapper :global(.hero-label) { color: rgba(255,255,255,0.6); }
+	.sticky-card-wrapper :global(.days-pill) { color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+	.sticky-card-wrapper :global(.hero-pct) { color: white; }
+	.sticky-card-wrapper :global(.hero-remaining) { color: rgba(255,255,255,0.6); }
+	.sticky-card-wrapper :global(.hero-complete-badge) { color: #6ee7a0; background: rgba(110,231,160,0.15); }
+	.sticky-card-wrapper :global(.overall-track) { background: rgba(255,255,255,0.18); }
+	.sticky-card-wrapper :global(.overall-fill) { background: rgba(255,255,255,0.85); }
+	.sticky-card-wrapper :global(.overall-fill.complete) { background: #6ee7a0; }
+	.sticky-card-wrapper :global(.section-label) { color: rgba(255,255,255,0.5); }
+	.sticky-card-wrapper :global(.section-count) { background: rgba(255,255,255,0.2); color: white; }
+	.sticky-card-wrapper :global(.stat-label) { color: rgba(255,255,255,0.92); }
+	.sticky-card-wrapper :global(.stat-badge) { background: rgba(255,255,255,0.15); color: white; }
+	.sticky-card-wrapper :global(.stat-arrow) { color: rgba(255,255,255,0.4); }
+	.sticky-card-wrapper :global(.ring-track) { stroke: rgba(255,255,255,0.18); }
+	.sticky-card-wrapper :global(.ring-fill) { stroke: rgba(255,255,255,0.85); }
+	.sticky-card-wrapper :global(.stat-row:hover) { background: rgba(255,255,255,0.08); }
+	.sticky-card-wrapper :global(.done-section) { border-color: rgba(255,255,255,0.15); }
+	.sticky-card-wrapper :global(.done-chip) { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
+	.sticky-card-wrapper :global(.done-chip:hover) { background: rgba(255,255,255,0.18); opacity: 1; }
+	.sticky-card-wrapper :global(.done-icon) { color: #6ee7a0; }
 
 	/* GuestRsvpSummaryCard */
 	.sticky-card-wrapper :global(.status-banner) { border-color: rgba(255, 255, 255, 0.2); color: white; }

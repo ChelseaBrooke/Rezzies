@@ -417,14 +417,14 @@
 				<div class="r-trophy r-trophy--gold">
 					<span class="r-trophy-medal">🥇</span>
 					<span class="r-trophy-cat">Most Active</span>
-					{#if activityWinners.length > 0}
-						<div class="r-trophy-avatars">
-							{#each activityWinners.slice(0, 4) as w}
-								<span class="r-trophy-avatar" title={w.name ?? ''}>
-									{#if w.avatarUrl}<img src={w.avatarUrl} alt="" />{:else}{initials(w.name)}{/if}
-								</span>
-							{/each}
-						</div>
+				{#if activityWinners.length > 0}
+					<div class="r-trophy-avatars">
+						{#each activityWinners.slice(0, 4) as w}
+							<button type="button" class="r-trophy-avatar r-trophy-avatar--btn" title={w.name ?? ''} onclick={() => openProfileCard(w.id)}>
+								{#if w.avatarUrl}<img src={w.avatarUrl} alt="" />{:else}{initials(w.name)}{/if}
+							</button>
+						{/each}
+					</div>
 						{#if activityWinners.length === 1}
 							<span class="r-trophy-name">{activityWinners[0].name ?? 'Unknown'}</span>
 						{:else}
@@ -442,14 +442,14 @@
 				<div class="r-trophy r-trophy--copper">
 					<span class="r-trophy-medal">👨‍🍳</span>
 					<span class="r-trophy-cat">Top Chef</span>
-					{#if chefWinners.length > 0}
-						<div class="r-trophy-avatars">
-							{#each chefWinners.slice(0, 4) as w}
-								<span class="r-trophy-avatar" title={w.name ?? ''}>
-									{#if w.avatarUrl}<img src={w.avatarUrl} alt="" />{:else}{initials(w.name)}{/if}
-								</span>
-							{/each}
-						</div>
+				{#if chefWinners.length > 0}
+					<div class="r-trophy-avatars">
+						{#each chefWinners.slice(0, 4) as w}
+							<button type="button" class="r-trophy-avatar r-trophy-avatar--btn" title={w.name ?? ''} onclick={() => openProfileCard(w.id)}>
+								{#if w.avatarUrl}<img src={w.avatarUrl} alt="" />{:else}{initials(w.name)}{/if}
+							</button>
+						{/each}
+					</div>
 						{#if chefWinners.length === 1}
 							<span class="r-trophy-name">{chefWinners[0].name ?? 'Unknown'}</span>
 						{:else}
@@ -1002,6 +1002,18 @@
 		box-shadow: 0 1px 4px rgba(0,0,0,0.12);
 	}
 	.r-trophy-avatar img { width: 100%; height: 100%; object-fit: cover; }
+	.r-trophy-avatar--btn {
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		transition: transform 120ms ease, outline 120ms ease;
+	}
+	.r-trophy-avatar--btn:hover {
+		transform: scale(1.12);
+		outline: 2px solid var(--copper, #bf4e30);
+		outline-offset: 2px;
+		z-index: 1;
+	}
 	.r-trophy-avatar--empty {
 		background: var(--surface2); color: var(--muted);
 		margin-top: 0.25rem;

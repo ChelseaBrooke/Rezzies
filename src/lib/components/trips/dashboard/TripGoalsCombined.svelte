@@ -62,7 +62,7 @@
 
 	const tripInfoPct = $derived(tripInfoTotal > 0 ? Math.min(100, Math.round((tripInfoFilled / tripInfoTotal) * 100)) : 0);
 
-	const stats = $derived([
+	const allStats = $derived([
 		...(costSharingEnabled ? [{
 			key: 'funding',
 			label: 'Funding',
@@ -100,6 +100,9 @@
 		}
 	]);
 
+	const pending = $derived(allStats.filter(s => s.pct < 100));
+	const done = $derived(allStats.filter(s => s.pct >= 100));
+
 	const overallPct = $derived.by(() => {
 		const parts = [rsvpPct, bedsPct, roomsPct, tripInfoPct];
 		if (costSharingEnabled) parts.push(fundingPctClamped);
@@ -108,71 +111,72 @@
 </script>
 
 <div class="readiness">
-	<div class="overall-bar-row">
-		<span class="overall-label">Trip readiness</span>
-		<span class="overall-pct" class:complete={overallPct >= 100}>{overallPct}%</span>
-	</div>
-	<div class="overall-track">
-		<div class="overall-fill" class:complete={overallPct >= 100} style="width: {overallPct}%"></div>
+
+	<!-- Hero: big % + bar -->
+	<div class="hero">
+		<div class="hero-top">
+			<span class="hero-label">Trip readiness</span>
+			{#if daysUntil != null}
+				<span class="days-pill">{daysUntil} days away</span>
+			{/if}
+		</div>
+		<div class="hero-pct-row">
+			<span class="hero-pct" class:complete={overallPct >= 100}>{overallPct}<span class="hero-pct-sym">%</span></span>
+			{#if overallPct >= 100}
+				<span class="hero-complete-badge">All done!</span>
+			{:else}
+				<span class="hero-remaining">{pending.length} item{pending.length === 1 ? '' : 's'} left</span>
+			{/if}
+		</div>
+		<div class="overall-track">
+			<div class="overall-fill" class:complete={overallPct >= 100} style="width: {overallPct}%"></div>
+		</div>
 	</div>
 
-	<div class="stat-list">
-		{#each stats as stat}
-			<a href={stat.href || '#'} class="stat-row" class:complete={stat.pct >= 100}>
-				<div class="stat-head">
-					<span class="stat-icon" aria-hidden="true">
-						{#if stat.key === 'funding'}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-								<circle cx="12" cy="12" r="10"/>
-								<path d="M12 6v2m0 8v2m-4-7h2a2 2 0 0 1 0 4H8m8-4h-2a2 2 0 0 0 0 4h2"/>
-							</svg>
-						{:else if stat.key === 'rsvps'}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-								<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-								<circle cx="9" cy="7" r="4"/>
-								<path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-								<path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-							</svg>
-						{:else if stat.key === 'rooms'}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-								<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-								<polyline points="9 22 9 12 15 12 15 22"/>
-							</svg>
-						{:else if stat.key === 'tripinfo'}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-								<circle cx="12" cy="12" r="10"/>
-								<line x1="12" y1="8" x2="12" y2="12"/>
-								<line x1="12" y1="16" x2="12.01" y2="16"/>
-							</svg>
-						{:else}
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-								<path d="M2 4v16"/>
-								<path d="M2 8h18a2 2 0 0 1 2 2v10"/>
-								<path d="M2 17h20"/>
-								<path d="M6 8V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/>
-							</svg>
-						{/if}
-					</span>
-					<span class="stat-label">{stat.label}</span>
-					{#if stat.pct >= 100}
-						<span class="stat-check" aria-label="Complete">
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-								<polyline points="20 6 9 17 4 12"/>
+	<!-- Pending items: grow to fill available space -->
+	{#if pending.length > 0}
+		<div class="pending-section">
+			<div class="section-label">
+				<span>Still needed</span>
+				<span class="section-count">{pending.length}</span>
+			</div>
+			<div class="pending-list">
+				{#each pending as stat}
+					<a href={stat.href || '#'} class="stat-row">
+						<span class="pct-ring" aria-hidden="true">
+							<svg viewBox="0 0 36 36" class="ring-svg">
+								<circle cx="18" cy="18" r="14" class="ring-track"/>
+								<circle
+									cx="18" cy="18" r="14"
+									class="ring-fill"
+									style="stroke-dasharray: {Math.round((stat.pct / 100) * 87.96)} 87.96"
+								/>
 							</svg>
 						</span>
-					{/if}
-					<span class="stat-value" class:done={stat.pct >= 100}>{stat.value}</span>
-				</div>
-				<div class="bar-track">
-					<div
-						class="bar-fill"
-						class:done={stat.pct >= 100}
-						style="width: {Math.min(100, stat.pct)}%"
-					></div>
-				</div>
-			</a>
-		{/each}
-	</div>
+						<span class="stat-label">{stat.label}</span>
+						<span class="stat-badge">{stat.value}</span>
+						<span class="stat-arrow" aria-hidden="true">›</span>
+					</a>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Done items: compact chips pinned to bottom -->
+	{#if done.length > 0}
+		<div class="done-section">
+			{#each done as stat}
+				<a href={stat.href || '#'} class="done-chip">
+					<svg class="done-icon" viewBox="0 0 14 14" fill="none">
+						<circle cx="7" cy="7" r="6" fill="currentColor" opacity="0.15"/>
+						<polyline points="4,7.5 6,9.5 10,5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+					</svg>
+					{stat.label}
+				</a>
+			{/each}
+		</div>
+	{/if}
+
 </div>
 
 <style>
@@ -181,153 +185,253 @@
 		flex-direction: column;
 		gap: 0;
 		min-width: 0;
+		height: 100%;
 	}
 
-	/* ── Overall readiness bar ── */
-	.overall-bar-row {
+	/* ── Hero ── */
+	.hero {
+		margin-bottom: 1.5rem;
+	}
+
+	.hero-top {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		margin-bottom: 0.35rem;
+		margin-bottom: 0.6rem;
 	}
 
-	.overall-label {
+	.hero-label {
+		font-size: 0.6875rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--muted);
+	}
+
+	.days-pill {
 		font-size: 0.6875rem;
 		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
 		color: var(--muted);
+		background: var(--border-soft);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		padding: 0.15rem 0.55rem;
 	}
 
-	.overall-pct {
-		font-size: 0.75rem;
+	.hero-pct-row {
+		display: flex;
+		align-items: baseline;
+		gap: 0.6rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.hero-pct {
+		font-size: 3rem;
+		font-weight: 900;
+		line-height: 1;
+		letter-spacing: -0.04em;
+		color: var(--text);
+	}
+
+	.hero-pct.complete {
+		color: #2a7a4a;
+	}
+
+	.hero-pct-sym {
+		font-size: 1.5rem;
 		font-weight: 700;
-		color: var(--muted);
+		letter-spacing: -0.02em;
+		opacity: 0.6;
 	}
 
-	.overall-pct.complete {
-		color: var(--copper, #BF4E30);
+	.hero-remaining {
+		font-size: 0.8125rem;
+		color: var(--muted);
+		font-weight: 500;
+		align-self: center;
+	}
+
+	.hero-complete-badge {
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: #2a7a4a;
+		background: rgba(42, 122, 74, 0.1);
+		border-radius: 999px;
+		padding: 0.2rem 0.6rem;
+		align-self: center;
 	}
 
 	.overall-track {
-		height: 4px;
-		background: var(--border-soft, rgba(0,0,0,0.07));
+		height: 6px;
+		background: var(--border-soft);
 		border-radius: 999px;
 		overflow: hidden;
-		margin-bottom: 1rem;
 	}
 
 	.overall-fill {
 		height: 100%;
-		background: var(--copper, #BF4E30);
+		background: var(--navy, #1d4d4e);
 		border-radius: 999px;
 		transition: width 0.5s ease;
-		opacity: 0.55;
 	}
 
 	.overall-fill.complete {
-		opacity: 1;
+		background: #2a7a4a;
 	}
 
-	/* ── Stat list ── */
-	.stat-list {
+	/* ── Pending section ── */
+	.pending-section {
+		flex: 1;
 		display: flex;
 		flex-direction: column;
-		gap: 0.125rem;
+		min-height: 0;
 	}
 
+	.section-label {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--muted);
+		margin-bottom: 0.375rem;
+		padding: 0 0.25rem;
+	}
+
+	.section-count {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 1.1rem;
+		height: 1.1rem;
+		padding: 0 0.3rem;
+		border-radius: 999px;
+		background: var(--navy, #1d4d4e);
+		color: #fff;
+		font-size: 0.625rem;
+		font-weight: 700;
+		line-height: 1;
+	}
+
+	.pending-list {
+		display: flex;
+		flex-direction: column;
+		justify-content: space-around;
+		flex: 1;
+	}
+
+	/* ── Stat rows ── */
 	.stat-row {
 		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
+		align-items: center;
+		gap: 0.625rem;
 		padding: 0.6rem 0.5rem;
 		border-radius: var(--radius-md);
 		text-decoration: none;
 		color: inherit;
-		transition: background 0.15s ease;
+		transition: background 0.13s ease;
 	}
 
 	.stat-row:hover {
-		background: rgba(191, 78, 48, 0.04);
+		background: var(--border-soft);
 	}
 
-	.stat-head {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		min-width: 0;
-	}
-
-	.stat-icon {
-		width: 15px;
-		height: 15px;
+	/* ── Ring ── */
+	.pct-ring {
 		flex-shrink: 0;
+		width: 28px;
+		height: 28px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: var(--copper, #BF4E30);
-		opacity: 0.65;
 	}
 
-	.stat-icon svg {
+	.ring-svg {
 		width: 100%;
 		height: 100%;
+		transform: rotate(-90deg);
 	}
 
+	.ring-track {
+		fill: none;
+		stroke: var(--border-soft);
+		stroke-width: 5;
+	}
+
+	.ring-fill {
+		fill: none;
+		stroke: var(--navy, #1d4d4e);
+		stroke-width: 5;
+		stroke-linecap: round;
+		transition: stroke-dasharray 0.4s ease;
+	}
+
+	/* ── Label & badge ── */
 	.stat-label {
-		font-size: 0.8125rem;
+		font-size: 0.875rem;
 		color: var(--text);
 		flex: 1;
 		min-width: 0;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		font-weight: 500;
 	}
 
-	.stat-check {
+	.stat-badge {
+		flex-shrink: 0;
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: var(--navy, #1d4d4e);
+		background: rgba(29, 77, 78, 0.09);
+		border-radius: 6px;
+		padding: 0.2rem 0.5rem;
+		white-space: nowrap;
+	}
+
+	.stat-arrow {
+		flex-shrink: 0;
+		font-size: 1.1rem;
+		color: var(--muted);
+		opacity: 0.4;
+		line-height: 1;
+	}
+
+	/* ── Done chips (bottom) ── */
+	.done-section {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.375rem;
+		padding-top: 0.875rem;
+		border-top: 1px solid var(--border-soft);
+		margin-top: 0.75rem;
+	}
+
+	.done-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--muted);
+		background: var(--border-soft);
+		border-radius: 999px;
+		padding: 0.25rem 0.6rem 0.25rem 0.4rem;
+		text-decoration: none;
+		transition: opacity 0.15s;
+		opacity: 0.7;
+	}
+
+	.done-chip:hover {
+		opacity: 1;
+	}
+
+	.done-icon {
 		width: 14px;
 		height: 14px;
 		flex-shrink: 0;
-		color: var(--copper, #BF4E30);
-		display: flex;
-		align-items: center;
-	}
-
-	.stat-check svg {
-		width: 100%;
-		height: 100%;
-	}
-
-	.stat-value {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--text);
-		white-space: nowrap;
-		flex-shrink: 0;
-	}
-
-	.stat-value.done {
-		color: var(--copper, #BF4E30);
-	}
-
-	.bar-track {
-		width: 100%;
-		height: 3px;
-		background: var(--border-soft, rgba(0,0,0,0.07));
-		border-radius: 999px;
-		overflow: hidden;
-	}
-
-	.bar-fill {
-		height: 100%;
-		background: var(--copper, #BF4E30);
-		border-radius: 999px;
-		transition: width 0.4s ease;
-		min-width: 3px;
-		opacity: 0.55;
-	}
-
-	.bar-fill.done {
-		opacity: 1;
+		color: #2a7a4a;
 	}
 </style>

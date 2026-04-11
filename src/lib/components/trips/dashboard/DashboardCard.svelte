@@ -81,14 +81,14 @@
 
 	.dashboard-card.variant-sticky {
 		background: linear-gradient(
-			to bottom,
-			rgba(255, 253, 230, 0.68) 0%,
-			rgba(252, 248, 200, 0.85) 45%,
-			rgba(250, 235, 140, 0.97) 100%
+			155deg,
+			#1d4d4e 0%,
+			#2a6263 55%,
+			#1a4041 100%
 		);
 		backdrop-filter: blur(8px);
 		border: none;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+		box-shadow: 0 8px 32px rgba(29, 77, 78, 0.35);
 	}
 
 	.dashboard-card.variant-glass {

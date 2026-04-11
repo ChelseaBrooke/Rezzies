@@ -2,6 +2,8 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
+	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 
 	let conversations = $state<Array<{
 		otherUserId: string;
@@ -121,43 +123,72 @@
 			{:else if conversations.length === 0}
 				<p class="muted">No conversations yet. Message someone from a trip's guest list.</p>
 			{:else}
-				<ul class="conversation-list">
-					{#each conversations as conv}
-						<li>
+			<ul class="conversation-list">
+				{#each conversations as conv}
+					<li class="conversation-item" class:active={selectedWith === conv.otherUserId}>
+						<ProfileTooltip
+							userId={conv.otherUserId}
+							name={conv.otherUser.name}
+							avatarUrl={conv.otherUser.avatarUrl}
+						>
 							<button
 								type="button"
-								class="conversation-item"
-								class:active={selectedWith === conv.otherUserId}
-								onclick={() => selectConversation(conv.otherUserId)}
+								class="conv-avatar-btn"
+								aria-label="View {conv.otherUser.name || conv.otherUser.email}'s profile"
+								onclick={() => openProfileCard(conv.otherUserId)}
 							>
 								{#if conv.otherUser.avatarUrl}
 									<img src={conv.otherUser.avatarUrl} alt="" class="conv-avatar" />
 								{:else}
 									<span class="conv-avatar-initials">{initials(conv.otherUser.name, conv.otherUser.email)}</span>
 								{/if}
-								<div class="conv-info">
-									<span class="conv-name">{conv.otherUser.name || conv.otherUser.email}</span>
-									<span class="conv-preview">{conv.lastMessage.slice(0, 50)}{conv.lastMessage.length > 50 ? '…' : ''}</span>
-								</div>
 							</button>
-						</li>
-					{/each}
-				</ul>
+						</ProfileTooltip>
+						<button
+							type="button"
+							class="conv-info-btn"
+							onclick={() => selectConversation(conv.otherUserId)}
+						>
+							<span class="conv-name">{conv.otherUser.name || conv.otherUser.email}</span>
+							<span class="conv-preview">{conv.lastMessage.slice(0, 50)}{conv.lastMessage.length > 50 ? '…' : ''}</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
 			{/if}
 		</aside>
 		<main class="chat-panel">
 			{#if selectedWith}
 				{#if otherUser}
-					<div class="chat-header">
-						<div class="chat-header-user">
-							{#if otherUser.avatarUrl}
-								<img src={otherUser.avatarUrl} alt="" class="chat-avatar" />
-							{:else}
-								<span class="chat-avatar-initials">{initials(otherUser.name, otherUser.email)}</span>
-							{/if}
-							<span class="chat-header-name">{otherUser.name || otherUser.email}</span>
-						</div>
+				<div class="chat-header">
+					<div class="chat-header-user">
+						<ProfileTooltip
+							userId={otherUser.id}
+							name={otherUser.name}
+							avatarUrl={otherUser.avatarUrl}
+						>
+							<button
+								type="button"
+								class="chat-avatar-btn"
+								aria-label="View {otherUser.name || otherUser.email}'s profile"
+								onclick={() => openProfileCard(otherUser.id)}
+							>
+								{#if otherUser.avatarUrl}
+									<img src={otherUser.avatarUrl} alt="" class="chat-avatar" />
+								{:else}
+									<span class="chat-avatar-initials">{initials(otherUser.name, otherUser.email)}</span>
+								{/if}
+							</button>
+						</ProfileTooltip>
+						<button
+							type="button"
+							class="chat-header-name-btn"
+							onclick={() => openProfileCard(otherUser.id)}
+						>
+							{otherUser.name || otherUser.email}
+						</button>
 					</div>
+				</div>
 					<div class="messages-container">
 						{#if loading && messages.length === 0}
 							<p class="muted">Loading...</p>
@@ -238,18 +269,38 @@
 	.conversation-item {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		gap: 0;
 		width: 100%;
+		border-bottom: 1px solid var(--border, #e5e7eb);
+		background: none;
+	}
+	.conversation-item:hover { background: #f3f4f6; }
+	.conversation-item.active { background: #eff6ff; }
+	.conv-avatar-btn {
+		flex-shrink: 0;
+		padding: 0.75rem 0 0.75rem 1rem;
+		border: none;
+		background: none;
+		cursor: pointer;
+		border-radius: 0;
+		display: flex;
+		align-items: center;
+	}
+	.conv-avatar-btn:hover .conv-avatar,
+	.conv-avatar-btn:hover .conv-avatar-initials {
+		outline: 2px solid var(--copper, #bf4e30);
+		outline-offset: 2px;
+	}
+	.conv-info-btn {
+		flex: 1;
+		min-width: 0;
 		padding: 0.75rem 1rem;
 		border: none;
 		background: none;
 		text-align: left;
 		cursor: pointer;
 		font: inherit;
-		border-bottom: 1px solid var(--border, #e5e7eb);
 	}
-	.conversation-item:hover { background: #f3f4f6; }
-	.conversation-item.active { background: #eff6ff; }
 	.conv-avatar, .conv-avatar-initials, .chat-avatar, .chat-avatar-initials {
 		width: 2.5rem;
 		height: 2.5rem;
@@ -266,7 +317,6 @@
 		color: var(--text);
 	}
 	.conv-avatar, .chat-avatar { object-fit: cover; }
-	.conv-info { flex: 1; min-width: 0; }
 	.conv-name { display: block; font-weight: 500; }
 	.conv-preview { display: block; font-size: 0.8125rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -275,7 +325,35 @@
 		border-bottom: 1px solid var(--border, #e5e7eb);
 	}
 	.chat-header-user { display: flex; align-items: center; gap: 0.75rem; }
-	.chat-header-name { font-weight: 600; }
+	.chat-avatar-btn {
+		border: none;
+		background: none;
+		padding: 0;
+		cursor: pointer;
+		border-radius: 50%;
+		display: flex;
+	}
+	.chat-avatar-btn:hover .chat-avatar,
+	.chat-avatar-btn:hover .chat-avatar-initials {
+		outline: 2px solid var(--copper, #bf4e30);
+		outline-offset: 2px;
+	}
+	.chat-header-name-btn {
+		border: none;
+		background: none;
+		padding: 0;
+		cursor: pointer;
+		font: inherit;
+		font-weight: 600;
+		color: var(--text);
+		text-decoration: underline;
+		text-decoration-color: transparent;
+		transition: text-decoration-color 0.15s;
+	}
+	.chat-header-name-btn:hover {
+		text-decoration-color: var(--copper, #bf4e30);
+		color: var(--copper, #bf4e30);
+	}
 	.messages-container {
 		flex: 1;
 		overflow-y: auto;
