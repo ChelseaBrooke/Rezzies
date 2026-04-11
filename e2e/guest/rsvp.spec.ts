@@ -20,13 +20,11 @@ test.describe('RSVP (guest)', () => {
 
 	test('can access RSVP page', async ({ page }) => {
 		await page.goto(`/trips/${tripId}/rsvp`);
-		await page.waitForLoadState('networkidle');
 		await expect(page).toHaveURL(new RegExp(`/trips/${tripId}/rsvp`));
 	});
 
 	test('RSVP page has status selector', async ({ page }) => {
 		await page.goto(`/trips/${tripId}/rsvp`);
-		await page.waitForLoadState('networkidle');
 
 		// The RSVP form uses select#status with name="status" and options yes/no
 		const statusSelect = page.locator('#status, select[name="status"]');
@@ -35,7 +33,6 @@ test.describe('RSVP (guest)', () => {
 
 	test('RSVP page has main form', async ({ page }) => {
 		await page.goto(`/trips/${tripId}/rsvp`);
-		await page.waitForLoadState('networkidle');
 
 		// The main form has id="rsvp-form" with action="?/updateRsvp"
 		const form = page.locator('#rsvp-form, form[action*="updateRsvp"]');
@@ -44,12 +41,11 @@ test.describe('RSVP (guest)', () => {
 
 	test('selecting yes shows party size fields', async ({ page }) => {
 		await page.goto(`/trips/${tripId}/rsvp`);
-		await page.waitForLoadState('networkidle');
 
 		// Select "yes"
 		const statusSelect = page.locator('#status, select[name="status"]');
+		await expect(statusSelect).toBeVisible({ timeout: 10_000 });
 		await statusSelect.selectOption('yes');
-		await page.waitForTimeout(500);
 
 		// Should show adults count (name="adultsCount")
 		const adultsInput = page.locator('#adultsCount, input[name="adultsCount"]');
@@ -58,11 +54,10 @@ test.describe('RSVP (guest)', () => {
 
 	test('selecting no shows notes field', async ({ page }) => {
 		await page.goto(`/trips/${tripId}/rsvp`);
-		await page.waitForLoadState('networkidle');
 
 		const statusSelect = page.locator('#status, select[name="status"]');
+		await expect(statusSelect).toBeVisible({ timeout: 10_000 });
 		await statusSelect.selectOption('no');
-		await page.waitForTimeout(500);
 
 		// Should show notes textarea (name="notes")
 		const notesField = page.locator('#notes, textarea[name="notes"]');
@@ -71,7 +66,6 @@ test.describe('RSVP (guest)', () => {
 
 	test('RSVP page has dietary section', async ({ page }) => {
 		await page.goto(`/trips/${tripId}/rsvp`);
-		await page.waitForLoadState('networkidle');
 
 		// Dietary form uses action="?/updateDietary"
 		const dietaryForm = page.locator('form[action*="updateDietary"]');
@@ -86,11 +80,10 @@ test.describe('RSVP (guest)', () => {
 
 	test('RSVP page shows room/bed selection when yes', async ({ page }) => {
 		await page.goto(`/trips/${tripId}/rsvp`);
-		await page.waitForLoadState('networkidle');
 
 		const statusSelect = page.locator('#status, select[name="status"]');
+		await expect(statusSelect).toBeVisible({ timeout: 10_000 });
 		await statusSelect.selectOption('yes');
-		await page.waitForTimeout(500);
 
 		// Should show room cards (.hotel-room-card) or bed checkboxes (name="bedIds")
 		const roomCards = page.locator('.hotel-room-card');

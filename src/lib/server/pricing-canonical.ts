@@ -1,6 +1,11 @@
 // Canonical Pricing Model for Divvi
 // Per-bed and per-room pricing use bed-type weights and room privacy factors.
 // See PRICING_MATH.md for formulas.
+//
+// Vocabulary note: this module uses UPPER_SNAKE form for PricingMode ('PER_BED', 'PER_ROOM', …).
+// The DB and REST API layer uses lowercase_underscore ('per_bed', 'per_room', …) — see pricing.ts.
+// calculatePrice() in pricing.ts is the public entry point; it normalises the model string and
+// delegates PER_BED math here via calculateReservationPrice().
 
 import { prisma } from './prisma.js';
 import {

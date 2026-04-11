@@ -1,7 +1,7 @@
 /**
  * PATCH /api/trips/:tripId/capacity
- * Update maxCapacity and waitlistClaimWindowHours for a trip.
- * Host-only. When capacity is increased, immediately promotes waitlisted users.
+ * Update maxCapacity for a trip.
+ * Host-only. When capacity is increased, immediately notifies all waitlisted guests.
  */
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -28,12 +28,8 @@ export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 		d.maxCapacity === null ? null :
 		typeof d.maxCapacity === 'number' && d.maxCapacity > 0 ? Math.floor(d.maxCapacity) :
 		undefined;
-	const waitlistClaimWindowHours =
-		typeof d.waitlistClaimWindowHours === 'number' && d.waitlistClaimWindowHours >= 1
-			? Math.floor(d.waitlistClaimWindowHours)
-			: undefined;
 
-	if (maxCapacity === undefined && waitlistClaimWindowHours === undefined) {
+	if (maxCapacity === undefined) {
 		return json({ error: 'No fields to update' }, { status: 400 });
 	}
 
@@ -44,14 +40,11 @@ export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 
 	await prisma.trip.update({
 		where: { id: tripId },
-		data: {
-			...(maxCapacity !== undefined && { maxCapacity }),
-			...(waitlistClaimWindowHours !== undefined && { waitlistClaimWindowHours })
-		}
+		data: { maxCapacity: maxCapacity ?? null }
 	});
 
-	// If capacity increased, immediately try to promote waitlisted users
-	const newCap = maxCapacity !== undefined ? maxCapacity : prev?.maxCapacity;
+	// If capacity increased, notify all waitlisted guests immediately
+	const newCap = maxCapacity;
 	const oldCap = prev?.maxCapacity;
 	if (newCap && (!oldCap || newCap > oldCap)) {
 		await handleSpotOpened(tripId).catch(console.error);

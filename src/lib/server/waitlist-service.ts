@@ -1,16 +1,16 @@
 /**
  * Waitlist Service
  *
- * Manages the FIFO waitlist queue for trips with a maxCapacity set.
+ * Manages the waitlist queue for trips with a maxCapacity set.
  *
  * Status lifecycle for a guest:
  *   (no row / not_responded)
  *     → waitlisted       (trip fills up; RSVP row created/updated)
- *     → invited_to_rsvp  (spot opens; user has claimWindowHours to respond)
- *     → yes              (user claims spot)
- *     → no               (user declines OR window expires and they exhaust retries)
+ *     → yes              (spot opens and guest RSVPs yes first — first come, first served)
+ *     → no               (trip starts and waitlist is dissolved, or guest explicitly declines)
  *
- * All transactional state changes use prisma.$transaction to prevent races.
+ * When a spot opens, ALL waitlisted guests are notified simultaneously.
+ * Spots go to whoever RSVPs yes first — no claim windows, no promotion queue.
  */
 
 import { prisma } from './prisma.js';
@@ -23,7 +23,7 @@ import { renderSpotOpenedHtml } from './email/render/spot-opened.js';
 // Types
 // ---------------------------------------------------------------------------
 
-export type WaitlistStatus = 'waitlisted' | 'invited_to_rsvp';
+export type WaitlistStatus = 'waitlisted';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,7 +34,7 @@ export async function getYesCount(tripId: string): Promise<number> {
 	return prisma.rSVP.count({ where: { tripId, status: 'yes' } });
 }
 
-/** Fetch trip's maxCapacity and claimWindowHours in one query. */
+/** Fetch trip's maxCapacity in one query. */
 async function getTripCapacitySettings(tripId: string) {
 	return prisma.trip.findUnique({
 		where: { id: tripId },
@@ -42,7 +42,6 @@ async function getTripCapacitySettings(tripId: string) {
 			id: true,
 			name: true,
 			maxCapacity: true,
-			waitlistClaimWindowHours: true,
 			checkInDate: true
 		}
 	});
@@ -83,7 +82,7 @@ async function notify(params: {
 /**
  * Called after a yes RSVP is submitted.
  * If the trip is now at or over maxCapacity, all guests who haven't responded
- * (no RSVP row, or RSVP with status in ["maybe"]) are moved to "waitlisted".
+ * (no RSVP row, or RSVP with status "maybe") are moved to "waitlisted".
  */
 export async function checkAndHandleCapacity(tripId: string): Promise<void> {
 	const trip = await getTripCapacitySettings(tripId);
@@ -112,8 +111,8 @@ export async function checkAndHandleCapacity(tripId: string): Promise<void> {
 
 		// Skip users who have already committed one way or the other
 		if (existingStatus === 'yes' || existingStatus === 'no') continue;
-		// Skip users already on the waitlist / in a claim window
-		if (existingStatus === 'waitlisted' || existingStatus === 'invited_to_rsvp') continue;
+		// Skip users already on the waitlist
+		if (existingStatus === 'waitlisted') continue;
 
 		// Upsert to "waitlisted"
 		await prisma.rSVP.upsert({
@@ -165,7 +164,7 @@ export async function checkAndHandleCapacity(tripId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Core: Handle spot opening — promote next waitlisted user
+// Core: Handle spot opening — notify all waitlisted guests (first come, first served)
 // ---------------------------------------------------------------------------
 
 /**
@@ -174,7 +173,9 @@ export async function checkAndHandleCapacity(tripId: string): Promise<void> {
  *  - A member is removed from the trip
  *  - Trip maxCapacity is increased
  *
- * Promotes as many users as there are open spots (handles bulk openings).
+ * Sends every waitlisted guest an email and in-app notification telling them
+ * how many spots are open. Whoever RSVPs yes first gets the spot(s).
+ * No promotion queue, no claim windows.
  */
 export async function handleSpotOpened(tripId: string): Promise<void> {
 	const trip = await getTripCapacitySettings(tripId);
@@ -184,135 +185,44 @@ export async function handleSpotOpened(tripId: string): Promise<void> {
 	const openSpots = trip.maxCapacity - yesCount;
 	if (openSpots <= 0) return;
 
-	for (let i = 0; i < openSpots; i++) {
-		const promoted = await promoteNextWaitlistUser(
-			tripId,
-			trip.name,
-			trip.waitlistClaimWindowHours
-		);
-		if (!promoted) break; // Queue is empty
-	}
-}
-
-/**
- * Promotes the next user in the waitlist to "invited_to_rsvp".
- * Returns true if someone was promoted, false if the queue was empty.
- */
-export async function promoteNextWaitlistUser(
-	tripId: string,
-	tripName: string,
-	claimWindowHours: number
-): Promise<boolean> {
-	// Find the next waitlisted user (lowest position; tie-break by waitlistJoinedAt then createdAt)
-	const next = await prisma.rSVP.findFirst({
-		where: { tripId, status: 'waitlisted', waitlistPosition: { not: null } },
+	// Find all waitlisted guests
+	const waitlisted = await prisma.rSVP.findMany({
+		where: { tripId, status: 'waitlisted' },
 		orderBy: [{ waitlistPosition: 'asc' }, { waitlistJoinedAt: 'asc' }],
-		select: { id: true, userId: true, waitlistPosition: true }
+		select: { userId: true }
 	});
-	if (!next) return false;
+	if (waitlisted.length === 0) return;
 
-	const expiresAt = new Date(Date.now() + claimWindowHours * 60 * 60 * 1000);
+	// Notify everyone simultaneously — first to RSVP yes wins
+	for (const entry of waitlisted) {
+		const user = await prisma.user.findUnique({
+			where: { id: entry.userId },
+			select: { name: true, email: true }
+		});
+		if (!user) continue;
 
-	await prisma.rSVP.update({
-		where: { id: next.id },
-		data: {
-			status: 'invited_to_rsvp',
-			waitlistPosition: null,
-			claimWindowExpiresAt: expiresAt
-		}
-	});
-
-	// Notify + email
-	const user = await prisma.user.findUnique({
-		where: { id: next.userId },
-		select: { name: true, email: true }
-	});
-
-	if (user) {
 		await notify({
-			userId: next.userId,
+			userId: entry.userId,
 			tripId,
 			type: 'waitlist_spot_opened',
-			title: 'A spot just opened up!',
-			message: `You're up next for "${tripName}". You have ${claimWindowHours} hours to claim your spot.`
-		});
+			title: openSpots === 1 ? 'A spot just opened!' : `${openSpots} spots just opened!`,
+			message: `${openSpots === 1 ? 'A spot' : `${openSpots} spots`} just opened on "${trip.name}". It's first come, first served — go RSVP now!`
+		}).catch(console.error);
+
 		if (user.email) {
 			const html = renderSpotOpenedHtml({
 				guestName: user.name ?? 'Guest',
-				tripName,
-				claimWindowHours,
-				expiresAt
+				tripName: trip.name,
+				spotsAvailable: openSpots
 			});
 			await sendHtmlEmail({
 				to: user.email,
-				subject: `A spot opened for "${tripName}" — claim it within ${claimWindowHours} hours`,
+				subject: `${openSpots === 1 ? 'A spot opened' : `${openSpots} spots opened`} on "${trip.name}" — first come, first served`,
 				html,
 				templateKey: TEMPLATE_KEYS.SPOT_OPENED
 			}).catch(console.error);
 		}
 	}
-
-	return true;
-}
-
-// ---------------------------------------------------------------------------
-// Cron: Expire lapsed claim windows
-// ---------------------------------------------------------------------------
-
-/**
- * Called periodically (e.g. every 15 min via cron endpoint).
- * Finds all "invited_to_rsvp" RSVPs whose window has expired, demotes them
- * to "waitlisted" (end of queue), and promotes the next user.
- */
-export async function expireClaimWindows(): Promise<string[]> {
-	const now = new Date();
-	const expired = await prisma.rSVP.findMany({
-		where: {
-			status: 'invited_to_rsvp',
-			claimWindowExpiresAt: { lt: now }
-		},
-		select: { id: true, userId: true, tripId: true }
-	});
-
-	const affectedTripIds = new Set<string>();
-
-	for (const rsvp of expired) {
-		const position = await nextWaitlistPosition(rsvp.tripId);
-
-		await prisma.rSVP.update({
-			where: { id: rsvp.id },
-			data: {
-				status: 'waitlisted',
-				waitlistPosition: position,
-				waitlistJoinedAt: now,
-				claimWindowExpiresAt: null
-			}
-		});
-
-		// Notify the user that they missed their window
-		const trip = await prisma.trip.findUnique({
-			where: { id: rsvp.tripId },
-			select: { name: true }
-		});
-		if (trip) {
-			await notify({
-				userId: rsvp.userId,
-				tripId: rsvp.tripId,
-				type: 'waitlist_window_expired',
-				title: 'Spot claim window expired',
-				message: `Your window to claim a spot for "${trip.name}" has passed. You've been returned to the waitlist.`
-			});
-		}
-
-		affectedTripIds.add(rsvp.tripId);
-	}
-
-	// Promote next users for all affected trips
-	for (const tripId of affectedTripIds) {
-		await handleSpotOpened(tripId);
-	}
-
-	return [...affectedTripIds];
 }
 
 // ---------------------------------------------------------------------------
@@ -321,13 +231,13 @@ export async function expireClaimWindows(): Promise<string[]> {
 
 /**
  * Called when a trip's check-in date is reached.
- * Moves all waitlisted / invited_to_rsvp users to "no" and clears queue state.
+ * Moves all waitlisted users to "no" and clears queue state.
  */
 export async function dissolveWaitlistForTrip(tripId: string): Promise<number> {
 	const result = await prisma.rSVP.updateMany({
 		where: {
 			tripId,
-			status: { in: ['waitlisted', 'invited_to_rsvp'] }
+			status: { in: ['waitlisted'] }
 		},
 		data: {
 			status: 'no',

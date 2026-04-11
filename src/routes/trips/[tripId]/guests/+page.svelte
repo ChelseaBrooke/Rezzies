@@ -307,7 +307,6 @@
 	// Capacity settings state
 	let capacitySettingsOpen = $state(false);
 	let capacityDraft = $state<number | ''>(data.maxCapacity ?? '');
-	let claimWindowDraft = $state<number>(12);
 	let capacitySaving = $state(false);
 	let capacitySaveError = $state<string | null>(null);
 	let capacitySaveOk = $state(false);
@@ -323,7 +322,6 @@
 			} else {
 				body.maxCapacity = Number(capacityDraft);
 			}
-			body.waitlistClaimWindowHours = Number(claimWindowDraft);
 			const res = await fetch(`/api/trips/${tripId}/capacity`, {
 				method: 'PATCH',
 				headers: { 'content-type': 'application/json' },
@@ -611,32 +609,20 @@
 						Leave blank to allow unlimited RSVPs.
 					</p>
 					<div class="gp-capacity-fields">
-						<div class="gp-capacity-field">
-							<label class="gp-capacity-field-label" for="maxCapacity">Max capacity</label>
-							<input
-								id="maxCapacity"
-								type="number"
-								min="1"
-								step="1"
-								placeholder="Unlimited"
-								bind:value={capacityDraft}
-								class="gp-capacity-input"
-							/>
-						</div>
-						<div class="gp-capacity-field">
-							<label class="gp-capacity-field-label" for="claimWindow">Claim window (hours)</label>
-							<input
-								id="claimWindow"
-								type="number"
-								min="1"
-								max="168"
-								step="1"
-								bind:value={claimWindowDraft}
-								class="gp-capacity-input"
-							/>
-							<span class="gp-capacity-field-hint">How long a promoted guest has to RSVP yes before their spot is offered to the next person.</span>
-						</div>
+					<div class="gp-capacity-field">
+						<label class="gp-capacity-field-label" for="maxCapacity">Max capacity</label>
+						<input
+							id="maxCapacity"
+							type="number"
+							min="1"
+							step="1"
+							placeholder="Unlimited"
+							bind:value={capacityDraft}
+							class="gp-capacity-input"
+						/>
+						<span class="gp-capacity-field-hint">When the cap is reached, new guests are waitlisted. If a spot opens, all waitlisted guests are notified — first come, first served.</span>
 					</div>
+				</div>
 					{#if capacitySaveError}
 						<p class="gp-capacity-error">{capacitySaveError}</p>
 					{/if}
@@ -657,7 +643,6 @@
 	<!-- ── WAITLIST PANEL (host/co-host only) ───────────────────────────── -->
 	{#if data.canManageGuests && (data.waitlistCount ?? 0) > 0}
 		{@const waitlistEntries = data.waitlistEntries ?? []}
-		{@const activeClaimUserId = data.activeClaimUserId ?? null}
 		<div class="gp-card gp-waitlist-card">
 			<div class="gp-waitlist-header">
 				<span class="gp-waitlist-title">Waitlist</span>
@@ -666,24 +651,15 @@
 					<span class="gp-waitlist-cap">Cap: {data.maxCapacity}</span>
 				{/if}
 			</div>
+			<p class="gp-waitlist-hint">All waitlisted guests are notified simultaneously when a spot opens — first come, first served.</p>
 			<div class="gp-waitlist-list" role="list">
 				{#each waitlistEntries as entry, i (entry.userId)}
-					{@const isActive = entry.status === 'invited_to_rsvp'}
-					{@const expiresAt = entry.claimWindowExpiresAt ? new Date(entry.claimWindowExpiresAt) : null}
-					<div class="gp-waitlist-row" class:gp-waitlist-row--active={isActive} role="listitem">
-						<span class="gp-waitlist-pos">{isActive ? '★' : `#${entry.waitlistPosition ?? i + 1}`}</span>
+					<div class="gp-waitlist-row" role="listitem">
+						<span class="gp-waitlist-pos">#{entry.waitlistPosition ?? i + 1}</span>
 						<div class="gp-waitlist-info">
 							<span class="gp-waitlist-name">{entry.name}</span>
 							<span class="gp-waitlist-email">{entry.email}</span>
 						</div>
-						{#if isActive}
-							<div class="gp-waitlist-claim-badge">
-								<span class="gp-waitlist-claim-label">Claim window open</span>
-								{#if expiresAt}
-									<span class="gp-waitlist-claim-exp">Expires {expiresAt.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}</span>
-								{/if}
-							</div>
-						{/if}
 					</div>
 				{/each}
 			</div>
@@ -1340,6 +1316,7 @@
 	row={editModalRow}
 	rooms={data.rooms ?? []}
 	tripId={data.trip?.id ?? ''}
+	isHostViewer={data.isHost}
 	checkInDate={data.trip?.checkInDate ?? undefined}
 	checkOutDate={data.trip?.checkOutDate ?? undefined}
 	allowPartialStays={data.trip?.allowPartialStays ?? false}

@@ -12,6 +12,12 @@ import {
 } from '$lib/server/guest-estimate.js';
 import { computeRoomPricing, computePerBedPricingAtHeadcount } from '$lib/server/pricing-canonical.js';
 import { checkAndHandleCapacity, handleSpotOpened } from '$lib/server/waitlist-service.js';
+import {
+	sendRsvpConfirmedToGuest,
+	sendNewRsvpToHost,
+	sendRsvpUpdatedToGuest,
+	sendTripFillingUpToHost
+} from '$lib/server/notification-service.js';
 import { z } from 'zod';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
@@ -132,11 +138,7 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	// Waitlist state for this user
 	const waitlistStatus = currentRsvp?.status ?? null;
 	const isWaitlisted = waitlistStatus === 'waitlisted';
-	const hasClaimWindow = waitlistStatus === 'invited_to_rsvp';
-	const claimWindowExpiresAt = currentRsvp?.claimWindowExpiresAt ?? null;
 	const waitlistPosition = currentRsvp?.waitlistPosition ?? null;
-	const claimWindowExpired =
-		hasClaimWindow && claimWindowExpiresAt ? claimWindowExpiresAt < new Date() : false;
 
 	// Count of yes RSVPs for capacity display
 	const yesCount = await prisma.rSVP.count({ where: { tripId, status: 'yes' } });
@@ -160,9 +162,6 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		yesRsvpHeadcount,
 		// Waitlist
 		isWaitlisted,
-		hasClaimWindow,
-		claimWindowExpiresAt: claimWindowExpiresAt?.toISOString() ?? null,
-		claimWindowExpired,
 		waitlistPosition,
 		maxCapacity: trip.maxCapacity ?? null,
 		yesCount
@@ -220,19 +219,22 @@ export const actions: Actions = {
 		}
 		const notesForStatus = validation.data.status === 'no' ? (data.notes ?? undefined) : undefined;
 
-		// Waitlist guard: only allow YES if the user is not on the waitlist (or has an active claim window)
+		// Waitlist guard: if the user is waitlisted, only allow YES if there's capacity available (FCFS)
 		if (validation.data.status === 'yes') {
 			const existingRsvp = await prisma.rSVP.findUnique({
 				where: { tripId_userId: { tripId, userId: user.id } },
-				select: { status: true, claimWindowExpiresAt: true }
+				select: { status: true }
 			});
 			if (existingRsvp?.status === 'waitlisted') {
-				return fail(403, { error: 'You are on the waitlist. Wait until a spot opens and you receive your invite.' });
-			}
-			if (existingRsvp?.status === 'invited_to_rsvp') {
-				const expired = existingRsvp.claimWindowExpiresAt && existingRsvp.claimWindowExpiresAt < new Date();
-				if (expired) {
-					return fail(403, { error: 'Your claim window has expired. You have been returned to the waitlist.' });
+				const tripCap = await prisma.trip.findUnique({
+					where: { id: tripId },
+					select: { maxCapacity: true }
+				});
+				if (tripCap?.maxCapacity) {
+					const yesCount = await prisma.rSVP.count({ where: { tripId, status: 'yes' } });
+					if (yesCount >= tripCap.maxCapacity) {
+						return fail(403, { error: 'The trip is still full. You\'ll be notified when a spot opens.' });
+					}
 				}
 			}
 		}
@@ -251,46 +253,56 @@ export const actions: Actions = {
 			const now = new Date();
 			await prisma.rSVP.upsert({
 				where: { tripId_userId: { tripId, userId: user.id } },
-				create: {
-					tripId,
-					userId: user.id,
-					...validation.data,
-					notes: null,
-					costCommitmentAccepted: true,
-					rsvpYesAcceptedAt: now,
-					yesSubstatus: 'confirmed',
-					acceptedEstimateLowCents: estimate.lowCents,
-					acceptedEstimateHighCents: estimate.highCents,
-					acceptedHeadcountMin: estimate.hmin,
-					acceptedHeadcountMax: estimate.hmax,
-					acceptedCostBasisVersion: estimate.costBasisVersion,
-					reconfirmRequiredAt: null,
-					reconfirmDeadlineAt: null,
-					latestEstimateLowCents: estimate.lowCents,
-					latestEstimateHighCents: estimate.highCents,
-					latestEstimateUpdatedAt: now
-				},
-				update: {
-					...validation.data,
-					notes: null,
-					costCommitmentAccepted: true,
-					rsvpYesAcceptedAt: now,
-					yesSubstatus: 'confirmed',
-					acceptedEstimateLowCents: estimate.lowCents,
-					acceptedEstimateHighCents: estimate.highCents,
-					acceptedHeadcountMin: estimate.hmin,
-					acceptedHeadcountMax: estimate.hmax,
-					acceptedCostBasisVersion: estimate.costBasisVersion,
-					reconfirmRequiredAt: null,
-					reconfirmDeadlineAt: null,
-					latestEstimateLowCents: estimate.lowCents,
-					latestEstimateHighCents: estimate.highCents,
-					latestEstimateUpdatedAt: now
-				}
+			create: {
+				tripId,
+				userId: user.id,
+				...validation.data,
+				notes: null,
+				costCommitmentAccepted: true,
+				rsvpYesAcceptedAt: now,
+				yesSubstatus: 'confirmed',
+				acceptedEstimateLowCents: estimate.lowCents,
+				acceptedEstimateHighCents: estimate.highCents,
+				acceptedHeadcountMin: estimate.hmin,
+				acceptedHeadcountMax: estimate.hmax,
+				acceptedCostBasisVersion: estimate.costBasisVersion,
+				reconfirmRequiredAt: null,
+				reconfirmDeadlineAt: null,
+				latestEstimateLowCents: estimate.lowCents,
+				latestEstimateHighCents: estimate.highCents,
+				latestEstimateUpdatedAt: now,
+				waitlistPosition: null,
+				waitlistJoinedAt: null,
+				claimWindowExpiresAt: null
+			},
+			update: {
+				...validation.data,
+				notes: null,
+				costCommitmentAccepted: true,
+				rsvpYesAcceptedAt: now,
+				yesSubstatus: 'confirmed',
+				acceptedEstimateLowCents: estimate.lowCents,
+				acceptedEstimateHighCents: estimate.highCents,
+				acceptedHeadcountMin: estimate.hmin,
+				acceptedHeadcountMax: estimate.hmax,
+				acceptedCostBasisVersion: estimate.costBasisVersion,
+				reconfirmRequiredAt: null,
+				reconfirmDeadlineAt: null,
+				latestEstimateLowCents: estimate.lowCents,
+				latestEstimateHighCents: estimate.highCents,
+				latestEstimateUpdatedAt: now,
+				waitlistPosition: null,
+				waitlistJoinedAt: null,
+				claimWindowExpiresAt: null
+			}
 			});
 		await checkAndSetReconfirmRequired(tripId);
 		// Check if the trip just became full and enqueue not-responded guests
 		await checkAndHandleCapacity(tripId).catch(console.error);
+		// Transactional emails (fire-and-forget — errors are logged internally)
+		sendRsvpConfirmedToGuest(tripId, user.id);
+		sendNewRsvpToHost(tripId, user.id);
+		sendTripFillingUpToHost(tripId);
 		return { success: true };
 	}
 
@@ -331,6 +343,7 @@ export const actions: Actions = {
 		}
 
 		await checkAndSetReconfirmRequired(tripId);
+		sendRsvpUpdatedToGuest(tripId, user.id);
 		return { success: true };
 	},
 

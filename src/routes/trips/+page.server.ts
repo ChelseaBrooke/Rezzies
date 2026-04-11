@@ -3,6 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { getUserTrips, isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { sendTripCanceledEmails } from '$lib/server/notification-service.js';
 
 export const load: PageServerLoad = async ({ cookies }) => {
 	const user = await getSessionUser(cookies);
@@ -60,6 +61,8 @@ export const actions: Actions = {
 		}
 
 		try {
+			// Notify members before deletion so we can still query the trip and member list
+			await sendTripCanceledEmails(tripId);
 			await prisma.trip.delete({ where: { id: tripId } });
 			return { success: true };
 		} catch (error) {

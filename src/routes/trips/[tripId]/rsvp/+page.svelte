@@ -162,29 +162,13 @@
 
 	// Waitlist derived state
 	const isWaitlisted = $derived(data.isWaitlisted ?? false);
-	const hasClaimWindow = $derived(data.hasClaimWindow ?? false);
-	const claimWindowExpiresAt = $derived(
-		data.claimWindowExpiresAt ? new Date(data.claimWindowExpiresAt) : null
-	);
 	const waitlistPosition = $derived(data.waitlistPosition ?? null);
-	const claimWindowExpired = $derived(data.claimWindowExpired ?? false);
-
-	// Countdown timer for the claim window
-	let claimCountdown = $state('');
-	$effect(() => {
-		if (!hasClaimWindow || !claimWindowExpiresAt) { claimCountdown = ''; return; }
-		function tick() {
-			const diff = claimWindowExpiresAt!.getTime() - Date.now();
-			if (diff <= 0) { claimCountdown = 'Expired'; return; }
-			const h = Math.floor(diff / 3600000);
-			const m = Math.floor((diff % 3600000) / 60000);
-			const s = Math.floor((diff % 60000) / 1000);
-			claimCountdown = h > 0 ? `${h}h ${m}m` : `${m}m ${s}s`;
-		}
-		tick();
-		const id = setInterval(tick, 1000);
-		return () => clearInterval(id);
-	});
+	// True when the guest is waitlisted but spots are currently open (FCFS — go RSVP now)
+	const waitlistSpotsOpen = $derived(
+		isWaitlisted &&
+		data.maxCapacity != null &&
+		(data.yesCount ?? 0) < data.maxCapacity
+	);
 
 	let rsvpStatus = $state('yes');
 	$effect(() => {
@@ -352,53 +336,33 @@
 			<section class="card-section rsvp-section">
 			{#if isWaitlisted}
 				<!-- ── Waitlisted banner ───────────────────────────────────────── -->
+			{#if waitlistSpotsOpen}
+				<!-- ── Spots open banner (FCFS) ───────────────────────────────── -->
+				<div class="waitlist-banner waitlist-banner--claim" role="alert">
+					<div class="waitlist-banner-icon" aria-hidden="true">🎉</div>
+					<div class="waitlist-banner-body">
+						<p class="waitlist-banner-title">
+							{data.maxCapacity != null && (data.yesCount ?? 0) < data.maxCapacity
+								? `${data.maxCapacity - (data.yesCount ?? 0)} spot${data.maxCapacity - (data.yesCount ?? 0) === 1 ? '' : 's'} just opened!`
+								: 'Spots just opened!'}
+						</p>
+						<p class="waitlist-banner-sub">It's first come, first served — RSVP yes below to claim your spot now.</p>
+					</div>
+				</div>
+			{:else}
 				<div class="waitlist-banner waitlist-banner--waiting" role="status">
 					<div class="waitlist-banner-icon" aria-hidden="true">⏳</div>
 					<div class="waitlist-banner-body">
 						<p class="waitlist-banner-title">You're on the waitlist</p>
 						{#if waitlistPosition != null}
-							<p class="waitlist-banner-sub">Position <strong>#{waitlistPosition}</strong> — we'll notify you when a spot opens.</p>
+							<p class="waitlist-banner-sub">Position <strong>#{waitlistPosition}</strong> — we'll email and notify you the moment a spot opens.</p>
 						{:else}
-							<p class="waitlist-banner-sub">We'll notify you when a spot opens up.</p>
+							<p class="waitlist-banner-sub">We'll email and notify you the moment a spot opens.</p>
 						{/if}
 					</div>
 				</div>
-			{:else if hasClaimWindow && !claimWindowExpired}
-				<!-- ── Claim window banner ────────────────────────────────────── -->
-				<div class="waitlist-banner waitlist-banner--claim" role="alert">
-					<div class="waitlist-banner-icon" aria-hidden="true">🎉</div>
-					<div class="waitlist-banner-body">
-						<p class="waitlist-banner-title">A spot just opened for you!</p>
-						<p class="waitlist-banner-sub">
-							Claim it before your window closes.
-							{#if claimCountdown}
-								<span class="claim-countdown">{claimCountdown} remaining</span>
-							{/if}
-						</p>
-						{#if claimWindowExpiresAt}
-							<p class="waitlist-banner-expires">
-								Expires {claimWindowExpiresAt.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-							</p>
-						{/if}
-					</div>
-				</div>
-				<div class="rsvp-yes-no-row">
-					<h2 class="section-title">Will you join us?</h2>
-					<div class="rsvp-choice-btns" role="group" aria-label="RSVP response">
-						<button type="button" class="rsvp-choice-btn" class:selected={rsvpStatus === 'yes'} aria-pressed={rsvpStatus === 'yes'} onclick={() => (rsvpStatus = 'yes')}>Going</button>
-						<button type="button" class="rsvp-choice-btn rsvp-choice-btn-decline" class:selected={rsvpStatus === 'no'} aria-pressed={rsvpStatus === 'no'} onclick={() => (rsvpStatus = 'no')}>Can't make it</button>
-					</div>
-				</div>
-			{:else if hasClaimWindow && claimWindowExpired}
-				<!-- ── Expired window banner ──────────────────────────────────── -->
-				<div class="waitlist-banner waitlist-banner--expired" role="alert">
-					<div class="waitlist-banner-icon" aria-hidden="true">⏰</div>
-					<div class="waitlist-banner-body">
-						<p class="waitlist-banner-title">Your claim window expired</p>
-						<p class="waitlist-banner-sub">You've been returned to the waitlist. Hang tight — the next spot is yours if one opens.</p>
-					</div>
-				</div>
-			{:else}
+			{/if}
+		{:else}
 				<div class="rsvp-yes-no-row">
 					<h2 class="section-title">Will you join us?</h2>
 					<div class="rsvp-choice-btns" role="group" aria-label="RSVP response">
@@ -438,7 +402,7 @@
 				{#if form?.error}
 					<div class="error-message" role="alert">{form.error}</div>
 				{/if}
-				{#if !isWaitlisted && !(hasClaimWindow && claimWindowExpired)}
+				{#if !isWaitlisted || waitlistSpotsOpen}
 				<form id="rsvp-form" method="POST" action="?/updateRsvp" use:enhance={enhanceRsvpSubmit}>
 					<input type="hidden" name="status" value={rsvpStatus} />
 					{#if isYes}

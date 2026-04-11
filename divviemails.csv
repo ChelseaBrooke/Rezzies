@@ -1,0 +1,24 @@
+﻿Category,Email Type,Subject, Recipient,Trigger,Body (User-Facing Copy)
+Account,Welcome,Welcome to Divvi,User,Sign up,"You’re in. Divvi helps you plan trips, organize your group, and keep everything in one place. Start by creating your first trip or joining one you’ve been invited to. [Create a Trip] [Join a Trip]"
+,Email Verification,Confirm your email,User,Sign up verification,"Confirm your email to finish setting up your account. [Confirm Email] If you didn’t create a Divvi account, ignore this."
+,Password Reset,Reset your password,User,Pw reset,"Click below to reset your password. [Reset Password] If you didn’t request this, ignore this email."
+Trip,Trip Created (Draft),Your trip is ready to build,Host,"Trip ""Save as Draft"" state for 3 days","Your trip “{Trip Name}” has been created. Add details, invite guests, and finalize plans before publishing. [Continue Planning]"
+,Trip Published,Your trip is live,Host,Trip published,"“{Trip Name}” is now live. Guests can RSVP, choose beds, and start planning with you. [View Trip]"
+,Payment Confirmation (Host),Your trip is confirmed,Host,Trip paid for (payment went through),Your payment for “{Trip Name}” is complete. You can now invite guests and start collecting RSVPs. [Invite Guests]
+Invitations,Guest Invitation,You’re invited to {Trip Name},Guest,Host sends invite,"{Host Name} invited you to join “{Trip Name}.” View trip details, choose your spot, and RSVP. [View Trip]"
+,Invitation Reminder,Reminder: {Trip Name},Guest,"No RSVP state for 33%, 66%, 99% of [days between date published - date of day 1 of trip]",You haven’t responded to “{Trip Name}” yet. Spots may fill up soon. [View Trip]
+,Guest Joined,You’re in,Guest,Joined trip,You’ve joined “{Trip Name}.” Next step: RSVP and choose your bed. [Complete RSVP]
+RSVP,RSVP Confirmation,RSVP confirmed,Host/Guest,Guest RSVP,You’re going to “{Trip Name}.” You selected: Bed: {Bed Name} • Guests: {#} [View Trip]
+,RSVP Updated,Your RSVP was updated,Guest,Edit RSVP,Your RSVP for “{Trip Name}” has been updated. [View Details]
+,New RSVP (Host),New RSVP for {Trip Name},Host,Guest RSVP,{Guest Name} just RSVP’d. Current status: {X}/{Capacity} spots filled. [View Trip]
+,Trip Filling Up,{Trip Name} is filling up,Host,"Half of capacity, 75% of capacity and 90% of capacity guests RSVP'd-yes",Spots are going quickly. {X} of {Capacity} spots are now taken. [View Trip]
+,Trip Full,{Trip Name} is full,Guest,No RSVP state when max capacity guest count reached,This trip has reached capacity. You can still view details or join the waitlist. [View Trip]
+Payments,Trip Full + Cost Breakdown,{Trip Name} cost has been finalized,Host/Guest,Max capacity guest count reached,Your share for “{Trip Name}” is now finalized. Total due: ${Amount}. [View Breakdown]
+Pre-Trip,Trip Starting Soon,{Trip Name} starts soon,Host/Guest,"Trip is one week away (or if [days between date published - date of day 1 of trip] is less than one week, 3 days)",Your trip starts in {X days}. Check the itinerary and finalize any plans. [View Trip]
+,Day Of Trip,Today’s the day,Host/Guest,7 am EST on trip day 1,Your trip starts today. Everything you need is in your trip dashboard. [Open Trip]
+During Trip,Daily Digest,Today’s plan,Host/Guest,7 am EST on trip day [day x],Here’s what’s happening today: • {Event 1} • {Event 2} [View Full Itinerary]
+Post-Trip,Trip Recap,Your trip recap,Host/Guest,7 am EST on day after last trip day,Your trip “{Trip Name}” has ended. Relive the moments and highlights. [View Recap]
+,Feedback Request,How was your trip?,Host/Guest,"7 am EST, one week after last trip day",Help us improve Divvi. [Leave Feedback]
+System,Removed from Trip,Update on {Trip Name},Guest,Host removed guest from trip,You no longer have access to this trip. Contact the host if this was a mistake.
+,Trip Canceled,{Trip Name} was canceled,Host/Guest,Host deleted trip,This trip has been canceled by the host.
+,Welcome Co-Host,Welcome as Co-Host,Co-Host,Host added a co-host,[Host Name} has added you as a co-host of “{Trip Name}” [Manage Trip]

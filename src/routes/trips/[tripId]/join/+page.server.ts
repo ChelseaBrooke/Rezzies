@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
+import { sendGuestJoinedEmail } from '$lib/server/notification-service.js';
 
 export const load: PageServerLoad = async ({ params, cookies }) => {
 	const user = await getSessionUser(cookies);
@@ -70,6 +71,7 @@ export const actions: Actions = {
 		});
 
 		if (status === 'approved') {
+			sendGuestJoinedEmail(tripId, user.id);
 			throw redirect(303, `/trips/${tripId}`);
 		} else {
 			throw redirect(303, `/trips/${tripId}/pending`);

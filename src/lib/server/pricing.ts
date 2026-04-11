@@ -1,6 +1,12 @@
 // Pricing calculation logic for Divvi
-// Supports multiple pricing models: per_room, per_bed, per_person, per_person_per_night
-// PER_BED uses selection-based live pricing via pricing-canonical.
+//
+// Vocabulary note — three representations of "pricing model" exist in this codebase:
+//   DB / API form    (this file):             'per_room' | 'per_bed' | 'per_person' | 'per_person_per_night'
+//   Internal/canonical form (pricing-canonical.ts): 'PER_ROOM' | 'PER_BED' | 'PER_PERSON' | 'PER_PERSON_PER_NIGHT'
+//   UI form (PricingStep.svelte):             'per-room' | 'per-bed' | 'per-person'
+//
+// mapPricingModel() in api/trips/publish and api/trips/[tripId]/update bridges UI → DB form.
+// calculatePrice() normalizes via .toLowerCase() so it accepts both DB and canonical forms.
 
 import { prisma } from './prisma.js';
 import { calculateReservationPrice } from './pricing-canonical.js';
@@ -35,18 +41,6 @@ function calculateNights(checkInDate: Date, checkOutDate: Date): number {
 	return Math.ceil(
 		(checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
 	);
-}
-
-/**
- * Generate a unique invite code
- */
-export function generateInviteCode(): string {
-	const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars
-	let code = '';
-	for (let i = 0; i < 6; i++) {
-		code += chars.charAt(Math.floor(Math.random() * chars.length));
-	}
-	return code;
 }
 
 /**
@@ -194,45 +188,3 @@ function calculatePerPersonPerNightPrice(
 	};
 }
 
-/**
- * Legacy function for backward compatibility
- * @deprecated Use calculatePrice instead
- */
-export function calculateGuestPrice({
-	bedId,
-	checkInDate,
-	checkOutDate
-}: {
-	bedId: string;
-	checkInDate: Date;
-	checkOutDate: Date;
-}): PriceCalculationResult {
-	const nights = calculateNights(checkInDate, checkOutDate);
-	// This is a stub - should not be used in new code
-	throw new Error('Legacy calculateGuestPrice is deprecated. Use calculatePrice with tripId instead.');
-}
-
-/**
- * Legacy function for backward compatibility
- * @deprecated
- */
-export function getAllBedsWithPricing(): Array<{ id: string; roomId: number; bedType: string; nightlyRate: number }> {
-	// Stub for backward compatibility
-	return [];
-}
-
-/**
- * Legacy function for backward compatibility
- * @deprecated
- */
-export function getBedById(bedId: string): { id: string; roomId: number; bedType: string } | undefined {
-	return undefined;
-}
-
-/**
- * Legacy function for backward compatibility
- * @deprecated
- */
-export function getBedsByRoomId(roomId: number): Array<{ id: string; roomId: number; bedType: string }> {
-	return [];
-}

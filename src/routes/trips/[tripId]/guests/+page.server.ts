@@ -9,7 +9,13 @@ import { createInvoiceForUser } from '$lib/server/invoice-calculator.js';
 import { hashPassword } from '$lib/server/auth.js';
 import { checkAndSetReconfirmRequired } from '$lib/server/guest-estimate.js';
 import { handleSpotOpened } from '$lib/server/waitlist-service.js';
+import { sendRemovedFromTripEmail, sendWelcomeCoHostEmail } from '$lib/server/notification-service.js';
 import { z } from 'zod';
+import {
+	applyBedAssignments,
+	parseTripDatesFromForm,
+	type WaitlistEntry
+} from './guests.helpers.js';
 
 const PENDING_INVITE_STATUSES = ['sent', 'opened'];
 
@@ -22,7 +28,7 @@ export type GuestRow = {
 	name: string;
 	email: string;
 	avatarUrl?: string | null;
-	rsvpStatus: 'yes' | 'no' | 'waitlisted' | 'invited_to_rsvp' | null;
+	rsvpStatus: 'yes' | 'no' | 'waitlisted' | null;
 	rsvpUpdatedAt: string | null;
 	yesSubstatus: 'confirmed' | 'reconfirm_required' | null;
 	reconfirmDeadlineAt: string | null;
@@ -160,11 +166,10 @@ export const load: PageServerLoad = async ({ parent }) => {
 		const firstAssignment = assignments[0] ?? null;
 		const profile = uid ? profileByUserId.get(uid) : null;
 		const status =
-			rsvp?.status === 'yes' ? 'yes' :
-			rsvp?.status === 'no' ? 'no' :
-			rsvp?.status === 'waitlisted' ? 'waitlisted' :
-			rsvp?.status === 'invited_to_rsvp' ? 'invited_to_rsvp' :
-			null;
+		rsvp?.status === 'yes' ? 'yes' :
+		rsvp?.status === 'no' ? 'no' :
+		rsvp?.status === 'waitlisted' ? 'waitlisted' :
+		null;
 		const totalPartySize = assignments.reduce((s, a) => s + (a.partySize || 1), 0);
 		if (status === 'yes') {
 			goingCount++;
@@ -290,29 +295,17 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const maxOccupancy = trip?.maxGuests ?? (roomSum > 0 ? roomSum : null);
 
 	// Waitlist data (only fetch for hosts/co-hosts)
-	type WaitlistEntry = {
-		userId: string;
-		name: string;
-		email: string;
-		avatarUrl: string | null;
-		waitlistPosition: number | null;
-		waitlistJoinedAt: string | null;
-		status: 'waitlisted' | 'invited_to_rsvp';
-		claimWindowExpiresAt: string | null;
-	};
 	let waitlistEntries: WaitlistEntry[] = [];
 	let waitlistCount = 0;
-	let activeClaimUserId: string | null = null;
 	if (canManageGuests && tripId) {
 		const waitlisted = await prisma.rSVP.findMany({
-			where: { tripId, status: { in: ['waitlisted', 'invited_to_rsvp'] } },
+			where: { tripId, status: 'waitlisted' },
 			orderBy: [{ waitlistPosition: 'asc' }, { waitlistJoinedAt: 'asc' }],
 			select: {
 				userId: true,
 				status: true,
 				waitlistPosition: true,
 				waitlistJoinedAt: true,
-				claimWindowExpiresAt: true,
 				user: { select: { name: true, email: true, avatarUrl: true } }
 			}
 		});
@@ -324,11 +317,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 			avatarUrl: w.user?.avatarUrl ?? null,
 			waitlistPosition: w.waitlistPosition,
 			waitlistJoinedAt: w.waitlistJoinedAt?.toISOString() ?? null,
-			status: w.status as 'waitlisted' | 'invited_to_rsvp',
-			claimWindowExpiresAt: w.claimWindowExpiresAt?.toISOString() ?? null
+			status: 'waitlisted' as const
 		}));
-		const active = waitlisted.find((w) => w.status === 'invited_to_rsvp');
-		activeClaimUserId = active?.userId ?? null;
 	}
 
 	let legacyReservations: { id: string; name: string; email: string; roomName: string; bedType: string | null; checkInDate: string; checkOutDate: string; nights: number; numberOfGuests: number; calculatedPrice: number; submittedAt: string }[] = [];
@@ -391,7 +381,6 @@ export const load: PageServerLoad = async ({ parent }) => {
 		// Waitlist
 		waitlistCount,
 		waitlistEntries,
-		activeClaimUserId,
 		maxCapacity: (trip as { maxCapacity?: number | null } | null)?.maxCapacity ?? null
 	};
 };
@@ -563,12 +552,19 @@ export const actions: Actions = {
 			await handleSpotOpened(tripId).catch(console.error);
 		}
 		// If they were waitlisted, remove from queue so positions stay clean
-		if (removedRsvp?.status === 'waitlisted' || removedRsvp?.status === 'invited_to_rsvp') {
+		if (removedRsvp?.status === 'waitlisted') {
 			await prisma.rSVP.update({
 				where: { tripId_userId: { tripId, userId } },
 				data: { status: 'no', waitlistPosition: null, claimWindowExpiresAt: null }
 			});
 		}
+
+		// Notify the removed guest (fire-and-forget; trip name fetched inside)
+		const tripForEmail = await prisma.trip.findUnique({
+			where: { id: tripId },
+			select: { name: true }
+		});
+		if (tripForEmail) sendRemovedFromTripEmail(tripId, userId, tripForEmail.name);
 
 		return { removeGuestSuccess: true };
 	},
@@ -690,9 +686,6 @@ export const actions: Actions = {
 
 		const formData = await request.formData();
 		const userId = (formData.get('userId') as string)?.trim();
-		const bedIds = formData.getAll('bedIds');
-		const partySizeRaw = formData.get('partySize');
-		const partySize = Math.min(20, Math.max(1, parseInt(String(partySizeRaw), 10) || 1));
 		if (!userId) return { assignBedsSuccess: true };
 
 		const trip = await prisma.trip.findUnique({
@@ -706,49 +699,8 @@ export const actions: Actions = {
 		});
 		if (!isMember || isMember.inviteStatus !== 'approved') return { assignBedsSuccess: true };
 
-		let startDate: Date | null = trip.checkInDate;
-		let endDate: Date | null = trip.checkOutDate;
-		if (trip.allowPartialStays) {
-			const startRaw = (formData.get('startDate') as string)?.trim();
-			const endRaw = (formData.get('endDate') as string)?.trim();
-			if (startRaw) {
-				const d = new Date(startRaw);
-				if (!Number.isNaN(d.getTime())) startDate = d;
-			}
-			if (endRaw) {
-				const d = new Date(endRaw);
-				if (!Number.isNaN(d.getTime())) endDate = d;
-			}
-		}
-
-		await prisma.roomAssignment.deleteMany({ where: { tripId, userId } });
-
-		const bedIdList = Array.isArray(bedIds) ? bedIds : [bedIds];
-		const validBedIds = bedIdList
-			.filter((id): id is string => typeof id === 'string')
-			.map((id) => id.trim())
-			.filter((id) => id !== '');
-
-		for (const bedId of validBedIds) {
-			const bed = await prisma.bed.findFirst({
-				where: { id: bedId },
-				include: { room: { select: { id: true, tripId: true } } }
-			});
-			if (!bed || bed.room.tripId !== tripId) continue;
-			await prisma.roomAssignment.create({
-				data: {
-					tripId,
-					userId,
-					roomId: bed.roomId,
-					bedId: bed.id,
-					bedType: bed.bedType,
-					partySize: 1,
-					...(startDate && { startDate }),
-					...(endDate && { endDate })
-				}
-			});
-		}
-
+		const { startDate, endDate } = parseTripDatesFromForm(formData, trip);
+		await applyBedAssignments({ tripId, userId, rawBedIds: formData.getAll('bedIds'), startDate, endDate });
 		await createInvoiceForUser(tripId, userId).catch(() => {});
 		return { assignBedsSuccess: true };
 	},
@@ -956,45 +908,14 @@ export const actions: Actions = {
 			select: { checkInDate: true, checkOutDate: true, allowPartialStays: true }
 		});
 		if (trip) {
-			let startDate: Date | null = trip.checkInDate;
-			let endDate: Date | null = trip.checkOutDate;
-			if (trip.allowPartialStays) {
-				const startRaw = (formData.get('startDate') as string)?.trim();
-				const endRaw = (formData.get('endDate') as string)?.trim();
-				if (startRaw) {
-					const d = new Date(startRaw);
-					if (!Number.isNaN(d.getTime())) startDate = d;
-				}
-				if (endRaw) {
-					const d = new Date(endRaw);
-					if (!Number.isNaN(d.getTime())) endDate = d;
-				}
-			}
-			await prisma.roomAssignment.deleteMany({ where: { tripId, userId: targetUserId } });
-			const validBedIds = (Array.isArray(bedIds) ? bedIds : [bedIds])
-				.filter((id): id is string => typeof id === 'string')
-				.map((id) => id.trim())
-				.filter((id) => id !== '');
-			for (const bedId of validBedIds) {
-				const bed = await prisma.bed.findFirst({
-					where: { id: bedId },
-					include: { room: { select: { tripId: true } } }
-				});
-				if (bed && bed.room.tripId === tripId) {
-					await prisma.roomAssignment.create({
-						data: {
-							tripId,
-							userId: targetUserId,
-							roomId: bed.roomId,
-							bedId: bed.id,
-							bedType: bed.bedType,
-							partySize: 1,
-							...(startDate && { startDate }),
-							...(endDate && { endDate })
-						}
-					});
-				}
-			}
+			const { startDate, endDate } = parseTripDatesFromForm(formData, trip);
+			await applyBedAssignments({
+				tripId,
+				userId: targetUserId,
+				rawBedIds: bedIds,
+				startDate,
+				endDate
+			});
 		}
 
 		// Invoice paid status
@@ -1013,5 +934,46 @@ export const actions: Actions = {
 		await createInvoiceForUser(tripId, targetUserId).catch(() => {});
 		await checkAndSetReconfirmRequired(tripId, { guestId: targetUserId });
 		return { updateGuestDetailsSuccess: true };
+	},
+
+	/**
+	 * Promote a guest to co-host, or demote a co-host back to guest.
+	 * Only the trip host can call this (not co-hosts).
+	 */
+	updateMemberRole: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) return fail(401, { message: 'Not logged in' });
+
+		const tripId = params.tripId;
+		const isHost = await isTripHost(tripId, user.id);
+		if (!isHost) return fail(403, { message: 'Only the trip host can change member roles' });
+
+		const formData = await request.formData();
+		const targetUserId = (formData.get('userId') as string)?.trim();
+		const newRole = (formData.get('role') as string)?.trim();
+
+		if (!targetUserId) return fail(400, { message: 'Missing user' });
+		if (newRole !== 'guest' && newRole !== 'co-host') {
+			return fail(400, { message: 'Role must be "guest" or "co-host"' });
+		}
+
+		const target = await prisma.tripMember.findUnique({
+			where: { tripId_userId: { tripId, userId: targetUserId } }
+		});
+		if (!target) return fail(404, { message: 'Member not found' });
+		if (target.role === 'host') return fail(400, { message: 'Cannot change the host\'s role' });
+		if (target.userId === user.id) return fail(400, { message: 'Cannot change your own role' });
+
+		await prisma.tripMember.update({
+			where: { tripId_userId: { tripId, userId: targetUserId } },
+			data: { role: newRole }
+		});
+
+		// Welcome email when promoting to co-host
+		if (newRole === 'co-host' && target.role !== 'co-host') {
+			sendWelcomeCoHostEmail(tripId, targetUserId, user.name ?? 'The host');
+		}
+
+		return { updateMemberRoleSuccess: true };
 	}
 };

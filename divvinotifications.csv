@@ -1,0 +1,32 @@
+﻿Category,Notification,Trigger,Message,CTA
+Invitations,Invited to Trip,User receives invite,{Host Name} invited you to “{Trip Name}”,View Trip
+Invitations,Invitation Reminder,No RSVP after X time,Don’t forget to respond to “{Trip Name}”,View Trip
+Invitations,Joined Trip,User joins trip,You joined “{Trip Name}”,Complete RSVP
+RSVP,RSVP Confirmed (self),User submits RSVP,You’re going to “{Trip Name}”,View Trip
+RSVP,New RSVP (host),Guest RSVPs,{Guest Name} is in — {X}/{Capacity} spots filled,View Trip
+RSVP,RSVP Change (host),Guest edits RSVP,{Guest Name} updated their RSVP,View Trip
+RSVP,Trip Filling Up,Capacity threshold reached,“{Trip Name}” is filling up,View Trip
+RSVP,Trip Full - Host,Capacity reached,“{Trip Name}” is now full,View Trip
+RSVP,Trip Full - Guest,Capacity reached,“{Trip Name}” is now full. You are on the waitlist.,View Trip
+Payments,Cost Breakdown Ready,Pricing finalized,Your trip cost is ready — ${Amount},View Details
+Planning,New Poll,Poll created,New poll: {Poll Question},Vote
+Planning,Poll Reminder,Unanswered poll,You have polls to answer,Answer Polls
+Planning,Poll Results,Poll closes,Poll results are in,View Results
+Planning,New Activity Added,Activity created,{Activity Name} added to itinerary,View Itinerary
+Planning,Activity Updated,Activity edited,{Activity Name} was updated,View Itinerary
+Planning,Activity Starting Soon,Time-based,{Activity Name} starts soon,View Details
+Planning,New Meal Planned,Meal added,{Meal Name} planned for {Day},View Details
+Planning,Meal Needs Attention,Missing meal plan,{Meal Slot} still needs a plan,Plan Meal
+Games,Game Started,Game created,{Game Name} is live,Play Now
+Games,Game Reminder,User inactive in game,Don’t miss this round,Play Now
+Games,Submission Received,User submits entry,Your entry is in,View Game
+Games,Voting Open,Voting phase starts,Vote now in {Game Name},Vote
+Games,Game Results,Round ends,Results are in,View Results
+Trip Lifecycle,Trip Starting Soon,X days before,“{Trip Name}” starts in {X days},View Trip
+Trip Lifecycle,Trip Starts Today,Day-of,Today’s the day,Open Trip
+Social,New Guest Joined,Guest joins,{Guest Name} joined the trip,View Trip
+Social,Guest Left,Guest leaves,{Guest Name} left the trip,View Trip
+Social,New Comment (future),Comment added,{Guest Name} commented on {Item},View
+System,Removed from Trip,Host removes user,You were removed from “{Trip Name}”,—
+System,Trip Canceled,Host cancels trip,“{Trip Name}” was canceled,—
+System,Welcome as Co-Host,Host addition,[Host Name} has added you as a co-host of “{Trip Name}”,Manage Trip

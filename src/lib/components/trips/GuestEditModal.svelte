@@ -5,6 +5,8 @@
 	interface GuestRow {
 		userId?: string;
 		name: string;
+		/** 'host' | 'co-host' | 'guest' */
+		role?: string;
 		rsvpStatus?: string | null;
 		partySize?: number;
 		priceApproved?: boolean | null;
@@ -26,6 +28,8 @@
 		row: GuestRow | null;
 		rooms: RoomOption[];
 		tripId: string;
+		/** Whether the viewer of this modal is the trip host (not just co-host). */
+		isHostViewer?: boolean;
 		checkInDate?: string;
 		checkOutDate?: string;
 		allowPartialStays: boolean;
@@ -38,6 +42,7 @@
 		row,
 		rooms,
 		tripId,
+		isHostViewer = false,
 		checkInDate = '',
 		checkOutDate = '',
 		allowPartialStays,
@@ -53,6 +58,12 @@
 	let submitError = $state<string | null>(null);
 	let saving = $state(false);
 
+	// Role change state (separate from the main form)
+	let formRole = $state<'guest' | 'co-host'>('guest');
+	let roleError = $state<string | null>(null);
+	let roleSuccess = $state(false);
+	let savingRole = $state(false);
+
 	$effect(() => {
 		if (open && row) {
 			selectedBedIds = [...(row.assignedBedIds ?? [])];
@@ -60,9 +71,41 @@
 			formPartySize = row.partySize || 1;
 			formPriceApproved = row.priceApproved ?? false;
 			formInvoicePaid = row.invoicePaid ?? false;
+			formRole = row.role === 'co-host' ? 'co-host' : 'guest';
 			submitError = null;
+			roleError = null;
+			roleSuccess = false;
 		}
 	});
+
+	const canChangeRole = $derived(isHostViewer && !!row?.userId && row?.role !== 'host');
+	const roleChanged = $derived(formRole !== (row?.role === 'co-host' ? 'co-host' : 'guest'));
+
+	const roleActionUrl = $derived(`/trips/${tripId}/guests?/updateMemberRole`);
+
+	async function handleRoleChange() {
+		if (!row?.userId || savingRole) return;
+		roleError = null;
+		roleSuccess = false;
+		savingRole = true;
+		try {
+			const fd = new FormData();
+			fd.set('userId', row.userId);
+			fd.set('role', formRole);
+			const res = await fetch(roleActionUrl, { method: 'POST', body: fd });
+			const result = deserialize(await res.text());
+			if (result.type === 'success') {
+				await invalidateAll();
+				roleSuccess = true;
+			} else if (result.type === 'failure' && result.data) {
+				roleError = (result.data as { message?: string }).message ?? 'Role change failed.';
+			}
+		} catch (err) {
+			roleError = err instanceof Error ? err.message : 'Role change failed.';
+		} finally {
+			savingRole = false;
+		}
+	}
 
 	$effect(() => {
 		if (!open) return;
@@ -177,36 +220,70 @@
 					</div>
 				</div>
 
-				{#if row.rsvpStatus === 'yes' || row.priceApproved != null}
-					<div class="form-group">
-						<label class="checkbox-label">
-							<input type="checkbox" bind:checked={formPriceApproved} />
-							Price approved
-						</label>
-					</div>
-				{/if}
-
-				{#if row.toPayTotal != null || row.invoicePaid}
-					<div class="form-group">
-						<label class="checkbox-label">
-							<input type="checkbox" bind:checked={formInvoicePaid} />
-							Paid
-						</label>
-					</div>
-				{/if}
-
-				<div class="modal-actions modal-actions--top">
-					{#if onRemove && row.userId}
-						<button type="button" class="modal-btn modal-btn--danger-ghost" onclick={() => { onRemove(); }} disabled={saving}>Remove from trip</button>
-					{/if}
+			{#if row.rsvpStatus === 'yes' || row.priceApproved != null}
+				<div class="form-group">
+					<label class="checkbox-label">
+						<input type="checkbox" bind:checked={formPriceApproved} />
+						Price approved
+					</label>
 				</div>
-				<div class="modal-actions">
-					<button type="button" class="modal-btn modal-btn--ghost" onclick={onClose} disabled={saving}>Cancel</button>
-					<button type="submit" class="modal-btn modal-btn--primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+			{/if}
+
+			{#if row.toPayTotal != null || row.invoicePaid}
+				<div class="form-group">
+					<label class="checkbox-label">
+						<input type="checkbox" bind:checked={formInvoicePaid} />
+						Paid
+					</label>
 				</div>
-			</form>
-		</div>
+			{/if}
+
+			<div class="modal-actions modal-actions--top">
+				{#if onRemove && row.userId}
+					<button type="button" class="modal-btn modal-btn--danger-ghost" onclick={() => { onRemove(); }} disabled={saving}>Remove from trip</button>
+				{/if}
+			</div>
+			<div class="modal-actions">
+				<button type="button" class="modal-btn modal-btn--ghost" onclick={onClose} disabled={saving}>Cancel</button>
+				<button type="submit" class="modal-btn modal-btn--primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+			</div>
+		</form>
+
+		{#if canChangeRole}
+			<div class="role-section">
+				<div class="role-section-label">Trip role</div>
+				<div class="role-row">
+					<select
+						id="edit-role"
+						bind:value={formRole}
+						class="form-select role-select"
+						disabled={savingRole}
+					>
+						<option value="guest">Guest</option>
+						<option value="co-host">Co-host</option>
+					</select>
+					<button
+						type="button"
+						class="modal-btn modal-btn--secondary"
+						onclick={handleRoleChange}
+						disabled={savingRole || !roleChanged}
+					>
+						{savingRole ? 'Saving…' : 'Change'}
+					</button>
+				</div>
+				{#if roleSuccess}
+					<p class="role-feedback role-feedback--success">Role updated.</p>
+				{/if}
+				{#if roleError}
+					<p class="role-feedback role-feedback--error" role="alert">{roleError}</p>
+				{/if}
+				{#if formRole === 'co-host'}
+					<p class="role-hint">Co-hosts can manage guests, assign rooms, and view invoices.</p>
+				{/if}
+			</div>
+		{/if}
 	</div>
+</div>
 {/if}
 
 <style>
@@ -374,5 +451,52 @@
 	.modal-btn--primary:hover:not(:disabled) {
 		background: var(--chocolate, #a84510);
 		transform: translateY(-1px);
+	}
+	.modal-btn--secondary {
+		background: var(--surface2, #f3f4f6);
+		color: var(--text, #222);
+		border: 1px solid var(--border-soft, #e5e7eb);
+		white-space: nowrap;
+	}
+	.modal-btn--secondary:hover:not(:disabled) {
+		background: var(--border, #e2e8f0);
+	}
+	.role-section {
+		margin-top: 1.25rem;
+		padding-top: 1.25rem;
+		border-top: 1px dashed var(--border-soft, #eee);
+	}
+	.role-section-label {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--muted, #888);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.6rem;
+	}
+	.role-row {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+	}
+	.role-select {
+		flex: 1;
+		min-width: 0;
+	}
+	.role-feedback {
+		font-size: 0.8125rem;
+		margin: 0.4rem 0 0;
+	}
+	.role-feedback--success {
+		color: var(--success, #15803d);
+	}
+	.role-feedback--error {
+		color: var(--error, #b91c1c);
+	}
+	.role-hint {
+		font-size: 0.8rem;
+		color: var(--muted, #888);
+		margin: 0.4rem 0 0;
+		line-height: 1.4;
 	}
 </style>
