@@ -19,7 +19,7 @@ export function renderTripRecapHtml(d: TripRecapEmailData): string {
 	return renderEmailLayout({
 		preheader: `"${d.tripName}" has ended. Relive the memories.`,
 		kicker: 'Trip recap',
-		heading: 'That's a wrap',
+		heading: "That's a wrap",
 		subheading: tripName,
 		body,
 		ctaUrl: d.tripUrl,
