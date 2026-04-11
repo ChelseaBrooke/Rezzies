@@ -54,26 +54,41 @@
 	<!-- Status header -->
 	{#if hasAccepted}
 		<div class="status-banner accepted">
-			<span class="status-icon">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-					<polyline points="20 6 9 17 4 12"/>
-				</svg>
-			</span>
-			<span class="status-text">You're going!</span>
+			<div class="status-banner-main">
+				<span class="status-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<polyline points="20 6 9 17 4 12"/>
+					</svg>
+				</span>
+				<span class="status-text">You're going!</span>
+			</div>
+			{#if daysUntil != null}
+				<span class="status-days" aria-label="{daysUntil} days until the trip">{daysUntil}d away</span>
+			{/if}
 		</div>
 	{:else if hasDeclined}
 		<div class="status-banner declined">
-			<span class="status-icon">
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-					<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-				</svg>
-			</span>
-			<span class="status-text">You declined</span>
+			<div class="status-banner-main">
+				<span class="status-icon">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+					</svg>
+				</span>
+				<span class="status-text">You declined</span>
+			</div>
+			{#if daysUntil != null}
+				<span class="status-days" aria-label="{daysUntil} days until the trip">{daysUntil}d away</span>
+			{/if}
 		</div>
 	{:else}
 		<div class="status-banner pending">
-			<span class="status-icon pending-dot" aria-hidden="true"></span>
-			<span class="status-text">Haven't RSVP'd yet</span>
+			<div class="status-banner-main">
+				<span class="status-icon pending-dot" aria-hidden="true"></span>
+				<span class="status-text">Haven't RSVP'd yet</span>
+			</div>
+			{#if daysUntil != null}
+				<span class="status-days" aria-label="{daysUntil} days until the trip">{daysUntil}d away</span>
+			{/if}
 		</div>
 	{/if}
 
@@ -158,6 +173,7 @@
 	.status-banner {
 		display: flex;
 		align-items: center;
+		justify-content: space-between;
 		gap: 0.5rem;
 		padding-bottom: 0.75rem;
 		margin-bottom: 0.75rem;
@@ -165,6 +181,14 @@
 		font-size: 0.875rem;
 		font-weight: 600;
 		color: var(--text);
+	}
+
+	.status-banner-main {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 0;
+		flex: 1;
 	}
 
 	.status-icon {
@@ -187,21 +211,25 @@
 	}
 
 	.status-text {
-		flex: 1;
+		min-width: 0;
 	}
 
 	.status-banner.declined .status-text {
 		color: var(--muted);
 	}
 
+	/* Same `Nd away` phrasing as TripGoalsCombined / AppShell; copper on light cards */
 	.status-days {
-		font-size: 0.6875rem;
+		font-size: 0.58rem;
 		font-weight: 600;
-		color: var(--copper, #BF4E30);
+		color: var(--copper, #bf4e30);
 		background: rgba(191, 78, 48, 0.08);
 		border: 1px solid rgba(191, 78, 48, 0.15);
-		padding: 0.15rem 0.45rem;
+		padding: 0.12rem 0.45rem;
 		border-radius: 999px;
+		white-space: nowrap;
+		flex-shrink: 0;
+		line-height: 1.2;
 	}
 
 	.pending-dot {

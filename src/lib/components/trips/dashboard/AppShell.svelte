@@ -84,6 +84,17 @@
 	);
 	const showModePillOnDashboard = $derived(!!(checkInDate && checkOutDate && isDashboardPage));
 
+	/** Same calendar math as TripGoalsCombined — only future check-ins, trip dashboard only */
+	const daysUntilTrip = $derived.by(() => {
+		if (!checkInDate || !isDashboardPage) return null;
+		const now = new Date();
+		now.setHours(0, 0, 0, 0);
+		const checkIn = new Date(checkInDate);
+		checkIn.setHours(0, 0, 0, 0);
+		const diff = Math.round((checkIn.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+		return diff > 0 ? diff : null;
+	});
+
 	function isActive(href: string): boolean {
 		if (href === `/trips/${tripId}`) return currentPath === href;
 		return currentPath.startsWith(href);
@@ -200,8 +211,8 @@
 		</div>
 	</aside>
 	<main class="main-content" bind:this={mainContentEl}>
-		{#if showModePillOnDashboard || !hideMessagesAndNotifications}
-			<div class="top-actions">
+		{#if showModePillOnDashboard || !hideMessagesAndNotifications || daysUntilTrip != null}
+			<div class="top-actions" class:top-actions--no-pill={!showModePillOnDashboard}>
 				{#if showModePillOnDashboard}
 					<div class="top-actions-spacer" aria-hidden="true"></div>
 					<div class="top-actions-pill">
@@ -213,14 +224,19 @@
 						/>
 					</div>
 				{/if}
-				{#if !hideMessagesAndNotifications}
+				{#if !hideMessagesAndNotifications || daysUntilTrip != null}
 					<div class="top-actions-right">
-						<a href="/messages" class="top-action-btn" title="Messages" aria-label="Messages">
-							<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
-						</a>
-						<span class="top-bell">
-							<NotificationTray />
-						</span>
+						{#if daysUntilTrip != null}
+							<span class="top-days-pill" aria-label="{daysUntilTrip} days until the trip">{daysUntilTrip}d away</span>
+						{/if}
+						{#if !hideMessagesAndNotifications}
+							<a href="/messages" class="top-action-btn" title="Messages" aria-label="Messages">
+								<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
+							</a>
+							<span class="top-bell">
+								<NotificationTray />
+							</span>
+						{/if}
 					</div>
 				{/if}
 			</div>
@@ -576,6 +592,10 @@
 		gap: 0.5rem;
 		z-index: 5;
 	}
+
+	.top-actions--no-pill {
+		justify-content: flex-end;
+	}
 	.top-actions-spacer {
 		flex: 1;
 		min-width: 0;
@@ -592,7 +612,24 @@
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
-		gap: 0.125rem;
+		gap: 0.375rem;
+	}
+
+	.top-actions--no-pill .top-actions-right {
+		flex: 0 1 auto;
+	}
+
+	/* Matches TripGoalsCombined `.rdy-pill` (trip readiness) */
+	.top-days-pill {
+		font-size: 0.65rem;
+		font-weight: 600;
+		color: var(--slate, #2f7778);
+		background: rgba(47, 119, 120, 0.1);
+		border: 1px solid rgba(47, 119, 120, 0.2);
+		border-radius: 999px;
+		padding: 0.2rem 0.5rem;
+		white-space: nowrap;
+		line-height: 1.2;
 	}
 	.top-action-btn {
 		width: 44px;

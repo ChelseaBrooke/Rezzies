@@ -264,7 +264,13 @@
 			<div class="result success">
 				<div class="result-summary">
 					<span class="big">${result.displayPrice.toFixed(2)}</span>
-					<span class="range">Range: ${result.lowEnd.toFixed(2)} – ${result.highEnd.toFixed(2)}</span>
+					<span class="range">
+						{#if Math.round(result.lowEnd * 100) === Math.round(result.highEnd * 100)}
+							${result.lowEnd.toFixed(2)}
+						{:else}
+							Range: ${result.lowEnd.toFixed(2)} – ${result.highEnd.toFixed(2)}
+						{/if}
+					</span>
 				</div>
 				<dl class="result-meta">
 					<dt>Nights</dt><dd>{result.totalTripNights}</dd>

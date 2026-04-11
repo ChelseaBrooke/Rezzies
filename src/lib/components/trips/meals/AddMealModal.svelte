@@ -4,10 +4,19 @@
 
 	type MealOption = 'ordering-in' | 'cooking' | 'going-out' | 'fend-for-yourself';
 
+	type DietarySummary = {
+		userId: string;
+		userName: string;
+		dietaryRestrictions: string | null;
+		allergies: string | null;
+	};
+
 	interface Props {
 		open: boolean;
 		members: MealGuest[];
 		tripDays: { value: string; label: string }[];
+		/** Confirmed (RSVP yes) guests with account dietary info — for meal planning */
+		yesRsvpDietarySummaries?: DietarySummary[];
 		prefill?: {
 			slotId?: string;
 			date: string;
@@ -26,6 +35,7 @@
 		open,
 		members,
 		tripDays,
+		yesRsvpDietarySummaries = [],
 		prefill = null,
 		formAction = '?/createMealSlot',
 		onClose,
@@ -114,6 +124,25 @@
 				}}
 				class="modal-form"
 			>
+				{#if yesRsvpDietarySummaries.length > 0}
+					<div class="dietary-callout" role="region" aria-label="Confirmed guest dietary notes">
+						<p class="dietary-callout-title">Guest dietary notes (RSVP yes)</p>
+						<ul class="dietary-callout-list">
+							{#each yesRsvpDietarySummaries as row (row.userId)}
+								<li>
+									<span class="dietary-name">{row.userName}</span>
+									{#if row.dietaryRestrictions}
+										<span class="dietary-line">Diet: {row.dietaryRestrictions}</span>
+									{/if}
+									{#if row.allergies}
+										<span class="dietary-line dietary-allergy">Allergies: {row.allergies}</span>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
+
 				<!-- Hidden fields -->
 				{#if prefill?.slotId}<input type="hidden" name="slotId" value={prefill.slotId} />{/if}
 				<input type="hidden" name="mealType" value={mealType} />
@@ -217,6 +246,38 @@
 	}
 	.modal-close:hover { color: var(--text); }
 	.modal-form { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+
+	.dietary-callout {
+		padding: 0.65rem 0.75rem;
+		border-radius: var(--radius-md);
+		background: rgba(47, 119, 120, 0.08);
+		border: 1px solid rgba(47, 119, 120, 0.2);
+	}
+	.dietary-callout-title {
+		margin: 0 0 0.4rem;
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: var(--navy, #1d4d4e);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	.dietary-callout-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+	.dietary-callout-list li {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		font-size: 0.8125rem;
+	}
+	.dietary-name { font-weight: 600; color: var(--text); }
+	.dietary-line { color: var(--muted); line-height: 1.35; }
+	.dietary-allergy { color: #b45309; font-weight: 500; }
 	.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 	.field { display: flex; flex-direction: column; gap: .35rem; }
 	.field .label { font-size: .875rem; font-weight: 500; color: var(--text); }

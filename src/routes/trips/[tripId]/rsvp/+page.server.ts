@@ -355,17 +355,8 @@ export const actions: Actions = {
 		if (!member) throw error(403, 'You must be a member of this trip');
 
 		const fd = await request.formData();
-		const dietaryRestrictions = (fd.get('dietaryRestrictions') as string)?.trim() || null;
-		const allergies = (fd.get('allergies') as string)?.trim() || null;
 
-		// Save user's own dietary info to GuestProfile
-		await prisma.guestProfile.upsert({
-			where: { tripId_userId: { tripId, userId: user.id } },
-			create: { tripId, userId: user.id, dietaryRestrictions, allergies },
-			update: { dietaryRestrictions, allergies }
-		});
-
-		// Collect plus-one dietary info and persist in RSVP notes (YES RSVPs only)
+		// Your dietary/allergies live in Account settings (User). Trip RSVP only stores plus-one notes.
 		const plusOneCount = parseInt((fd.get('plusOneCount') as string) ?? '0', 10) || 0;
 		if (plusOneCount > 0) {
 			const plusOnes = Array.from({ length: plusOneCount }, (_, i) => ({

@@ -9,9 +9,8 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 	if (!user || !trip) return parentData;
 
 	const tripId = params.tripId;
-	const [userRsvp, userProfile, userInvoices, roomAssignments] = await Promise.all([
+	const [userRsvp, userInvoices, roomAssignments] = await Promise.all([
 		prisma.rSVP.findFirst({ where: { tripId, userId: user.id } }),
-		prisma.guestProfile.findFirst({ where: { tripId, userId: user.id } }),
 		prisma.invoice.findMany({
 			where: { tripId, userId: user.id },
 			orderBy: { createdAt: 'desc' }
@@ -52,7 +51,6 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 	return {
 		...parentData,
 		userRsvp,
-		userProfile,
 		userInvoices,
 		roomAssignments,
 		userReservationPrice

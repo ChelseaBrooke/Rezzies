@@ -16,7 +16,6 @@
 		guestsHref = '',
 		roomsHref = '',
 		paymentsHref = '',
-		tripCheckInDate = '',
 		tripInfoFilled = 0,
 		tripInfoTotal = 3,
 		costSharingEnabled = true
@@ -37,21 +36,10 @@
 		guestsHref?: string;
 		roomsHref?: string;
 		paymentsHref?: string;
-		tripCheckInDate?: string;
 		tripInfoFilled?: number;
 		tripInfoTotal?: number;
 		costSharingEnabled?: boolean;
 	} = $props();
-
-	const daysUntil = $derived.by(() => {
-		if (!tripCheckInDate) return null;
-		const now = new Date();
-		now.setHours(0, 0, 0, 0);
-		const checkIn = new Date(tripCheckInDate);
-		checkIn.setHours(0, 0, 0, 0);
-		const diff = Math.round((checkIn.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-		return diff > 0 ? diff : null;
-	});
 
 	const tripInfoPct = $derived(
 		tripInfoTotal > 0 ? Math.min(100, Math.round((tripInfoFilled / tripInfoTotal) * 100)) : 0
@@ -134,9 +122,6 @@
 	<!-- ── Header ── -->
 	<div class="rdy-header">
 		<span class="rdy-title">Trip readiness</span>
-		{#if daysUntil != null}
-			<span class="rdy-pill">{daysUntil}d away</span>
-		{/if}
 	</div>
 
 	<!-- ── Multi-ring gauge (dark section) ── -->
@@ -227,17 +212,6 @@
 		letter-spacing: 0.12em;
 		color: var(--slate, #2f7778);
 		opacity: 0.6;
-	}
-
-	.rdy-pill {
-		font-size: 0.58rem;
-		font-weight: 600;
-		color: var(--slate, #2f7778);
-		background: rgba(47, 119, 120, 0.1);
-		border: 1px solid rgba(47, 119, 120, 0.2);
-		border-radius: 999px;
-		padding: 0.12rem 0.45rem;
-		white-space: nowrap;
 	}
 
 	/* ── Gauge section: solid teal, matches chat tab ── */

@@ -430,7 +430,7 @@
 		if (target.closest('.resize-handle')) return;
 
 		// Don't drag if not host (only host can move events)
-		if (!data.isHost) return;
+		if (!data.canManageMeals) return;
 
 		e.preventDefault();
 		const isMeal = ev.type === 'meal';
@@ -793,7 +793,7 @@
 						{/if}
 
 					<!-- Meal placeholders (only when meal planning is on) -->
-					{#if mealPlanOn && data.isHost}
+					{#if mealPlanOn && data.canManageMeals}
 						{#each [
 							{ mealType: 'breakfast', defaultMin: 9 * 60,  defaultTime: '9:00 AM',  label: '🍳 Breakfast' },
 							{ mealType: 'lunch',     defaultMin: 13 * 60, defaultTime: '1:00 PM',  label: '🥗 Lunch' },
@@ -887,8 +887,8 @@
 										<span class="evt-rsvp-pill" style="color:{style.subColor}">✓{gCount}</span>
 									{/if}
 
-										<!-- Drag hint for host -->
-										{#if data.isHost}
+										<!-- Drag hint for host / co-host -->
+										{#if data.canManageMeals}
 											<div class="drag-handle" title="Drag to move"></div>
 										{/if}
 
@@ -1021,6 +1021,7 @@
 		open={showAddMeal}
 		members={mealModalMembers}
 		tripDays={mealModalDays}
+		yesRsvpDietarySummaries={data.yesRsvpDietarySummaries ?? []}
 		prefill={addMealPrefill}
 		formAction={addMealPrefill?.slotId ? '?/updateMealSlot' : '?/createMealSlot'}
 		onClose={closeAddMeal}
@@ -1033,7 +1034,7 @@
 	<EventDetailsDrawer
 		event={drawerEvent}
 		currentUserId={data.user.id}
-		isHost={data.isHost}
+		isHost={data.canManageMeals}
 		tripId={data.trip.id}
 		onClose={() => (drawerEvent = null)}
 		onLocalRsvpUpdate={handleLocalRsvpUpdate}

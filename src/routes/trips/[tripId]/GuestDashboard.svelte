@@ -32,7 +32,6 @@
 	const dashboardMode = $derived(($dashboardModeByTripId)[trip?.id ?? ''] ?? modeFromDate);
 	const user = $derived(data.user);
 	const userRsvp = $derived(data.userRsvp);
-	const userProfile = $derived(data.userProfile);
 	const userInvoices = $derived(data.userInvoices ?? []);
 
 	const members = $derived(trip?.members ?? []);
@@ -247,7 +246,6 @@
 			{guestPreviewList}
 			{pendingRsvpCount}
 			{userRsvp}
-			{userProfile}
 			{myAssignment}
 		userReservationPrice={data.userReservationPrice ?? null}
 		platformFeePerPerson={trip.platformFeePerPerson ?? 0}

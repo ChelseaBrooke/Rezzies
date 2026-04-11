@@ -20,6 +20,12 @@
 	function bedWeight(type: string): number {
 		return BED_WEIGHTS[type.toLowerCase().replace(/\s+/g, '_')] ?? BED_WEIGHTS.other;
 	}
+	function formatUsdRange(low: number, high: number): string {
+		const a = Math.round(low * 100) / 100;
+		const b = Math.round(high * 100) / 100;
+		if (a === b) return `$${a.toFixed(2)}`;
+		return `$${a.toFixed(2)}–$${b.toFixed(2)}`;
+	}
 	function roomSlotCount(room: { beds?: Array<{ count?: number }> }): number {
 		if (!room.beds?.length) return 0;
 		return room.beds.reduce((s, b) => s + (b.count || 1), 0);
@@ -263,8 +269,8 @@
 									{#each perBedSlotBreakdown as item, i (item.roomName + '-' + item.bedType + '-' + i)}
 										<li>
 											<span class="bed-slot-label">{item.label}</span>
-											<span class="bed-slot-price">${item.low.toFixed(2)}–${item.high.toFixed(2)}</span>
-											<p class="per-person-line per-person-price">${item.lowPP.toFixed(2)}–${item.highPP.toFixed(2)}<span class="per-person-label">/person</span></p>
+											<span class="bed-slot-price">{formatUsdRange(item.low, item.high)}</span>
+											<p class="per-person-line per-person-price">{formatUsdRange(item.lowPP, item.highPP)}<span class="per-person-label">/person</span></p>
 										</li>
 									{/each}
 								</ul>

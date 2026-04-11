@@ -191,6 +191,7 @@
 		open={addModalOpen}
 		members={data.members ?? []}
 		tripDays={tripDayOptions}
+		yesRsvpDietarySummaries={[]}
 		prefill={addModalPrefill}
 		onClose={closeAddModal}
 		onSuccess={() => {}}

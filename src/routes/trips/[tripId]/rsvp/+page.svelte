@@ -36,10 +36,6 @@
 	let kidsCount = $state(0);
 	let petsCount = $state(0);
 
-	// ── Dietary info ────────────────────────────────────────────────────────
-	let myDietary = $state('');
-	let myAllergies = $state('');
-
 	type PlusOneInfo = { name: string; dietary: string; allergies: string };
 	let plusOnes = $state<PlusOneInfo[]>([]);
 
@@ -179,8 +175,6 @@
 		if (data.currentRsvp?.kidsCount != null) kidsCount = data.currentRsvp.kidsCount;
 		if (data.currentRsvp?.petsCount != null) petsCount = data.currentRsvp.petsCount;
 		noNotes = data.currentRsvp?.status === 'no' ? (data.currentRsvp?.notes ?? '') : '';
-		if (data.currentProfile?.dietaryRestrictions != null) myDietary = data.currentProfile.dietaryRestrictions;
-		if (data.currentProfile?.allergies != null) myAllergies = data.currentProfile.allergies;
 	});
 	const isYes = $derived(rsvpStatus === 'yes');
 	// Add-on feature flags — default true so nothing breaks for existing trips
@@ -277,6 +271,11 @@
 	});
 	function formatDollars(dollars: number): string {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(dollars);
+	}
+	/** Per-night or total $ display: single amount when endpoints round to the same cent. */
+	function formatDollarRange(low: number, high: number): string {
+		if (Math.round(low * 100) === Math.round(high * 100)) return formatDollars(low);
+		return `${formatDollars(low)}–${formatDollars(high)}`;
 	}
 	function bedPricePerNight(roomId: number, slots: number): number {
 		const p = pricingByRoomId.get(roomId);
@@ -444,44 +443,39 @@
 
 	{#if isYes && mealPlanOn}
 		<section class="card-section dietary-section">
-		<h2 class="section-title">Dietary info</h2>
-		<p class="dietary-intro">This helps us plan meals for everyone. Any info you share is visible to the host.</p>
-			<form method="POST" action="?/updateDietary" use:enhance>
-				<div class="dietary-self">
-					<p class="dietary-person-label">Your info</p>
-					<div class="dietary-row">
-						<div class="form-group">
-							<label class="form-label" for="myDietary">Dietary restrictions</label>
-							<input id="myDietary" type="text" name="dietaryRestrictions" bind:value={myDietary} placeholder="e.g. vegetarian, vegan, halal…" />
-						</div>
-						<div class="form-group">
-							<label class="form-label" for="myAllergies">Allergies</label>
-							<input id="myAllergies" type="text" name="allergies" bind:value={myAllergies} placeholder="e.g. peanuts, shellfish, dairy…" />
-						</div>
-					</div>
-				</div>
-				{#each plusOnes as po, i}
-					<div class="dietary-plusone">
-						<p class="dietary-person-label">Guest {i + 1}</p>
-						<div class="dietary-row dietary-row-3">
-							<div class="form-group">
-								<label class="form-label">Name <span class="label-opt">(optional)</span></label>
-								<input type="text" name="plusOneName_{i}" bind:value={po.name} placeholder="e.g. Alex" />
-							</div>
-							<div class="form-group">
-								<label class="form-label">Dietary restrictions</label>
-								<input type="text" name="plusOneDietary_{i}" bind:value={po.dietary} placeholder="e.g. vegan" />
-							</div>
-							<div class="form-group">
-								<label class="form-label">Allergies</label>
-								<input type="text" name="plusOneAllergies_{i}" bind:value={po.allergies} placeholder="e.g. nuts" />
+			<h2 class="section-title">Meals & dietary</h2>
+			<p class="dietary-intro">
+				Your dietary preferences and allergies are saved in
+				<a href="/settings">Account settings → Basics</a>. When your RSVP is “yes”, they are shown to anyone adding meals for this trip.
+			</p>
+			{#if plusOnes.length > 0}
+				<p class="dietary-plusone-intro">
+					For guests in your party who do not have an account, you can note name, dietary needs, and allergies below (optional).
+				</p>
+				<form method="POST" action="?/updateDietary" use:enhance>
+					{#each plusOnes as po, i}
+						<div class="dietary-plusone">
+							<p class="dietary-person-label">Guest {i + 1}</p>
+							<div class="dietary-row dietary-row-3">
+								<div class="form-group">
+									<label class="form-label">Name <span class="label-opt">(optional)</span></label>
+									<input type="text" name="plusOneName_{i}" bind:value={po.name} placeholder="e.g. Alex" />
+								</div>
+								<div class="form-group">
+									<label class="form-label">Dietary restrictions</label>
+									<input type="text" name="plusOneDietary_{i}" bind:value={po.dietary} placeholder="e.g. vegan" />
+								</div>
+								<div class="form-group">
+									<label class="form-label">Allergies</label>
+									<input type="text" name="plusOneAllergies_{i}" bind:value={po.allergies} placeholder="e.g. nuts" />
+								</div>
 							</div>
 						</div>
-					</div>
-				{/each}
-				<input type="hidden" name="plusOneCount" value={plusOnes.length} />
-				<button type="submit" class="btn btn-secondary dietary-save">Save dietary info</button>
-			</form>
+					{/each}
+					<input type="hidden" name="plusOneCount" value={plusOnes.length} />
+					<button type="submit" class="btn btn-secondary dietary-save">Save plus-one notes</button>
+				</form>
+			{/if}
 		</section>
 	{/if}
 
@@ -632,7 +626,7 @@
 														<span class="bed-type">{bed.bedType}</span>
 						{#if costSharingOn && perNightLow > 0 && tripNights > 0}
 								<span class="bed-price"
-									>{formatDollars(perNightLow)}–{formatDollars(perNightHigh)}/night · {formatDollars(totalLow)}–{formatDollars(totalHigh)} est.</span
+									>{formatDollarRange(perNightLow, perNightHigh)}/night · {formatDollarRange(totalLow, totalHigh)} est.</span
 								>
 							{/if}
 														{#if isClaimedByOther}
@@ -671,7 +665,11 @@
 											{#if data.isPerRoomPricing}
 												Each room pays an equal share of the trip total; your dates prorate that amount.
 											{:else if guestEstimate.displayCents != null}
-												Range {formatRange(guestEstimate.lowCents, guestEstimate.highCents)} depending on final headcount.
+												{#if guestEstimate.lowCents === guestEstimate.highCents}
+													{formatRange(guestEstimate.lowCents, guestEstimate.highCents)} for your selection at the modeled headcount range (no low–high spread).
+												{:else}
+													Range {formatRange(guestEstimate.lowCents, guestEstimate.highCents)} depending on final headcount.
+												{/if}
 											{:else}
 												Least if {guestEstimate.hmax} people attend (max headcount, capacity limit); most if {guestEstimate.hmin} attend (min headcount, realistic low). Final amount depends on the number of attendees.
 											{/if}
@@ -1291,7 +1289,14 @@
 	/* ── Dietary section ─────────────────────────────────────────── */
 	.dietary-section { border-top: 1px solid #f0ece7; }
 	.dietary-intro { font-size: 0.825rem; color: #78716c; margin: 0 0 0.75rem; }
-	.dietary-self, .dietary-plusone { margin-bottom: 1rem; }
+	.dietary-intro a { font-weight: 600; color: var(--slate, #2f7778); }
+	.dietary-plusone-intro {
+		font-size: 0.8rem;
+		color: #57534e;
+		margin: 0 0 0.75rem;
+		line-height: 1.45;
+	}
+	.dietary-plusone { margin-bottom: 1rem; }
 	.dietary-person-label { font-size: 0.75rem; font-weight: 700; color: #57534e; text-transform: uppercase; letter-spacing: .05em; margin: 0 0 0.4rem; }
 	.dietary-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 	.dietary-row-3 { grid-template-columns: 1fr 1fr 1fr; }

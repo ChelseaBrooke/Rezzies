@@ -2,7 +2,7 @@
 	import DashboardCard from './DashboardCard.svelte';
 	import TripGoalsCombined from './TripGoalsCombined.svelte';
 	import TripInfoCard from './TripInfoCard.svelte';
-	import CostAtMaxParticipationCard from './CostAtMaxParticipationCard.svelte';
+	import CapacityGuestsCard from './CapacityGuestsCard.svelte';
 	import GuestRsvpSummaryCard from './GuestRsvpSummaryCard.svelte';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
@@ -32,11 +32,17 @@
 		tripId: string;
 		currentUserId: string;
 		members: Array<{ user?: { id: string; name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
-		rsvps: Array<{ status: string; user?: { name: string | null } | null; arrivalDatetime?: string | null; createdAt?: string | null; updatedAt?: string | null }>;
+		rsvps: Array<{
+			status: string;
+			userId?: string;
+			user?: { id?: string; name: string | null; email?: string | null; avatarUrl?: string | null } | null;
+			arrivalDatetime?: string | null;
+			createdAt?: string | null;
+			updatedAt?: string | null;
+		}>;
 		guestPreviewList: Array<{ user?: { id: string; name: string | null; email: string | null; avatarUrl?: string | null } | null }>;
 		pendingRsvpCount: number;
 		userRsvp?: { status?: string; arrivalDatetime?: string | null } | null;
-		userProfile?: { dietaryRestrictions?: string | null; allergies?: string | null } | null;
 		myAssignment?: { room?: { name: string | null } | null } | null;
 		/** Guest only: current reservation price (may change as more RSVP) */
 		userReservationPrice?: number | null;
@@ -66,6 +72,8 @@
 		paymentsHref: string;
 		nudgePending?: () => void;
 	showToast?: (msg: string) => void;
+		/** Host: invite action for capacity card */
+		onInvite?: () => void;
 		/** Checklist stats for role-based checklists */
 		checklistStats: ChecklistStats;
 		/** Trip info for TripInfoCard */
@@ -104,7 +112,6 @@
 		guestPreviewList,
 		pendingRsvpCount,
 		userRsvp,
-		userProfile,
 		myAssignment,
 		userReservationPrice = null,
 	platformFeePerPerson = 0,
@@ -129,7 +136,8 @@
 		roomsHref,
 		paymentsHref,
 		nudgePending,
-	showToast,
+		showToast,
+		onInvite = undefined,
 		checklistStats,
 		tripDescription = null,
 		extraCostRules = [],
@@ -239,11 +247,12 @@
 		return items.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 4);
 	});
 
-	const hasMissingDietary = $derived(!userProfile?.dietaryRestrictions && !userProfile?.allergies);
-	const hasMissingArrival = $derived(!userRsvp?.arrivalDatetime && userRsvp?.status === 'yes');
-
 	const acceptedRsvpCount = $derived(rsvps.filter((r) => r.status === 'yes').length);
 	const declinedRsvpCount = $derived(rsvps.filter((r) => r.status === 'no').length);
+
+	const showCapacityGuestsCard = $derived(
+		isHost && costSharingEnabled && costAtMaxParticipation != null
+	);
 
 </script>
 
@@ -271,7 +280,7 @@
 		<a href={`/trips/${tripId}/guests`} class="view-detail-btn">View Detail</a>
 	{/snippet}
 	<!-- Layout: row1 = reminders | goals | recent, row2 = guests under reminders + goals only -->
-	<div class="dashboard-layout">
+	<div class="dashboard-layout" class:dashboard-layout--no-guests-row={showCapacityGuestsCard}>
 		<div class="left-column">
 		<div class="sticky-card-wrapper" class:host-mode={isHost}>
 			{#if isHost}
@@ -298,7 +307,6 @@
 						{guestsHref}
 						{roomsHref}
 						{paymentsHref}
-						{tripCheckInDate}
 						tripInfoFilled={tripInfoFilled}
 						tripInfoTotal={TRIP_INFO_TOTAL}
 						{costSharingEnabled}
@@ -323,8 +331,14 @@
 		<div class="goals-cell" id="trip-info">
 			<div class="goals-card-wrap">
 				<DashboardCard>
-					{#if isHost && costSharingEnabled && costAtMaxParticipation != null}
-						<CostAtMaxParticipationCard data={costAtMaxParticipation} {tripId} />
+					{#if showCapacityGuestsCard}
+						<CapacityGuestsCard
+							{tripId}
+							{members}
+							{rsvps}
+							data={costAtMaxParticipation}
+							onInvite={onInvite}
+						/>
 					{:else}
 						<TripInfoCard
 							isHost={isHost}
@@ -378,55 +392,57 @@
 			</DashboardCard>
 		</div>
 
-		<div class="guests-row">
-			<div class="guests-card-wrapper">
-				<DashboardCard
-					title="Guests"
-					titleHref={`/trips/${tripId}/guests`}
-					headerRight={isHost && nudgePending ? guestsNudgeButton : undefined}
-				>
-				<div class="guests-preview">
-					<div class="avatar-row">
-						{#each guestPreviewList as member}
-							{#if member.user?.id}
-								<ProfileTooltip userId={member.user.id}>
-									<button type="button" class="avatar avatar-btn" title={member.user?.name ?? member.user?.email ?? ''} onclick={() => openProfileCard(member.user!.id)}>
+		{#if !showCapacityGuestsCard}
+			<div class="guests-row">
+				<div class="guests-card-wrapper">
+					<DashboardCard
+						title="Guests"
+						titleHref={`/trips/${tripId}/guests`}
+						headerRight={isHost && nudgePending ? guestsNudgeButton : undefined}
+					>
+					<div class="guests-preview">
+						<div class="avatar-row">
+							{#each guestPreviewList as member}
+								{#if member.user?.id}
+									<ProfileTooltip userId={member.user.id}>
+										<button type="button" class="avatar avatar-btn" title={member.user?.name ?? member.user?.email ?? ''} onclick={() => openProfileCard(member.user!.id)}>
+											{#if member.user?.avatarUrl}
+												<img src={member.user.avatarUrl} alt="" class="avatar-img" />
+											{:else}
+												{initials(member.user?.name, member.user?.email)}
+											{/if}
+										</button>
+									</ProfileTooltip>
+								{:else}
+									<span class="avatar" title={member.user?.name ?? member.user?.email ?? ''}>
 										{#if member.user?.avatarUrl}
 											<img src={member.user.avatarUrl} alt="" class="avatar-img" />
 										{:else}
 											{initials(member.user?.name, member.user?.email)}
 										{/if}
-									</button>
-								</ProfileTooltip>
-							{:else}
-								<span class="avatar" title={member.user?.name ?? member.user?.email ?? ''}>
-									{#if member.user?.avatarUrl}
-										<img src={member.user.avatarUrl} alt="" class="avatar-img" />
-									{:else}
-										{initials(member.user?.name, member.user?.email)}
-									{/if}
+									</span>
+								{/if}
+							{/each}
+						</div>
+						<div class="guests-meta">
+							{#if acceptedRsvpCount > 0}
+								<span class="guests-stat">
+									<span class="guests-stat-dot accepted"></span>
+									{acceptedRsvpCount} going
 								</span>
 							{/if}
-						{/each}
+							{#if declinedRsvpCount > 0}
+								<span class="guests-stat">
+									<span class="guests-stat-dot declined"></span>
+									{declinedRsvpCount} declined
+								</span>
+							{/if}
+						</div>
 					</div>
-					<div class="guests-meta">
-						{#if acceptedRsvpCount > 0}
-							<span class="guests-stat">
-								<span class="guests-stat-dot accepted"></span>
-								{acceptedRsvpCount} going
-							</span>
-						{/if}
-						{#if declinedRsvpCount > 0}
-							<span class="guests-stat">
-								<span class="guests-stat-dot declined"></span>
-								{declinedRsvpCount} declined
-							</span>
-						{/if}
-					</div>
+					</DashboardCard>
 				</div>
-				</DashboardCard>
 			</div>
-		</div>
+		{/if}
 	</div>
 </div>
 
@@ -462,6 +478,15 @@
 		width: 100%;
 		min-width: 0;
 		align-items: stretch;
+	}
+
+	/* Host capacity card replaces bottom guests row — single tall row */
+	.dashboard-layout--no-guests-row {
+		grid-template-rows: 1fr;
+	}
+
+	.dashboard-layout--no-guests-row .recent-cell {
+		grid-row: 1;
 	}
 
 	/*
@@ -709,6 +734,20 @@
 		.guests-row {
 			grid-column: 1;
 			grid-row: 4;
+		}
+
+		.dashboard-layout--no-guests-row {
+			grid-template-rows: auto auto auto;
+		}
+
+		.dashboard-layout--no-guests-row .goals-cell {
+			grid-column: 1;
+			grid-row: 3;
+		}
+
+		.dashboard-layout--no-guests-row .recent-cell {
+			grid-column: 1;
+			grid-row: 2;
 		}
 	}
 

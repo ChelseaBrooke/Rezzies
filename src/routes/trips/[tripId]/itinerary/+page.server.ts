@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
-import { isTripMember, isTripHost } from '$lib/server/trip-access.js';
+import { isTripMember, isTripHost, isTripHostOrCoHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
@@ -27,36 +27,48 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		throw error(403, 'You do not have access to this trip');
 	}
 
-	// Build a dietary lookup: prefer GuestProfile (trip-scoped), fall back to User.dietaryTags/allergiesTags
-	// First get all trip member user IDs so we know who to fetch User data for
+	const canManageMeals = await isTripHostOrCoHost(tripId, user.id);
+
+	// Dietary lookup: User account fields (Basics) take priority; trip GuestProfile fills gaps only.
 	const tripMembers = await prisma.tripMember.findMany({
 		where: { tripId },
 		select: { userId: true, user: { select: { id: true, name: true, dietaryTags: true, allergiesTags: true } } }
 	});
 
-	// Seed from User-level dietary fields
-	const dietaryByUser: Record<string, { dietaryRestrictions: string | null; allergies: string | null; name: string }> = {};
+	/** Account settings (User) win; trip GuestProfile fills gaps only */
+	const dietaryByUser: Record<string, { dietaryRestrictions: string | null; allergies: string | null; name: string }> =
+		{};
 	for (const m of tripMembers) {
-		if (m.user && (m.user.dietaryTags || m.user.allergiesTags)) {
-			dietaryByUser[m.user.id] = {
-				name: m.user.name ?? 'Guest',
-				dietaryRestrictions: m.user.dietaryTags ?? null,
-				allergies: m.user.allergiesTags ?? null
-			};
-		}
+		if (!m.user) continue;
+		const dt = m.user.dietaryTags?.trim() || null;
+		const al = m.user.allergiesTags?.trim() || null;
+		dietaryByUser[m.user.id] = {
+			name: m.user.name ?? 'Guest',
+			dietaryRestrictions: dt,
+			allergies: al
+		};
 	}
 
-	// Override / merge with GuestProfile (trip-scoped), takes priority
 	const guestProfiles = await prisma.guestProfile.findMany({
 		where: { tripId },
 		select: { userId: true, dietaryRestrictions: true, allergies: true }
 	});
 	for (const gp of guestProfiles) {
 		const existing = dietaryByUser[gp.userId];
+		const gpD = gp.dietaryRestrictions?.trim() || null;
+		const gpA = gp.allergies?.trim() || null;
+		if (!existing) {
+			dietaryByUser[gp.userId] = {
+				name: 'Guest',
+				dietaryRestrictions: gpD,
+				allergies: gpA
+			};
+			continue;
+		}
 		dietaryByUser[gp.userId] = {
-			name: existing?.name ?? 'Guest',
-			dietaryRestrictions: gp.dietaryRestrictions ?? existing?.dietaryRestrictions ?? null,
-			allergies: gp.allergies ?? existing?.allergies ?? null
+			name: existing.name,
+			dietaryRestrictions: existing.dietaryRestrictions || gpD,
+			allergies: existing.allergies || gpA
 		};
 	}
 
@@ -100,12 +112,61 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 
 	if (!trip) throw error(404, 'Trip not found');
 
+	const yesRsvpUserIdSet = new Set(
+		(trip.rsvps ?? []).filter((r) => r.status === 'yes' && r.userId).map((r) => r.userId as string)
+	);
+
 	const members =
 		trip.members?.map((m) => ({
 			id: m.user?.id,
 			name: m.user?.name ?? m.user?.email ?? 'Unknown',
 			email: m.user?.email
 		})) ?? [];
+
+	type DietaryNoteRow = {
+		userId: string;
+		userName: string;
+		dietaryRestrictions: string | null;
+		allergies: string | null;
+	};
+
+	const accountGuestDietaryRows: DietaryNoteRow[] = Object.entries(dietaryByUser)
+		.filter(([uid]) => yesRsvpUserIdSet.has(uid))
+		.filter(([, d]) => d.dietaryRestrictions || d.allergies)
+		.map(([userId, d]) => ({
+			userId,
+			userName: d.name,
+			dietaryRestrictions: d.dietaryRestrictions,
+			allergies: d.allergies
+		}));
+
+	const plusOneDietaryRows: DietaryNoteRow[] = [];
+	for (const r of trip.rsvps ?? []) {
+		if (r.status !== 'yes' || !r.notes?.trim()) continue;
+		let parsed: { plusOneDietaryProfiles?: Array<{ name?: string | null; dietary?: string | null; allergies?: string | null }> };
+		try {
+			parsed = JSON.parse(r.notes) as typeof parsed;
+		} catch {
+			continue;
+		}
+		const profiles = parsed?.plusOneDietaryProfiles;
+		if (!Array.isArray(profiles)) continue;
+		const hostName = r.user?.name ?? 'Guest';
+		profiles.forEach((p, i) => {
+			const dietaryRestrictions = p.dietary?.trim() || null;
+			const allergies = p.allergies?.trim() || null;
+			if (!dietaryRestrictions && !allergies) return;
+			const label = p.name?.trim() || `Plus-one (${hostName}'s party)`;
+			plusOneDietaryRows.push({
+				userId: `plusone:${r.userId}:${i}`,
+				userName: label,
+				dietaryRestrictions,
+				allergies
+			});
+		});
+	}
+
+	const yesRsvpDietarySummaries: DietaryNoteRow[] = [...accountGuestDietaryRows, ...plusOneDietaryRows];
 
 	// Group events by date
 	const eventsByDate: Record<string, unknown[]> = {};
@@ -148,15 +209,8 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		})),
 		// currentUserOptedOut derived server-side for convenience
 		currentUserOptedOut: slot.attendance.find((a) => a.userId === user.id)?.optedOut ?? false,
-		// Dietary notes for all trip members who have any dietary info
-		guestDietaryNotes: Object.entries(dietaryByUser)
-			.filter(([, d]) => d.dietaryRestrictions || d.allergies)
-			.map(([uid, d]) => ({
-				userId: uid,
-				userName: d.name,
-				dietaryRestrictions: d.dietaryRestrictions,
-				allergies: d.allergies
-			}))
+		// Dietary notes: RSVP yes + account or plus-one notes
+		guestDietaryNotes: yesRsvpDietarySummaries
 		});
 	});
 
@@ -225,6 +279,8 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		eventsByDate,
 		tripDays,
 		goingUsers,
+		yesRsvpDietarySummaries,
+		canManageMeals,
 		mealPlan: trip.mealPlan ?? null,
 		mealSlots: trip.mealSlots,
 		members: members.filter((m) => m.id),
@@ -320,8 +376,8 @@ export const actions: Actions = {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
-		const host = await isTripHost(tripId, user.id);
-		if (!host) return { createMealSlotError: 'Only the host can add meal slots.' };
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) return { createMealSlotError: 'Only the host or co-host can add meal slots.' };
 		const formData = await request.formData();
 		const mealType = (formData.get('mealType') as string) || 'dinner';
 		const dateStr = formData.get('date') as string;
@@ -349,7 +405,7 @@ export const actions: Actions = {
 		if (!slotId) return { updateMealSlotError: 'Slot ID required.' };
 		const slot = await prisma.mealSlot.findFirst({ where: { id: slotId, tripId } });
 		if (!slot) return { updateMealSlotError: 'Slot not found.' };
-		const isHost = await isTripHost(tripId, user.id);
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
 		const mealType = (formData.get('mealType') as string) || slot.mealType;
 		const dateStr = formData.get('date') as string;
 		const time = (formData.get('time') as string)?.trim() || null;
@@ -357,7 +413,7 @@ export const actions: Actions = {
 		const notes = (formData.get('notes') as string)?.trim() || null;
 		const assignedUserId = formData.get('assignedUserId') as string | null;
 		const data: Record<string, unknown> = {};
-		if (isHost) {
+		if (canManage) {
 			if (dateStr) data.date = new Date(dateStr);
 			data.mealType = MEAL_TYPES.includes(mealType as (typeof MEAL_TYPES)[number])
 				? mealType
@@ -380,8 +436,8 @@ export const actions: Actions = {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
-		const host = await isTripHost(tripId, user.id);
-		if (!host) return { deleteMealSlotError: 'Only the host can remove meal slots.' };
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) return { deleteMealSlotError: 'Only the host or co-host can remove meal slots.' };
 		const formData = await request.formData();
 		const slotId = formData.get('slotId') as string;
 		if (!slotId) return { deleteMealSlotError: 'Slot ID required.' };
@@ -467,8 +523,8 @@ export const actions: Actions = {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
-		const host = await isTripHost(tripId, user.id);
-		if (!host) return { moveMealSlotError: 'Only host can move meal slots.' };
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) return { moveMealSlotError: 'Only the host or co-host can move meal slots.' };
 		const formData = await request.formData();
 		const slotId = formData.get('slotId') as string;
 		const dateStr = formData.get('date') as string;

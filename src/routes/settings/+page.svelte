@@ -94,7 +94,9 @@
 				</section>
 				<section class="settings-section basics-section">
 					<h2>Basics</h2>
-					<p class="section-description">Emergency contact, dietary needs, and accessibility. Shared with trip hosts when relevant.</p>
+					<p class="section-description">
+						Emergency contact, dietary needs, and accessibility. Dietary and allergies are shown to trip members who add meals when you have RSVP’d yes (plus optional plus-one notes from your RSVP page).
+					</p>
 					<form method="POST" action="?/updateProfile" use:enhance>
 						<input type="hidden" name="name" value={data.user?.name || ''} />
 						<input type="hidden" name="phone" value={data.user?.phone || ''} />
