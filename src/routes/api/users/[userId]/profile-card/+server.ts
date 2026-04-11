@@ -20,7 +20,8 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 			travelStyle: true,
 			homeCity: true,
 			profileVisibility: true,
-			friendsListVisibility: true
+			friendsListVisibility: true,
+			createdAt: true
 		}
 	});
 
@@ -111,6 +112,7 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 		avatarUrl: user.avatarUrl,
 		travelStyle: user.travelStyle,
 		homeCity: user.homeCity,
+		memberSince: user.createdAt.getFullYear(),
 		isSelf,
 		tripsHosted,
 		tripsJoined,

@@ -7,6 +7,7 @@
 		avatarUrl: string | null;
 		travelStyle: string | null;
 		homeCity: string | null;
+		memberSince: number | null;
 		isSelf: boolean;
 		tripsHosted: number;
 		tripsJoined: number;
@@ -236,10 +237,13 @@
 					{#if profile.homeCity}
 						<p class="profile-card-location">{profile.homeCity}</p>
 					{/if}
-					<div class="profile-card-stats">
-						<span class="profile-card-stat"><strong>{profile.tripsHosted}</strong> trips hosted</span>
-						<span class="profile-card-stat"><strong>{profile.tripsJoined}</strong> trips joined</span>
-					</div>
+				<div class="profile-card-stats">
+					<span class="profile-card-stat"><strong>{profile.tripsHosted}</strong> trips hosted</span>
+					<span class="profile-card-stat"><strong>{profile.tripsJoined}</strong> trips joined</span>
+				</div>
+				{#if profile.memberSince}
+					<p class="profile-card-member-since">Member since {profile.memberSince}</p>
+				{/if}
 					{#if !profile.isSelf && profile.sharedTrips.length > 0}
 						<div class="profile-card-shared">
 							<h3>Trips you've been on together</h3>
@@ -411,6 +415,11 @@
 		color: var(--text);
 		display: block;
 		font-size: 1.125rem;
+	}
+	.profile-card-member-since {
+		font-size: 0.8rem;
+		color: var(--muted);
+		margin: -0.25rem 0 0.75rem;
 	}
 	.profile-card-shared {
 		text-align: left;

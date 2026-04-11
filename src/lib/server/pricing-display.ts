@@ -115,7 +115,15 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 					bedPricing.push({
 						bedId: bed.id,
 						bedType: bed.bedType,
-						priceDisplay: `$${p.perNightLow.toFixed(2)}–$${p.perNightHigh.toFixed(2)}/night ($${p.low.toFixed(2)}–$${p.high.toFixed(2)} est. for ${perBedPricing.totalNights} nights)`
+						priceDisplay: (() => {
+						const nightPart = p.perNightLow === p.perNightHigh
+							? `$${p.perNightLow.toFixed(2)}/night`
+							: `$${p.perNightLow.toFixed(2)}–$${p.perNightHigh.toFixed(2)}/night`;
+						const totalPart = p.low === p.high
+							? `$${p.low.toFixed(2)} est. for ${perBedPricing.totalNights} nights`
+							: `$${p.low.toFixed(2)}–$${p.high.toFixed(2)} est. for ${perBedPricing.totalNights} nights`;
+						return `${nightPart} (${totalPart})`;
+					})()
 					});
 				}
 			}
