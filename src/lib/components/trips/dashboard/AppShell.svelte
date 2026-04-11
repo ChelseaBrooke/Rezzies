@@ -3,6 +3,7 @@
 	import { setContext } from 'svelte';
 	import { page } from '$app/stores';
 	import { afterNavigate } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import divviLogo from '$lib/assets/images/divvi logo.png';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
@@ -109,6 +110,15 @@
 
 	let mainContentEl = $state<HTMLElement | null>(null);
 
+	let collapsed = $state(
+		browser ? localStorage.getItem('sidebar-collapsed') === 'true' : false
+	);
+
+	function toggleCollapsed() {
+		collapsed = !collapsed;
+		if (browser) localStorage.setItem('sidebar-collapsed', String(collapsed));
+	}
+
 	// Reset the custom scroll container to the top on every client-side navigation.
 	// SvelteKit's built-in scroll restoration only handles window scroll, not this div.
 	afterNavigate(() => {
@@ -116,7 +126,7 @@
 	});
 </script>
 
-<div class="app-shell">
+<div class="app-shell" class:collapsed>
 	<aside class="left-rail">
 		<a href="/trips" class="logo-button" aria-label="Divvi">
 			<img src={divviLogo} alt="Divvi" class="logo-img" />
@@ -129,9 +139,9 @@
 					class="rail-nav-item"
 					class:active={isActive(item.href)}
 					aria-label={item.label}
-					title={item.label}
+					title={collapsed ? item.label : undefined}
 				>
-					<span class="rail-nav-item-inner">
+					<span class="rail-icon-wrap">
 					{#if item.icon === 'dashboard'}
 						<svg class="rail-icon-svg" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
 					{:else if item.icon === 'guests'}
@@ -155,17 +165,38 @@
 						<span class="rail-nav-badge" aria-label="{pollsBadgeCount} new poll(s) since last visit">{pollsBadgeCount > 9 ? '9+' : pollsBadgeCount}</span>
 					{/if}
 					</span>
+					<span class="rail-item-label">{item.label}</span>
 				</a>
 				{/each}
 			</nav>
 		</div>
 		<div class="rail-bottom">
 			{#if user}
-				<AvatarMenu user={user} class="user-avatar-wrap" placement="above" />
+				<div class="rail-user-row">
+					<AvatarMenu user={user} class="user-avatar-wrap" placement="above" />
+					<span class="rail-item-label rail-user-name">{user.name || user.email || ''}</span>
+				</div>
 			{/if}
-			<a href="/trips/{tripId}/settings" class="rail-util" aria-label="Settings" title="Settings">
-				<svg class="rail-icon-svg" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+			<a href="/trips/{tripId}/settings" class="rail-util" aria-label="Settings" title={collapsed ? 'Settings' : undefined}>
+				<span class="rail-icon-wrap">
+					<svg class="rail-icon-svg" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+				</span>
+				<span class="rail-item-label">Settings</span>
 			</a>
+			<button
+				type="button"
+				class="rail-collapse-btn"
+				onclick={toggleCollapsed}
+				aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+				title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+			>
+				{#if collapsed}
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+				{:else}
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+				{/if}
+				<span class="rail-item-label">Collapse</span>
+			</button>
 		</div>
 	</aside>
 	<main class="main-content" bind:this={mainContentEl}>
@@ -203,7 +234,9 @@
 </div>
 
 <style>
+	/* ── Layout shell ── */
 	.app-shell {
+		--sidebar-w: 210px;
 		display: block;
 		height: 100vh;
 		overflow: hidden;
@@ -211,29 +244,37 @@
 		padding: 12px 0 12px 12px;
 		box-sizing: border-box;
 	}
+	.app-shell.collapsed {
+		--sidebar-w: 72px;
+	}
 
+	/* ── Left rail ── */
 	.left-rail {
 		position: fixed;
 		left: 12px;
 		top: 12px;
 		bottom: 12px;
-		width: 72px;
+		width: var(--sidebar-w);
 		background: #fcfcfc;
 		border-radius: 12px;
 		display: flex;
 		flex-direction: column;
-		align-items: center;
+		align-items: stretch;
 		padding: 1rem 0;
 		gap: 0;
 		box-shadow: 4px 0 24px rgba(17, 24, 39, 0.06);
 		z-index: 10;
+		overflow: hidden;
+		transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
+	/* Logo: fixed left indent that also centers in collapsed width */
+	/* collapsed: (72 - 48) / 2 = 12px — margin-left:12px is already perfect */
 	.logo-button {
 		width: 48px;
 		height: 48px;
-		border-radius: 50%;
-		background: var(--carrot);
+		border-radius: 12px;
+		background: var(--warm);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -241,13 +282,14 @@
 		transition: transform var(--transition-fast), background var(--transition-fast);
 		flex-shrink: 0;
 		overflow: hidden;
-		padding: 6px;
+		padding: 4px;
 		box-sizing: border-box;
+		margin-left: 12px;
 	}
 
 	.logo-button:hover {
 		transform: scale(1.05);
-		background: var(--warm);
+		background: #b8480e;
 	}
 
 	.logo-img {
@@ -255,39 +297,65 @@
 		height: 100%;
 		object-fit: contain;
 		display: block;
+		filter: brightness(0) invert(1);
 	}
 
+	/* ── Nav wrap & nav ── */
 	.rail-nav-wrap {
 		flex: 1;
 		display: flex;
 		align-items: center;
-		justify-content: center;
 		width: 100%;
-		padding: 0 12px;
+		padding: 0;
+		box-sizing: border-box;
+		overflow-y: auto;
+		overflow-x: hidden;
 	}
 
 	.rail-nav {
 		background: rgba(47, 119, 120, 0.1);
 		border-radius: 10px;
-		padding: 10px 0;
+		padding: 6px;
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
+		gap: 2px;
 		width: 100%;
-		align-items: center;
+		box-sizing: border-box;
+		margin: 0 8px;
+		/* margin transitions so the gray pill resizes with the rail */
+		transition: margin 220ms cubic-bezier(0.4, 0, 0.2, 1),
+		            padding 220ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.app-shell.collapsed .rail-nav {
+		margin: 0 6px;
+		padding: 6px 4px;
 	}
 
+	/* ── Nav items ──
+	   padding-left:13px keeps the icon's center at ~24px from item left.
+	   In collapsed mode: item width ≈ 60px  → icon center at 24px ≈ centered.
+	   gap animates to 0 so labels slide away without snapping.              */
 	.rail-nav-item {
-		width: 44px;
-		height: 44px;
+		height: 40px;
 		border-radius: 8px;
 		display: flex;
 		align-items: center;
-		justify-content: center;
+		gap: 10px;
+		padding: 0 10px 0 13px;
 		text-decoration: none;
 		color: #374151;
-		transition: all var(--transition-fast);
-		position: relative;
+		transition:
+			background var(--transition-fast),
+			color var(--transition-fast),
+			gap 220ms cubic-bezier(0.4, 0, 0.2, 1),
+			padding 220ms cubic-bezier(0.4, 0, 0.2, 1);
+		white-space: nowrap;
+		width: 100%;
+		box-sizing: border-box;
+	}
+	.app-shell.collapsed .rail-nav-item {
+		gap: 0;
+		padding: 0 0 0 13px;
 	}
 
 	.rail-nav-item:hover {
@@ -298,21 +366,24 @@
 	.rail-nav-item.active {
 		background: rgba(47, 119, 120, 0.2);
 		color: var(--navy);
+		font-weight: 500;
 	}
 
-	.rail-nav-item-inner {
+	/* ── Icon wrap (holds svg + badge) ── */
+	.rail-icon-wrap {
 		position: relative;
+		width: 22px;
+		height: 22px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 100%;
-		height: 100%;
+		flex-shrink: 0;
 	}
 
 	.rail-nav-badge {
 		position: absolute;
-		top: -2px;
-		right: -2px;
+		top: -4px;
+		right: -6px;
 		min-width: 16px;
 		height: 16px;
 		padding: 0 4px;
@@ -328,33 +399,80 @@
 		box-sizing: border-box;
 	}
 
-	.rail-nav .rail-icon-svg {
-		color: inherit;
-	}
-
 	.rail-icon-svg {
 		display: block;
 		flex-shrink: 0;
+		color: inherit;
 	}
 
+	/* ── Expandable label ── */
+	.rail-item-label {
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: inherit;
+		overflow: hidden;
+		white-space: nowrap;
+		opacity: 1;
+		max-width: 120px;
+		transition: opacity 180ms ease, max-width 220ms ease;
+	}
+	.app-shell.collapsed .rail-item-label {
+		opacity: 0;
+		max-width: 0;
+		pointer-events: none;
+	}
+
+	/* ── Bottom rail ── */
 	.rail-bottom {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 6px;
+		align-items: stretch;
+		gap: 2px;
 		width: 100%;
-		padding: 1rem 12px 0;
+		padding: 0.75rem 14px 0;
 		margin-top: auto;
 		flex-shrink: 0;
+		border-top: 1px solid rgba(17, 24, 39, 0.08);
+		box-sizing: border-box;
+		transition: padding 220ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.app-shell.collapsed .rail-bottom {
+		padding: 0.75rem 10px 0;
+	}
+
+	/* ── User row ── */
+	.rail-user-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		width: 100%;
+		min-width: 0;
+		padding: 4px 0;
+		transition: gap 220ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.app-shell.collapsed .rail-user-row {
+		gap: 0;
+	}
+
+	.rail-user-name {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: #374151;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		min-width: 0;
+		flex: 1;
 	}
 
 	.user-avatar-wrap {
 		display: inline-flex;
+		flex-shrink: 0;
 	}
 	.user-avatar-wrap :global(.avatar-trigger) {
-		width: 44px;
-		height: 44px;
-		border-radius: 12px;
+		width: 36px;
+		height: 36px;
+		border-radius: 10px;
 		background: var(--surface2);
 		border: 1px solid var(--border-soft);
 	}
@@ -362,31 +480,78 @@
 		background: rgba(17, 24, 39, 0.06);
 	}
 	.user-avatar-wrap :global(.avatar-trigger .avatar-inner) {
-		border-radius: 10px;
+		border-radius: 8px;
 	}
 	.user-avatar-wrap :global(.avatar-trigger .avatar-img) {
-		border-radius: 10px;
+		border-radius: 8px;
 	}
 
+	/* ── Settings link (bottom) ── */
 	.rail-util {
-		width: 44px;
-		height: 44px;
-		border-radius: 12px;
+		height: 40px;
+		border-radius: 10px;
 		display: flex;
 		align-items: center;
-		justify-content: center;
+		gap: 10px;
+		padding: 0 10px 0 3px;
 		text-decoration: none;
 		color: var(--text);
-		transition: all var(--transition-fast);
+		transition:
+			background var(--transition-fast),
+			gap 220ms cubic-bezier(0.4, 0, 0.2, 1);
+		width: 100%;
+		box-sizing: border-box;
+		white-space: nowrap;
 	}
-
+	.app-shell.collapsed .rail-util {
+		gap: 0;
+	}
 	.rail-util:hover {
 		background: rgba(17, 24, 39, 0.06);
-		color: var(--text);
+	}
+	.rail-util .rail-icon-wrap {
+		width: 20px;
+		height: 20px;
+		/* same left position as nav icons */
+		margin-left: 10px;
+		flex-shrink: 0;
 	}
 
+	/* ── Collapse toggle button ── */
+	.rail-collapse-btn {
+		height: 36px;
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 0 10px 0 13px;
+		border: none;
+		background: none;
+		color: #9ca3af;
+		cursor: pointer;
+		font: inherit;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		transition:
+			background var(--transition-fast),
+			color var(--transition-fast),
+			gap 220ms cubic-bezier(0.4, 0, 0.2, 1);
+		width: 100%;
+		box-sizing: border-box;
+		white-space: nowrap;
+		margin-top: 2px;
+	}
+	.app-shell.collapsed .rail-collapse-btn {
+		gap: 0;
+	}
+	.rail-collapse-btn:hover {
+		background: rgba(17, 24, 39, 0.06);
+		color: #374151;
+	}
+
+	/* ── Main content ── */
 	.main-content {
-		margin: 12px 12px 12px 84px;
+		margin: 12px 12px 12px calc(var(--sidebar-w) + 12px);
 		height: calc(100vh - 24px);
 		display: flex;
 		flex-direction: column;
@@ -397,6 +562,7 @@
 		max-width: 100%;
 		background: var(--bg);
 		position: relative;
+		transition: margin-left 220ms cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.top-actions {
@@ -471,6 +637,7 @@
 
 	@media (max-width: 1024px) {
 		.app-shell {
+			--sidebar-w: 64px;
 			padding: 8px 0 8px 8px;
 		}
 
@@ -478,35 +645,32 @@
 			left: 8px;
 			top: 8px;
 			bottom: 8px;
-			width: 64px;
 			padding: 1rem 0;
 			border-radius: 12px;
+			align-items: center;
 		}
 
 		.logo-button {
 			width: 40px;
 			height: 40px;
 			padding: 5px;
+			margin-left: 0;
 		}
 
-		.rail-nav-item,
-		.user-avatar-wrap :global(.avatar-trigger),
-		.rail-util {
-			width: 40px;
-			height: 40px;
-		}
-		.user-avatar-wrap :global(.avatar-trigger) {
-			border-radius: 10px;
-		}
-
-		.rail-nav {
-			margin-top: 1.5rem;
-		}
+		/* Force collapsed icon-only layout on tablet */
+		.rail-nav { margin: 0 4px; }
+		.rail-nav-item { gap: 0; padding: 0 0 0 9px; }
+		.user-avatar-wrap :global(.avatar-trigger) { width: 40px; height: 40px; border-radius: 10px; }
+		.rail-util { gap: 0; }
+		.rail-user-row { gap: 0; }
+		.rail-item-label { opacity: 0; max-width: 0; pointer-events: none; transition: none; }
+		.rail-collapse-btn { display: none; }
 
 		.main-content {
-			margin: 8px 8px 8px 72px;
+			margin: 8px 8px 8px 76px;
 			height: calc(100vh - 16px);
 			padding: 0.75rem 1.5rem 1.5rem;
+			transition: none;
 		}
 	}
 

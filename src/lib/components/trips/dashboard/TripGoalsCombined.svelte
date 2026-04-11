@@ -13,35 +13,35 @@
 		fundingTotal = 0,
 		fundingPct = 0,
 		fundingDisplay = '',
-	guestsHref = '',
-	roomsHref = '',
-	paymentsHref = '',
-	tripCheckInDate = '',
-	tripInfoFilled = 0,
-	tripInfoTotal = 3,
-	costSharingEnabled = true
-}: {
-	rsvpCurrent?: number;
-	rsvpTotal?: number;
-	rsvpPct?: number;
-	bedsCurrent?: number;
-	bedsTotal?: number;
-	bedsPct?: number;
-	roomsFilled?: number;
-	roomsTotal?: number;
-	roomsPct?: number;
-	fundingCurrent?: number;
-	fundingTotal?: number;
-	fundingPct?: number;
-	fundingDisplay?: string;
-	guestsHref?: string;
-	roomsHref?: string;
-	paymentsHref?: string;
-	tripCheckInDate?: string;
-	tripInfoFilled?: number;
-	tripInfoTotal?: number;
-	costSharingEnabled?: boolean;
-} = $props();
+		guestsHref = '',
+		roomsHref = '',
+		paymentsHref = '',
+		tripCheckInDate = '',
+		tripInfoFilled = 0,
+		tripInfoTotal = 3,
+		costSharingEnabled = true
+	}: {
+		rsvpCurrent?: number;
+		rsvpTotal?: number;
+		rsvpPct?: number;
+		bedsCurrent?: number;
+		bedsTotal?: number;
+		bedsPct?: number;
+		roomsFilled?: number;
+		roomsTotal?: number;
+		roomsPct?: number;
+		fundingCurrent?: number;
+		fundingTotal?: number;
+		fundingPct?: number;
+		fundingDisplay?: string;
+		guestsHref?: string;
+		roomsHref?: string;
+		paymentsHref?: string;
+		tripCheckInDate?: string;
+		tripInfoFilled?: number;
+		tripInfoTotal?: number;
+		costSharingEnabled?: boolean;
+	} = $props();
 
 	const daysUntil = $derived.by(() => {
 		if (!tripCheckInDate) return null;
@@ -53,129 +53,153 @@
 		return diff > 0 ? diff : null;
 	});
 
-	const fundingPctClamped = $derived(fundingTotal > 0 ? Math.min(100, Math.max(0, fundingPct)) : 0);
-	const fundingValueLabel = $derived(
-		fundingTotal > 0
-			? `$${Math.round(fundingCurrent).toLocaleString()} / $${Math.round(fundingTotal).toLocaleString()}`
-			: fundingDisplay || 'Not set'
+	const tripInfoPct = $derived(
+		tripInfoTotal > 0 ? Math.min(100, Math.round((tripInfoFilled / tripInfoTotal) * 100)) : 0
 	);
 
-	const tripInfoPct = $derived(tripInfoTotal > 0 ? Math.min(100, Math.round((tripInfoFilled / tripInfoTotal) * 100)) : 0);
+	// Four stat rings — outer to inner, each paired with a theme color
+	const RING_COLORS = ['#CE5612', '#E8922C', '#2F7778', '#6FB8BA'] as const;
 
 	const allStats = $derived([
-		...(costSharingEnabled ? [{
-			key: 'funding',
-			label: 'Funding',
-			value: fundingValueLabel,
-			pct: fundingPctClamped,
-			href: paymentsHref
-		}] : []),
 		{
-			key: 'rsvps',
-			label: 'RSVPs confirmed',
+			label: 'RSVPs',
 			value: rsvpTotal > 0 ? `${rsvpCurrent} / ${rsvpTotal}` : '—',
 			pct: rsvpPct,
-			href: guestsHref
+			href: guestsHref,
+			color: RING_COLORS[0]
 		},
 		{
-			key: 'rooms',
-			label: 'Rooms filled',
+			label: 'Rooms',
 			value: roomsTotal > 0 ? `${roomsFilled} / ${roomsTotal}` : '—',
 			pct: roomsPct,
-			href: roomsHref
+			href: roomsHref,
+			color: RING_COLORS[1]
 		},
 		{
-			key: 'beds',
-			label: 'Beds claimed',
+			label: 'Beds',
 			value: bedsTotal > 0 ? `${bedsCurrent} / ${bedsTotal}` : '—',
 			pct: bedsPct,
-			href: roomsHref
+			href: roomsHref,
+			color: RING_COLORS[2]
 		},
 		{
-			key: 'tripinfo',
 			label: 'Trip info',
 			value: tripInfoTotal > 0 ? `${tripInfoFilled} / ${tripInfoTotal}` : '—',
 			pct: tripInfoPct,
-			href: '#trip-info'
+			href: '#trip-info',
+			color: RING_COLORS[3]
 		}
 	]);
 
-	const pending = $derived(allStats.filter(s => s.pct < 100));
-	const done = $derived(allStats.filter(s => s.pct >= 100));
+	const overallPct = $derived(
+		Math.round([rsvpPct, bedsPct, roomsPct, tripInfoPct].reduce((a, b) => a + b, 0) / 4)
+	);
 
-	const overallPct = $derived.by(() => {
-		const parts = [rsvpPct, bedsPct, roomsPct, tripInfoPct];
-		if (costSharingEnabled) parts.push(fundingPctClamped);
-		return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
-	});
+	// ── SVG ring math ──────────────────────────────────────────────────────
+	// Each ring is a 270° arc (gap at the bottom), starting at lower-left
+	// and sweeping clockwise to lower-right.
+	//
+	// For a circle of radius r centered at (100, 100):
+	//   start = (100 − r·sin45°, 100 + r·sin45°)  ← SVG 135° from 3-o'clock
+	//   end   = (100 + r·sin45°, 100 + r·sin45°)  ← SVG 45°  from 3-o'clock
+	//   large-arc-flag = 1 (270° > 180°), sweep-flag = 1 (clockwise)
+	const S = 0.7071; // sin/cos 45°
+	const RADII = [86, 70, 54, 38] as const;
+
+	const rings = $derived(
+		RADII.map((r, i) => {
+			const sx = +(100 - S * r).toFixed(2);
+			const sy = +(100 + S * r).toFixed(2);
+			const ex = +(100 + S * r).toFixed(2);
+			const arcLen = +(0.75 * 2 * Math.PI * r).toFixed(2);
+			const fillLen = +((allStats[i].pct / 100) * arcLen).toFixed(2);
+			return {
+				d: `M ${sx},${sy} A ${r},${r} 0 1 1 ${ex},${sy}`,
+				arcLen,
+				fillLen,
+				color: RING_COLORS[i],
+				stat: allStats[i]
+			};
+		})
+	);
+
+	// viewBox: top of outermost arc = 100 − 86 = 14
+	// Arc endpoints (45° / 135°) at y = 100 + 86·sin45 ≈ 161
+	// Gap centre (6-o'clock, r=86) at y = 100 + 86 = 186
+	// Expand viewBox to 200 × 200 so the gap text fits inside
 </script>
 
 <div class="readiness">
 
-	<!-- Hero: big % + bar -->
-	<div class="hero">
-		<div class="hero-top">
-			<span class="hero-label">Trip readiness</span>
-			{#if daysUntil != null}
-				<span class="days-pill">{daysUntil} days away</span>
-			{/if}
-		</div>
-		<div class="hero-pct-row">
-			<span class="hero-pct" class:complete={overallPct >= 100}>{overallPct}<span class="hero-pct-sym">%</span></span>
-			{#if overallPct >= 100}
-				<span class="hero-complete-badge">All done!</span>
-			{:else}
-				<span class="hero-remaining">{pending.length} item{pending.length === 1 ? '' : 's'} left</span>
-			{/if}
-		</div>
-		<div class="overall-track">
-			<div class="overall-fill" class:complete={overallPct >= 100} style="width: {overallPct}%"></div>
-		</div>
+	<!-- ── Header ── -->
+	<div class="rdy-header">
+		<span class="rdy-title">Trip readiness</span>
+		{#if daysUntil != null}
+			<span class="rdy-pill">{daysUntil}d away</span>
+		{/if}
 	</div>
 
-	<!-- Pending items: grow to fill available space -->
-	{#if pending.length > 0}
-		<div class="pending-section">
-			<div class="section-label">
-				<span>Still needed</span>
-				<span class="section-count">{pending.length}</span>
-			</div>
-			<div class="pending-list">
-				{#each pending as stat}
-					<a href={stat.href || '#'} class="stat-row">
-						<span class="pct-ring" aria-hidden="true">
-							<svg viewBox="0 0 36 36" class="ring-svg">
-								<circle cx="18" cy="18" r="14" class="ring-track"/>
-								<circle
-									cx="18" cy="18" r="14"
-									class="ring-fill"
-									style="stroke-dasharray: {Math.round((stat.pct / 100) * 87.96)} 87.96"
-								/>
-							</svg>
-						</span>
-						<span class="stat-label">{stat.label}</span>
-						<span class="stat-badge">{stat.value}</span>
-						<span class="stat-arrow" aria-hidden="true">›</span>
-					</a>
-				{/each}
-			</div>
-		</div>
-	{/if}
-
-	<!-- Done items: compact chips pinned to bottom -->
-	{#if done.length > 0}
-		<div class="done-section">
-			{#each done as stat}
-				<a href={stat.href || '#'} class="done-chip">
-					<svg class="done-icon" viewBox="0 0 14 14" fill="none">
-						<circle cx="7" cy="7" r="6" fill="currentColor" opacity="0.15"/>
-						<polyline points="4,7.5 6,9.5 10,5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-					</svg>
-					{stat.label}
-				</a>
+	<!-- ── Multi-ring gauge (dark section) ── -->
+	<div class="rdy-gauge-section">
+	<div class="rdy-gauge-wrap">
+		<svg class="rdy-rings" viewBox="0 0 200 200" aria-hidden="true">
+			{#each rings as ring}
+				<!-- Track (full 270° arc, very subtle) -->
+				<path
+					d={ring.d}
+					fill="none"
+					stroke="rgba(47,119,120,0.18)"
+					stroke-width="9"
+					stroke-linecap="round"
+				/>
+				<!-- Fill (partial arc, colored) -->
+				{#if ring.stat.pct > 1}
+					<path
+						d={ring.d}
+						fill="none"
+						stroke={ring.color}
+						stroke-width="9"
+						stroke-linecap="round"
+						stroke-dasharray="{ring.fillLen} {ring.arcLen}"
+					/>
+				{/if}
 			{/each}
-		</div>
-	{/if}
+
+			<!-- % and label anchored in the bottom gap -->
+			<text
+				x="100" y="176"
+				text-anchor="middle" dominant-baseline="auto"
+				font-size="32" font-weight="900" letter-spacing="-1.5"
+				fill="#1d4d4e"
+			>{overallPct}%</text>
+			<text
+				x="100" y="190"
+				text-anchor="middle" dominant-baseline="auto"
+				font-size="9" font-weight="700" letter-spacing="2.5"
+				fill="rgba(29,77,78,0.5)"
+			>{overallPct >= 100 ? 'ALL SET' : 'READY'}</text>
+		</svg>
+	</div>
+
+	</div><!-- /rdy-gauge-section -->
+
+	<!-- ── Stat legend rows ── -->
+	<div class="rdy-stats">
+		{#each allStats as stat}
+			<a href={stat.href || '#'} class="rdy-row">
+				<span class="rdy-dot" style="background: {stat.color}"></span>
+				<span class="rdy-row-label">{stat.label}</span>
+				<div class="rdy-row-bar">
+					<div class="rdy-row-fill" style="width: {stat.pct}%; background: {stat.color}"></div>
+				</div>
+				{#if stat.pct >= 100}
+					<span class="rdy-row-val rdy-row-val--done">✓</span>
+				{:else}
+					<span class="rdy-row-val">{stat.value}</span>
+				{/if}
+			</a>
+		{/each}
+	</div>
 
 </div>
 
@@ -183,255 +207,132 @@
 	.readiness {
 		display: flex;
 		flex-direction: column;
-		gap: 0;
-		min-width: 0;
+		gap: 0.5rem;
 		height: 100%;
+		min-width: 0;
 	}
 
-	/* ── Hero ── */
-	.hero {
-		margin-bottom: 1.5rem;
-	}
-
-	.hero-top {
+	/* ── Header ── */
+	.rdy-header {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		margin-bottom: 0.6rem;
+		gap: 0.5rem;
 	}
 
-	.hero-label {
-		font-size: 0.6875rem;
+	.rdy-title {
+		font-size: 0.6rem;
 		font-weight: 700;
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--muted);
-	}
-
-	.days-pill {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		color: var(--muted);
-		background: var(--border-soft);
-		border: 1px solid var(--border);
-		border-radius: 999px;
-		padding: 0.15rem 0.55rem;
-	}
-
-	.hero-pct-row {
-		display: flex;
-		align-items: baseline;
-		gap: 0.6rem;
-		margin-bottom: 0.75rem;
-	}
-
-	.hero-pct {
-		font-size: 3rem;
-		font-weight: 900;
-		line-height: 1;
-		letter-spacing: -0.04em;
-		color: var(--text);
-	}
-
-	.hero-pct.complete {
-		color: #2a7a4a;
-	}
-
-	.hero-pct-sym {
-		font-size: 1.5rem;
-		font-weight: 700;
-		letter-spacing: -0.02em;
+		letter-spacing: 0.12em;
+		color: var(--slate, #2f7778);
 		opacity: 0.6;
 	}
 
-	.hero-remaining {
-		font-size: 0.8125rem;
-		color: var(--muted);
-		font-weight: 500;
-		align-self: center;
-	}
-
-	.hero-complete-badge {
-		font-size: 0.8rem;
-		font-weight: 700;
-		color: #2a7a4a;
-		background: rgba(42, 122, 74, 0.1);
+	.rdy-pill {
+		font-size: 0.58rem;
+		font-weight: 600;
+		color: var(--slate, #2f7778);
+		background: rgba(47, 119, 120, 0.1);
+		border: 1px solid rgba(47, 119, 120, 0.2);
 		border-radius: 999px;
-		padding: 0.2rem 0.6rem;
-		align-self: center;
+		padding: 0.12rem 0.45rem;
+		white-space: nowrap;
 	}
 
-	.overall-track {
-		height: 6px;
-		background: var(--border-soft);
-		border-radius: 999px;
-		overflow: hidden;
-	}
-
-	.overall-fill {
-		height: 100%;
-		background: var(--navy, #1d4d4e);
-		border-radius: 999px;
-		transition: width 0.5s ease;
-	}
-
-	.overall-fill.complete {
-		background: #2a7a4a;
-	}
-
-	/* ── Pending section ── */
-	.pending-section {
+	/* ── Gauge section: solid teal, matches chat tab ── */
+	.rdy-gauge-section {
 		flex: 1;
+		min-height: 0;
+		border-radius: 14px;
+		background: rgb(0, 0, 0, 0.2);
 		display: flex;
 		flex-direction: column;
+		padding: 0.25rem 0.25rem 0.5rem;
+	}
+
+	/* ── Ring gauge ── */
+	.rdy-gauge-wrap {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		min-height: 0;
 	}
 
-	.section-label {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.6875rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--muted);
-		margin-bottom: 0.375rem;
-		padding: 0 0.25rem;
-	}
-
-	.section-count {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		min-width: 1.1rem;
-		height: 1.1rem;
-		padding: 0 0.3rem;
-		border-radius: 999px;
-		background: var(--navy, #1d4d4e);
-		color: #fff;
-		font-size: 0.625rem;
-		font-weight: 700;
-		line-height: 1;
-	}
-
-	.pending-list {
-		display: flex;
-		flex-direction: column;
-		justify-content: space-around;
-		flex: 1;
-	}
-
-	/* ── Stat rows ── */
-	.stat-row {
-		display: flex;
-		align-items: center;
-		gap: 0.625rem;
-		padding: 0.6rem 0.5rem;
-		border-radius: var(--radius-md);
-		text-decoration: none;
-		color: inherit;
-		transition: background 0.13s ease;
-	}
-
-	.stat-row:hover {
-		background: var(--border-soft);
-	}
-
-	/* ── Ring ── */
-	.pct-ring {
-		flex-shrink: 0;
-		width: 28px;
-		height: 28px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.ring-svg {
+	.rdy-rings {
 		width: 100%;
 		height: 100%;
-		transform: rotate(-90deg);
+		max-width: 200px;
+		max-height: 200px;
+		overflow: visible;
 	}
 
-	.ring-track {
-		fill: none;
-		stroke: var(--border-soft);
-		stroke-width: 5;
+	/* ── Stat rows (on white) ── */
+	.rdy-stats {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		padding-top: 0.4rem;
 	}
 
-	.ring-fill {
-		fill: none;
-		stroke: var(--navy, #1d4d4e);
-		stroke-width: 5;
-		stroke-linecap: round;
-		transition: stroke-dasharray 0.4s ease;
-	}
-
-	/* ── Label & badge ── */
-	.stat-label {
-		font-size: 0.875rem;
-		color: var(--text);
-		flex: 1;
+	.rdy-row {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.28rem 0.25rem;
+		border-radius: 7px;
+		text-decoration: none;
+		transition: background 0.12s;
 		min-width: 0;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		font-weight: 500;
 	}
 
-	.stat-badge {
+	.rdy-row:hover {
+		background: rgba(29, 77, 78, 0.05);
+	}
+
+	.rdy-dot {
 		flex-shrink: 0;
-		font-size: 0.75rem;
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+	}
+
+	.rdy-row-label {
+		font-size: 0.7rem;
+		font-weight: 500;
+		color: var(--slate, #2f7778);
+		white-space: nowrap;
+		min-width: 3.5rem;
+	}
+
+	.rdy-row-bar {
+		flex: 1;
+		height: 3px;
+		background: rgba(29, 77, 78, 0.1);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+
+	.rdy-row-fill {
+		height: 100%;
+		border-radius: 999px;
+		transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.rdy-row-val {
+		flex-shrink: 0;
+		font-size: 0.68rem;
 		font-weight: 700;
 		color: var(--navy, #1d4d4e);
-		background: rgba(29, 77, 78, 0.09);
-		border-radius: 6px;
-		padding: 0.2rem 0.5rem;
-		white-space: nowrap;
+		opacity: 0.6;
+		font-variant-numeric: tabular-nums;
+		min-width: 2.5rem;
+		text-align: right;
 	}
 
-	.stat-arrow {
-		flex-shrink: 0;
-		font-size: 1.1rem;
-		color: var(--muted);
-		opacity: 0.4;
-		line-height: 1;
-	}
-
-	/* ── Done chips (bottom) ── */
-	.done-section {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.375rem;
-		padding-top: 0.875rem;
-		border-top: 1px solid var(--border-soft);
-		margin-top: 0.75rem;
-	}
-
-	.done-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: var(--muted);
-		background: var(--border-soft);
-		border-radius: 999px;
-		padding: 0.25rem 0.6rem 0.25rem 0.4rem;
-		text-decoration: none;
-		transition: opacity 0.15s;
-		opacity: 0.7;
-	}
-
-	.done-chip:hover {
+	.rdy-row-val--done {
+		color: var(--warm, #ce5612);
 		opacity: 1;
-	}
-
-	.done-icon {
-		width: 14px;
-		height: 14px;
-		flex-shrink: 0;
-		color: #2a7a4a;
 	}
 </style>

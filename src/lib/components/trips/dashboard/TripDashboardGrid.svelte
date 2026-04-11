@@ -273,9 +273,9 @@
 	<!-- Layout: row1 = reminders | goals | recent, row2 = guests under reminders + goals only -->
 	<div class="dashboard-layout">
 		<div class="left-column">
-			<div class="sticky-card-wrapper">
-				{#if isHost}
-					<DashboardCard
+		<div class="sticky-card-wrapper" class:host-mode={isHost}>
+			{#if isHost}
+				<DashboardCard
 						variant="sticky"
 						title="Progress"
 						headerLeft={stickyPinIcon}
@@ -576,21 +576,12 @@
 		flex-direction: column;
 	}
 
-	/* Progress / Your RSVP: deep teal card */
+	/* ── Shared sticky card shell ── */
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
 		flex: 1;
 		width: 100%;
 		overflow: hidden;
 		padding: 1rem 1.125rem;
-		background:
-			radial-gradient(ellipse at 20% 0%, rgba(122, 206, 211, 0.18) 0%, transparent 55%),
-			linear-gradient(
-				155deg,
-				#1d4d4e 0%,
-				#2a6263 55%,
-				#1a4041 100%
-			);
-		box-shadow: 0 8px 32px rgba(29, 77, 78, 0.35);
 	}
 
 	.sticky-card-wrapper :global(.card-header) {
@@ -610,64 +601,68 @@
 		min-height: 0;
 	}
 
-	/* Progress / RSVP, white text and UI on dark teal */
-	.sticky-card-wrapper :global(.card-title) { color: white; }
-	.sticky-card-wrapper :global(.pin-circle) { background: rgba(255, 255, 255, 0.22); }
-	.sticky-card-wrapper :global(.pin-svg) { color: white; stroke: white; }
-	.sticky-card-wrapper :global(.view-detail-btn) {
+	/* ── Host progress card: white with dark gauge section inside ── */
+	.sticky-card-wrapper.host-mode :global(.dashboard-card.variant-sticky) {
+		background: white;
+		box-shadow: 0 4px 28px rgba(29, 77, 78, 0.12), 0 1px 4px rgba(0, 0, 0, 0.05);
+	}
+	.sticky-card-wrapper.host-mode :global(.card-title) { color: var(--navy, #1d4d4e); }
+	.sticky-card-wrapper.host-mode :global(.pin-circle) { background: rgba(47, 119, 120, 0.1); }
+	.sticky-card-wrapper.host-mode :global(.pin-svg) { color: var(--slate, #2f7778); stroke: var(--slate, #2f7778); }
+	.sticky-card-wrapper.host-mode :global(.view-detail-btn) {
+		color: var(--slate, #2f7778);
+		background: rgba(47, 119, 120, 0.07);
+		border-color: rgba(47, 119, 120, 0.18);
+	}
+	.sticky-card-wrapper.host-mode :global(.view-detail-btn:hover) {
+		background: rgba(47, 119, 120, 0.13);
+		border-color: rgba(47, 119, 120, 0.3);
+	}
+
+	/* TripGoalsCombined fills the card body */
+	.sticky-card-wrapper :global(.readiness) { flex: 1; }
+
+	/* ── Non-host RSVP card: dark teal ── */
+	.sticky-card-wrapper:not(.host-mode) :global(.dashboard-card.variant-sticky) {
+		background:
+			radial-gradient(ellipse at 20% 0%, rgba(122, 206, 211, 0.18) 0%, transparent 55%),
+			linear-gradient(155deg, #1d4d4e 0%, #2a6263 55%, #1a4041 100%);
+		box-shadow: 0 8px 32px rgba(29, 77, 78, 0.35);
+	}
+	.sticky-card-wrapper:not(.host-mode) :global(.card-title) { color: white; }
+	.sticky-card-wrapper:not(.host-mode) :global(.pin-circle) { background: rgba(255, 255, 255, 0.22); }
+	.sticky-card-wrapper:not(.host-mode) :global(.pin-svg) { color: white; stroke: white; }
+	.sticky-card-wrapper:not(.host-mode) :global(.view-detail-btn) {
 		color: rgba(255, 255, 255, 0.85);
 		background: rgba(255, 255, 255, 0.15);
 		border-color: rgba(255, 255, 255, 0.25);
 	}
-	.sticky-card-wrapper :global(.view-detail-btn:hover) {
+	.sticky-card-wrapper:not(.host-mode) :global(.view-detail-btn:hover) {
 		background: rgba(255, 255, 255, 0.25);
 		border-color: rgba(255, 255, 255, 0.4);
 	}
 
-	/* TripGoalsCombined — sticky dark card overrides */
-	.sticky-card-wrapper :global(.readiness) { flex: 1; }
-	.sticky-card-wrapper :global(.hero-label) { color: rgba(255,255,255,0.6); }
-	.sticky-card-wrapper :global(.days-pill) { color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
-	.sticky-card-wrapper :global(.hero-pct) { color: white; }
-	.sticky-card-wrapper :global(.hero-remaining) { color: rgba(255,255,255,0.6); }
-	.sticky-card-wrapper :global(.hero-complete-badge) { color: #6ee7a0; background: rgba(110,231,160,0.15); }
-	.sticky-card-wrapper :global(.overall-track) { background: rgba(255,255,255,0.18); }
-	.sticky-card-wrapper :global(.overall-fill) { background: rgba(255,255,255,0.85); }
-	.sticky-card-wrapper :global(.overall-fill.complete) { background: #6ee7a0; }
-	.sticky-card-wrapper :global(.section-label) { color: rgba(255,255,255,0.5); }
-	.sticky-card-wrapper :global(.section-count) { background: rgba(255,255,255,0.2); color: white; }
-	.sticky-card-wrapper :global(.stat-label) { color: rgba(255,255,255,0.92); }
-	.sticky-card-wrapper :global(.stat-badge) { background: rgba(255,255,255,0.15); color: white; }
-	.sticky-card-wrapper :global(.stat-arrow) { color: rgba(255,255,255,0.4); }
-	.sticky-card-wrapper :global(.ring-track) { stroke: rgba(255,255,255,0.18); }
-	.sticky-card-wrapper :global(.ring-fill) { stroke: rgba(255,255,255,0.85); }
-	.sticky-card-wrapper :global(.stat-row:hover) { background: rgba(255,255,255,0.08); }
-	.sticky-card-wrapper :global(.done-section) { border-color: rgba(255,255,255,0.15); }
-	.sticky-card-wrapper :global(.done-chip) { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
-	.sticky-card-wrapper :global(.done-chip:hover) { background: rgba(255,255,255,0.18); opacity: 1; }
-	.sticky-card-wrapper :global(.done-icon) { color: #6ee7a0; }
-
-	/* GuestRsvpSummaryCard */
-	.sticky-card-wrapper :global(.status-banner) { border-color: rgba(255, 255, 255, 0.2); color: white; }
-	.sticky-card-wrapper :global(.status-icon) { color: white; }
-	.sticky-card-wrapper :global(.status-text) { color: white; }
-	.sticky-card-wrapper :global(.status-days) {
+	/* GuestRsvpSummaryCard — scoped to non-host (dark teal) card */
+	.sticky-card-wrapper:not(.host-mode) :global(.status-banner) { border-color: rgba(255, 255, 255, 0.2); color: white; }
+	.sticky-card-wrapper:not(.host-mode) :global(.status-icon) { color: white; }
+	.sticky-card-wrapper:not(.host-mode) :global(.status-text) { color: white; }
+	.sticky-card-wrapper:not(.host-mode) :global(.status-days) {
 		background: rgba(255, 255, 255, 0.2);
 		border-color: rgba(255, 255, 255, 0.3);
 		color: white;
 	}
-	.sticky-card-wrapper :global(.pending-dot) { background: white; }
-	.sticky-card-wrapper :global(.nudge-text) { color: rgba(255, 255, 255, 0.82); }
-	.sticky-card-wrapper :global(.detail-block) { border-color: rgba(255, 255, 255, 0.18); }
-	.sticky-card-wrapper :global(.detail-label) { color: rgba(255, 255, 255, 0.65); }
-	.sticky-card-wrapper :global(.detail-price) { color: white; }
-	.sticky-card-wrapper :global(.detail-value) { color: white; }
-	.sticky-card-wrapper :global(.detail-note) { color: rgba(255, 255, 255, 0.65); }
-	.sticky-card-wrapper :global(.detail-empty) { color: rgba(255, 255, 255, 0.55); }
-	.sticky-card-wrapper :global(.cta-primary) { background: white; color: var(--warm); }
-	.sticky-card-wrapper :global(.cta-primary:hover) { background: rgba(255, 255, 255, 0.9); }
-	.sticky-card-wrapper :global(.cta-ghost) { color: white; border-color: rgba(255, 255, 255, 0.35); }
-	.sticky-card-wrapper :global(.cta-ghost:hover) { background: rgba(255, 255, 255, 0.12); }
+	.sticky-card-wrapper:not(.host-mode) :global(.pending-dot) { background: white; }
+	.sticky-card-wrapper:not(.host-mode) :global(.nudge-text) { color: rgba(255, 255, 255, 0.82); }
+	.sticky-card-wrapper:not(.host-mode) :global(.detail-block) { border-color: rgba(255, 255, 255, 0.18); }
+	.sticky-card-wrapper:not(.host-mode) :global(.detail-label) { color: rgba(255, 255, 255, 0.65); }
+	.sticky-card-wrapper:not(.host-mode) :global(.detail-price) { color: white; }
+	.sticky-card-wrapper:not(.host-mode) :global(.detail-value) { color: white; }
+	.sticky-card-wrapper:not(.host-mode) :global(.detail-note) { color: rgba(255, 255, 255, 0.65); }
+	.sticky-card-wrapper:not(.host-mode) :global(.detail-empty) { color: rgba(255, 255, 255, 0.55); }
+	.sticky-card-wrapper:not(.host-mode) :global(.cta-primary) { background: white; color: var(--warm); }
+	.sticky-card-wrapper:not(.host-mode) :global(.cta-primary:hover) { background: rgba(255, 255, 255, 0.9); }
+	.sticky-card-wrapper:not(.host-mode) :global(.cta-ghost) { color: white; border-color: rgba(255, 255, 255, 0.35); }
+	.sticky-card-wrapper:not(.host-mode) :global(.cta-ghost:hover) { background: rgba(255, 255, 255, 0.12); }
 
 	@media (max-width: 1024px) {
 		.dashboard-wrapper {

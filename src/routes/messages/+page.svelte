@@ -115,9 +115,15 @@
 </svelte:head>
 
 <div class="messages-page">
+	<div class="messages-topbar">
+		<button type="button" class="messages-back-btn" onclick={() => history.back()} aria-label="Go back">
+			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+			Back
+		</button>
+		<h1 class="messages-heading">Messages</h1>
+	</div>
 	<div class="messages-layout">
 		<aside class="conversations-panel">
-			<h2>Messages</h2>
 			{#if loading && conversations.length === 0}
 				<p class="muted">Loading...</p>
 			{:else if conversations.length === 0}
@@ -238,6 +244,42 @@
 	.messages-page {
 		min-height: calc(100vh - 80px);
 		background: var(--bg, #f9fafb);
+	}
+	.messages-topbar {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		max-width: 900px;
+		margin: 0 auto;
+		padding: 1rem 0 0.5rem;
+	}
+	.messages-back-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.375rem 0.75rem;
+		border: 1.5px solid var(--border, #e5e7eb);
+		border-radius: 8px;
+		background: white;
+		color: var(--text, #111827);
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background 0.15s, border-color 0.15s;
+		font: inherit;
+	}
+	.messages-back-btn:hover {
+		background: var(--bg, #f9fafb);
+		border-color: var(--slate, #2f7778);
+		color: var(--slate, #2f7778);
+	}
+	.messages-heading {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.5rem;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		color: var(--navy, #1d4d4e);
+		margin: 0;
 	}
 	.messages-layout {
 		display: flex;

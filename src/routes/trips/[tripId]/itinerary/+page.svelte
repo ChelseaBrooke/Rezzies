@@ -182,6 +182,27 @@
 	// ── Mini-calendar derived state ────────────────────────────────────────
 	const todayKey = $derived(new Date().toISOString().slice(0, 10));
 
+	// ── 7-day pagination ────────────────────────────────────────────────────
+	// Start at today if the trip is underway; fall back to day 0
+	const initialPageStart = (() => {
+		const days = data.tripDays ?? [];
+		const today = new Date().toISOString().slice(0, 10);
+		const idx = days.indexOf(today);
+		return idx >= 0 ? idx : 0;
+	})();
+	let pageStartIdx = $state(initialPageStart);
+	const PAGE_SIZE = 7;
+	const visibleDays = $derived(tripDays.slice(pageStartIdx, pageStartIdx + PAGE_SIZE));
+	const canGoPrevPage = $derived(pageStartIdx > 0);
+	const canGoNextPage = $derived(pageStartIdx + PAGE_SIZE < tripDays.length);
+	const pageLabel = $derived.by(() => {
+		if (visibleDays.length === 0) return '';
+		const fmt = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+		return `${fmt(visibleDays[0])} – ${fmt(visibleDays[visibleDays.length - 1])}`;
+	});
+	function prevPage() { pageStartIdx = Math.max(0, pageStartIdx - PAGE_SIZE); }
+	function nextPage() { pageStartIdx = Math.min(tripDays.length - PAGE_SIZE, pageStartIdx + PAGE_SIZE); }
+
 	// All unique months spanned by the trip, in order
 	const tripMonths = $derived.by(() => {
 		if (!tripDays.length) return [{ year: new Date().getFullYear(), month: new Date().getMonth() }];
@@ -244,7 +265,7 @@
 
 	// ── "Now" indicator ────────────────────────────────────────────────────
 	const nowTopPx = $derived.by(() => {
-		if (!tripDays.includes(todayKey)) return null;
+		if (!visibleDays.includes(todayKey)) return null;
 		const now = new Date();
 		const hour = now.getHours() + now.getMinutes() / 60;
 		if (hour < HOUR_START || hour > HOUR_END) return null;
@@ -451,11 +472,11 @@
 
 		// X → which day column
 		const xInDays = e.clientX - rect.left + scrollLeft - TIME_COL_WIDTH;
-		const numDays = tripDays.length;
+		const numDays = visibleDays.length;
 		const dayColWidth = (gridWrapperEl.scrollWidth - TIME_COL_WIDTH) / numDays;
 		const dayIdx = clamp(Math.floor(xInDays / dayColWidth), 0, numDays - 1);
 
-		ghostDate = tripDays[dayIdx] ?? dragState.origDate;
+		ghostDate = visibleDays[dayIdx] ?? dragState.origDate;
 		ghostStartMin = snapped;
 	}
 
@@ -511,7 +532,7 @@
 	});
 	const ghostDayIdx = $derived.by(() => {
 		if (!ghostDate) return -1;
-		return tripDays.indexOf(ghostDate);
+		return visibleDays.indexOf(ghostDate);
 	});
 
 	// ── Helpers for event card coloring ───────────────────────────────────
@@ -593,6 +614,21 @@
 </script>
 
 <div class="itinerary-page">
+	<!-- ── Page header ── -->
+	<div class="itin-page-header">
+		<div class="itin-page-header-left">
+			<h1 class="itin-page-title">Itinerary</h1>
+			{#if tripDays.length > 0}
+				<p class="itin-page-sub">
+					{new Date(tripDays[0] + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+					–
+					{new Date(tripDays[tripDays.length - 1] + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+					· {tripDays.length} day{tripDays.length !== 1 ? 's' : ''}
+				</p>
+			{/if}
+		</div>
+	</div>
+
 	{#if tripDays.length === 0}
 		<div class="empty-state">
 			<p>Set trip check-in and check-out dates to see the daily schedule.</p>
@@ -680,10 +716,23 @@
 				</div>
 				</div>
 
-				<!-- Calendar grid -->
+				<!-- 7-day page navigation -->
+							{#if tripDays.length > PAGE_SIZE}
+								<div class="page-nav">
+									<button class="page-nav-btn" onclick={prevPage} disabled={!canGoPrevPage} aria-label="Previous 7 days">
+										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+									</button>
+									<span class="page-nav-label">{pageLabel}</span>
+									<button class="page-nav-btn" onclick={nextPage} disabled={!canGoNextPage} aria-label="Next 7 days">
+										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+									</button>
+								</div>
+							{/if}
+
+			<!-- Calendar grid -->
 				<div
 					class="schedule-grid-wrapper"
-					style="--day-cols:{tripDays.length}; --slot-h:{SLOT_HEIGHT}px; --time-w:{TIME_COL_WIDTH}px; --hdr-h:{HEADER_HEIGHT}px;"
+					style="--day-cols:{visibleDays.length}; --slot-h:{SLOT_HEIGHT}px; --time-w:{TIME_COL_WIDTH}px; --hdr-h:{HEADER_HEIGHT}px;"
 					bind:this={gridWrapperEl}
 					onpointermove={onGridPointerMove}
 					onpointerup={onGridPointerUp}
@@ -694,7 +743,7 @@
 							<!-- Corner -->
 							<div class="grid-corner"></div>
 							<!-- Day headers -->
-							{#each tripDays as date}
+							{#each visibleDays as date}
 								{@const d = new Date(date + 'T12:00:00')}
 								<div class="grid-day-header" class:today={date === todayKey}>
 									<span class="day-num" class:today-num={date === todayKey}>{d.getDate()}</span>
@@ -704,25 +753,25 @@
 							<!-- Time rows -->
 							{#each timeSlots as slot}
 								<div class="grid-time-label">{slot}</div>
-								{#each tripDays as _date}
+								{#each visibleDays as _date}
 									<div class="grid-cell"></div>
 								{/each}
 							{/each}
 						</div>
 
 
-					<!-- "Now" line -->
-						{#if nowTopPx !== null}
-							{@const nowDayIdx = tripDays.indexOf(todayKey)}
-							{#if nowDayIdx >= 0}
-								<div
-									class="now-line"
-									style="
-										top:{HEADER_HEIGHT + nowTopPx}px;
-										left:calc({TIME_COL_WIDTH}px + {nowDayIdx} * (100% - {TIME_COL_WIDTH}px) / {tripDays.length});
-										width:calc((100% - {TIME_COL_WIDTH}px) / {tripDays.length});
-									"
-								>
+				<!-- "Now" line -->
+					{#if nowTopPx !== null}
+						{@const nowDayIdx = visibleDays.indexOf(todayKey)}
+						{#if nowDayIdx >= 0}
+							<div
+								class="now-line"
+								style="
+									top:{HEADER_HEIGHT + nowTopPx}px;
+									left:calc({TIME_COL_WIDTH}px + {nowDayIdx} * (100% - {TIME_COL_WIDTH}px) / {visibleDays.length});
+									width:calc((100% - {TIME_COL_WIDTH}px) / {visibleDays.length});
+								"
+							>
 									<span class="now-dot"></span>
 								</div>
 							{/if}
@@ -735,32 +784,32 @@
 								style="
 									top:{HEADER_HEIGHT + ghostTopPx}px;
 									height:{ghostHeightPx}px;
-									left:calc({TIME_COL_WIDTH}px + {ghostDayIdx} * (100% - {TIME_COL_WIDTH}px) / {tripDays.length} + 6px);
-									width:calc((100% - {TIME_COL_WIDTH}px) / {tripDays.length} - 12px);
+									left:calc({TIME_COL_WIDTH}px + {ghostDayIdx} * (100% - {TIME_COL_WIDTH}px) / {visibleDays.length} + 6px);
+									width:calc((100% - {TIME_COL_WIDTH}px) / {visibleDays.length} - 12px);
 								"
 							>
 								<span class="ghost-time">{formatMinutes(ghostStartMin)}</span>
 							</div>
 						{/if}
 
-						<!-- Meal placeholders (only when meal planning is on) -->
-						{#if mealPlanOn && data.isHost}
-							{#each [
-								{ mealType: 'breakfast', defaultMin: 9 * 60,  defaultTime: '9:00 AM',  label: '🍳 Breakfast' },
-								{ mealType: 'lunch',     defaultMin: 13 * 60, defaultTime: '1:00 PM',  label: '🥗 Lunch' },
-								{ mealType: 'dinner',    defaultMin: 17 * 60, defaultTime: '5:00 PM',  label: '🍽 Dinner' }
-							] as slot}
-								{#each tripDays as date, colIdx}
+					<!-- Meal placeholders (only when meal planning is on) -->
+					{#if mealPlanOn && data.isHost}
+						{#each [
+							{ mealType: 'breakfast', defaultMin: 9 * 60,  defaultTime: '9:00 AM',  label: '🍳 Breakfast' },
+							{ mealType: 'lunch',     defaultMin: 13 * 60, defaultTime: '1:00 PM',  label: '🥗 Lunch' },
+							{ mealType: 'dinner',    defaultMin: 17 * 60, defaultTime: '5:00 PM',  label: '🍽 Dinner' }
+						] as slot}
+							{#each visibleDays as date, colIdx}
 									{@const key = `${date}|${slot.mealType}`}
 									{@const topPx = HEADER_HEIGHT + ((slot.defaultMin - HOUR_START * 60) / 60) * SLOT_HEIGHT}
 									{#if !existingMealKeys.has(key)}
-										<button
-											class="meal-placeholder"
-											style="
-												top:{topPx}px;
-												left:calc({TIME_COL_WIDTH}px + {colIdx} * ((100% - {TIME_COL_WIDTH}px) / {tripDays.length}) + 4px);
-												width:calc((100% - {TIME_COL_WIDTH}px) / {tripDays.length} - 8px);
-											"
+									<button
+										class="meal-placeholder"
+										style="
+											top:{topPx}px;
+											left:calc({TIME_COL_WIDTH}px + {colIdx} * ((100% - {TIME_COL_WIDTH}px) / {visibleDays.length}) + 4px);
+											width:calc((100% - {TIME_COL_WIDTH}px) / {visibleDays.length} - 8px);
+										"
 											onclick={() => openAddMeal(date, slot.mealType, slot.defaultTime)}
 											title="Add {slot.mealType}"
 										>
@@ -771,9 +820,9 @@
 							{/each}
 						{/if}
 
-						<!-- Events layer -->
-						<div class="schedule-events-layer">
-							{#each tripDays as date, colIdx}
+					<!-- Events layer -->
+					<div class="schedule-events-layer">
+						{#each visibleDays as date, colIdx}
 								{@const dayEvents = positionedByDate[date] ?? []}
 								{#each dayEvents as { ev, col, totalCols, topPx, heightPx }}
 								{@const isMeal = ev.type === 'meal'}
@@ -790,12 +839,12 @@
 									class="event-block"
 									class:is-dragging={isDragging}
 									class:not-going={isNotGoing}
-										style="
-											top:{topPx}px;
-											height:{heightPx}px;
-											left:calc({colIdx} * (100% / {tripDays.length}) + {(col / totalCols) * 100}% / {tripDays.length} + 4px);
-											width:calc((100% / {tripDays.length}) / {totalCols} - 8px);
-											z-index:{2 + col};
+								style="
+										top:{topPx}px;
+										height:{heightPx}px;
+										left:calc({colIdx} * (100% / {visibleDays.length}) + {(col / totalCols) * 100}% / {visibleDays.length} + 4px);
+										width:calc((100% / {visibleDays.length}) / {totalCols} - 8px);
+										z-index:{2 + col};
 											background:{style.bg};
 											border:1px solid {style.border};
 										"
@@ -995,7 +1044,73 @@
 <style>
 	/* ── Page shell ── */
 	.itinerary-page {
-		padding: 3rem 0 2rem;
+		padding: 1rem 0 2rem;
+	}
+
+	/* ── Page header ── */
+	.itin-page-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-bottom: 1.5rem;
+	}
+	.itin-page-header-left {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+	.itin-page-title {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.75rem;
+		font-weight: 700;
+		letter-spacing: -0.03em;
+		color: var(--navy, var(--text));
+		margin: 0;
+	}
+	.itin-page-sub {
+		font-size: 0.8125rem;
+		color: var(--muted);
+		margin: 0;
+	}
+
+	/* ── 7-day pagination ── */
+	.page-nav {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
+		justify-content: flex-end;
+	}
+	.page-nav-label {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--text, #1e293b);
+		min-width: 12ch;
+		text-align: center;
+	}
+	.page-nav-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border: 1.5px solid #e2e8f0;
+		border-radius: 8px;
+		background: white;
+		color: #374151;
+		cursor: pointer;
+		transition: background 0.12s, border-color 0.12s, color 0.12s;
+		padding: 0;
+	}
+	.page-nav-btn:hover:not(:disabled) {
+		background: #f1f5f9;
+		border-color: var(--slate, #2f7778);
+		color: var(--slate, #2f7778);
+	}
+	.page-nav-btn:disabled {
+		opacity: 0.35;
+		cursor: default;
 	}
 
 	.empty-state {
