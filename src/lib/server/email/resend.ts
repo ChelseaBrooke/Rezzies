@@ -1,19 +1,48 @@
+import { env } from '$env/dynamic/private';
 import { Resend } from 'resend';
 import { prisma } from '../prisma.js';
 import type { EmailTemplateKey } from './templates.js';
 
 function getResendClient(): Resend {
-	const key = process.env.RESEND_API_KEY;
+	const key = env.RESEND_API_KEY;
 	if (!key) {
 		throw new Error('RESEND_API_KEY environment variable is required');
 	}
 	return new Resend(key);
 }
 
+/** Lowercase domain only; keeps local-part as-is (RFC allows case sensitivity there). */
+function normalizeFromEmail(raw: string): string {
+	const trimmed = raw.trim();
+	const at = trimmed.lastIndexOf('@');
+	if (at < 1) return trimmed;
+	const local = trimmed.slice(0, at);
+	const domain = trimmed.slice(at + 1).toLowerCase();
+	return `${local}@${domain}`;
+}
+
+/**
+ * Resend only allows arbitrary recipients when `from` uses your verified domain.
+ * See https://resend.com/docs/dashboard/domains/introduction
+ */
 function fromAddress(): string {
-	const email = process.env.RESEND_FROM_EMAIL || 'support@divvihq.com';
-	const name = process.env.RESEND_FROM_NAME || 'Divvi Support';
+	const raw = env.RESEND_FROM_EMAIL?.trim();
+	if (!raw) {
+		throw new Error(
+			'RESEND_FROM_EMAIL is required (e.g. noreply@your-verified-domain.com). It must match a domain verified in the same Resend project as RESEND_API_KEY.'
+		);
+	}
+	const email = normalizeFromEmail(raw);
+	const name = (env.RESEND_FROM_NAME ?? 'Divvi Support').trim() || 'Divvi Support';
 	return `${name} <${email}>`;
+}
+
+function resendFromHint(errMessage: string): string {
+	if (!/testing emails|verify a domain/i.test(errMessage)) return '';
+	return (
+		' Set RESEND_FROM_EMAIL to an address on your Resend-verified domain (Resend → Domains), ' +
+		'use the API key from that same Resend project, and restart the dev server after changing .env.'
+	);
 }
 
 export interface SendHtmlEmailParams {
@@ -62,7 +91,8 @@ export async function sendHtmlEmail({
 			messageId: data?.id
 		};
 	} catch (err) {
-		const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+		let errorMessage = err instanceof Error ? err.message : 'Unknown error';
+		errorMessage += resendFromHint(errorMessage);
 
 		await prisma.emailLog.create({
 			data: {

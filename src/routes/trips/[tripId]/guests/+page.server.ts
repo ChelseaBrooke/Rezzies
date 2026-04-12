@@ -484,17 +484,23 @@ export const actions: Actions = {
 				? new Date(trip.checkOutDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 				: '';
 			const destination = trip.locationCity?.trim() || trip.location?.trim() || '';
-			try {
-				const html = renderTripInviteHtml({ hostName, tripName: trip.name, checkIn, checkOut, inviteUrl, destination });
-				await sendHtmlEmail({
-					to: email,
-					subject: `${hostName} invited you to ${trip.name}`,
-					html,
-					templateKey: TEMPLATE_KEYS.TRIP_INVITE,
-					tags: [{ name: 'category', value: 'trip-invite' }]
-				});
-			} catch (err) {
-				console.error('Failed to send invite email:', err);
+			const html = renderTripInviteHtml({ hostName, tripName: trip.name, checkIn, checkOut, inviteUrl, destination });
+			const sendResult = await sendHtmlEmail({
+				to: email,
+				subject: `${hostName} invited you to ${trip.name}`,
+				html,
+				templateKey: TEMPLATE_KEYS.TRIP_INVITE,
+				tags: [{ name: 'category', value: 'trip-invite' }]
+			});
+			if (!sendResult.success) {
+				const err = sendResult.error ?? '';
+				const testingMode =
+					/testing emails|only send testing|verify a domain/i.test(err) ||
+					err.includes('your own email address');
+				const createInviteEmailWarning = testingMode
+					? 'Invite was saved, but Resend did not deliver the email. In testing mode you can only send to your own verified address until you add and verify a domain at resend.com/domains and set RESEND_FROM_EMAIL to an address on that domain. Share your trip link from the Guests page, or invite again after DNS is verified.'
+					: `Invite was saved, but the email could not be sent: ${err.slice(0, 280)}${err.length > 280 ? '…' : ''}`;
+				return { createInviteSuccess: true, createInviteEmailWarning };
 			}
 		}
 
@@ -601,6 +607,33 @@ export const actions: Actions = {
 		if (tripForEmail) sendRemovedFromTripEmail(tripId, userId, tripForEmail.name);
 
 		return { removeGuestSuccess: true };
+	},
+
+	/** Deletes a pending trip invite row only (sent/opened). Does not delete any User account. */
+	deletePendingInvite: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) throw redirect(303, '/login');
+		const tripId = params.tripId;
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) throw error(403, 'Only the host or co-host can manage invites');
+
+		const formData = await request.formData();
+		const inviteId = (formData.get('inviteId') as string)?.trim();
+		if (!inviteId) return fail(400, { deletePendingInviteError: 'Missing invite' });
+
+		const invite = await prisma.invite.findFirst({
+			where: {
+				id: inviteId,
+				tripId,
+				status: { in: PENDING_INVITE_STATUSES }
+			}
+		});
+		if (!invite) {
+			return fail(400, { deletePendingInviteError: 'Invite not found or already accepted' });
+		}
+
+		await prisma.invite.delete({ where: { id: inviteId } });
+		return { deletePendingInviteSuccess: true };
 	},
 
 	restoreGuest: async ({ request, params, cookies }) => {

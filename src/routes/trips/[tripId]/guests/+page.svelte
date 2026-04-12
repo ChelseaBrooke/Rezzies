@@ -35,6 +35,7 @@
 	let inviteEmail = $state('');
 	let inviteRole = $state<'guest' | 'co-host'>('guest');
 	let inviteError = $state('');
+	let inviteEmailWarning = $state('');
 	let friendsList = $state<{ id: string; name: string | null; avatarUrl: string | null }[]>([]);
 	let friendsLoading = $state(false);
 	let inviteFriendError = $state('');
@@ -52,6 +53,8 @@
 	let sortBy = $state<'name' | 'rsvp' | 'party-size'>('name');
 	let sortDir = $state<'asc' | 'desc'>('asc');
 	let removeTarget = $state<GuestRow | null>(null);
+	let pendingInviteDeleteTarget = $state<GuestRow | null>(null);
+	let pendingInviteDeleteError = $state('');
 	let selectedRowIds = $state<Set<string>>(new Set());
 	let copyToast = $state(false);
 	let nudgeToast = $state(false);
@@ -164,6 +167,7 @@
 	function openInvite() {
 		inviteOpen = true;
 		inviteError = '';
+		inviteEmailWarning = '';
 	}
 	function closeInvite() {
 		inviteOpen = false;
@@ -172,6 +176,7 @@
 		inviteEmail = '';
 		inviteRole = 'guest';
 		inviteError = '';
+		inviteEmailWarning = '';
 		inviteFriendError = '';
 	}
 	// User IDs already on the trip (members or pending invites with account)
@@ -214,14 +219,30 @@
 		addManualError = '';
 	}
 	function handleInviteSubmit() {
-		return async ({ result }: { result: { type: string; data?: { createInviteError?: string; createInviteSuccess?: boolean } } }) => {
+		return async ({
+			result
+		}: {
+			result: {
+				type: string;
+				data?: {
+					createInviteError?: string;
+					createInviteSuccess?: boolean;
+					createInviteEmailWarning?: string;
+				};
+			};
+		}) => {
 			if (result.type === 'success' && result.data?.createInviteError) {
 				inviteError = result.data.createInviteError;
 				return;
 			}
 			if (result.type === 'success' && result.data?.createInviteSuccess) {
-				closeInvite();
 				await invalidateAll();
+				if (result.data.createInviteEmailWarning) {
+					inviteEmailWarning = result.data.createInviteEmailWarning;
+					inviteError = '';
+				} else {
+					closeInvite();
+				}
 			}
 		};
 	}
@@ -968,6 +989,11 @@
 													<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
 												</button>
 											{/if}
+											{#if row.type === 'invite' && row.inviteId}
+												<button type="button" class="gp-icon-btn gp-icon-btn--remove" title="Remove invite" aria-label="Remove invite" onclick={() => { pendingInviteDeleteError = ''; pendingInviteDeleteTarget = row; }}>
+													<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+												</button>
+											{/if}
 										</div>
 									</td>
 								{/if}
@@ -997,11 +1023,13 @@
 					<p class="gp-section-hint">Bookings from the public trip link (before the RSVP flow). Read-only.</p>
 				</div>
 				{#if (data.legacyReservations?.length ?? 0) > 0}
-					<form method="POST" action="?/exportLegacyBookings" use:enhance={async ({ result }) => {
-						if (result.type === 'success' && result.data?.exportLegacyCsv) {
-							triggerCsvDownload(result.data.exportLegacyCsv, result.data.exportLegacyFilename ?? 'legacy_bookings.csv');
-							await invalidateAll();
-						}
+					<form method="POST" action="?/exportLegacyBookings" use:enhance={() => {
+						return async ({ result }) => {
+							if (result.type === 'success' && result.data?.exportLegacyCsv) {
+								triggerCsvDownload(result.data.exportLegacyCsv, result.data.exportLegacyFilename ?? 'legacy_bookings.csv');
+								await invalidateAll();
+							}
+						};
 					}}>
 						<button type="submit" class="gp-btn gp-btn--ghost gp-btn--sm">Export CSV</button>
 					</form>
@@ -1111,17 +1139,52 @@
 	</div>
 {/if}
 
+<!-- ── REMOVE PENDING INVITE MODAL ─────────────────────────────────────── -->
+{#if pendingInviteDeleteTarget}
+	<div class="gp-backdrop" onclick={() => { pendingInviteDeleteTarget = null; pendingInviteDeleteError = ''; }} role="presentation"></div>
+	<div class="gp-modal" role="dialog" aria-labelledby="remove-invite-modal-title">
+		<div class="gp-modal-icon gp-modal-icon--danger" aria-hidden="true">
+			<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+		</div>
+		<h2 id="remove-invite-modal-title" class="gp-modal-title">Remove invite for {pendingInviteDeleteTarget.name}?</h2>
+		<p class="gp-modal-body">They have not joined this trip yet. This revokes their invite for this trip.</p>
+		<form method="POST" action="?/deletePendingInvite" use:enhance={() => {
+			return async ({ result }) => {
+				await invalidateAll();
+				if (result.type === 'success') {
+					pendingInviteDeleteTarget = null;
+					pendingInviteDeleteError = '';
+				} else if (result.type === 'failure' && result.data && typeof result.data === 'object' && 'deletePendingInviteError' in result.data) {
+					pendingInviteDeleteError = String((result.data as { deletePendingInviteError?: string }).deletePendingInviteError ?? 'Could not remove invite.');
+				}
+			};
+		}}>
+			{#if pendingInviteDeleteError}
+				<p class="gp-form-error" role="alert">{pendingInviteDeleteError}</p>
+			{/if}
+			<input type="hidden" name="inviteId" value={pendingInviteDeleteTarget.inviteId ?? ''} />
+			<div class="gp-modal-actions">
+				<button type="button" class="gp-btn gp-btn--ghost" onclick={() => { pendingInviteDeleteTarget = null; pendingInviteDeleteError = ''; }}>Cancel</button>
+				<button type="submit" class="gp-btn gp-btn--danger">Remove invite</button>
+			</div>
+		</form>
+	</div>
+{/if}
+
 <!-- ── INVITE MODAL ───────────────────────────────────────────────────── -->
 {#if inviteOpen}
 	<div class="gp-backdrop" onclick={closeInvite} role="presentation"></div>
 	<div class="gp-modal" role="dialog">
 		<h2 class="gp-modal-title">Invite someone</h2>
 		<div class="gp-invite-tabs">
-			<button type="button" class="gp-invite-tab" class:active={inviteTab === 'email'} onclick={() => { inviteTab = 'email'; inviteError = ''; }}>By email</button>
-			<button type="button" class="gp-invite-tab" class:active={inviteTab === 'friends'} onclick={() => { inviteTab = 'friends'; inviteFriendError = ''; }}>From friends</button>
+			<button type="button" class="gp-invite-tab" class:active={inviteTab === 'email'} onclick={() => { inviteTab = 'email'; inviteError = ''; inviteEmailWarning = ''; }}>By email</button>
+			<button type="button" class="gp-invite-tab" class:active={inviteTab === 'friends'} onclick={() => { inviteTab = 'friends'; inviteFriendError = ''; inviteEmailWarning = ''; }}>From friends</button>
 		</div>
 		{#if inviteTab === 'email'}
 			<form method="POST" action="?/createInvite" use:enhance={handleInviteSubmit}>
+				{#if inviteEmailWarning}
+					<p class="gp-form-warn" role="status">{inviteEmailWarning}</p>
+				{/if}
 				{#if inviteError}
 					<p class="gp-form-error" role="alert">{inviteError}</p>
 				{/if}
@@ -1158,9 +1221,11 @@
 					<ul class="gp-friends-invite-list">
 						{#each invitableFriends as friend}
 							<li>
-								<form method="POST" action="?/inviteFriend" use:enhance={async ({ result }) => {
-									if (result.type === 'success' && result.data?.inviteFriendSuccess) { await invalidateAll(); inviteFriendError = ''; }
-									if (result.type === 'success' && result.data?.inviteFriendError) { inviteFriendError = result.data.inviteFriendError; }
+								<form method="POST" action="?/inviteFriend" use:enhance={() => {
+									return async ({ result }) => {
+										if (result.type === 'success' && result.data?.inviteFriendSuccess) { await invalidateAll(); inviteFriendError = ''; }
+										if (result.type === 'success' && result.data?.inviteFriendError) { inviteFriendError = result.data.inviteFriendError; }
+									};
 								}}>
 									<input type="hidden" name="friendUserId" value={friend.id} />
 									<div class="gp-friend-invite-row">
@@ -1191,9 +1256,11 @@
 	<div class="gp-modal" role="dialog" aria-labelledby="add-manual-title">
 		<h2 id="add-manual-title" class="gp-modal-title">Add guest manually</h2>
 		<p class="gp-modal-body">For someone who doesn't go online much. They'll appear on the guest list so you can assign a room, set their RSVP, and account for their cost.</p>
-		<form method="POST" action="?/addManualGuest" use:enhance={async ({ result }) => {
-			if (result.type === 'success' && result.data?.addManualGuestSuccess) { closeAddManual(); await invalidateAll(); }
-			if (result.type === 'failure' && result.data?.addManualGuestError) { addManualError = result.data.addManualGuestError; }
+		<form method="POST" action="?/addManualGuest" use:enhance={() => {
+			return async ({ result }) => {
+				if (result.type === 'success' && result.data?.addManualGuestSuccess) { closeAddManual(); await invalidateAll(); }
+				if (result.type === 'failure' && result.data?.addManualGuestError) { addManualError = result.data.addManualGuestError; }
+			};
 		}}>
 			{#if addManualError}<p class="gp-form-error">{addManualError}</p>{/if}
 			<div class="gp-form-group">
@@ -1760,6 +1827,16 @@
 	}
 	.gp-input:focus { outline: none; border-color: var(--slate); box-shadow: 0 0 0 3px rgba(47,119,120,0.12); }
 	.gp-form-error { font-size: 0.875rem; color: #dc2626; margin: 0 0 1rem; }
+	.gp-form-warn {
+		font-size: 0.875rem;
+		color: #92400e;
+		background: rgba(245, 158, 11, 0.12);
+		border: 1px solid rgba(217, 119, 6, 0.35);
+		border-radius: 8px;
+		padding: 0.65rem 0.75rem;
+		margin: 0 0 1rem;
+		line-height: 1.5;
+	}
 	.gp-muted { font-size: 0.875rem; color: var(--muted); margin: 0 0 1rem; }
 	.gp-invite-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; }
 	.gp-invite-tab {

@@ -73,8 +73,8 @@ npm run db:dev
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (server-only, never expose to client)
 - `DATABASE_URL` - PostgreSQL connection string (use **Connection pooling** in Supabase, port **6543**). Append `?pgbouncer=true` so Prisma works with the pooler (e.g. `...6543/postgres?pgbouncer=true`). Without this you may see "connection forcibly closed" (10054) or timeouts.
 - `DIRECT_URL` - PostgreSQL direct connection string (Supabase **Direct** connection, port **5432**; used for migrations only)
-- `RESEND_API_KEY` - Resend API key (`re_...`)
-- `RESEND_FROM_EMAIL` - Verified sender address (use `support@divviHQ.com` for testing)
+- `RESEND_API_KEY` - Resend API key (`re_...`) from the project where your domain is verified
+- `RESEND_FROM_EMAIL` - **Required.** Sender address on a domain that shows **Verified** in [Resend → Domains](https://resend.com/domains) (same project as the API key). A default domain in code will not work for your GoDaddy/Resend setup until this matches verification.
 - `RESEND_FROM_NAME` - Display name for sender (optional)
 - `INTERNAL_API_KEY` - Secret key for protecting write endpoints
 - `APP_BASE_URL` - Base URL of your app (e.g., https://your-app.vercel.app)
@@ -238,7 +238,7 @@ After deployment:
 
 ## Email (Resend)
 
-Transactional HTML is built in code: trip invites (`src/lib/server/email/render/trip-invite.ts`) and guest confirmations (`render/guest-confirmation.ts`). Configure `RESEND_API_KEY` and a verified `RESEND_FROM_EMAIL`.
+Transactional HTML is built in code: trip invites (`src/lib/server/email/render/trip-invite.ts`) and guest confirmations (`render/guest-confirmation.ts`). Configure `RESEND_API_KEY` and set `RESEND_FROM_EMAIL` to an address on your **Resend-verified** domain. If Resend says you can only send to your own email, the `from` domain and API key project do not match verification (or `RESEND_FROM_EMAIL` is unset / wrong—restart dev server after editing `.env`).
 
 ## Troubleshooting
 
