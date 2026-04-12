@@ -29,9 +29,28 @@
 		activitiesEnabled?: boolean;
 		gamesEnabled?: boolean;
 		isHost?: boolean;
+		/** Invite email: anonymous limited preview on trip dashboard */
+		invitePreviewMode?: boolean;
+		inviteToken?: string | null;
 	}
 
-	let { tripId, user, children, onInvite, showToast, showGuestsTab = true, pollsBadgeCount = 0, tripLockedForRecap = false, checkInDate = null, checkOutDate = null, activitiesEnabled = true, gamesEnabled = true, isHost = false }: Props = $props();
+	let {
+		tripId,
+		user,
+		children,
+		onInvite,
+		showToast,
+		showGuestsTab = true,
+		pollsBadgeCount = 0,
+		tripLockedForRecap = false,
+		checkInDate = null,
+		checkOutDate = null,
+		activitiesEnabled = true,
+		gamesEnabled = true,
+		isHost = false,
+		invitePreviewMode = false,
+		inviteToken = null
+	}: Props = $props();
 
 	const modeSelectorTip = $derived(getTooltip(isHost ? 'host_mode_selector' : 'guest_mode_selector'));
 
@@ -81,13 +100,23 @@
 	const currentPath = $derived($page.url.pathname);
 	/** Hide global messages + notifications while editing trip settings or on publish/pay */
 	const hideMessagesAndNotifications = $derived(
-		currentPath.includes(`/trips/${tripId}/settings`) ||
+		invitePreviewMode ||
+			currentPath.includes(`/trips/${tripId}/settings`) ||
 			currentPath.includes(`/trips/${tripId}/publish`)
 	);
 	const isDashboardPage = $derived(
 		currentPath === `/trips/${tripId}` || currentPath.replace(/\/$/, '') === `/trips/${tripId}`
 	);
-	const showModePillOnDashboard = $derived(!!(checkInDate && checkOutDate && isDashboardPage));
+	const showModePillOnDashboard = $derived(
+		!!(checkInDate && checkOutDate && isDashboardPage && !invitePreviewMode)
+	);
+
+	function navHref(itemHref: string): string {
+		if (invitePreviewMode && inviteToken && itemHref === `/trips/${tripId}`) {
+			return `${itemHref}?invite=${encodeURIComponent(inviteToken)}`;
+		}
+		return itemHref;
+	}
 
 	function isActive(href: string): boolean {
 		if (href === `/trips/${tripId}`) return currentPath === href;
@@ -139,13 +168,26 @@
 		<div class="rail-nav-wrap">
 			<nav class="rail-nav" aria-label="Primary navigation">
 				{#each navItems as item}
-				<a
-					href={item.href}
-					class="rail-nav-item"
-					class:active={isActive(item.href)}
-					aria-label={item.label}
-					title={collapsed ? item.label : undefined}
-				>
+					{@const locked = invitePreviewMode && item.href !== `/trips/${tripId}`}
+					{@const itemHref = navHref(item.href)}
+					<svelte:element
+						this={locked ? 'span' : 'a'}
+						class="rail-nav-item"
+						class:active={!locked && isActive(item.href)}
+						class:rail-nav-item--locked={locked}
+						{...(locked
+							? {
+									'aria-disabled': true,
+									'aria-label': `${item.label} (locked until you join)`,
+									title: 'Join the trip from the preview to unlock',
+									role: 'presentation'
+								}
+							: {
+									href: itemHref,
+									'aria-label': item.label,
+									title: collapsed ? item.label : undefined
+								})}
+					>
 					<span class="rail-icon-wrap">
 					{#if item.icon === 'dashboard'}
 						<svg class="rail-icon-svg" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
@@ -171,7 +213,7 @@
 					{/if}
 					</span>
 					<span class="rail-item-label">{item.label}</span>
-				</a>
+					</svelte:element>
 				{/each}
 			</nav>
 		</div>
@@ -182,12 +224,14 @@
 					<span class="rail-item-label rail-user-name">{user.name || user.email || ''}</span>
 				</div>
 			{/if}
+			{#if !invitePreviewMode}
 			<a href="/trips/{tripId}/settings" class="rail-util" aria-label="Settings" title={collapsed ? 'Settings' : undefined}>
 				<span class="rail-icon-wrap">
 					<svg class="rail-icon-svg" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
 				</span>
 				<span class="rail-item-label">Settings</span>
 			</a>
+			{/if}
 			<button
 				type="button"
 				class="rail-collapse-btn"
@@ -375,6 +419,17 @@
 	.rail-nav-item:hover {
 		background: rgba(47, 119, 120, 0.12);
 		color: var(--navy);
+	}
+
+	.rail-nav-item--locked {
+		opacity: 0.45;
+		cursor: not-allowed;
+		pointer-events: none;
+	}
+
+	.rail-nav-item--locked:hover {
+		background: transparent;
+		color: #374151;
 	}
 
 	.rail-nav-item.active {

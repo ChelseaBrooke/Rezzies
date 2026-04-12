@@ -4,20 +4,30 @@
 		bed?: { id: string; bedType: string | null } | null;
 		partySize?: number;
 	}
+
 	interface Props {
 		tripId: string;
 		userRsvp?: { status?: string; adultsCount?: number; kidsCount?: number } | null;
 		myAssignments: Assignment[];
 		userReservationPrice: number | null;
-		/** Per-person share of the Divvi platform fee added by the host; 0 when not split */
 		platformFeePerPerson?: number;
 		tripCheckInDate?: string;
 		costSharingEnabled?: boolean;
 	}
 
-	let { tripId, userRsvp, myAssignments, userReservationPrice, platformFeePerPerson = 0, tripCheckInDate = '', costSharingEnabled = true }: Props = $props();
+	let {
+		tripId,
+		userRsvp,
+		myAssignments,
+		userReservationPrice,
+		platformFeePerPerson = 0,
+		tripCheckInDate = '',
+		costSharingEnabled = true
+	}: Props = $props();
 
-	/** Total price the guest will pay: reservation cost + their share of the Divvi fee */
+	const rsvpEditHref = $derived(`/trips/${tripId}/rsvp`);
+	const roomsBrowseHref = $derived(`/trips/${tripId}/rooms`);
+
 	const totalGuestPrice = $derived(
 		userReservationPrice != null ? userReservationPrice + platformFeePerPerson : null
 	);
@@ -25,7 +35,20 @@
 	const peopleCount = $derived((userRsvp?.adultsCount ?? 0) + (userRsvp?.kidsCount ?? 0));
 	const hasAccepted = $derived(userRsvp?.status === 'yes');
 	const hasDeclined = $derived(userRsvp?.status === 'no');
-	const rsvpEditHref = $derived(`/trips/${tripId}/rsvp`);
+
+	const primaryAssignment = $derived(myAssignments[0] ?? null);
+	const roomName = $derived(primaryAssignment?.room?.name?.trim() || null);
+	const bedLabel = $derived(primaryAssignment?.bed?.bedType?.trim() || null);
+	const roomPhotoUrl = $derived(
+		myAssignments.find((a) => a.room?.photoUrls && a.room.photoUrls.length > 0)?.room?.photoUrls?.[0] ??
+			null
+	);
+
+	const hasRoom = $derived(Boolean(roomName));
+	const hasBed = $derived(Boolean(bedLabel));
+
+	/** Confirmed RSVP = going + room + bed (product rule: no “confirmed” without both). */
+	const rsvpFullyComplete = $derived(hasAccepted && hasRoom && hasBed);
 
 	const daysUntil = $derived.by(() => {
 		if (!tripCheckInDate) return null;
@@ -37,340 +60,455 @@
 		return diff > 0 ? diff : null;
 	});
 
-	const roomBedItems = $derived(
-		myAssignments.map((a) => {
-			const roomName = a.room?.name?.trim() || 'Room';
-			const bedLabel = a.bed?.bedType?.trim();
-			return { line: bedLabel ? `${roomName} – ${bedLabel}` : roomName };
-		})
-	);
+	const partyLine = $derived.by(() => {
+		if (peopleCount <= 0) return null;
+		return peopleCount === 1 ? '1 guest' : `${peopleCount} guests`;
+	});
 
-	const roomPhoto = $derived(
-		myAssignments.find((a) => a.room?.photoUrls && a.room.photoUrls.length > 0)?.room?.photoUrls?.[0] ?? null
-	);
+	/** Going but data missing room/bed — surface as incomplete, not “confirmed”. */
+	const acceptedNeedsRoomBed = $derived(hasAccepted && (!hasRoom || !hasBed));
+
+	const statusHeadline = $derived.by(() => {
+		if (hasDeclined) return 'You’ve declined this trip';
+		if (rsvpFullyComplete) return 'RSVP confirmed';
+		if (acceptedNeedsRoomBed) return 'Room and bed selection required';
+		return 'Finish your RSVP';
+	});
+
+	const statusSubline = $derived.by(() => {
+		if (hasDeclined) return 'You can update your RSVP any time before the trip.';
+		if (rsvpFullyComplete) return 'You’re going';
+		if (acceptedNeedsRoomBed)
+			return 'Choose your room and bed to complete your RSVP.';
+		return 'Let your host know you’re joining, then pick your room and bed.';
+	});
+
+	const roomDisplay = $derived(hasRoom ? roomName! : 'Not selected');
+	const bedDisplay = $derived(hasBed ? bedLabel! : 'Not selected');
+
+	const incompletePrimaryLabel = $derived(hasAccepted ? 'Choose room & bed' : 'Complete RSVP');
 </script>
 
-<div class="rsvp-card">
-	<!-- Status header -->
-	{#if hasAccepted}
-		<div class="status-banner accepted">
-			<div class="status-banner-main">
-				<span class="status-icon">
-					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-						<polyline points="20 6 9 17 4 12"/>
-					</svg>
-				</span>
-				<span class="status-text">You're going!</span>
-			</div>
-			{#if daysUntil != null}
-				<span class="status-days" aria-label="{daysUntil} days until the trip">{daysUntil}d away</span>
-			{/if}
+<!-- Premium guest RSVP panel (planning dashboard sticky card). -->
+<div class="grsvp">
+	<header class="grsvp-header">
+		<div class="grsvp-header-text">
+			<h2 class="grsvp-title">Your RSVP</h2>
+			<p class="grsvp-statusline">{statusHeadline}</p>
+			<p class="grsvp-subline">{statusSubline}</p>
 		</div>
-	{:else if hasDeclined}
-		<div class="status-banner declined">
-			<div class="status-banner-main">
-				<span class="status-icon">
-					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-						<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-					</svg>
-				</span>
-				<span class="status-text">You declined</span>
-			</div>
-			{#if daysUntil != null}
-				<span class="status-days" aria-label="{daysUntil} days until the trip">{daysUntil}d away</span>
-			{/if}
+		{#if daysUntil != null && !hasDeclined}
+			<span class="grsvp-pill" aria-label="{daysUntil} days until the trip">{daysUntil}d away</span>
+		{/if}
+		{#if rsvpFullyComplete}
+			<span class="grsvp-confirm-icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+					<polyline points="22 4 12 14.01 9 11.01" />
+				</svg>
+			</span>
+		{/if}
+	</header>
+
+	{#if hasDeclined}
+		<section class="grsvp-panel grsvp-panel--muted" aria-label="RSVP status">
+			<p class="grsvp-panel-copy">If plans change, you can RSVP again from the trip page.</p>
+		</section>
+		<div class="grsvp-actions">
+			<a href={rsvpEditHref} class="cta-btn cta-ghost">Update RSVP</a>
 		</div>
 	{:else}
-		<div class="status-banner pending">
-			<div class="status-banner-main">
-				<span class="status-icon pending-dot" aria-hidden="true"></span>
-				<span class="status-text">Haven't RSVP'd yet</span>
+		<!-- Reservation-style summary (always shown; placeholder when incomplete). -->
+		<section class="grsvp-reservation" aria-label="Room and bed">
+			<div class="grsvp-res-thumb">
+				{#if rsvpFullyComplete && roomPhotoUrl}
+					<img src={roomPhotoUrl} alt="" class="grsvp-res-img" />
+				{:else}
+					<div class="grsvp-res-placeholder" class:grsvp-res-placeholder--dim={!rsvpFullyComplete}>
+						<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+							<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+							<polyline points="9 22 9 12 15 12 15 22" />
+						</svg>
+					</div>
+				{/if}
 			</div>
-			{#if daysUntil != null}
-				<span class="status-days" aria-label="{daysUntil} days until the trip">{daysUntil}d away</span>
+			<div class="grsvp-res-body">
+				<p class="grsvp-res-label">Your stay</p>
+				<p class="grsvp-res-room">{roomDisplay}</p>
+				<p class="grsvp-res-bed">
+					<span class="grsvp-res-bed-k">Bed</span>
+					<span class="grsvp-res-bed-v">{bedDisplay}</span>
+				</p>
+				{#if partyLine}
+					<p class="grsvp-res-party">
+						<span class="grsvp-res-bed-k">Party size</span>
+						<span class="grsvp-res-bed-v">{partyLine}</span>
+					</p>
+				{:else if rsvpFullyComplete}
+					<p class="grsvp-res-party">
+						<span class="grsvp-res-bed-k">Party size</span>
+						<span class="grsvp-res-bed-v">—</span>
+					</p>
+				{:else}
+					<p class="grsvp-res-party">
+						<span class="grsvp-res-bed-k">Party size</span>
+						<span class="grsvp-res-bed-v">Add when you RSVP</span>
+					</p>
+				{/if}
+			</div>
+		</section>
+
+		<!-- Compact detail chips -->
+		<div class="grsvp-chips" aria-label="RSVP details">
+			<span class="grsvp-chip">
+				<span class="grsvp-chip-k">Party</span>{partyLine ?? (rsvpFullyComplete ? '—' : 'Add when you RSVP')}
+			</span>
+			<span class="grsvp-chip"><span class="grsvp-chip-k">Room</span>{roomDisplay}</span>
+			<span class="grsvp-chip"><span class="grsvp-chip-k">Bed</span>{bedDisplay}</span>
+		</div>
+
+		{#if costSharingEnabled && totalGuestPrice != null && rsvpFullyComplete}
+			<p class="grsvp-estimate">
+				<span class="grsvp-estimate-k">Current estimate</span>
+				<span class="grsvp-estimate-v">${totalGuestPrice.toFixed(2)}</span>
+				{#if platformFeePerPerson > 0}
+					<span class="grsvp-estimate-note">
+						Includes ${platformFeePerPerson.toFixed(2)} Divvi fee
+						{#if userReservationPrice != null}
+							· ${userReservationPrice.toFixed(2)} trip share
+						{/if}
+					</span>
+				{:else}
+					<span class="grsvp-estimate-note">May change slightly as the guest list fills in.</span>
+				{/if}
+			</p>
+		{/if}
+
+		<!-- Next step / reassurance -->
+		{#if rsvpFullyComplete}
+			<div class="grsvp-footnote grsvp-footnote--ok" role="status">
+				Your room and bed are reserved. You’re all set for this trip.
+			</div>
+		{:else}
+			<div class="grsvp-footnote" role="status">
+				Choose your room and bed to finish your RSVP — it only takes a minute.
+			</div>
+		{/if}
+
+		<div class="grsvp-actions">
+			{#if rsvpFullyComplete}
+				<a href={rsvpEditHref} class="cta-btn cta-primary">Edit my RSVP</a>
+			{:else}
+				<a href={rsvpEditHref} class="cta-btn cta-primary">{incompletePrimaryLabel}</a>
+				<a href={roomsBrowseHref} class="grsvp-secondary-link">View room options</a>
 			{/if}
 		</div>
 	{/if}
-
-	<!-- Content -->
-	<div class="rsvp-body">
-		{#if !hasAccepted && !hasDeclined}
-			<!-- Not RSVP'd: nudge them -->
-			<p class="nudge-text">Let your host know if you're joining the trip.</p>
-			<a href={rsvpEditHref} class="cta-btn cta-primary">
-				RSVP Now
-				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-					<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
-				</svg>
-			</a>
-		{:else if hasDeclined}
-			<p class="nudge-text">Changed your mind? Update your RSVP.</p>
-			<a href={rsvpEditHref} class="cta-btn cta-ghost">Update RSVP</a>
-		{:else}
-			<!-- Accepted: room photo -->
-			{#if roomPhoto}
-				<div class="room-photo-wrap">
-					<img src={roomPhoto} alt="Your room" class="room-photo" />
-				</div>
-			{/if}
-
-			<!-- Accepted: details -->
-		{#if costSharingEnabled && totalGuestPrice != null}
-			<div class="detail-block">
-				<span class="detail-label">Current Price Estimate</span>
-				<div class="detail-price-row">
-					<span class="detail-price">${totalGuestPrice.toFixed(2)}</span>
-				</div>
-				{#if platformFeePerPerson > 0}
-					<span class="detail-note fee-note">
-						Includes ${platformFeePerPerson.toFixed(2)} Divvi fee · {userReservationPrice != null ? `$${userReservationPrice.toFixed(2)} trip cost` : ''}
-					</span>
-				{:else}
-					<span class="detail-note">Subject to change based on headcount</span>
-				{/if}
-			</div>
-			{/if}
-
-			{#if roomBedItems.length > 0}
-				<div class="detail-block">
-					<span class="detail-label">Room & bed</span>
-					<div class="detail-values">
-						{#each roomBedItems as { line }}
-							<span class="detail-value">{line}</span>
-						{/each}
-					</div>
-				</div>
-			{:else}
-				<div class="detail-block">
-					<span class="detail-label">Room & bed</span>
-					<span class="detail-empty">No room assigned yet</span>
-				</div>
-			{/if}
-
-			{#if peopleCount > 0}
-				<div class="detail-block">
-					<span class="detail-label">Party size</span>
-					<span class="detail-value">{peopleCount} {peopleCount === 1 ? 'person' : 'people'}</span>
-				</div>
-			{/if}
-
-			<div class="edit-rsvp-anchor">
-				<a href={rsvpEditHref} class="cta-btn cta-ghost cta-small">Edit my RSVP</a>
-			</div>
-		{/if}
-	</div>
 </div>
 
 <style>
-	.rsvp-card {
+	.grsvp {
 		display: flex;
 		flex-direction: column;
+		gap: 0.75rem;
 		min-width: 0;
 		flex: 1;
+		color: rgba(255, 255, 255, 0.94);
 	}
 
-	/* ── Status row ── same neutral base, copper accent for active state ── */
-	.status-banner {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem;
-		padding-bottom: 0.75rem;
-		margin-bottom: 0.75rem;
-		border-bottom: 1px solid var(--border-soft);
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: var(--text);
+	.grsvp-header {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		grid-template-rows: auto auto;
+		align-items: start;
+		gap: 0.35rem 0.5rem;
+		padding-bottom: 0.65rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 	}
 
-	.status-banner-main {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		min-width: 0;
-		flex: 1;
-	}
-
-	.status-icon {
-		width: 16px;
-		height: 16px;
-		flex-shrink: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--copper, #BF4E30);
-	}
-
-	.status-banner.declined .status-icon {
-		color: var(--muted);
-	}
-
-	.status-icon svg {
-		width: 100%;
-		height: 100%;
-	}
-
-	.status-text {
+	.grsvp-header-text {
+		grid-column: 1;
 		min-width: 0;
 	}
 
-	.status-banner.declined .status-text {
-		color: var(--muted);
+	.grsvp-title {
+		margin: 0 0 0.2rem;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		letter-spacing: 0.11em;
+		text-transform: uppercase;
+		color: rgba(255, 255, 255, 0.55);
 	}
 
-	/* Same `Nd away` phrasing as TripGoalsCombined / AppShell; copper on light cards */
-	.status-days {
-		font-size: 0.58rem;
+	.grsvp-statusline {
+		margin: 0;
+		font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+		font-size: 1.125rem;
+		font-weight: 650;
+		line-height: 1.25;
+		letter-spacing: -0.02em;
+		color: #fff;
+	}
+
+	.grsvp-subline {
+		margin: 0.35rem 0 0;
+		font-size: 0.8125rem;
+		line-height: 1.45;
+		color: rgba(255, 255, 255, 0.78);
+		font-weight: 450;
+	}
+
+	.grsvp-pill {
+		grid-column: 2;
+		grid-row: 1;
+		align-self: start;
+		font-size: 0.625rem;
 		font-weight: 600;
-		color: var(--copper, #bf4e30);
-		background: rgba(191, 78, 48, 0.08);
-		border: 1px solid rgba(191, 78, 48, 0.15);
-		padding: 0.12rem 0.45rem;
+		color: rgba(255, 255, 255, 0.95);
+		background: rgba(255, 255, 255, 0.16);
+		border: 1px solid rgba(255, 255, 255, 0.28);
+		padding: 0.2rem 0.5rem;
 		border-radius: 999px;
 		white-space: nowrap;
-		flex-shrink: 0;
 		line-height: 1.2;
 	}
 
-	.pending-dot {
-		width: 7px;
-		height: 7px;
+	.grsvp-confirm-icon {
+		grid-column: 2;
+		grid-row: 2;
+		justify-self: end;
+		width: 28px;
+		height: 28px;
 		border-radius: 50%;
-		background: var(--copper, #BF4E30);
-		flex-shrink: 0;
-		animation: pulse 2s infinite;
-	}
-
-	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.35; }
-	}
-
-	/* ── Body ── */
-	.rsvp-body {
 		display: flex;
-		flex-direction: column;
-		gap: 0.875rem;
-		flex: 1;
+		align-items: center;
+		justify-content: center;
+		background: rgba(255, 255, 255, 0.14);
+		border: 1px solid rgba(255, 255, 255, 0.22);
+		color: rgba(186, 240, 220, 0.95);
 	}
 
-	/* ── Room photo ── */
-	.room-photo-wrap {
-		width: 100%;
-		border-radius: var(--radius-md, 8px);
+	.grsvp-confirm-icon svg {
+		width: 15px;
+		height: 15px;
+	}
+
+	/* Inset reservation module */
+	.grsvp-reservation {
+		display: grid;
+		grid-template-columns: 4.25rem 1fr;
+		gap: 0.75rem;
+		align-items: center;
+		padding: 0.65rem 0.7rem;
+		border-radius: 12px;
+		background: rgba(0, 0, 0, 0.12);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.grsvp-res-thumb {
+		width: 4.25rem;
+		height: 4.25rem;
+		border-radius: 10px;
 		overflow: hidden;
 		flex-shrink: 0;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid rgba(255, 255, 255, 0.12);
 	}
 
-	.room-photo {
+	.grsvp-res-img {
 		width: 100%;
-		height: 90px;
+		height: 100%;
 		object-fit: cover;
 		display: block;
 	}
 
-	/* ── Edit RSVP anchored to bottom ── */
-	.edit-rsvp-anchor {
-		margin-top: auto;
-		padding-top: 0.5rem;
+	.grsvp-res-placeholder {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: rgba(255, 255, 255, 0.45);
+		background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
 	}
 
-	.nudge-text {
-		margin: 0;
-		font-size: 0.8125rem;
-		color: var(--muted);
-		line-height: 1.5;
+	.grsvp-res-placeholder--dim {
+		color: rgba(255, 255, 255, 0.35);
 	}
 
-	/* ── Detail blocks ── */
-	.detail-block {
+	.grsvp-res-body {
+		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		text-align: center;
 		gap: 0.2rem;
-		padding-bottom: 0.75rem;
-		border-bottom: 1px solid var(--border-soft, rgba(0,0,0,0.06));
 	}
 
-	.detail-block:last-of-type {
-		border-bottom: none;
-		padding-bottom: 0;
-	}
-
-	.detail-label {
-		font-size: 0.625rem;
+	.grsvp-res-label {
+		margin: 0;
+		font-size: 0.5625rem;
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
-		color: var(--muted);
+		color: rgba(255, 255, 255, 0.5);
 	}
 
-	.detail-price-row {
+	.grsvp-res-room {
+		margin: 0;
+		font-size: 0.9375rem;
+		font-weight: 650;
+		line-height: 1.25;
+		color: #fff;
+	}
+
+	.grsvp-res-bed,
+	.grsvp-res-party {
+		margin: 0;
+		font-size: 0.8125rem;
+		line-height: 1.35;
 		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
 		align-items: baseline;
-		justify-content: center;
+	}
+
+	.grsvp-res-bed-k,
+	.grsvp-chip-k {
+		font-size: 0.625rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: rgba(255, 255, 255, 0.48);
+		margin-right: 0.15rem;
+	}
+
+	.grsvp-res-bed-v {
+		color: rgba(255, 255, 255, 0.92);
+		font-weight: 500;
+	}
+
+	.grsvp-chips {
+		display: flex;
+		flex-wrap: wrap;
 		gap: 0.4rem;
 	}
 
-	.detail-price {
-		font-size: 1.375rem;
+	.grsvp-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.28rem 0.55rem;
+		border-radius: 999px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: rgba(255, 255, 255, 0.92);
+		background: rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+	}
+
+	.grsvp-estimate {
+		margin: 0;
+		font-size: 0.75rem;
+		line-height: 1.45;
+		color: rgba(255, 255, 255, 0.72);
+	}
+
+	.grsvp-estimate-k {
+		display: block;
+		font-size: 0.5625rem;
 		font-weight: 700;
-		color: var(--text);
-		line-height: 1.1;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		color: rgba(255, 255, 255, 0.45);
+		margin-bottom: 0.1rem;
 	}
 
-	.detail-note {
+	.grsvp-estimate-v {
+		font-size: 1rem;
+		font-weight: 700;
+		color: #fff;
+		margin-right: 0.35rem;
+	}
+
+	.grsvp-estimate-note {
+		display: block;
+		margin-top: 0.15rem;
 		font-size: 0.6875rem;
-		color: var(--muted);
-		line-height: 1.4;
+		color: rgba(255, 255, 255, 0.58);
 	}
 
-	.fee-note {
-		font-size: 0.625rem;
+	.grsvp-footnote {
+		font-size: 0.8125rem;
+		line-height: 1.45;
+		color: rgba(255, 255, 255, 0.78);
+		padding: 0.5rem 0.65rem;
+		border-radius: 10px;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid rgba(255, 255, 255, 0.08);
 	}
 
-	.detail-values {
+	.grsvp-footnote--ok {
+		color: rgba(230, 250, 245, 0.92);
+		background: rgba(122, 206, 211, 0.1);
+		border-color: rgba(122, 206, 211, 0.22);
+	}
+
+	.grsvp-panel {
+		padding: 0.65rem 0.75rem;
+		border-radius: 12px;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		background: rgba(0, 0, 0, 0.1);
+	}
+
+	.grsvp-panel--muted {
+		background: rgba(0, 0, 0, 0.08);
+	}
+
+	.grsvp-panel-copy {
+		margin: 0;
+		font-size: 0.8125rem;
+		line-height: 1.45;
+		color: rgba(255, 255, 255, 0.75);
+	}
+
+	.grsvp-actions {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 0.15rem;
+		gap: 0.5rem;
+		margin-top: auto;
+		padding-top: 0.25rem;
 	}
 
-	.detail-value {
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--text);
-		line-height: 1.4;
+	.grsvp-secondary-link {
+		align-self: center;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: rgba(255, 255, 255, 0.82);
+		text-decoration: none;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+		padding-bottom: 1px;
+		transition: color 0.15s ease, border-color 0.15s ease;
 	}
 
-	.detail-sub {
-		font-size: 0.75rem;
-		font-weight: 400;
-		color: var(--muted);
+	.grsvp-secondary-link:hover {
+		color: #fff;
+		border-color: rgba(255, 255, 255, 0.5);
 	}
 
-	.detail-empty {
-		font-size: 0.875rem;
-		color: var(--muted);
-		font-style: italic;
-	}
-
-	/* ── CTA buttons ── */
+	/* CTAs — class names kept for TripDashboardGrid :global(...) overrides on teal card */
 	.cta-btn {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		gap: 0.4rem;
-		padding: 0.625rem 1rem;
-		border-radius: var(--radius-md);
+		padding: 0.65rem 1rem;
+		border-radius: 10px;
 		font-size: 0.875rem;
 		font-weight: 600;
 		text-decoration: none;
-		transition: all 0.15s ease;
+		transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 		width: 100%;
 		box-sizing: border-box;
-		margin-top: 0.25rem;
 	}
 
 	.cta-btn svg {
@@ -382,29 +520,22 @@
 	.cta-primary {
 		background: var(--copper, #bf4e30);
 		color: white;
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 	}
 
 	.cta-primary:hover {
-		background: #a63d25;
 		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(191, 78, 48, 0.35);
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 	}
 
 	.cta-ghost {
-		background: transparent;
-		color: var(--text);
-		border: 1px solid var(--border-soft, rgba(0,0,0,0.1));
+		background: rgba(255, 255, 255, 0.08);
+		color: rgba(255, 255, 255, 0.95);
+		border: 1px solid rgba(255, 255, 255, 0.28);
 	}
 
 	.cta-ghost:hover {
-		background: rgba(0, 0, 0, 0.04);
-		border-color: var(--muted);
-	}
-
-	.cta-small {
-		padding: 0.4rem 0.75rem;
-		font-size: 0.75rem;
-		font-weight: 600;
-		margin-top: 0;
+		background: rgba(255, 255, 255, 0.14);
+		border-color: rgba(255, 255, 255, 0.4);
 	}
 </style>

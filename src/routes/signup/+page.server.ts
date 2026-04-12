@@ -28,7 +28,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies }) => {
+	default: async ({ request, cookies, url }) => {
 		const formData = await request.formData();
 		const email = formData.get('email');
 		const password = formData.get('password');
@@ -87,8 +87,12 @@ export const actions: Actions = {
 			// Create session
 			await createSession(cookies, user.id);
 
-			// Redirect to trips page
-			throw redirect(303, '/trips');
+			const raw = url.searchParams.get('redirect') ?? '';
+			const redirectTo =
+				raw.startsWith('/') && !raw.startsWith('//') && !raw.includes(':')
+					? raw
+					: '/trips';
+			throw redirect(303, redirectTo);
 		} catch (error) {
 			// Re-throw redirects (they're special errors in SvelteKit)
 			if (error && typeof error === 'object' && 'status' in error && error.status === 303) {

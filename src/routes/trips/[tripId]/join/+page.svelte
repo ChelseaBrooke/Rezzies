@@ -1,12 +1,30 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
+	import { onMount } from 'svelte';
+
+	const INVITE_STORAGE_KEY = 'divvi_invite_token';
 
 	let { data }: { data: PageData } = $props();
 
 	const trip = data.trip;
 	const formatDate = (d: Date | string) =>
 		new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+	let resolvedToken = $state(data.inviteToken ?? '');
+
+	onMount(() => {
+		if (resolvedToken) return;
+		try {
+			const raw = sessionStorage.getItem(INVITE_STORAGE_KEY);
+			if (raw) {
+				const parsed = JSON.parse(raw) as { tripId?: string; token?: string };
+				if (parsed.tripId === trip.id && parsed.token) {
+					resolvedToken = parsed.token;
+				}
+			}
+		} catch { /* unavailable */ }
+	});
 </script>
 
 <div class="join-shell">
@@ -38,7 +56,15 @@
 				{/if}
 			</p>
 
-			<form method="POST" action="?/join" use:enhance>
+			<form method="POST" action="?/join" use:enhance={() => {
+				return async ({ update }) => {
+					try { sessionStorage.removeItem(INVITE_STORAGE_KEY); } catch { /* */ }
+					await update();
+				};
+			}}>
+				{#if resolvedToken}
+					<input type="hidden" name="inviteToken" value={resolvedToken} />
+				{/if}
 				<button type="submit" class="join-btn">
 					{trip.inviteMode === 'open' ? 'Join Trip' : 'Request to Join'}
 				</button>

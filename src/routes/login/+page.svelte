@@ -1,9 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/stores';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 	import type { ActionData } from './$types';
 
 	let { form } = $props();
+
+	const redirectParam = $derived($page.url.searchParams.get('redirect') ?? '');
+	const signupHref = $derived(redirectParam ? `/signup?redirect=${encodeURIComponent(redirectParam)}` : '/signup');
 </script>
 
 <div class="auth-page">
@@ -17,7 +21,7 @@
 			<RezziesLogo href="/" class="auth-logo" />
 		</div>
 		<div class="auth-header-right">
-			<a href="/signup" class="auth-header-btn auth-header-btn-primary">Sign up</a>
+			<a href={signupHref} class="auth-header-btn auth-header-btn-primary">Sign up</a>
 		</div>
 	</header>
 
@@ -43,7 +47,7 @@
 			</form>
 
 			<p class="auth-footer">
-				Don't have an account? <a href="/signup">Sign up</a>
+				Don't have an account? <a href={signupHref}>Sign up</a>
 			</p>
 		</div>
 	</main>

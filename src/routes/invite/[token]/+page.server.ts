@@ -20,6 +20,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw error(410, 'This invite link has expired');
 	}
 
-	// Redirect to the join page; login + membership creation happen there
-	throw redirect(303, `/trips/${invite.tripId}/join`);
+	// Land on the trip page in invite preview mode (limited access before RSVP / join).
+	throw redirect(303, `/trips/${invite.tripId}?invite=${encodeURIComponent(token)}`);
 };
+

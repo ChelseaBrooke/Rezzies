@@ -61,7 +61,6 @@ This document describes everything Divvi does: pages, flows, API endpoints, form
 | `/trips/[tripId]/settings` | Redirects to `/trips/[tripId]/settings/step/1` (host only) | Host |
 | `/trips/[tripId]/settings/step/1` | Edit trip basics (same as create Step 1) | Host |
 | `/trips/[tripId]/settings/step/2` | Edit pricing & rooms link | Host |
-| `/trips/[tripId]/meals` | Meals planning / coverage | Member |
 | `/messages` | Direct messages: conversation list, open thread, send message | Yes |
 | `/settings` | Account settings (profile, basics, dietary, etc.) | Yes |
 | `/qc` | QC / internal tooling (if present) | Depends |
@@ -195,8 +194,7 @@ This document describes everything Divvi does: pages, flows, API endpoints, form
 
 ## 11. Itinerary & Meals
 
-- **Itinerary:** `GET /trips/[tripId]/itinerary` — meal plan, meal slots, assignments, attendance; form actions for updating assignments/attendance (see server actions in itinerary `+page.server.ts`).
-- **Meals:** `GET /trips/[tripId]/meals` — meal coverage and planning.
+- **Itinerary:** `GET /trips/[tripId]/itinerary` — meal plan, meal slots, assignments, attendance, and meal coverage/planning UI; form actions for updating assignments/attendance (see server actions in itinerary `+page.server.ts`).
 
 ---
 

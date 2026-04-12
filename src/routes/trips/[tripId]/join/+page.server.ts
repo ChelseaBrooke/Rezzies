@@ -4,16 +4,20 @@ import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
 import { sendGuestJoinedEmail } from '$lib/server/notification-service.js';
 
-export const load: PageServerLoad = async ({ params, cookies }) => {
+export const load: PageServerLoad = async ({ params, cookies, url }) => {
+	const inviteFromQuery = url.searchParams.get('invite')?.trim() || '';
+	const loginRedirect = inviteFromQuery
+		? `/login?redirect=${encodeURIComponent(`/trips/${params.tripId}/join?invite=${encodeURIComponent(inviteFromQuery)}`)}`
+		: `/login?redirect=/trips/${params.tripId}/join`;
+
 	const user = await getSessionUser(cookies);
 
 	if (!user) {
-		throw redirect(303, `/login?redirect=/trips/${params.tripId}/join`);
+		throw redirect(303, loginRedirect);
 	}
 
 	const tripId = params.tripId;
 
-	// Check if already a member
 	const existing = await prisma.tripMember.findUnique({
 		where: { tripId_userId: { tripId, userId: user.id } }
 	});
@@ -42,17 +46,20 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		throw error(404, 'Trip not found');
 	}
 
-	return { trip, user };
+	return { trip, user, inviteToken: inviteFromQuery || null };
 };
 
 export const actions: Actions = {
-	join: async ({ params, cookies }) => {
+	join: async ({ params, cookies, request }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) {
 			throw redirect(303, `/login?redirect=/trips/${params.tripId}/join`);
 		}
 
 		const tripId = params.tripId;
+		const fd = await request.formData();
+		const inviteToken = (fd.get('inviteToken') as string | null)?.trim() || '';
+
 		const trip = await prisma.trip.findUnique({
 			where: { id: tripId },
 			select: { id: true, isPublished: true, inviteMode: true, maxCapacity: true }
@@ -62,7 +69,6 @@ export const actions: Actions = {
 			throw error(404, 'Trip not found');
 		}
 
-		// Enforce capacity before allowing join
 		if (trip.maxCapacity) {
 			const currentCount = await prisma.tripMember.count({
 				where: { tripId, inviteStatus: 'approved' }
@@ -80,9 +86,16 @@ export const actions: Actions = {
 			update: {}
 		});
 
+		if (inviteToken) {
+			await prisma.invite.updateMany({
+				where: { token: inviteToken, tripId },
+				data: { status: 'accepted', recipientUserId: user.id }
+			});
+		}
+
 		if (status === 'approved') {
 			sendGuestJoinedEmail(tripId, user.id);
-			throw redirect(303, `/trips/${tripId}`);
+			throw redirect(303, `/trips/${tripId}/rsvp`);
 		} else {
 			throw redirect(303, `/trips/${tripId}/pending`);
 		}

@@ -237,12 +237,14 @@
 		<RecapModeView
 			tripId={trip.id}
 			isHost={true}
+			{hostedByLine}
 			trip={{
 				name: trip.name,
 				checkInDate: trip.checkInDate,
 				checkOutDate: trip.checkOutDate,
 				listingCoverPhoto: trip.listingCoverPhoto,
-				location: trip.location
+				location: trip.location,
+				description: trip.description
 			}}
 			{activities}
 			{mealSlots}
@@ -262,7 +264,8 @@
 				location: trip.location,
 				locationCity: trip.locationCity,
 				fullAddress: trip.fullAddress,
-				listingCoverPhoto: trip.listingCoverPhoto
+				listingCoverPhoto: trip.listingCoverPhoto,
+				description: trip.description
 			}}
 			{dateRange}
 			{calendarAddUrl}

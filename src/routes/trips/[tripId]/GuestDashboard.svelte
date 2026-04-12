@@ -7,6 +7,7 @@
 	import VacationModeView from '$lib/components/trips/dashboard/VacationModeView.svelte';
 	import PollCardContainer from '$lib/components/trips/polls/PollCardContainer.svelte';
 	import RecapModeView from '$lib/components/trips/dashboard/RecapModeView.svelte';
+	import InviteeTripPreview from '$lib/components/trips/dashboard/InviteeTripPreview.svelte';
 	import { dashboardModeByTripId } from '$lib/stores/dashboardMode.js';
 	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
 	import { formatHostedByLine } from '$lib/format-hosted-by.js';
@@ -155,7 +156,17 @@
 </script>
 
 {#if trip}
-	{#if dashboardMode === 'vacation'}
+	{#if data.invitePreview && data.inviteToken && data.previewCounts != null && data.previewHostName != null}
+		<InviteeTripPreview
+			tripId={trip.id}
+			inviteToken={data.inviteToken}
+			inviteStatus={data.inviteStatus ?? 'sent'}
+			{trip}
+			previewHostName={data.previewHostName}
+			goingMembers={trip.members ?? []}
+			counts={data.previewCounts}
+		/>
+	{:else if dashboardMode === 'vacation'}
 		<VacationModeView
 			tripId={trip.id}
 			isHost={false}
@@ -189,12 +200,14 @@
 		<RecapModeView
 			tripId={trip.id}
 			isHost={false}
+			{hostedByLine}
 			trip={{
 				name: trip.name,
 				checkInDate: trip.checkInDate,
 				checkOutDate: trip.checkOutDate,
 				listingCoverPhoto: trip.listingCoverPhoto,
-				location: trip.location
+				location: trip.location,
+				description: trip.description
 			}}
 			{activities}
 			{mealSlots}
@@ -214,7 +227,8 @@
 				location: trip.location,
 				locationCity: trip.locationCity,
 				fullAddress: trip.fullAddress,
-				listingCoverPhoto: trip.listingCoverPhoto
+				listingCoverPhoto: trip.listingCoverPhoto,
+				description: trip.description
 			}}
 			{dateRange}
 			{calendarAddUrl}

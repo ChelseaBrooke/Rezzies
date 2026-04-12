@@ -317,7 +317,13 @@
 		{/if}
 
 		<div class="v-hero-body">
-			<h1 class="v-hero-title">{displayTripName}</h1>
+			<div class="v-hero-title-stack">
+				<h1 class="v-hero-title">{displayTripName}</h1>
+				{#if hostName}<p class="v-hero-host">Hosted by {hostName}</p>{/if}
+				{#if (trip.description ?? '').trim()}
+					<p class="v-hero-desc">{(trip.description ?? '').trim()}</p>
+				{/if}
+			</div>
 			<div class="v-hero-meta">
 				{#if displayTripLocation}
 					{#if mapsUrl}
@@ -328,7 +334,6 @@
 				{/if}
 				{#if tripDateRange}<span>{tripDateRange}</span>{/if}
 			</div>
-			{#if hostName}<p class="v-hero-host">Hosted by {hostName}</p>{/if}
 			{#if mapsUrl}
 				<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="v-pill v-pill--hero">
 					<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -656,7 +661,14 @@
 	.v-hero-body {
 		position: relative;
 		padding: 2.75rem 1.75rem 2rem;
-		display: flex; flex-direction: column; gap: 0.25rem;
+		display: flex; flex-direction: column; gap: 0.65rem;
+	}
+	.v-hero-title-stack {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.15rem;
+		max-width: min(40rem, 100%);
 	}
 	.v-hero-title {
 		font-family: 'Fraunces', Georgia, serif;
@@ -680,8 +692,18 @@
 		text-underline-offset: 2px;
 	}
 	.v-hero-host {
-		margin: 0.2rem 0 0;
-		font-size: 0.8125rem; color: rgba(255,255,255,0.6);
+		margin: 0;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: rgba(255,255,255,0.9);
+		line-height: 1.3;
+	}
+	.v-hero-desc {
+		margin: 0.25rem 0 0;
+		font-size: 0.875rem;
+		font-weight: 400;
+		line-height: 1.45;
+		color: rgba(255,255,255,0.82);
 	}
 	.v-pill--hero {
 		align-self: flex-start;

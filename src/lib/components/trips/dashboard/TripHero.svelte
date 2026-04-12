@@ -12,6 +12,8 @@
 			locationCity?: string | null;
 			fullAddress?: string | null;
 			listingCoverPhoto: string | null;
+			/** Trip blurb shown under host line on all dashboard heroes */
+			description?: string | null;
 		};
 		dateRange: string;
 		calendarAddUrl: string | null;
@@ -37,6 +39,8 @@
 		gamesCount?: number;
 		/** e.g. "Hosted by Alex" or "Hosted by Alex, Sam, and Jordan" */
 		hostedByLine?: string | null;
+		/** Hide share/edit quick-action buttons (e.g. invite preview) */
+		hideQuickActions?: boolean;
 	}
 
 	let {
@@ -56,7 +60,8 @@
 		itineraryHref = '',
 		gamesHref = '',
 		gamesCount = 0,
-		hostedByLine = null
+		hostedByLine = null,
+		hideQuickActions = false
 	}: Props = $props();
 
 	const quickActionsTip = $derived(isHost ? getTooltip('host_quick_actions') : null);
@@ -67,6 +72,7 @@
 
 	const destinationLabel = $derived((trip.locationCity ?? trip.fullAddress ?? trip.location)?.trim() ?? '');
 	const isCompact = $derived(selectedMode === 'vacation' || selectedMode === 'recap');
+	const tripDescriptionTrim = $derived((trip.description ?? '').trim());
 
 	const daysUntil = $derived.by(() => {
 		if (!checkInDate) return null;
@@ -114,10 +120,15 @@
 						{/if}
 					</div>
 				{/if}
-				<h1 class="compact-name">{trip.name ?? 'Trip'}</h1>
-				{#if hostedByLine}
-					<p class="compact-hosted-by">{hostedByLine}</p>
-				{/if}
+				<div class="compact-title-stack">
+					<h1 class="compact-name">{trip.name ?? 'Trip'}</h1>
+					{#if hostedByLine}
+						<p class="compact-hosted-by">{hostedByLine}</p>
+					{/if}
+					{#if tripDescriptionTrim}
+						<p class="compact-trip-desc">{tripDescriptionTrim}</p>
+					{/if}
+				</div>
 				<div class="compact-meta">
 					{#if calendarAddUrl}
 						<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="compact-meta-link" title="Add to calendar">
@@ -148,6 +159,7 @@
 			</div>
 		</div>
 
+		{#if !hideQuickActions}
 		<div class="compact-actions">
 		<TripQuickActions
 			tripId={trip.id}
@@ -156,6 +168,7 @@
 			{isHost}
 		/>
 	</div>
+		{/if}
 </div>
 {:else}
 	<!-- ═══ Full hero for Planning ═══ -->
@@ -203,10 +216,15 @@
 						{/if}
 					</div>
 				{/if}
-				<h1 class="hero-name">{trip.name ?? 'Trip'}</h1>
-				{#if hostedByLine}
-					<p class="hero-hosted-by">{hostedByLine}</p>
-				{/if}
+				<div class="hero-title-stack">
+					<h1 class="hero-name">{trip.name ?? 'Trip'}</h1>
+					{#if hostedByLine}
+						<p class="hero-hosted-by">{hostedByLine}</p>
+					{/if}
+					{#if tripDescriptionTrim}
+						<p class="hero-trip-desc">{tripDescriptionTrim}</p>
+					{/if}
+				</div>
 				<div class="hero-subline">
 					{#if calendarAddUrl}
 						<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Add to calendar">
@@ -233,8 +251,9 @@
 						{/if}
 					{/if}
 				</div>
-				<div class="hero-center-actions" style="position:relative;">
-			<TripQuickActions
+			{#if !hideQuickActions}
+			<div class="hero-center-actions" style="position:relative;">
+		<TripQuickActions
 					tripId={trip.id}
 					onInvite={quickActions.onInvite}
 					showToast={quickActions.showToast}
@@ -250,6 +269,7 @@
 					/>
 				{/if}
 				</div>
+			{/if}
 			</div>
 			</div>
 		</div>
@@ -300,6 +320,11 @@
 		background: linear-gradient(135deg, rgba(10, 18, 22, 0.72) 0%, rgba(165, 68, 14, 0.45) 100%);
 	}
 
+	.compact-hero.compact-hero--has-desc {
+		min-height: 168px;
+		height: auto;
+	}
+
 	.compact-content {
 		position: relative;
 		z-index: 1;
@@ -313,7 +338,15 @@
 	.compact-left {
 		display: flex;
 		flex-direction: column;
-		gap: 0.375rem;
+		gap: 0.5rem;
+		min-width: 0;
+	}
+
+	.compact-title-stack {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.15rem;
 		min-width: 0;
 	}
 
@@ -331,7 +364,7 @@
 		color: white;
 		text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 		letter-spacing: -0.02em;
-		line-height: 1.2;
+		line-height: 1.15;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -343,10 +376,25 @@
 		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: rgba(255, 255, 255, 0.88);
+		color: rgba(255, 255, 255, 0.9);
 		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-		line-height: 1.35;
+		line-height: 1.3;
 		max-width: min(420px, 100%);
+	}
+
+	.compact-trip-desc {
+		margin: 0.2rem 0 0;
+		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+		font-size: 0.75rem;
+		font-weight: 400;
+		line-height: 1.45;
+		color: rgba(255, 255, 255, 0.82);
+		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+		max-width: min(520px, 100%);
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
 	}
 
 	.compact-meta {
@@ -568,8 +616,16 @@
 		flex-direction: column;
 		justify-content: center;
 		align-items: center;
-		gap: 1rem;
+		gap: 0.75rem;
 		text-align: center;
+	}
+
+	.hero-title-stack {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.2rem;
+		max-width: min(48rem, 100%);
 	}
 
 	.hero-counts {
@@ -606,7 +662,7 @@
 		font-family: 'Fraunces', Georgia, serif;
 		font-size: 4rem;
 		font-weight: 700;
-		line-height: 1.1;
+		line-height: 1.08;
 		color: white;
 		text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 		letter-spacing: -0.025em;
@@ -616,13 +672,25 @@
 	.hero-hosted-by {
 		margin: 0;
 		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-		font-size: 1.0625rem;
+		font-size: 1rem;
 		font-weight: 500;
-		color: rgba(255, 255, 255, 0.92);
+		color: rgba(255, 255, 255, 0.94);
 		text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
-		line-height: 1.35;
+		line-height: 1.3;
 		text-align: center;
 		max-width: 42rem;
+	}
+
+	.hero-trip-desc {
+		margin: 0.35rem 0 0;
+		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+		font-size: 0.9375rem;
+		font-weight: 400;
+		line-height: 1.5;
+		color: rgba(255, 255, 255, 0.88);
+		text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+		text-align: center;
+		max-width: 40rem;
 	}
 
 	.hero-subline {
@@ -713,6 +781,10 @@
 			font-size: 0.9375rem;
 		}
 
+		.hero-trip-desc {
+			font-size: 0.875rem;
+		}
+
 		.hero-subline {
 			font-size: 0.9375rem;
 		}
@@ -760,6 +832,11 @@
 		.hero-hosted-by {
 			font-size: 0.875rem;
 			padding: 0 0.25rem;
+		}
+
+		.hero-trip-desc {
+			font-size: 0.8125rem;
+			padding: 0 0.5rem;
 		}
 
 		.hero-subline {

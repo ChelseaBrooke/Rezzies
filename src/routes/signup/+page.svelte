@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/stores';
 	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
 	import { TRAVEL_STYLE_OPTIONS } from '$lib/travel-style.js';
 	import type { ActionData } from './$types';
 
 	let { form } = $props();
+
+	const redirectParam = $derived($page.url.searchParams.get('redirect') ?? '');
+	const loginHref = $derived(redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : '/login');
 </script>
 
 <div class="auth-page">
@@ -18,7 +22,7 @@
 			<RezziesLogo href="/" class="auth-logo" />
 		</div>
 		<div class="auth-header-right">
-			<a href="/login" class="auth-header-btn">Log in</a>
+			<a href={loginHref} class="auth-header-btn">Log in</a>
 		</div>
 	</header>
 
@@ -71,7 +75,7 @@
 			</form>
 
 			<p class="auth-footer">
-				Already have an account? <a href="/login">Log in</a>
+				Already have an account? <a href={loginHref}>Log in</a>
 			</p>
 		</div>
 	</main>

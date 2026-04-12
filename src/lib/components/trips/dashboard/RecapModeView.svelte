@@ -34,6 +34,7 @@
 		tripId,
 		isHost = false,
 		trip = {},
+		hostedByLine = null,
 		activities = [],
 		mealSlots = [],
 		members = [],
@@ -45,12 +46,15 @@
 	}: {
 		tripId: string;
 		isHost?: boolean;
+		/** e.g. "Hosted by Alex" — same line as planning hero */
+		hostedByLine?: string | null;
 		trip?: {
 			name?: string | null;
 			checkInDate?: Date | string | null;
 			checkOutDate?: Date | string | null;
 			listingCoverPhoto?: string | null;
 			location?: string | null;
+			description?: string | null;
 		};
 		activities?: Activity[];
 		mealSlots?: MealSlot[];
@@ -166,6 +170,7 @@
 	const coverPhoto = $derived(trip?.listingCoverPhoto ?? null);
 	const tripLocation = $derived((trip?.location ?? '').trim());
 	const displayTripName = $derived((trip?.name ?? '').trim() || 'Trip Recap');
+	const tripDescriptionTrim = $derived((trip?.description ?? '').trim());
 
 	// ── Avatar lookup from rsvps (fallback for activity/meal data) ────────
 	const avatarByUserId = $derived.by(() => {
@@ -284,7 +289,15 @@
 			<!-- Content -->
 			<div class="r-banner-content">
 				<div class="r-banner-text">
-					<h1 class="r-banner-title">{displayTripName}</h1>
+					<div class="r-banner-title-stack">
+						<h1 class="r-banner-title">{displayTripName}</h1>
+						{#if hostedByLine}
+							<p class="r-banner-hosted">{hostedByLine}</p>
+						{/if}
+						{#if tripDescriptionTrim}
+							<p class="r-banner-desc">{tripDescriptionTrim}</p>
+						{/if}
+					</div>
 					<p class="r-banner-sub">
 						{#if tripLocation}{tripLocation}{#if tripDateRange} · {/if}{/if}{tripDateRange}
 					</p>
@@ -751,13 +764,36 @@
 	}
 	.r-banner-text {
 		display: flex; flex-direction: column;
-		align-items: center; text-align: center; gap: 0.35rem;
+		align-items: center; text-align: center; gap: 0.5rem;
+	}
+	.r-banner-title-stack {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.15rem;
+		max-width: min(40rem, 100%);
 	}
 	.r-banner-title {
 		font-family: 'Fraunces', Georgia, serif;
 		margin: 0; font-size: clamp(1.625rem, 3.5vw, 2.25rem);
-		font-weight: 700; letter-spacing: -0.03em; line-height: 1.2;
+		font-weight: 700; letter-spacing: -0.03em; line-height: 1.15;
 		color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.25);
+	}
+	.r-banner-hosted {
+		margin: 0;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		color: rgba(255,255,255,0.92);
+		line-height: 1.3;
+		text-shadow: 0 1px 6px rgba(0,0,0,0.35);
+	}
+	.r-banner-desc {
+		margin: 0.25rem 0 0;
+		font-size: 0.875rem;
+		font-weight: 400;
+		line-height: 1.45;
+		color: rgba(255,255,255,0.85);
+		text-shadow: 0 1px 6px rgba(0,0,0,0.3);
 	}
 	.r-banner-sub {
 		margin: 0; font-size: 0.9375rem;
