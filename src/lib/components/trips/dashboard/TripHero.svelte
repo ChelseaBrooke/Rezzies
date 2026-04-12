@@ -791,34 +791,45 @@
 	}
 
 	@media (max-width: 640px) {
+		.compact-hero {
+			margin-left: -1rem;
+			margin-right: -1rem;
+			width: calc(100% + 2rem);
+			border-radius: 0;
+		}
+
 		.trip-hero {
-			height: 340px;
-			min-height: 340px;
+			margin-left: -1rem;
+			margin-right: -1rem;
+			width: calc(100% + 2rem);
+			border-radius: 0;
+			height: 280px;
+			min-height: 280px;
 		}
 
 		.hero-countdown {
-			--countdown-box: 6.25rem;
-			top: 1rem;
-			right: 1rem;
-			border-radius: 1rem;
-			padding: 0.35rem 0.3rem 0.4rem;
+			--countdown-box: 5rem;
+			top: 0.75rem;
+			right: 0.75rem;
+			border-radius: 0.75rem;
+			padding: 0.28rem 0.22rem 0.32rem;
 		}
 
 		.hero-countdown-num {
 			font-size: clamp(
-				1.15rem,
-				calc(2.85rem / (0.42 + var(--countdown-digits, 2) * 0.52)),
-				2.85rem
+				0.95rem,
+				calc(2.2rem / (0.42 + var(--countdown-digits, 2) * 0.52)),
+				2.2rem
 			);
 		}
 
 		.hero-countdown-unit {
-			font-size: 0.5625rem;
+			font-size: 0.5rem;
 			letter-spacing: 0.06em;
 		}
 
 		.hero-countdown-label {
-			font-size: 0.5rem;
+			font-size: 0.4375rem;
 		}
 
 		.hero-overlay {
@@ -845,7 +856,7 @@
 		}
 
 		.hero-content {
-			justify-content: flex-end;
+			justify-content: center;
 			padding-bottom: 0.5rem;
 		}
 	}

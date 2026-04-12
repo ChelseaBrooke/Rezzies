@@ -542,10 +542,12 @@
 		gap: 0.5rem;
 		align-items: flex-end;
 		background: white;
+		min-width: 0;
 	}
 
 	.chat-input {
 		flex: 1;
+		min-width: 0;
 		border: 1px solid var(--border-strong, #d1d5db);
 		border-radius: var(--radius-md, 8px);
 		padding: 0.625rem 0.75rem;
@@ -601,11 +603,18 @@
 	}
 
 	@media (max-width: 640px) {
+		.chat-widget.open {
+			left: 0.5rem;
+			right: 0.5rem;
+			width: auto;
+		}
+
 		.chat-window {
-			max-width: calc(100vw - 1rem);
-			width: calc(100vw - 1rem);
-			height: calc(100vh - 4rem);
-			max-height: 500px;
+			width: 100%;
+			max-width: 100%;
+			box-sizing: border-box;
+			height: min(360px, calc(100vh - 5.5rem));
+			max-height: min(500px, calc(100vh - 5.5rem));
 		}
 
 		.chat-widget {
@@ -614,7 +623,7 @@
 
 		.chat-toggle {
 			min-width: 240px;
-			max-width: calc(100vw - 1rem);
+			max-width: min(500px, calc(100vw - 1rem));
 		}
 	}
 </style>

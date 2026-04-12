@@ -286,10 +286,13 @@
 		</div>
 	</aside>
 	<main class="main-content" bind:this={mainContentEl}>
-		<div class="mobile-menu-bar">
+		<div
+			class="trip-sticky-header"
+			class:trip-sticky-header--with-bar={showModePillOnDashboard || !hideMessagesAndNotifications}
+		>
 			<button
 				type="button"
-				class="mobile-menu-btn"
+				class="mobile-drawer-trigger"
 				onclick={toggleMobileDrawer}
 				aria-expanded={mobileDrawerOpen}
 				aria-controls="trip-portal-sidebar"
@@ -301,8 +304,7 @@
 					<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
 				{/if}
 			</button>
-		</div>
-		{#if showModePillOnDashboard || !hideMessagesAndNotifications}
+			{#if showModePillOnDashboard || !hideMessagesAndNotifications}
 			<div class="top-actions" class:top-actions--no-pill={!showModePillOnDashboard}>
 				{#if showModePillOnDashboard}
 					<div class="top-actions-spacer" aria-hidden="true"></div>
@@ -335,7 +337,8 @@
 					</div>
 				{/if}
 			</div>
-		{/if}
+			{/if}
+		</div>
 		{#if children != null && typeof children === 'function'}
 			<div class="main-content-inner">
 				{@render children()}
@@ -373,18 +376,15 @@
 		-webkit-tap-highlight-color: transparent;
 	}
 
-	.mobile-menu-bar {
-		display: none;
-		align-items: center;
+	.trip-sticky-header {
+		position: relative;
+		z-index: 5;
 		flex-shrink: 0;
-		min-height: 48px;
-		padding: 0.35rem 0 0.5rem;
-		margin: 0 0 0.15rem;
-		gap: 0.5rem;
+		min-height: 0;
 	}
 
-	.mobile-menu-btn {
-		display: inline-flex;
+	.mobile-drawer-trigger {
+		display: none;
 		align-items: center;
 		justify-content: center;
 		width: 44px;
@@ -395,11 +395,19 @@
 		color: var(--text);
 		cursor: pointer;
 		box-shadow: var(--shadow-sm);
+		flex-shrink: 0;
+		-webkit-tap-highlight-color: transparent;
 	}
-	.mobile-menu-btn:hover {
+	.mobile-drawer-trigger:hover {
 		background: var(--surface2);
 		color: var(--primary);
 		border-color: rgba(47, 119, 120, 0.25);
+	}
+
+	@media (min-width: 641px) {
+		.trip-sticky-header {
+			display: contents;
+		}
 	}
 
 	/* ── Left rail ── */
@@ -853,12 +861,29 @@
 			padding: 0;
 		}
 
-		.mobile-menu-bar {
+		.trip-sticky-header {
 			display: flex;
+			align-items: center;
+			gap: 0.5rem;
 			position: sticky;
 			top: 0;
 			z-index: 30;
 			background: var(--bg);
+			padding: 0.35rem 0 0.5rem;
+			margin: 0 0 0.15rem;
+		}
+
+		.mobile-drawer-trigger {
+			display: inline-flex;
+		}
+
+		.trip-sticky-header .top-actions {
+			position: static;
+			flex: 1;
+			min-width: 0;
+			top: auto;
+			left: auto;
+			right: auto;
 		}
 
 		.app-shell.drawer-open .mobile-nav-backdrop {
@@ -917,10 +942,6 @@
 			margin: 0;
 			height: 100vh;
 			padding: 0.65rem 1rem 0;
-		}
-
-		.top-actions {
-			top: 3.35rem;
 		}
 	}
 </style>
