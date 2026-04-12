@@ -270,7 +270,7 @@
 			gamesCount={data.tripGames?.length ?? 0}
 			{hostedByLine}
 			/>
-			<PollCardContainer tripId={trip.id} placement="hero" />
+			<PollCardContainer tripId={trip.id} placement="hero" isHost={true} />
 		</div>
 		{#if user}
 			<TripDashboardGrid

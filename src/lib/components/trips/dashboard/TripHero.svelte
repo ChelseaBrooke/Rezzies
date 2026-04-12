@@ -1,5 +1,7 @@
 <script lang="ts">
 	import TripQuickActions from '$lib/components/trips/TripQuickActions.svelte';
+	import OnboardingTooltip from '$lib/components/ui/OnboardingTooltip.svelte';
+	import { getTooltip } from '$lib/config/onboardingTooltips.js';
 	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
 
 	interface Props {
@@ -56,6 +58,8 @@
 		gamesCount = 0,
 		hostedByLine = null
 	}: Props = $props();
+
+	const quickActionsTip = $derived(isHost ? getTooltip('host_quick_actions') : null);
 
 	const mealsCount = $derived(mealSlots.length);
 	const activitiesCount = $derived(activities.length);
@@ -229,13 +233,22 @@
 						{/if}
 					{/if}
 				</div>
-				<div class="hero-center-actions">
+				<div class="hero-center-actions" style="position:relative;">
 			<TripQuickActions
 					tripId={trip.id}
 					onInvite={quickActions.onInvite}
 					showToast={quickActions.showToast}
 					{isHost}
 				/>
+				{#if quickActionsTip}
+					<OnboardingTooltip
+						key={quickActionsTip.key}
+						title={quickActionsTip.title}
+						body={quickActionsTip.body}
+						position={quickActionsTip.position}
+						align={quickActionsTip.align}
+					/>
+				{/if}
 				</div>
 			</div>
 			</div>

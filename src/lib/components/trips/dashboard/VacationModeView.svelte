@@ -296,7 +296,7 @@
 
 <!-- ════════════════ TEMPLATE ════════════════ -->
 <div class="v">
-	<PollCardContainer tripId={tripId} placement="sidebar-left" />
+	<PollCardContainer tripId={tripId} placement="sidebar-left" {isHost} />
 	<!-- 1 ── HERO -->
 	<header class="v-hero">
 		<div class="v-hero-clip">

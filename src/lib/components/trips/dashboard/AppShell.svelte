@@ -8,6 +8,8 @@
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 	import DashboardModeSelector from '$lib/components/trips/dashboard/DashboardModeSelector.svelte';
+	import OnboardingTooltip from '$lib/components/ui/OnboardingTooltip.svelte';
+	import { getTooltip } from '$lib/config/onboardingTooltips.js';
 	import { dashboardModeByTripId } from '$lib/stores/dashboardMode.js';
 	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
 
@@ -26,9 +28,12 @@
 		/** Add-on flags — when false the corresponding nav item is hidden */
 		activitiesEnabled?: boolean;
 		gamesEnabled?: boolean;
+		isHost?: boolean;
 	}
 
-	let { tripId, user, children, onInvite, showToast, showGuestsTab = true, pollsBadgeCount = 0, tripLockedForRecap = false, checkInDate = null, checkOutDate = null, activitiesEnabled = true, gamesEnabled = true }: Props = $props();
+	let { tripId, user, children, onInvite, showToast, showGuestsTab = true, pollsBadgeCount = 0, tripLockedForRecap = false, checkInDate = null, checkOutDate = null, activitiesEnabled = true, gamesEnabled = true, isHost = false }: Props = $props();
+
+	const modeSelectorTip = $derived(getTooltip(isHost ? 'host_mode_selector' : 'guest_mode_selector'));
 
 	const modeFromDate = $derived.by((): DashboardMode => {
 		const checkIn = checkInDate ? new Date(checkInDate) : null;
@@ -204,13 +209,22 @@
 			<div class="top-actions" class:top-actions--no-pill={!showModePillOnDashboard}>
 				{#if showModePillOnDashboard}
 					<div class="top-actions-spacer" aria-hidden="true"></div>
-					<div class="top-actions-pill">
+					<div class="top-actions-pill" style="position:relative;">
 						<DashboardModeSelector
 							{checkInDate}
 							{checkOutDate}
 							selectedMode={headerMode}
 							onModeChange={setHeaderMode}
 						/>
+						{#if modeSelectorTip}
+							<OnboardingTooltip
+								key={modeSelectorTip.key}
+								title={modeSelectorTip.title}
+								body={modeSelectorTip.body}
+								position={modeSelectorTip.position}
+								align={modeSelectorTip.align}
+							/>
+						{/if}
 					</div>
 				{/if}
 				{#if !hideMessagesAndNotifications}

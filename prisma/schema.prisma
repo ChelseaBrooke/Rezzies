@@ -220,6 +220,7 @@ model User {
   // Profile and friends visibility
   profileVisibility    String  @default("public")   // "public" | "trip_only" | "private"
   friendsListVisibility String @default("friends")  // "friends" | "trip_members" | "private"
+  dismissedTooltips     Json     @default("[]")       // string[] of dismissed onboarding tooltip IDs
   createdAt       DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

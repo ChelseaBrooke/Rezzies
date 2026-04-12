@@ -1,9 +1,13 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
 	import type { Snippet } from 'svelte';
+	import { onMount } from 'svelte';
 	import AppShell from '$lib/components/trips/dashboard/AppShell.svelte';
 	import TripChat from '$lib/components/trips/TripChat.svelte';
+	import { onboardingStore } from '$lib/stores/onboarding.js';
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
+
+	onMount(() => { onboardingStore.init(data.isHost); });
 
 	// Trip is in recap (past checkout), disable editing (e.g. hide Settings)
 	const tripLockedForRecap = $derived.by(() => {
@@ -30,6 +34,7 @@
 		tripId={data.trip.id}
 		user={data.user}
 		onInvite={handleInvite}
+		isHost={data.isHost}
 		showGuestsTab={data.isHost || data.membership?.role === 'co-host'}
 		pollsBadgeCount={data.pollsBadgeCount ?? 0}
 		tripLockedForRecap={tripLockedForRecap}

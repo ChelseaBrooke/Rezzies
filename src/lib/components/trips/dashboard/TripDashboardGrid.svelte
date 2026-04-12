@@ -4,6 +4,8 @@
 	import TripInfoCard from './TripInfoCard.svelte';
 	import CapacityGuestsCard from './CapacityGuestsCard.svelte';
 	import GuestRsvpSummaryCard from './GuestRsvpSummaryCard.svelte';
+	import OnboardingTooltip from '$lib/components/ui/OnboardingTooltip.svelte';
+	import { getTooltip } from '$lib/config/onboardingTooltips.js';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import type { CostAtMaxParticipation } from '$lib/server/pricing-canonical.js';
@@ -254,6 +256,13 @@
 		isHost && costSharingEnabled && costAtMaxParticipation != null
 	);
 
+	const progressTip = $derived(isHost ? getTooltip('host_progress') : null);
+	const tripInfoTip = $derived(getTooltip(isHost ? 'host_trip_info' : 'guest_trip_info'));
+	const capacityTip = $derived(isHost ? getTooltip('host_capacity_card') : null);
+	const recentTip = $derived(getTooltip(isHost ? 'host_recent_activity' : 'guest_recent_activity'));
+	const guestsTip = $derived(isHost ? getTooltip('host_guests_preview') : null);
+	const guestRsvpTip = $derived(!isHost ? getTooltip('guest_rsvp_card') : null);
+
 </script>
 
 <div class="dashboard-wrapper">
@@ -282,7 +291,7 @@
 	<!-- Layout: row1 = reminders | goals | recent, row2 = guests under reminders + goals only -->
 	<div class="dashboard-layout" class:dashboard-layout--no-guests-row={showCapacityGuestsCard}>
 		<div class="left-column">
-		<div class="sticky-card-wrapper" class:host-mode={isHost}>
+		<div class="sticky-card-wrapper" class:host-mode={isHost} style="position:relative;">
 			{#if isHost}
 				<DashboardCard
 						variant="sticky"
@@ -325,10 +334,28 @@
 					/>
 					</DashboardCard>
 				{/if}
+				{#if progressTip}
+					<OnboardingTooltip
+						key={progressTip.key}
+						title={progressTip.title}
+						body={progressTip.body}
+						position={progressTip.position}
+						align={progressTip.align}
+					/>
+				{/if}
+				{#if guestRsvpTip}
+					<OnboardingTooltip
+						key={guestRsvpTip.key}
+						title={guestRsvpTip.title}
+						body={guestRsvpTip.body}
+						position={guestRsvpTip.position}
+						align={guestRsvpTip.align}
+					/>
+				{/if}
 			</div>
 		</div>
 
-		<div class="goals-cell" id="trip-info">
+		<div class="goals-cell" id="trip-info" style="position:relative;">
 			<div class="goals-card-wrap">
 				<DashboardCard>
 					{#if showCapacityGuestsCard}
@@ -356,9 +383,26 @@
 					{/if}
 				</DashboardCard>
 			</div>
+			{#if showCapacityGuestsCard && capacityTip}
+				<OnboardingTooltip
+					key={capacityTip.key}
+					title={capacityTip.title}
+					body={capacityTip.body}
+					position={capacityTip.position}
+					align={capacityTip.align}
+				/>
+			{:else if !showCapacityGuestsCard && tripInfoTip}
+				<OnboardingTooltip
+					key={tripInfoTip.key}
+					title={tripInfoTip.title}
+					body={tripInfoTip.body}
+					position={tripInfoTip.position}
+					align={tripInfoTip.align}
+				/>
+			{/if}
 		</div>
 
-		<div class="recent-cell">
+		<div class="recent-cell" style="position:relative;">
 			<DashboardCard
 				title="Recent Activity"
 				headerLeft={activityIcon}
@@ -390,10 +434,19 @@
 					{/if}
 				</div>
 			</DashboardCard>
+			{#if recentTip}
+				<OnboardingTooltip
+					key={recentTip.key}
+					title={recentTip.title}
+					body={recentTip.body}
+					position={recentTip.position}
+					align={recentTip.align}
+				/>
+			{/if}
 		</div>
 
 		{#if !showCapacityGuestsCard}
-			<div class="guests-row">
+			<div class="guests-row" style="position:relative;">
 				<div class="guests-card-wrapper">
 					<DashboardCard
 						title="Guests"
@@ -441,6 +494,15 @@
 					</div>
 					</DashboardCard>
 				</div>
+				{#if guestsTip}
+					<OnboardingTooltip
+						key={guestsTip.key}
+						title={guestsTip.title}
+						body={guestsTip.body}
+						position={guestsTip.position}
+						align={guestsTip.align}
+					/>
+				{/if}
 			</div>
 		{/if}
 	</div>

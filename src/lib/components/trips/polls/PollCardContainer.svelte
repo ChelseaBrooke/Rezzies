@@ -1,5 +1,7 @@
 <script lang="ts">
 	import PollCard from './PollCard.svelte';
+	import OnboardingTooltip from '$lib/components/ui/OnboardingTooltip.svelte';
+	import { getTooltip } from '$lib/config/onboardingTooltips.js';
 
 	/** Matches GET /trips/[tripId]/polls/unanswered response item */
 	type UnansweredPollItem = {
@@ -15,8 +17,11 @@
 	let {
 		tripId,
 		/** 'hero' = upper-right of main photo (parent must be position: relative); 'sidebar-left' = left of vacation right sidebar; 'viewport' = fixed to viewport (default) */
-		placement = 'viewport'
-	}: { tripId: string; placement?: 'viewport' | 'hero' | 'sidebar-left' } = $props();
+		placement = 'viewport',
+		isHost = false
+	}: { tripId: string; placement?: 'viewport' | 'hero' | 'sidebar-left'; isHost?: boolean } = $props();
+
+	const pollsTip = $derived(getTooltip(isHost ? 'host_polls' : 'guest_polls'));
 
 	let queue = $state<UnansweredPollItem[]>([]);
 	let loading = $state(true);
@@ -92,6 +97,15 @@
 			onVote={handleVote}
 			disabled={votingOptionId !== null}
 		/>
+		{#if pollsTip}
+			<OnboardingTooltip
+				key={pollsTip.key}
+				title={pollsTip.title}
+				body={pollsTip.body}
+				position={pollsTip.position}
+				align={pollsTip.align}
+			/>
+		{/if}
 	</div>
 {/if}
 
