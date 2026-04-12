@@ -7,8 +7,9 @@
  * Protect with a shared secret via the CRON_SECRET env var.
  * Call this daily from your scheduler (Vercel Cron, Railway Cron, etc.).
  *
- * Example Vercel cron entry (vercel.json):
- *   { "path": "/api/cron/waitlist", "schedule": "0 12 * * *" }
+ * Schedule is defined in vercel.json (every 15 minutes). Do not put cron
+ * expressions containing star-slash here inside a block comment — that
+ * sequence ends the comment and breaks the build.
  */
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
