@@ -148,20 +148,57 @@
 		browser ? localStorage.getItem('sidebar-collapsed') === 'true' : false
 	);
 
+	/** Slide-out trip nav on small viewports (see @media max-width 640px). */
+	let mobileDrawerOpen = $state(false);
+
 	function toggleCollapsed() {
 		collapsed = !collapsed;
 		if (browser) localStorage.setItem('sidebar-collapsed', String(collapsed));
+	}
+
+	function closeMobileDrawer() {
+		mobileDrawerOpen = false;
+	}
+
+	function toggleMobileDrawer() {
+		mobileDrawerOpen = !mobileDrawerOpen;
 	}
 
 	// Reset the custom scroll container to the top on every client-side navigation.
 	// SvelteKit's built-in scroll restoration only handles window scroll, not this div.
 	afterNavigate(() => {
 		mainContentEl?.scrollTo({ top: 0, behavior: 'instant' });
+		mobileDrawerOpen = false;
+	});
+
+	$effect(() => {
+		if (!browser) return;
+		const mq = window.matchMedia('(min-width: 641px)');
+		const onChange = () => {
+			if (mq.matches) mobileDrawerOpen = false;
+		};
+		mq.addEventListener('change', onChange);
+		return () => mq.removeEventListener('change', onChange);
+	});
+
+	$effect(() => {
+		if (!browser || !mobileDrawerOpen) return;
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') closeMobileDrawer();
+		};
+		document.addEventListener('keydown', onKey);
+		return () => document.removeEventListener('keydown', onKey);
 	});
 </script>
 
-<div class="app-shell" class:collapsed>
-	<aside class="left-rail">
+<div class="app-shell" class:collapsed class:drawer-open={mobileDrawerOpen}>
+	<button
+		type="button"
+		class="mobile-nav-backdrop"
+		aria-label="Close trip menu"
+		onclick={closeMobileDrawer}
+	></button>
+	<aside class="left-rail" id="trip-portal-sidebar">
 		<a href="/trips" class="logo-button" aria-label="Divvi">
 			<img src={divviLogo} alt="Divvi" class="logo-img" />
 		</a>
@@ -249,6 +286,22 @@
 		</div>
 	</aside>
 	<main class="main-content" bind:this={mainContentEl}>
+		<div class="mobile-menu-bar">
+			<button
+				type="button"
+				class="mobile-menu-btn"
+				onclick={toggleMobileDrawer}
+				aria-expanded={mobileDrawerOpen}
+				aria-controls="trip-portal-sidebar"
+				aria-label={mobileDrawerOpen ? 'Close trip menu' : 'Open trip menu'}
+			>
+				{#if mobileDrawerOpen}
+					<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+				{:else}
+					<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+				{/if}
+			</button>
+		</div>
 		{#if showModePillOnDashboard || !hideMessagesAndNotifications}
 			<div class="top-actions" class:top-actions--no-pill={!showModePillOnDashboard}>
 				{#if showModePillOnDashboard}
@@ -304,6 +357,49 @@
 	}
 	.app-shell.collapsed {
 		--sidebar-w: 72px;
+	}
+
+	/* Full-screen dim when mobile drawer open (visible only ≤640px via media block below) */
+	.mobile-nav-backdrop {
+		display: none;
+		position: fixed;
+		inset: 0;
+		z-index: 150;
+		margin: 0;
+		padding: 0;
+		border: none;
+		background: rgba(15, 23, 42, 0.48);
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.mobile-menu-bar {
+		display: none;
+		align-items: center;
+		flex-shrink: 0;
+		min-height: 48px;
+		padding: 0.35rem 0 0.5rem;
+		margin: 0 0 0.15rem;
+		gap: 0.5rem;
+	}
+
+	.mobile-menu-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 44px;
+		height: 44px;
+		border-radius: 10px;
+		border: 1px solid var(--border-soft);
+		background: var(--surfaceSolid);
+		color: var(--text);
+		cursor: pointer;
+		box-shadow: var(--shadow-sm);
+	}
+	.mobile-menu-btn:hover {
+		background: var(--surface2);
+		color: var(--primary);
+		border-color: rgba(47, 119, 120, 0.25);
 	}
 
 	/* ── Left rail ── */
@@ -757,14 +853,74 @@
 			padding: 0;
 		}
 
+		.mobile-menu-bar {
+			display: flex;
+			position: sticky;
+			top: 0;
+			z-index: 30;
+			background: var(--bg);
+		}
+
+		.app-shell.drawer-open .mobile-nav-backdrop {
+			display: block;
+		}
+
 		.left-rail {
-			display: none;
+			display: flex !important;
+			left: 0;
+			top: 0;
+			bottom: 0;
+			width: min(288px, 88vw);
+			max-width: 288px;
+			margin: 0;
+			padding: 1rem 0;
+			border-radius: 0 14px 14px 0;
+			align-items: stretch;
+			transform: translateX(calc(-100% - 8px));
+			transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+			z-index: 200;
+			box-shadow: 8px 0 36px rgba(0, 0, 0, 0.14);
+		}
+
+		.app-shell.drawer-open .left-rail {
+			transform: translateX(0);
+		}
+
+		/* Expanded labels inside the mobile drawer */
+		.app-shell.drawer-open .rail-item-label {
+			opacity: 1 !important;
+			max-width: 200px !important;
+			pointer-events: auto !important;
+		}
+		.app-shell.drawer-open .rail-nav-item {
+			justify-content: flex-start;
+			padding-left: 12px;
+			padding-right: 10px;
+			gap: 10px;
+		}
+		.app-shell.drawer-open .rail-nav {
+			margin: 0 8px;
+			align-self: stretch;
+			width: calc(100% - 16px);
+		}
+		.app-shell.drawer-open .rail-user-row {
+			gap: 10px;
+			padding-left: 4px;
+			padding-right: 4px;
+		}
+		.app-shell.drawer-open .rail-util {
+			gap: 10px;
+			padding-left: 12px;
 		}
 
 		.main-content {
 			margin: 0;
 			height: 100vh;
-			padding: 1rem 1rem 0.0rem;
+			padding: 0.65rem 1rem 0;
+		}
+
+		.top-actions {
+			top: 3.35rem;
 		}
 	}
 </style>
