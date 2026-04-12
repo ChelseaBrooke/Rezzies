@@ -19,7 +19,7 @@
 
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
+import { cronAuthDenied } from '$lib/server/cron-auth.js';
 import {
 	sendInvitationReminders,
 	sendTripStartingSoonEmails,
@@ -30,13 +30,8 @@ import {
 } from '$lib/server/cron-email-service.js';
 
 export const GET: RequestHandler = async ({ request }) => {
-	const secret = env.CRON_SECRET;
-	if (secret) {
-		const authHeader = request.headers.get('authorization');
-		if (authHeader !== `Bearer ${secret}`) {
-			return json({ error: 'Unauthorized' }, { status: 401 });
-		}
-	}
+	const denied = cronAuthDenied(request);
+	if (denied) return denied;
 
 	const results: Record<string, unknown> = {};
 

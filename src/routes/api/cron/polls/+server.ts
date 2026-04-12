@@ -5,21 +5,16 @@
  * Discover activity polls resolve to "Add to itinerary".
  *
  * Protect with CRON_SECRET (Bearer token), same as /api/cron/waitlist.
- * Schedule: see vercel.json (every 15 minutes). Avoid star-slash in block comments.
+ * Schedule: see vercel.json (daily on Hobby; Pro allows more frequent runs).
  */
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { env } from '$env/dynamic/private';
+import { cronAuthDenied } from '$lib/server/cron-auth.js';
 import { maintainAllPolls } from '$lib/server/poll-maintenance.js';
 
 export const GET: RequestHandler = async ({ request }) => {
-	const secret = env.CRON_SECRET;
-	if (secret) {
-		const authHeader = request.headers.get('authorization');
-		if (authHeader !== `Bearer ${secret}`) {
-			return json({ error: 'Unauthorized' }, { status: 401 });
-		}
-	}
+	const denied = cronAuthDenied(request);
+	if (denied) return denied;
 
 	try {
 		const { expiredClosed } = await maintainAllPolls();
