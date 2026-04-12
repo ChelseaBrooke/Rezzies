@@ -572,7 +572,7 @@
 		overflow: hidden;
 		box-sizing: border-box;
 		min-width: 0;
-		padding: 0.5rem 2rem 2rem;
+		padding: 0.5rem 2rem 0rem;
 		max-width: 100%;
 		background: var(--bg);
 		position: relative;
@@ -692,7 +692,7 @@
 		.main-content {
 			margin: 8px 8px 8px 76px;
 			height: calc(100vh - 16px);
-			padding: 0.75rem 1.5rem 1.5rem;
+			padding: 0.75rem 1.5rem 0rem;
 			transition: none;
 		}
 	}
@@ -709,7 +709,7 @@
 		.main-content {
 			margin: 0;
 			height: 100vh;
-			padding: 1rem;
+			padding: 1rem 1rem 0.0rem;
 		}
 	}
 </style>

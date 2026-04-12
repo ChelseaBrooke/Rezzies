@@ -77,6 +77,18 @@
 	const roomsFilled = $derived(new Set(roomAssignments.map((a) => a.roomId)).size);
 	const roomsPct = $derived(roomsTotal > 0 ? Math.round((roomsFilled / roomsTotal) * 100) : 0);
 
+	/** Max headcount for host planning card when server pricing payload is absent (mirrors getCostAtMaxParticipation fallbacks). */
+	const planningMaxHeadcount = $derived.by(() => {
+		const fromServer = data.costAtMaxParticipation?.maxHeadcount;
+		if (fromServer != null && fromServer > 0) return fromServer;
+		const cap = trip?.maxCapacity ?? null;
+		const mg = trip?.maxGuests ?? null;
+		if (cap != null && cap > 0) return cap;
+		if (mg != null && mg > 0) return mg;
+		if (totalBedSlots > 0) return totalBedSlots;
+		return Math.max(acceptedCount, 1);
+	});
+
 	// Committed = sum of yes-RSVPs' current expected cost (their reserved beds/rooms/slots), not the estimate range
 	const committedFunds = $derived(
 		data.committedFundsFromYesRsvps ?? (trip?.invoices ?? []).reduce((s, i) => s + (i.status === 'paid' ? i.totalAmount : 0), 0)
@@ -237,6 +249,7 @@
 			{members}
 			userInvoices={userInvoices}
 			totalCost={totalCost}
+			costSharingEnabled={trip.costSharingEnabled ?? true}
 			{rsvps}
 			tripGalleryFiles={data.tripGalleryFiles ?? []}
 		/>
@@ -321,6 +334,8 @@
 				tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
 				costAtMaxParticipation={data.costAtMaxParticipation ?? null}
 				costSharingEnabled={trip.costSharingEnabled ?? true}
+				expectedPeopleCount={trip.expectedPeopleCount ?? null}
+				planningMaxHeadcount={planningMaxHeadcount}
 				recentActivities={activities.map((a) => ({ title: a.title, createdAt: String(a.createdAt) }))}
 				recentMealSlots={mealSlots.map((m) => ({
 					mealType: m.mealType,

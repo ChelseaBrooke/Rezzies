@@ -39,6 +39,7 @@
 		members = [],
 		userInvoices = [],
 		totalCost = 0,
+		costSharingEnabled = true,
 		rsvps = [],
 		tripGalleryFiles = []
 	}: {
@@ -56,6 +57,8 @@
 		members?: Array<{ user?: { id: string; name: string | null; avatarUrl?: string | null } | null }>;
 		userInvoices?: Array<{ status: string; totalAmount: number; breakdownJson?: string | null }>;
 		totalCost?: number;
+		/** When false, do not show invoice breakdown or trip totals (privacy / product). */
+		costSharingEnabled?: boolean;
 		rsvps?: Array<{ status: string; user?: { id: string; name: string | null; avatarUrl?: string | null } | null }>;
 		tripGalleryFiles?: GalleryFile[];
 	} = $props();
@@ -523,7 +526,7 @@
 			<div class="r-card-head">
 				<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v.5"/><path d="M12 6v.5"/></svg>
 				<h3>Cost summary</h3>
-				{#if myCost !== null}
+				{#if costSharingEnabled && myCost !== null}
 					{#if isPaid}
 						<span class="r-cost-badge r-cost-badge--paid" style="margin-left:auto">
 							<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
@@ -535,74 +538,78 @@
 				{/if}
 			</div>
 
-			{#if myCost !== null}
-				{#if breakdown}
-					<ul class="r-breakdown">
-						<!-- Rooms -->
-						{#each breakdown.rooms as room}
-							<li class="r-breakdown-item">
-								<div class="r-breakdown-left">
-									<span class="r-breakdown-name">{room.roomName}{room.bedType ? ` – ${room.bedType}` : ''}</span>
-									<span class="r-breakdown-sub">{room.nights} night{room.nights === 1 ? '' : 's'}</span>
-								</div>
-								<span class="r-breakdown-amt">${room.amount.toFixed(2)}</span>
-							</li>
-						{/each}
-						<!-- Meal sharing / food fund -->
-						{#each breakdown.meals ?? [] as meal}
-							<li class="r-breakdown-item r-breakdown-item--meal">
-								<div class="r-breakdown-left">
-									<span class="r-breakdown-name">🍽 {meal.label}</span>
-									<span class="r-breakdown-sub">${meal.perPerson.toFixed(2)} × {meal.partySize} guest{meal.partySize === 1 ? '' : 's'}</span>
-								</div>
-								<span class="r-breakdown-amt">${meal.amount.toFixed(2)}</span>
-							</li>
-						{/each}
-						<!-- Activities -->
-						{#each breakdown.activities as act}
-							{#if act.amount > 0}
+			{#if costSharingEnabled}
+				{#if myCost !== null}
+					{#if breakdown}
+						<ul class="r-breakdown">
+							<!-- Rooms -->
+							{#each breakdown.rooms as room}
 								<li class="r-breakdown-item">
 									<div class="r-breakdown-left">
-										<span class="r-breakdown-name">{act.activityName}</span>
-										<span class="r-breakdown-sub">activity fee</span>
+										<span class="r-breakdown-name">{room.roomName}{room.bedType ? ` – ${room.bedType}` : ''}</span>
+										<span class="r-breakdown-sub">{room.nights} night{room.nights === 1 ? '' : 's'}</span>
 									</div>
-									<span class="r-breakdown-amt">${act.amount.toFixed(2)}</span>
+									<span class="r-breakdown-amt">${room.amount.toFixed(2)}</span>
 								</li>
-							{/if}
-						{/each}
-						<!-- Extras -->
-						{#each breakdown.extras as extra}
-							<li class="r-breakdown-item">
-								<div class="r-breakdown-left">
-									<span class="r-breakdown-name">{extra.label}</span>
-									{#if extra.quantity > 1}<span class="r-breakdown-sub">×{extra.quantity}</span>{/if}
-								</div>
-								<span class="r-breakdown-amt">${extra.amount.toFixed(2)}</span>
-							</li>
-						{/each}
-					</ul>
-					<div class="r-breakdown-total">
-						<span>Your total</span>
-						<span>${myCost.toFixed(2)}</span>
-					</div>
+							{/each}
+							<!-- Meal sharing / food fund -->
+							{#each breakdown.meals ?? [] as meal}
+								<li class="r-breakdown-item r-breakdown-item--meal">
+									<div class="r-breakdown-left">
+										<span class="r-breakdown-name">🍽 {meal.label}</span>
+										<span class="r-breakdown-sub">${meal.perPerson.toFixed(2)} × {meal.partySize} guest{meal.partySize === 1 ? '' : 's'}</span>
+									</div>
+									<span class="r-breakdown-amt">${meal.amount.toFixed(2)}</span>
+								</li>
+							{/each}
+							<!-- Activities -->
+							{#each breakdown.activities as act}
+								{#if act.amount > 0}
+									<li class="r-breakdown-item">
+										<div class="r-breakdown-left">
+											<span class="r-breakdown-name">{act.activityName}</span>
+											<span class="r-breakdown-sub">activity fee</span>
+										</div>
+										<span class="r-breakdown-amt">${act.amount.toFixed(2)}</span>
+									</li>
+								{/if}
+							{/each}
+							<!-- Extras -->
+							{#each breakdown.extras as extra}
+								<li class="r-breakdown-item">
+									<div class="r-breakdown-left">
+										<span class="r-breakdown-name">{extra.label}</span>
+										{#if extra.quantity > 1}<span class="r-breakdown-sub">×{extra.quantity}</span>{/if}
+									</div>
+									<span class="r-breakdown-amt">${extra.amount.toFixed(2)}</span>
+								</li>
+							{/each}
+						</ul>
+						<div class="r-breakdown-total">
+							<span>Your total</span>
+							<span>${myCost.toFixed(2)}</span>
+						</div>
+					{:else}
+						<!-- No breakdown JSON, just show the total -->
+						<div class="r-cost-main">
+							<span class="r-cost-amount">${myCost.toFixed(2)}</span>
+							<span class="r-cost-label">your trip cost</span>
+						</div>
+					{/if}
 				{:else}
-					<!-- No breakdown JSON, just show the total -->
-					<div class="r-cost-main">
-						<span class="r-cost-amount">${myCost.toFixed(2)}</span>
-						<span class="r-cost-label">your trip cost</span>
+					<p class="r-empty">No cost on record.</p>
+				{/if}
+
+				{#if isHost && totalCost > 0}
+					<div class="r-receipt-row r-receipt-row--total">
+						<span>Total trip cost</span>
+						<span class="r-receipt-val">${totalCost.toFixed(2)}</span>
 					</div>
 				{/if}
+				<a href="/trips/{tripId}/guests" class="r-card-link">View all payments →</a>
 			{:else}
-				<p class="r-empty">No cost on record.</p>
+				<p class="r-cost-sharing-off">Cost sharing was turned off for this trip.</p>
 			{/if}
-
-			{#if isHost && totalCost > 0}
-				<div class="r-receipt-row r-receipt-row--total">
-					<span>Total trip cost</span>
-					<span class="r-receipt-val">${totalCost.toFixed(2)}</span>
-				</div>
-			{/if}
-			<a href="/trips/{tripId}/guests" class="r-card-link">View all payments →</a>
 		</section>
 
 		<!-- ACTIVITIES (left half) -->
@@ -829,6 +836,14 @@
 	}
 	.r-card-link:hover { text-decoration: underline; }
 	.r-empty { margin: 0; font-size: 0.875rem; color: var(--muted); }
+
+	.r-cost-sharing-off {
+		margin: 0;
+		padding: 0.35rem 0 0.15rem;
+		font-size: 0.9375rem;
+		line-height: 1.5;
+		color: var(--muted);
+	}
 
 	/* Badges */
 	.r-badge {

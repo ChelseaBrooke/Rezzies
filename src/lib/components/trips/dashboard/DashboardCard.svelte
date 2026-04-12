@@ -71,7 +71,8 @@
 		gap: 0.5rem;
 		transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 		min-width: 0;
-		overflow: hidden;
+		/* Default visible so content (e.g. goals / capacity card) isn’t clipped; opt in to clip in TripDashboardGrid where scroll/max-height needs it */
+		overflow: visible;
 	}
 
 	.dashboard-card:hover {
@@ -141,7 +142,7 @@
 		flex: 1;
 		min-height: 0;
 		min-width: 0;
-		overflow: hidden;
+		overflow: visible;
 	}
 
 	.card-cta {

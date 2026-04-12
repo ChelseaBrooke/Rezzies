@@ -98,6 +98,10 @@
 	costAtMaxParticipation?: CostAtMaxParticipation | null;
 	/** Whether cost-sharing features are enabled for this trip */
 	costSharingEnabled?: boolean;
+	/** Host planning card: expected guest count from trip (for “expected headcount” pricing column). */
+	expectedPeopleCount?: number | null;
+	/** Host planning card: max headcount when `costAtMaxParticipation` is null (must match trip capacity rules). */
+	planningMaxHeadcount?: number;
 	/** Recent activity feed sources */
 		recentActivities?: Array<{ title: string; createdAt: string }>;
 		recentMealSlots?: Array<{ mealType: string; title: string | null; createdAt: string }>;
@@ -149,6 +153,8 @@
 		tripCheckInDate = '',
 		costAtMaxParticipation = null,
 	costSharingEnabled = true,
+	expectedPeopleCount = null,
+	planningMaxHeadcount = 1,
 	recentActivities = [],
 		recentMealSlots = [],
 		recentGames = [],
@@ -252,9 +258,28 @@
 	const acceptedRsvpCount = $derived(rsvps.filter((r) => r.status === 'yes').length);
 	const declinedRsvpCount = $derived(rsvps.filter((r) => r.status === 'no').length);
 
-	const showCapacityGuestsCard = $derived(
-		isHost && costSharingEnabled && costAtMaxParticipation != null
-	);
+	const rsvpStatusByUserId = $derived.by(() => {
+		const m = new Map<string, string>();
+		for (const r of rsvps) {
+			const uid = r.userId ?? r.user?.id;
+			if (uid) m.set(uid, r.status);
+		}
+		return m;
+	});
+
+	function guestPreviewTip(
+		name: string | null | undefined,
+		email: string | null | undefined,
+		status: string | undefined
+	): string {
+		const who = name?.trim() || email || 'Guest';
+		if (status === 'yes') return `${who} · Going`;
+		if (status === 'no') return `${who} · Declined`;
+		return `${who} · Pending`;
+	}
+
+	/** Host: planning card replaces trip info in goals cell (cost-sharing on/off). */
+	const showHostPlanningCard = $derived(isHost);
 
 	const progressTip = $derived(isHost ? getTooltip('host_progress') : null);
 	const tripInfoTip = $derived(getTooltip(isHost ? 'host_trip_info' : 'guest_trip_info'));
@@ -289,9 +314,9 @@
 		<a href={`/trips/${tripId}/guests`} class="view-detail-btn">View Detail</a>
 	{/snippet}
 	<!-- Layout: row1 = reminders | goals | recent, row2 = guests under reminders + goals only -->
-	<div class="dashboard-layout" class:dashboard-layout--no-guests-row={showCapacityGuestsCard}>
+	<div class="dashboard-layout" class:dashboard-layout--no-guests-row={showHostPlanningCard}>
 		<div class="left-column">
-		<div class="sticky-card-wrapper" class:host-mode={isHost} style="position:relative;">
+		<div class="sticky-card-wrapper" class:host-mode={isHost}>
 			{#if isHost}
 				<DashboardCard
 						variant="sticky"
@@ -358,12 +383,19 @@
 		<div class="goals-cell" id="trip-info" style="position:relative;">
 			<div class="goals-card-wrap">
 				<DashboardCard>
-					{#if showCapacityGuestsCard}
+					{#if showHostPlanningCard}
 						<CapacityGuestsCard
 							{tripId}
 							{members}
 							{rsvps}
 							data={costAtMaxParticipation}
+							{costSharingEnabled}
+							{expectedPeopleCount}
+							{planningMaxHeadcount}
+							roomsFilled={roomsFilled}
+							roomsTotal={roomsTotal}
+							bedsCurrent={bedsCurrent}
+							bedsTotal={bedsTotal}
 							onInvite={onInvite}
 						/>
 					{:else}
@@ -383,7 +415,7 @@
 					{/if}
 				</DashboardCard>
 			</div>
-			{#if showCapacityGuestsCard && capacityTip}
+			{#if showHostPlanningCard && capacityTip}
 				<OnboardingTooltip
 					key={capacityTip.key}
 					title={capacityTip.title}
@@ -391,7 +423,7 @@
 					position={capacityTip.position}
 					align={capacityTip.align}
 				/>
-			{:else if !showCapacityGuestsCard && tripInfoTip}
+			{:else if !showHostPlanningCard && tripInfoTip}
 				<OnboardingTooltip
 					key={tripInfoTip.key}
 					title={tripInfoTip.title}
@@ -445,7 +477,7 @@
 			{/if}
 		</div>
 
-		{#if !showCapacityGuestsCard}
+		{#if !showHostPlanningCard}
 			<div class="guests-row" style="position:relative;">
 				<div class="guests-card-wrapper">
 					<DashboardCard
@@ -454,27 +486,56 @@
 						headerRight={isHost && nudgePending ? guestsNudgeButton : undefined}
 					>
 					<div class="guests-preview">
-						<div class="avatar-row">
+						<div class="guest-avatar-scroll" aria-label="Trip members">
 							{#each guestPreviewList as member}
-								{#if member.user?.id}
-									<ProfileTooltip userId={member.user.id}>
-										<button type="button" class="avatar avatar-btn" title={member.user?.name ?? member.user?.email ?? ''} onclick={() => openProfileCard(member.user!.id)}>
+								{@const uid = member.user?.id ?? ''}
+								{@const rsvpStatus = rsvpStatusByUserId.get(uid)}
+								{@const tip = guestPreviewTip(member.user?.name, member.user?.email, rsvpStatus)}
+								<div
+									class="guest-avatar-chip"
+									class:guest-avatar-chip--going={rsvpStatus === 'yes'}
+									class:guest-avatar-chip--declined={rsvpStatus === 'no'}
+								>
+									{#if member.user?.id}
+										<ProfileTooltip userId={member.user.id}>
+											<button
+												type="button"
+												class="guest-avatar-btn"
+												title={tip}
+												aria-label={tip}
+												onclick={() => openProfileCard(member.user!.id)}
+											>
+												{#if member.user?.avatarUrl}
+													<img src={member.user.avatarUrl} alt="" class="guest-avatar-img" />
+												{:else}
+													<span class="guest-avatar-initials">{initials(member.user?.name, member.user?.email)}</span>
+												{/if}
+												<span
+													class="guest-avatar-dot"
+													class:guest-avatar-dot--yes={rsvpStatus === 'yes'}
+													class:guest-avatar-dot--no={rsvpStatus === 'no'}
+													class:guest-avatar-dot--pending={rsvpStatus !== 'yes' && rsvpStatus !== 'no'}
+													aria-hidden="true"
+												></span>
+											</button>
+										</ProfileTooltip>
+									{:else}
+										<span class="guest-avatar-btn guest-avatar-btn--static" title={tip}>
 											{#if member.user?.avatarUrl}
-												<img src={member.user.avatarUrl} alt="" class="avatar-img" />
+												<img src={member.user.avatarUrl} alt="" class="guest-avatar-img" />
 											{:else}
-												{initials(member.user?.name, member.user?.email)}
+												<span class="guest-avatar-initials">{initials(member.user?.name, member.user?.email)}</span>
 											{/if}
-										</button>
-									</ProfileTooltip>
-								{:else}
-									<span class="avatar" title={member.user?.name ?? member.user?.email ?? ''}>
-										{#if member.user?.avatarUrl}
-											<img src={member.user.avatarUrl} alt="" class="avatar-img" />
-										{:else}
-											{initials(member.user?.name, member.user?.email)}
-										{/if}
-									</span>
-								{/if}
+											<span
+												class="guest-avatar-dot"
+												class:guest-avatar-dot--yes={rsvpStatus === 'yes'}
+												class:guest-avatar-dot--no={rsvpStatus === 'no'}
+												class:guest-avatar-dot--pending={rsvpStatus !== 'yes' && rsvpStatus !== 'no'}
+												aria-hidden="true"
+											></span>
+										</span>
+									{/if}
+								</div>
 							{/each}
 						</div>
 						<div class="guests-meta">
@@ -613,6 +674,7 @@
 		flex: 1;
 		display: flex;
 		flex-direction: column;
+		overflow: visible;
 	}
 
 	.goals-cell :global(.card-body) {
@@ -620,6 +682,7 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
+		overflow: visible;
 	}
 
 	/* Recent Activity card, limited height so it doesn’t collide with Chat */
@@ -629,6 +692,7 @@
 		flex-direction: column;
 		min-height: 0;
 		max-height: 320px;
+		overflow: hidden;
 	}
 
 	.recent-cell :global(.card-body) {
@@ -653,6 +717,12 @@
 
 	.guests-card-wrapper :global(.dashboard-card) {
 		max-height: 140px;
+		overflow: hidden;
+	}
+
+	.guests-card-wrapper :global(.card-body) {
+		overflow: hidden;
+		min-height: 0;
 	}
 
 	/* Trip info card wrapper, fills goals-cell so card stretches to row 1 height */
@@ -667,7 +737,7 @@
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
 		flex: 1;
 		width: 100%;
-		overflow: hidden;
+		overflow: visible;
 		padding: 1rem 1.125rem;
 	}
 
@@ -686,6 +756,7 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
+		overflow: visible;
 	}
 
 	/* ── Host progress card: white with dark gauge section inside ── */
@@ -1020,51 +1091,98 @@
 		gap: 0.35rem;
 	}
 
-	.avatar-row {
+	/* Match CapacityGuestsCard `.cg-guest-scroll` + `.cg-chip*` (no overlap, 5px gap) */
+	.guest-avatar-scroll {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
+		flex-direction: row;
 		align-items: center;
+		gap: 5px;
+		min-width: 0;
+		overflow-x: auto;
+		overflow-y: hidden;
+		scrollbar-width: thin;
+		padding: 1px 0 0;
 	}
 
-	.avatar {
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, var(--slate) 0%, var(--primary) 100%);
-		color: white;
-		font-size: 0.6875rem;
-		font-weight: 600;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
+	.guest-avatar-chip {
 		flex-shrink: 0;
-		overflow: hidden;
-		border: 2px solid var(--surfaceSolid);
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 	}
 
-	.avatar-btn {
-		padding: 0;
-		border: 2px solid var(--surfaceSolid);
-		cursor: pointer;
-		background: linear-gradient(135deg, var(--slate) 0%, var(--primary) 100%);
-		font: inherit;
-		transition: transform 0.15s ease, box-shadow 0.15s ease;
+	.guest-avatar-chip--declined {
+		opacity: 0.5;
 	}
 
-	.avatar-btn:hover {
-		transform: scale(1.1);
-		box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
-		z-index: 1;
+	.guest-avatar-btn {
 		position: relative;
+		display: block;
+		width: 30px;
+		height: 30px;
+		padding: 0;
+		margin: 0;
+		border-radius: 50%;
+		border: 2px solid var(--border-soft);
+		background: linear-gradient(135deg, var(--slate, #2f7778) 0%, var(--navy, #1d4d4e) 100%);
+		overflow: visible;
+		cursor: pointer;
+		font: inherit;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+		transition: transform 0.12s ease, box-shadow 0.12s ease;
 	}
 
-	.avatar :global(.avatar-img),
-	.avatar-btn :global(.avatar-img) {
+	.guest-avatar-btn--static {
+		cursor: default;
+	}
+
+	.guest-avatar-chip--going .guest-avatar-btn {
+		border-color: rgba(47, 119, 120, 0.4);
+	}
+
+	.guest-avatar-btn:hover:not(.guest-avatar-btn--static) {
+		transform: scale(1.05);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+	}
+
+	.guest-avatar-img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		border-radius: 50%;
+		display: block;
+	}
+
+	.guest-avatar-initials {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		font-size: 0.625rem;
+		font-weight: 700;
+		color: white;
+		border-radius: 50%;
+	}
+
+	.guest-avatar-dot {
+		position: absolute;
+		right: -1px;
+		bottom: -1px;
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		border: 2px solid white;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+	}
+
+	.guest-avatar-dot--yes {
+		background: var(--slate, #2f7778);
+	}
+
+	.guest-avatar-dot--no {
+		background: #dc2626;
+	}
+
+	.guest-avatar-dot--pending {
+		background: var(--warm, #ce5612);
 	}
 
 	.guests-meta {

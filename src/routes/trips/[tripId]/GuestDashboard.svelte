@@ -201,6 +201,7 @@
 			{members}
 			userInvoices={userInvoices}
 			totalCost={totalCost}
+			costSharingEnabled={trip.costSharingEnabled ?? true}
 			{rsvps}
 			tripGalleryFiles={data.tripGalleryFiles ?? []}
 		/>
