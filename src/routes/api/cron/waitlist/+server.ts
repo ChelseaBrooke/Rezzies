@@ -1,16 +1,10 @@
-/**
- * Cron endpoint: /api/cron/waitlist
- *
- * Dissolves waitlists for trips whose check-in date is today (day-1 rule).
- * Moves all waitlisted guests to "no" so the roster is clean at trip start.
- *
- * Protect with a shared secret via the CRON_SECRET env var.
- * Call this daily from your scheduler (Vercel Cron, Railway Cron, etc.).
- *
- * Schedule is defined in vercel.json (every 15 minutes). Do not put cron
- * expressions containing star-slash here inside a block comment — that
- * sequence ends the comment and breaks the build.
- */
+// Cron endpoint: GET /api/cron/waitlist
+//
+// Dissolves waitlists for trips whose check-in date is today (day-1 rule).
+// Moves all waitlisted guests to "no" so the roster is clean at trip start.
+//
+// Protect with CRON_SECRET (Bearer). Schedule: see vercel.json.
+// Safe to mention cron strings like */15 here — line comments are fine (block /* */ is not).
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { dissolveWaitlistsForTodayTrips } from '$lib/server/waitlist-service.js';
