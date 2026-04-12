@@ -203,6 +203,12 @@
 	function prevPage() { pageStartIdx = Math.max(0, pageStartIdx - PAGE_SIZE); }
 	function nextPage() { pageStartIdx = Math.min(tripDays.length - PAGE_SIZE, pageStartIdx + PAGE_SIZE); }
 
+	// Clamp pageStartIdx when tripDays shrinks (e.g. after trip date edits)
+	$effect(() => {
+		const maxStart = Math.max(0, tripDays.length - PAGE_SIZE);
+		if (pageStartIdx > maxStart) pageStartIdx = maxStart;
+	});
+
 	// All unique months spanned by the trip, in order
 	const tripMonths = $derived.by(() => {
 		if (!tripDays.length) return [{ year: new Date().getFullYear(), month: new Date().getMonth() }];
@@ -268,7 +274,7 @@
 		if (!visibleDays.includes(todayKey)) return null;
 		const now = new Date();
 		const hour = now.getHours() + now.getMinutes() / 60;
-		if (hour < HOUR_START || hour > HOUR_END) return null;
+		if (hour < HOUR_START || hour >= HOUR_END) return null;
 		return (hour - HOUR_START) * SLOT_HEIGHT;
 	});
 
@@ -417,6 +423,10 @@
 	let ghostDate = $state<string | null>(null);
 	let ghostStartMin = $state<number | null>(null);
 	let gridWrapperEl = $state<HTMLElement | null>(null);
+	// True when the pointer actually moved while a drag was active.
+	// Survives the pointerup→click gap so the drawer doesn't open after a drag.
+	let didDrag = $state(false);
+	let moveError = $state<string | null>(null);
 
 	function onEventPointerDown(
 		e: PointerEvent,
@@ -433,6 +443,7 @@
 		if (!data.canManageMeals) return;
 
 		e.preventDefault();
+		didDrag = false; // reset before each new drag gesture
 		const isMeal = ev.type === 'meal';
 		const id = ((ev.activityId ?? ev.slotId) as string) ?? '';
 		const startMin = parseTimeToMinutes(
@@ -459,6 +470,7 @@
 	function onGridPointerMove(e: PointerEvent) {
 		if (!dragState || !gridWrapperEl) return;
 		e.preventDefault();
+		didDrag = true; // pointer actually moved while dragging
 
 		const rect = gridWrapperEl.getBoundingClientRect();
 		const scrollTop = gridWrapperEl.scrollTop;
@@ -502,17 +514,30 @@
 
 		// Optimistic update
 		overrides[ds.eventId] = { ...overrides[ds.eventId], date: newDate, time: newTime };
+		moveError = null;
 
-		// Persist
+		// Persist — roll back the optimistic update on failure
 		const fd = new FormData();
 		fd.set('date', newDate);
 		fd.set('time', newTime);
-		if (ds.type === 'meal') {
-			fd.set('slotId', ds.eventId);
-			await fetch(`?/moveMealSlot`, { method: 'POST', body: fd });
-		} else {
-			fd.set('activityId', ds.eventId);
-			await fetch(`?/moveActivity`, { method: 'POST', body: fd });
+		try {
+			let res: Response;
+			if (ds.type === 'meal') {
+				fd.set('slotId', ds.eventId);
+				res = await fetch(`?/moveMealSlot`, { method: 'POST', body: fd });
+			} else {
+				fd.set('activityId', ds.eventId);
+				res = await fetch(`?/moveActivity`, { method: 'POST', body: fd });
+			}
+			if (!res.ok) {
+				const { [ds.eventId]: _removed, ...rest } = overrides;
+				overrides = rest;
+				moveError = 'Could not move event — please try again.';
+			}
+		} catch {
+			const { [ds.eventId]: _removed, ...rest } = overrides;
+			overrides = rest;
+			moveError = 'Could not move event — please try again.';
 		}
 		await invalidateAll();
 	}
@@ -568,7 +593,12 @@
 		e.preventDefault();
 		const raw = e.dataTransfer?.getData('application/json');
 		if (!raw) return;
-		const payload = JSON.parse(raw) as { type: string; id: string };
+		let payload: { type: string; id: string };
+		try {
+			payload = JSON.parse(raw) as { type: string; id: string };
+		} catch {
+			return;
+		}
 		if (payload.type !== 'person') return;
 		const form = document.getElementById(`assign-meal-${slotId}`) as HTMLFormElement | null;
 		if (form) {
@@ -581,7 +611,12 @@
 		e.preventDefault();
 		const raw = e.dataTransfer?.getData('application/json');
 		if (!raw) return;
-		const payload = JSON.parse(raw) as { type: string; id: string };
+		let payload: { type: string; id: string };
+		try {
+			payload = JSON.parse(raw) as { type: string; id: string };
+		} catch {
+			return;
+		}
 		if (payload.type !== 'person') return;
 		const form = document.getElementById(`add-participant-${activityId}`) as HTMLFormElement | null;
 		if (form) {
@@ -614,19 +649,9 @@
 </script>
 
 <div class="itinerary-page">
-	<!-- ── Page header ── -->
+	<!-- ── Page header (date range lives in schedule header below) ── -->
 	<div class="itin-page-header">
-		<div class="itin-page-header-left">
-			<h1 class="itin-page-title">Itinerary</h1>
-			{#if tripDays.length > 0}
-				<p class="itin-page-sub">
-					{new Date(tripDays[0] + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-					–
-					{new Date(tripDays[tripDays.length - 1] + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-					· {tripDays.length} day{tripDays.length !== 1 ? 's' : ''}
-				</p>
-			{/if}
-		</div>
+		<h1 class="itin-page-title">Itinerary</h1>
 	</div>
 
 	{#if tripDays.length === 0}
@@ -729,14 +754,20 @@
 								</div>
 							{/if}
 
-			<!-- Calendar grid -->
-				<div
-					class="schedule-grid-wrapper"
-					style="--day-cols:{visibleDays.length}; --slot-h:{SLOT_HEIGHT}px; --time-w:{TIME_COL_WIDTH}px; --hdr-h:{HEADER_HEIGHT}px;"
-					bind:this={gridWrapperEl}
-					onpointermove={onGridPointerMove}
-					onpointerup={onGridPointerUp}
-				>
+		{#if moveError}
+				<p class="move-error" role="alert">{moveError}
+					<button class="move-error-dismiss" onclick={() => (moveError = null)} aria-label="Dismiss">✕</button>
+				</p>
+			{/if}
+
+		<!-- Calendar grid -->
+			<div
+				class="schedule-grid-wrapper"
+				style="--day-cols:{visibleDays.length}; --slot-h:{SLOT_HEIGHT}px; --time-w:{TIME_COL_WIDTH}px; --hdr-h:{HEADER_HEIGHT}px;"
+				bind:this={gridWrapperEl}
+				onpointermove={onGridPointerMove}
+				onpointerup={onGridPointerUp}
+			>
 					<div class="schedule-scroll-inner">
 						<!-- Background grid -->
 						<div class="schedule-grid">
@@ -849,9 +880,10 @@
 											border:1px solid {style.border};
 										"
 										onpointerdown={(e) => onEventPointerDown(e, ev, topPx, date)}
-										onclick={(e) => {
-											// Only open drawer on click (not after a drag)
-											if (!isDragging) openDrawer({ ...ev, date });
+										onclick={() => {
+											// Suppress drawer open when pointer actually dragged
+											if (didDrag) { didDrag = false; return; }
+											openDrawer({ ...ev, date });
 										}}
 										ondragover={(e) => { e.preventDefault(); dragOverTarget = evId; }}
 										ondragleave={() => { dragOverTarget = null; }}
@@ -860,7 +892,12 @@
 											: (e) => { dragOverTarget = null; handleDropActivity(e, ev.activityId as string); }}
 										role="button"
 										tabindex="0"
-										onkeydown={(e) => e.key === 'Enter' && openDrawer({ ...ev, date })}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												openDrawer({ ...ev, date });
+											}
+										}}
 										title={isMeal ? `${ev.mealType}` : (ev.title as string)}
 									>
 										<!-- Title -->
@@ -1043,44 +1080,67 @@
 {/if}
 
 <style>
-	/* ── Page shell ── */
+	/* ── Page shell (fills AppShell main so the grid scrolls inside, not the whole page) ── */
 	.itinerary-page {
-		padding: 1rem 0 2rem;
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		padding: 0.25rem 0 0.5rem;
+		overflow-x: hidden; /* vertical overflow propagates to AppShell scroller (safe for empty state) */
+		box-sizing: border-box;
 	}
 
 	/* ── Page header ── */
 	.itin-page-header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 0.75rem;
-		margin-bottom: 1.5rem;
-	}
-	.itin-page-header-left {
-		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
+		flex-shrink: 0;
+		margin-bottom: 0.5rem;
 	}
 	.itin-page-title {
 		font-family: 'Fraunces', Georgia, serif;
-		font-size: 1.75rem;
+		font-size: 1.5rem;
 		font-weight: 700;
 		letter-spacing: -0.03em;
 		color: var(--navy, var(--text));
 		margin: 0;
+		line-height: 1.15;
 	}
-	.itin-page-sub {
+
+	/* ── Move error banner ── */
+	.move-error {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
 		font-size: 0.8125rem;
-		color: var(--muted);
-		margin: 0;
+		color: #b91c1c;
+		background: #fef2f2;
+		border: 1px solid #fecaca;
+		border-radius: 8px;
+		padding: 0.45rem 0.75rem;
+		margin-bottom: 0.35rem;
+		line-height: 1.4;
 	}
+	.move-error-dismiss {
+		background: none;
+		border: none;
+		cursor: pointer;
+		color: #b91c1c;
+		font-size: 0.875rem;
+		padding: 0 0.15rem;
+		line-height: 1;
+		flex-shrink: 0;
+	}
+	.move-error-dismiss:hover { opacity: 0.7; }
 
 	/* ── 7-day pagination ── */
 	.page-nav {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		margin-bottom: 0.75rem;
+		margin-bottom: 0.45rem;
+		flex-shrink: 0;
 		justify-content: flex-end;
 	}
 	.page-nav-label {
@@ -1126,23 +1186,26 @@
 	.schedule-card {
 		display: flex;
 		gap: 0;
+		flex: 1;
+		min-height: 0;
 		background: white;
 		border-radius: 20px;
 		box-shadow: 0 4px 32px rgba(17,24,39,.07), 0 1px 6px rgba(17,24,39,.04);
 		overflow: hidden;
-		min-height: 680px;
 	}
 
 	/* ── Sidebar ── */
 	.schedule-sidebar {
 		flex-shrink: 0;
 		width: 220px;
+		min-height: 0;
 		background: #fff;
 		border-right: 1px solid #f0f2f5;
-		padding: 1.5rem 1.25rem;
+		padding: 1rem 1.1rem;
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
+		gap: 1rem;
+		overflow-y: auto;
 	}
 	.mini-calendar { background: #f8fafc; border-radius: 14px; padding: 1rem; }
 	.mini-cal-header {
@@ -1198,14 +1261,20 @@
 
 	/* ── Main area ── */
 	.schedule-main {
-		flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 1.5rem 1.5rem 0;
+		flex: 1;
+		min-width: 0;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		padding: 0.85rem 1.1rem 0;
 	}
 	.schedule-header {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
-		margin-bottom: 1.25rem;
+		margin-bottom: 0.65rem;
+		flex-shrink: 0;
 	}
 	.schedule-header-left { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; justify-content: center; }
 	.schedule-date-range {
@@ -1239,9 +1308,13 @@
 
 	/* ── Grid wrapper ── */
 	.schedule-grid-wrapper {
-		flex: 1; overflow-x: auto; overflow-y: auto;
-		max-height: calc(100vh - 320px);
-		border-radius: 12px; border: 1px solid #f0f2f5; background: white;
+		flex: 1;
+		min-height: 0;
+		overflow-x: auto;
+		overflow-y: auto;
+		border-radius: 12px;
+		border: 1px solid #f0f2f5;
+		background: white;
 		position: relative;
 		touch-action: pan-y; /* allow vertical scroll, intercept horizontal for drag */
 	}
@@ -1400,14 +1473,15 @@
 
 	/* ── Footer ── */
 	.schedule-footer {
-		padding: .875rem 0;
+		flex-shrink: 0;
+		padding: 0.5rem 0 0.35rem;
 		border-top: 1px solid #f0f2f5;
 		display: flex;
 		align-items: center;
 		flex-wrap: wrap;
 		gap: .5rem;
 		justify-content: flex-end;
-		margin-top: .5rem;
+		margin-top: 0.35rem;
 	}
 	.itinerary-addon-hint {
 		display: inline-flex;

@@ -32,14 +32,22 @@
 		if (e.key === 'Escape') open = false;
 	}
 
+	let fetchError = $state<string | null>(null);
+
 	async function fetchNotifications() {
 		loading = true;
+		fetchError = null;
 		try {
 			const res = await fetch('/api/notifications');
-			if (!res.ok) return;
+			if (!res.ok) {
+				fetchError = 'Could not load notifications';
+				return;
+			}
 			const data = await res.json();
 			notifications = data.notifications ?? [];
 			unreadCount = data.unreadCount ?? 0;
+		} catch {
+			fetchError = 'Could not load notifications';
 		} finally {
 			loading = false;
 		}
@@ -126,6 +134,8 @@
 			<div class="tray-list">
 				{#if loading}
 					<p class="tray-loading">Loading…</p>
+				{:else if fetchError}
+					<p class="tray-empty" style="color: #b91c1c;">{fetchError}</p>
 				{:else if notifications.length === 0}
 					<p class="tray-empty">No notifications yet.</p>
 				{:else}

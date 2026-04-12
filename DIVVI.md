@@ -48,8 +48,7 @@ This document describes everything Divvi does: pages, flows, API endpoints, form
 | `/trips/new/step/5` | **Step 5:** Review & Publish → `POST /api/trips/publish` → redirect to `/trip/[inviteCode]` | Yes |
 | `/trips/[tripId]` | Trip dashboard (overview, goals, quick actions) | Member |
 | `/trips/[tripId]/guests` | Guest list, invite (email/friends), room assignment, RSVP override, remove/restore, add manual guest | Host/co-host/guest |
-| `/trips/[tripId]/rooms` | Rooms & beds overview; link to edit | Member |
-| `/trips/[tripId]/rooms/edit` | Add/edit/delete rooms and beds; upload room photos | Host |
+| `/trips/[tripId]/rooms` | Rooms & beds overview; claim/request share; hosts edit rooms via Settings Step 1 | Member |
 | `/trips/[tripId]/rsvp` | **Guest RSVP:** Yes/No, party size, beds claim, dietary, dates, cost estimate | Member |
 | `/trips/[tripId]/itinerary` | Itinerary + meal slots, assignments, attendance | Member |
 | `/trips/[tripId]/activities` | Discover activities (Divvi Events API), add to trip, view details | Member |
@@ -171,22 +170,18 @@ This document describes everything Divvi does: pages, flows, API endpoints, form
 - **API:** `PATCH /api/trips/[tripId]/room-assignment`
 - **Body:** `userId`, `roomId` (optional), `bedType`, `partySize`. Clear assignment with `roomId: null` and header `x-confirm-clear-room: true`.
 
-### 8.5 Rooms edit
+### 8.5 Rooms (overview)
 
-- **Page:** `GET /trips/[tripId]/rooms/edit`
-- **APIs used:**  
-  - `GET/POST/DELETE /api/trips/[tripId]/rooms`,  
-  - `GET/PUT/DELETE /api/trips/[tripId]/rooms/[roomId]`,  
-  - `POST /api/trips/[tripId]/rooms/[roomId]/beds`,  
-  - `DELETE/PATCH /api/trips/[tripId]/beds/[bedId]`,  
-  - `POST /api/upload-image` for room photos.
+- **Page:** `GET /trips/[tripId]/rooms` — who is in which bed, per-bed pricing, empty-bed claim / request to share (form actions on this page).
+- **Host edits (rooms, beds, room photos):** `GET /trips/[tripId]/settings/step/1` (same wizard as create-trip Step 1); saved with trip **Save** via `PUT /api/trips/[tripId]/update` (rooms included in payload).
 
 ---
 
 ## 9. Trip Settings (Host)
 
 - **Entry:** `/trips/[tripId]/settings` → redirect to `/trips/[tripId]/settings/step/1`.
-- **Steps:** 1 (basics), 2 (pricing/rooms link). Same components as create flow; **Save** calls `PUT /api/trips/[tripId]/update` with trip payload (name, dates, rooms, pricing, etc.).
+- **Steps:** 1 (basics + **rooms & beds** editor), 2 (pricing). Same components as create flow; **Save** calls `PUT /api/trips/[tripId]/update` with trip payload (name, dates, rooms, pricing, etc.).
+- **Room/bed REST APIs** (still available; useful for integrations or other UI): `GET/POST/DELETE /api/trips/[tripId]/rooms`, `GET/PUT/DELETE /api/trips/[tripId]/rooms/[roomId]`, `POST /api/trips/[tripId]/rooms/[roomId]/beds`, `DELETE/PATCH /api/trips/[tripId]/beds/[bedId]`, `POST /api/upload-image` (room photos).
 
 ---
 

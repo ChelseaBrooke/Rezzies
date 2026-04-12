@@ -8,6 +8,7 @@ import {
 	type PricingMode
 } from './pricing-canonical.js';
 import { prisma } from './prisma.js';
+import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from './trip-room-order.js';
 
 export interface RoomPricingDisplay {
 	roomId: number;
@@ -34,8 +35,9 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 		where: { id: tripId },
 		include: {
 			rooms: {
+				orderBy: TRIP_ROOMS_ORDER_BY,
 				include: {
-					beds: true
+					beds: { orderBy: ROOM_BEDS_ORDER_BY }
 				}
 			}
 		}

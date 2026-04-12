@@ -17,10 +17,12 @@ const signupSchema = z.object({
 });
 
 export const load: PageServerLoad = async ({ cookies }) => {
-	// If already logged in, redirect to trips
 	const sessionToken = cookies.get('user_session');
 	if (sessionToken) {
-		throw redirect(303, '/trips');
+		const { getSessionUser } = await import('$lib/server/session.js');
+		const user = await getSessionUser(cookies);
+		if (user) throw redirect(303, '/trips');
+		cookies.delete('user_session', { path: '/' });
 	}
 	return {};
 };

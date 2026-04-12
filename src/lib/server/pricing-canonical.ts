@@ -8,6 +8,7 @@
 // delegates PER_BED math here via calculateReservationPrice().
 
 import { prisma } from './prisma.js';
+import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from './trip-room-order.js';
 import {
 	perBedLowHighForUnit,
 	computePerBedRangeByBedId as computePerBedRangeByBedIdCore,
@@ -182,8 +183,9 @@ const BED_TYPE_CANONICAL_KEYS = [
 /**
  * Normalize bed type for weight lookup: lowercase, spaces -> underscore,
  * strip common suffixes (_bed, _size), then match exact or substring so "Queen Bed" -> "queen", "Bunk" -> "bunk".
+ * Distinct from the shared normalizeBedType in $lib/bed-types — this one does extra fuzzy matching for pricing weights.
  */
-function normalizeBedType(bedType: string | null): string {
+function normalizeBedTypeForWeight(bedType: string | null): string {
 	if (!bedType || !bedType.trim()) return 'other';
 	let key = bedType.trim().toLowerCase().replace(/\s+/g, '_');
 	// Strip trailing _bed or _size so we match canonical keys (king, queen, twin, etc.)
@@ -201,7 +203,7 @@ function normalizeBedType(bedType: string | null): string {
 }
 
 export function getBedWeight(weights: BedWeights, bedType: string | null): number {
-	const key = normalizeBedType(bedType);
+	const key = normalizeBedTypeForWeight(bedType);
 	return weights[key] ?? weights.other ?? DEFAULT_BED_WEIGHTS.other;
 }
 
@@ -290,7 +292,7 @@ export function aggregatePerBedTypeRanges(
 	for (const u of units) {
 		const r = rangeByBedId.get(u.bedId);
 		if (!r) continue;
-		const key = normalizeBedType(u.bedType);
+		const key = normalizeBedTypeForWeight(u.bedType);
 		if (!byType[key]) byType[key] = { low: r.lowBedPrice, high: r.highBedPrice };
 		else {
 			byType[key].low = Math.min(byType[key].low, r.lowBedPrice);
@@ -401,7 +403,7 @@ export function parseBedWeights(weightsJson: string | null): BedWeights {
 		// Normalize keys to lowercase with underscores
 		const normalized: BedWeights = {};
 		for (const [k, v] of Object.entries(parsed)) {
-			if (typeof v === 'number') normalized[normalizeBedType(k)] = v;
+			if (typeof v === 'number') normalized[normalizeBedTypeForWeight(k)] = v;
 		}
 		return { ...DEFAULT_BED_WEIGHTS, ...normalized };
 	} catch {
@@ -420,8 +422,9 @@ export async function computeRoomPricing(
 		where: { id: tripId },
 		include: {
 			rooms: {
+				orderBy: TRIP_ROOMS_ORDER_BY,
 				include: {
-					beds: true
+					beds: { orderBy: ROOM_BEDS_ORDER_BY }
 				}
 			}
 		}
@@ -591,7 +594,12 @@ export async function computePerBedDisplayPricing(tripId: string): Promise<{
 } | null> {
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
-		include: { rooms: { include: { beds: true } } }
+		include: {
+			rooms: {
+				orderBy: TRIP_ROOMS_ORDER_BY,
+				include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+			}
+		}
 	});
 	if (!trip || trip.rooms.length === 0) return null;
 	const bedWeights = parseBedWeights(trip.bedWeights);
@@ -634,7 +642,12 @@ export interface CostAtMaxParticipation {
 export async function getCostAtMaxParticipation(tripId: string): Promise<CostAtMaxParticipation | null> {
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
-		include: { rooms: { include: { beds: true } } }
+		include: {
+			rooms: {
+				orderBy: TRIP_ROOMS_ORDER_BY,
+				include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+			}
+		}
 	});
 	if (!trip || trip.rooms.length === 0) return null;
 
@@ -684,7 +697,10 @@ export async function computeCommittedFundsFromYesRsvps(tripId: string): Promise
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
 		include: {
-			rooms: { include: { beds: true } },
+			rooms: {
+				orderBy: TRIP_ROOMS_ORDER_BY,
+				include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+			},
 			rsvps: { where: { status: 'yes' }, select: { userId: true, adultsCount: true } },
 			roomAssignments: true
 		}
@@ -807,7 +823,8 @@ export async function calculateReservationPrice(
 		where: { id: tripId },
 		include: {
 			rooms: {
-				include: { beds: true }
+				orderBy: TRIP_ROOMS_ORDER_BY,
+				include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
 			},
 			rsvps: { where: { status: 'yes' }, select: { userId: true, adultsCount: true } },
 			roomAssignments: {
@@ -963,7 +980,12 @@ export async function getPricingPreview(
 	const pricing = await computeRoomPricing(tripId);
 	const trip = await prisma.trip.findUnique({
 		where: { id: tripId },
-		include: { rooms: { include: { beds: true } } }
+		include: {
+			rooms: {
+				orderBy: TRIP_ROOMS_ORDER_BY,
+				include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+			}
+		}
 	});
 
 	if (!trip) {

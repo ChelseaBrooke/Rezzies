@@ -3,6 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripMember } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
 import { totalSpotsForBeds, hasEnoughSpots, isPrismaUniqueConflict } from '$lib/bed-spot-validation.js';
 import {
 	computeGuestEstimateRange,
@@ -41,8 +42,9 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		include: {
 			mealPlan: true,
 			rooms: {
+				orderBy: TRIP_ROOMS_ORDER_BY,
 				include: {
-					beds: { where: { isAvailable: true } },
+					beds: { where: { isAvailable: true }, orderBy: ROOM_BEDS_ORDER_BY },
 					roomAssignments: true
 				}
 			},
@@ -239,9 +241,14 @@ export const actions: Actions = {
 			}
 		}
 
-		// YES requires cost commitment: server recomputes estimate and persists accepted range
+		// YES requires cost commitment only when cost-sharing is enabled
 		if (validation.data.status === 'yes') {
-			if (!costCommitmentAccepted) {
+			const tripForCostCheck = await prisma.trip.findUnique({
+				where: { id: tripId },
+				select: { costSharingEnabled: true }
+			});
+			const costSharingEnabled = tripForCostCheck?.costSharingEnabled ?? false;
+			if (costSharingEnabled && !costCommitmentAccepted) {
 				return fail(400, { error: 'Please agree to the cost estimate below to submit YES RSVP.' });
 			}
 			let estimate;
@@ -251,13 +258,20 @@ export const actions: Actions = {
 				return fail(400, { error: 'Could not compute cost estimate. Try again or pick a room first.' });
 			}
 			const now = new Date();
+			// Preserve existing notes (e.g. plus-one dietary JSON from updateDietary)
+			const existingRsvp = await prisma.rSVP.findUnique({
+				where: { tripId_userId: { tripId, userId: user.id } },
+				select: { notes: true }
+			});
+			const preservedNotes = existingRsvp?.notes ?? null;
+
 			await prisma.rSVP.upsert({
 				where: { tripId_userId: { tripId, userId: user.id } },
 			create: {
 				tripId,
 				userId: user.id,
 				...validation.data,
-				notes: null,
+				notes: preservedNotes,
 				costCommitmentAccepted: true,
 				rsvpYesAcceptedAt: now,
 				yesSubstatus: 'confirmed',
@@ -277,7 +291,7 @@ export const actions: Actions = {
 			},
 			update: {
 				...validation.data,
-				notes: null,
+				notes: preservedNotes,
 				costCommitmentAccepted: true,
 				rsvpYesAcceptedAt: now,
 				yesSubstatus: 'confirmed',
@@ -441,7 +455,12 @@ export const actions: Actions = {
 
 		const trip = await prisma.trip.findUnique({
 			where: { id: tripId },
-			include: { rooms: { include: { beds: true } } }
+			include: {
+				rooms: {
+					orderBy: TRIP_ROOMS_ORDER_BY,
+					include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+				}
+			}
 		});
 		if (!trip) return fail(404, { claimBedsError: 'Trip not found' });
 		if ((trip.pricingModel ?? '').toLowerCase() !== 'per_room') {
@@ -527,7 +546,12 @@ export const actions: Actions = {
 
 		const trip = await prisma.trip.findUnique({
 			where: { id: tripId },
-			include: { rooms: { include: { beds: true } } }
+			include: {
+				rooms: {
+					orderBy: TRIP_ROOMS_ORDER_BY,
+					include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+				}
+			}
 		});
 		if (!trip) return fail(404, { claimBedsError: 'Trip not found' });
 		if ((trip.pricingModel ?? '').toLowerCase() === 'per_room') {
@@ -537,9 +561,11 @@ export const actions: Actions = {
 		}
 
 		const allBeds = trip.rooms.flatMap((r) => r.beds);
-		const bedsById = new Map(allBeds.map((b) => [b.id, b]));
-		const totalSpots = totalSpotsForBeds(bedsById, bedIds);
-		const toCreate = bedIds
+		const availableBeds = allBeds.filter((b) => b.isAvailable !== false);
+		const bedsById = new Map(availableBeds.map((b) => [b.id, b]));
+		const uniqueBedIds = [...new Set(bedIds)];
+		const totalSpots = totalSpotsForBeds(bedsById, uniqueBedIds);
+		const toCreate = uniqueBedIds
 			.map((bedId) => {
 				const bed = bedsById.get(bedId);
 				if (!bed) return null;

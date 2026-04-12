@@ -5,14 +5,13 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const DISCOUNT_CODE = 'BearsBestFriend#1';
-
 	const tripId = $derived(data.trip.id);
 	const expectedGuests = $derived(Math.max(1, data.trip.expectedPeopleCount ?? 1));
 
 	async function handlePublish(opts: {
 		splitCost: boolean;
 		discountWaived: boolean;
+		discountCode?: string;
 		paymentIntentId?: string;
 	}) {
 		const res = await fetch(`/api/trips/${tripId}/publish`, {
@@ -20,7 +19,7 @@
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
 				splitCost: opts.splitCost,
-				...(opts.discountWaived ? { discountCode: DISCOUNT_CODE } : {}),
+				...(opts.discountCode ? { discountCode: opts.discountCode } : {}),
 				...(opts.paymentIntentId ? { paymentIntentId: opts.paymentIntentId } : {})
 			})
 		});

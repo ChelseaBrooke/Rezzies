@@ -9,6 +9,7 @@
 // calculatePrice() normalizes via .toLowerCase() so it accepts both DB and canonical forms.
 
 import { prisma } from './prisma.js';
+import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from './trip-room-order.js';
 import { calculateReservationPrice } from './pricing-canonical.js';
 
 export type PricingModel = 'per_room' | 'per_bed' | 'per_person' | 'per_person_per_night';
@@ -57,8 +58,9 @@ export async function calculatePrice(
 		where: { id: tripId },
 		include: {
 			rooms: {
+				orderBy: TRIP_ROOMS_ORDER_BY,
 				include: {
-					beds: true
+					beds: { orderBy: ROOM_BEDS_ORDER_BY }
 				}
 			}
 		}

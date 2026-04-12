@@ -4,6 +4,7 @@ import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost, isTripHostOrCoHost, getMemberTripState, type MemberTripState } from '$lib/server/trip-access.js';
 import type { InvoiceBreakdown } from '$lib/server/invoice-calculator.js';
 import { prisma } from '$lib/server/prisma.js';
+import { ROOM_BEDS_ORDER_BY } from '$lib/server/trip-room-order.js';
 import { notifyExistingUserOfInvite } from '$lib/server/invite-service.js';
 import { createInvoiceForUser } from '$lib/server/invoice-calculator.js';
 import { hashPassword } from '$lib/server/auth.js';
@@ -78,7 +79,13 @@ export const load: PageServerLoad = async ({ parent }) => {
 		tripId ?
 			await prisma.roomAssignment.findMany({
 				where: { tripId },
-				include: { room: { include: { beds: { select: { id: true, bedType: true } } } } }
+				include: {
+					room: {
+						include: {
+							beds: { orderBy: ROOM_BEDS_ORDER_BY, select: { id: true, bedType: true } }
+						}
+					}
+				}
 			})
 		:	[];
 	const isHost = parentData.isHost ?? false;
@@ -232,11 +239,11 @@ export const load: PageServerLoad = async ({ parent }) => {
 			hasDietaryFlags: hasDietary,
 			dietaryRestrictions: profile?.dietaryRestrictions ?? null,
 			allergies: profile?.allergies ?? null,
-			toPayTotal: toPayTotal !== null && toPayTotal > 0 ? toPayTotal : null,
-			priceApproved,
-			priceApprovedByHost,
-			invoicePaid,
-			invoiceBreakdown: invoiceBreakdown ?? null,
+			toPayTotal: canManageGuests ? (toPayTotal !== null && toPayTotal > 0 ? toPayTotal : null) : null,
+			priceApproved: canManageGuests ? priceApproved : null,
+			priceApprovedByHost: canManageGuests ? priceApprovedByHost : null,
+			invoicePaid: canManageGuests ? invoicePaid : null,
+			invoiceBreakdown: canManageGuests ? (invoiceBreakdown ?? null) : null,
 			assignedBedIds,
 			memberTripState
 		});
@@ -395,8 +402,8 @@ export const actions: Actions = {
 		if (!user) throw redirect(303, '/login');
 
 		const tripId = params.tripId;
-		const host = await isTripHost(tripId, user.id);
-		if (!host) throw error(403, 'Only the trip host can invite guests');
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) throw error(403, 'Only the host or co-host can invite guests');
 
 		const formData = await request.formData();
 		const email = (formData.get('email') as string)?.trim() ?? '';
@@ -449,11 +456,12 @@ export const actions: Actions = {
 			}
 		});
 
+		const trip = await prisma.trip.findUnique({
+			where: { id: tripId },
+			select: { name: true, checkInDate: true, checkOutDate: true, location: true, locationCity: true }
+		});
+
 		if (existingUser) {
-			const trip = await prisma.trip.findUnique({
-				where: { id: tripId },
-				select: { name: true }
-			});
 			if (trip) {
 				await notifyExistingUserOfInvite({
 					inviteId: invite.id,
@@ -461,6 +469,32 @@ export const actions: Actions = {
 					tripName: trip.name,
 					recipientUserId: existingUser.id
 				});
+			}
+		} else if (trip) {
+			const { sendHtmlEmail } = await import('$lib/server/email/resend.js');
+			const { TEMPLATE_KEYS } = await import('$lib/server/email/templates.js');
+			const { renderTripInviteHtml } = await import('$lib/server/email/render/trip-invite.js');
+			const baseUrl = process.env.APP_BASE_URL || 'http://localhost:5173';
+			const inviteUrl = `${baseUrl}/invite/${token}`;
+			const hostName = user.name || user.email;
+			const checkIn = trip.checkInDate
+				? new Date(trip.checkInDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+				: '';
+			const checkOut = trip.checkOutDate
+				? new Date(trip.checkOutDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+				: '';
+			const destination = trip.locationCity?.trim() || trip.location?.trim() || '';
+			try {
+				const html = renderTripInviteHtml({ hostName, tripName: trip.name, checkIn, checkOut, inviteUrl, destination });
+				await sendHtmlEmail({
+					to: email,
+					subject: `${hostName} invited you to ${trip.name}`,
+					html,
+					templateKey: TEMPLATE_KEYS.TRIP_INVITE,
+					tags: [{ name: 'category', value: 'trip-invite' }]
+				});
+			} catch (err) {
+				console.error('Failed to send invite email:', err);
 			}
 		}
 
@@ -471,8 +505,8 @@ export const actions: Actions = {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
-		const host = await isTripHost(tripId, user.id);
-		if (!host) throw error(403, 'Only the trip host can invite guests');
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) throw error(403, 'Only the host or co-host can invite guests');
 		const formData = await request.formData();
 		const friendUserId = (formData.get('friendUserId') as string)?.trim() ?? '';
 		if (!friendUserId) return { inviteFriendError: 'Missing friend' };
@@ -594,8 +628,21 @@ export const actions: Actions = {
 		const host = await isTripHost(tripId, user.id);
 		if (!host) throw error(403, 'Only the trip host can nudge guests');
 		const formData = await request.formData();
-		const _userId = (formData.get('userId') as string)?.trim();
-		// Nudge is not tracked in activity feed per request
+		const targetUserId = (formData.get('userId') as string)?.trim();
+		if (!targetUserId) return { nudgeUnrespondedSuccess: true };
+
+		const trip = await prisma.trip.findUnique({ where: { id: tripId }, select: { name: true } });
+		if (trip) {
+			await prisma.notification.create({
+				data: {
+					userId: targetUserId,
+					type: 'rsvp_nudge',
+					title: 'RSVP Reminder',
+					message: `The host is waiting for your RSVP to "${trip.name}".`,
+					relatedTripId: tripId
+				}
+			});
+		}
 		return { nudgeUnrespondedSuccess: true };
 	},
 
@@ -605,8 +652,8 @@ export const actions: Actions = {
 		const tripId = params.tripId;
 		const host = await isTripHost(tripId, user.id);
 		if (!host) throw error(403, 'Only the trip host can nudge guests');
-		// Get all members who have not responded (no yes/no RSVP)
-		const rsvps = await prisma.rsvp.findMany({
+
+		const rsvps = await prisma.rSVP.findMany({
 			where: { tripId },
 			select: { userId: true, status: true }
 		});
@@ -615,8 +662,22 @@ export const actions: Actions = {
 			where: { tripId, inviteStatus: 'approved' },
 			select: { userId: true }
 		});
-		const _unrespondedUserIds = members.map((m) => m.userId).filter((uid) => !respondedUserIds.has(uid));
-		// TODO: send nudge notification to each unresponded user
+		const unrespondedUserIds = members.map((m) => m.userId).filter((uid) => !respondedUserIds.has(uid) && uid !== user.id);
+
+		if (unrespondedUserIds.length > 0) {
+			const trip = await prisma.trip.findUnique({ where: { id: tripId }, select: { name: true } });
+			if (trip) {
+				await prisma.notification.createMany({
+					data: unrespondedUserIds.map((uid) => ({
+						userId: uid,
+						type: 'rsvp_nudge',
+						title: 'RSVP Reminder',
+						message: `The host is waiting for your RSVP to "${trip.name}".`,
+						relatedTripId: tripId
+					}))
+				});
+			}
+		}
 		return { nudgeAllPendingSuccess: true };
 	},
 

@@ -473,6 +473,8 @@ export const actions: Actions = {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) return { assignMealMakerError: 'Only the host or co-host can assign cooks.' };
 		const formData = await request.formData();
 		const slotId = formData.get('slotId') as string;
 		const assignedUserId = (formData.get('assignedUserId') as string) || null;
@@ -510,11 +512,16 @@ export const actions: Actions = {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
+		const member = await isTripMember(tripId, user.id);
+		if (!member) return { removeActivityParticipantError: 'Not a trip member.' };
 		const formData = await request.formData();
 		const activityId = formData.get('activityId') as string;
 		const userId = formData.get('userId') as string;
 		if (!activityId || !userId)
 			return { removeActivityParticipantError: 'Activity and user required.' };
+		// Scope activity to this trip before deleting
+		const activity = await prisma.activity.findFirst({ where: { id: activityId, tripId } });
+		if (!activity) return { removeActivityParticipantError: 'Activity not found.' };
 		await prisma.activityParticipant.deleteMany({ where: { activityId, userId } });
 		return { removeActivityParticipantSuccess: true };
 	},
@@ -540,8 +547,8 @@ export const actions: Actions = {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
-		const host = await isTripHost(tripId, user.id);
-		if (!host) return { moveActivityError: 'Only host can move activities.' };
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) return { moveActivityError: 'Only the host or co-host can move activities.' };
 		const formData = await request.formData();
 		const activityId = formData.get('activityId') as string;
 		const dateStr = formData.get('date') as string;
@@ -597,8 +604,8 @@ export const actions: Actions = {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
-		const member = await isTripMember(tripId, user.id);
-		if (!member) return { updateActivityError: 'Not a trip member.' };
+		const canManage = await isTripHostOrCoHost(tripId, user.id);
+		if (!canManage) return { updateActivityError: 'Only the host or co-host can edit activities.' };
 
 		const fd = await request.formData();
 		const activityId = (fd.get('activityId') as string)?.trim();

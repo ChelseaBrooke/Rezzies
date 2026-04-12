@@ -3,7 +3,6 @@
 	import { loadStripe, type Stripe, type StripeElements } from '@stripe/stripe-js';
 
 	const BASE_PRICE = 25;
-	const DISCOUNT_CODE = 'BearsBestFriend#1';
 
 	let {
 		expectedGuests = 1,
@@ -19,6 +18,7 @@
 		onPublish: (opts: {
 			splitCost: boolean;
 			discountWaived: boolean;
+			discountCode?: string;
 			paymentIntentId?: string;
 		}) => Promise<void>;
 		onSaveDraft?: (opts: { splitCost: boolean }) => Promise<void>;
@@ -143,11 +143,22 @@
 		};
 	});
 
-	function applyDiscount() {
-		if (discountInput.trim() === DISCOUNT_CODE) {
-			discountApplied = true;
-			discountError = false;
-		} else {
+	async function applyDiscount() {
+		try {
+			const res = await fetch('/api/discount/validate', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ code: discountInput.trim() })
+			});
+			const data = await res.json().catch(() => ({}));
+			if (res.ok && data.valid) {
+				discountApplied = true;
+				discountError = false;
+			} else {
+				discountApplied = false;
+				discountError = true;
+			}
+		} catch {
 			discountApplied = false;
 			discountError = true;
 		}
@@ -194,6 +205,7 @@
 			await onPublish({
 				splitCost,
 				discountWaived: discountApplied,
+				...(discountApplied ? { discountCode: discountInput.trim() } : {}),
 				...(paymentIntentId ? { paymentIntentId } : {})
 			});
 		} catch (e) {

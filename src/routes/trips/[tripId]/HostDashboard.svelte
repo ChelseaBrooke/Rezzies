@@ -10,6 +10,7 @@
 	import PendingMembersBanner from '$lib/components/trips/dashboard/PendingMembersBanner.svelte';
 	import { dashboardModeByTripId } from '$lib/stores/dashboardMode.js';
 	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
+	import { formatHostedByLine } from '$lib/format-hosted-by.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -86,6 +87,7 @@
 
 	const hostMember = $derived((trip?.members ?? []).find((m: { role?: string }) => m.role === 'host'));
 	const hostName = $derived(hostMember?.user?.name ?? hostMember?.user?.email ?? 'Host');
+	const hostedByLine = $derived(formatHostedByLine(trip?.members ?? []));
 
 	const myAssignment = $derived(user ? roomAssignments.find((a) => a.userId === user.id) : null);
 	const myPaidTotal = $derived(
@@ -190,38 +192,6 @@
 
 {#if trip}
 	<PendingMembersBanner tripId={trip.id} initialCount={data.pendingMemberCount ?? 0} />
-	{#if dashboardMode === 'planning'}
-		<div class="planning-hero-wrap">
-			<TripHero
-			trip={{
-				id: trip.id,
-				name: trip.name,
-				location: trip.location,
-				locationCity: trip.locationCity,
-				fullAddress: trip.fullAddress,
-				listingCoverPhoto: trip.listingCoverPhoto
-			}}
-			{dateRange}
-			{calendarAddUrl}
-			{mapsUrl}
-			quickActions={{
-				onInvite: quickActions?.onInvite ?? (() => {}),
-				showToast: quickActions?.showToast ?? (() => {})
-			}}
-		{tripInfoContent}
-		isHost={true}
-		checkInDate={trip.checkInDate ?? ''}
-			checkOutDate={trip.checkOutDate ?? ''}
-			{activities}
-			{mealSlots}
-			selectedMode={dashboardMode}
-			itineraryHref={trip ? `/trips/${trip.id}/itinerary` : ''}
-			gamesHref={trip ? `/trips/${trip.id}/games` : ''}
-			gamesCount={data.tripGames?.length ?? 0}
-			/>
-			<PollCardContainer tripId={trip.id} placement="hero" />
-		</div>
-	{/if}
 	{#if dashboardMode === 'vacation'}
 		<VacationModeView
 			tripId={trip.id}
@@ -271,59 +241,96 @@
 			tripGalleryFiles={data.tripGalleryFiles ?? []}
 		/>
 		{:else}
-		<TripDashboardGrid
-		isHost={true}
-		tripId={trip.id}
-		showToast={quickActions?.showToast}
-			onInvite={quickActions?.onInvite}
-			currentUserId={user.id}
-			{members}
-			{rsvps}
-			{guestPreviewList}
-			{pendingRsvpCount}
-			{userRsvp}
-			{myAssignment}
-			{myDueTotal}
-			{myPaidTotal}
-			{nextUpcomingItem}
-			rsvpCurrent={acceptedCount}
-			rsvpTotal={members.length}
-			{rsvpPct}
-			bedsCurrent={claimedSlots}
-			bedsTotal={totalBedSlots}
-			{bedsPct}
-			roomsFilled={roomsFilled}
-			roomsTotal={roomsTotal}
-			roomsPct={roomsPct}
-			fundingCurrent={Math.round(committedFunds)}
-			fundingTotal={Math.round(totalCost)}
-			{fundingPct}
-			fundingDisplay={totalCost > 0 ? `$${committedFunds.toFixed(0)} / $${totalCost.toFixed(0)}` : 'Not set'}
-			guestsHref="/trips/{trip.id}/guests"
-			roomsHref="/trips/{trip.id}/rooms"
-			paymentsHref="/trips/{trip.id}/guests"
-			{nudgePending}
-			{checklistStats}
-			tripDescription={trip?.description ?? null}
-			extraCostRules={trip?.extraCostRules ?? []}
-			itineraryHref={trip ? `/trips/${trip.id}/itinerary` : ''}
-			tripInfo={{
-				description: trip?.description,
-				checkInTime: trip?.checkInTime,
-				checkOutTime: trip?.checkOutTime,
-				fullAddress: trip?.fullAddress ?? trip?.location,
-				parkingNotes: trip?.parkingNotes,
-				houseRules: trip?.houseRules,
-				tripInfoEditedAt: trip?.tripInfoEditedAt
+		<div class="planning-hero-wrap">
+			<TripHero
+			trip={{
+				id: trip.id,
+				name: trip.name,
+				location: trip.location,
+				locationCity: trip.locationCity,
+				fullAddress: trip.fullAddress,
+				listingCoverPhoto: trip.listingCoverPhoto
 			}}
-			tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
-		costAtMaxParticipation={data.costAtMaxParticipation ?? null}
-		costSharingEnabled={trip.costSharingEnabled ?? true}
-	recentActivities={activities.map(a => ({ title: a.title, createdAt: String(a.createdAt) }))}
-		recentMealSlots={mealSlots.map(m => ({ mealType: m.mealType, title: m.title ?? null, createdAt: String(m.createdAt) }))}
-		recentGames={data.tripGames ?? []}
-		recentPolls={data.recentPolls ?? []}
-		/>
+			{dateRange}
+			{calendarAddUrl}
+			{mapsUrl}
+			quickActions={{
+				onInvite: quickActions?.onInvite ?? (() => {}),
+				showToast: quickActions?.showToast ?? (() => {})
+			}}
+		{tripInfoContent}
+		isHost={true}
+		checkInDate={trip.checkInDate ?? ''}
+			checkOutDate={trip.checkOutDate ?? ''}
+			{activities}
+			{mealSlots}
+			selectedMode={dashboardMode}
+			itineraryHref={trip ? `/trips/${trip.id}/itinerary` : ''}
+			gamesHref={trip ? `/trips/${trip.id}/games` : ''}
+			gamesCount={data.tripGames?.length ?? 0}
+			{hostedByLine}
+			/>
+			<PollCardContainer tripId={trip.id} placement="hero" />
+		</div>
+		{#if user}
+			<TripDashboardGrid
+				isHost={true}
+				tripId={trip.id}
+				showToast={quickActions?.showToast}
+				onInvite={quickActions?.onInvite}
+				currentUserId={user.id}
+				{members}
+				{rsvps}
+				{guestPreviewList}
+				{pendingRsvpCount}
+				{userRsvp}
+				{myAssignment}
+				{myDueTotal}
+				{myPaidTotal}
+				{nextUpcomingItem}
+				rsvpCurrent={acceptedCount}
+				rsvpTotal={members.length}
+				{rsvpPct}
+				bedsCurrent={claimedSlots}
+				bedsTotal={totalBedSlots}
+				{bedsPct}
+				roomsFilled={roomsFilled}
+				roomsTotal={roomsTotal}
+				roomsPct={roomsPct}
+				fundingCurrent={Math.round(committedFunds)}
+				fundingTotal={Math.round(totalCost)}
+				{fundingPct}
+				fundingDisplay={totalCost > 0 ? `$${committedFunds.toFixed(0)} / $${totalCost.toFixed(0)}` : 'Not set'}
+				guestsHref={`/trips/${trip.id}/guests`}
+				roomsHref={`/trips/${trip.id}/rooms`}
+				paymentsHref={`/trips/${trip.id}/guests`}
+				{nudgePending}
+				{checklistStats}
+				tripDescription={trip?.description ?? null}
+				extraCostRules={trip?.extraCostRules ?? []}
+				itineraryHref={trip ? `/trips/${trip.id}/itinerary` : ''}
+				tripInfo={{
+					description: trip?.description,
+					checkInTime: trip?.checkInTime,
+					checkOutTime: trip?.checkOutTime,
+					fullAddress: trip?.fullAddress ?? trip?.location,
+					parkingNotes: trip?.parkingNotes,
+					houseRules: trip?.houseRules,
+					tripInfoEditedAt: trip?.tripInfoEditedAt
+				}}
+				tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
+				costAtMaxParticipation={data.costAtMaxParticipation ?? null}
+				costSharingEnabled={trip.costSharingEnabled ?? true}
+				recentActivities={activities.map((a) => ({ title: a.title, createdAt: String(a.createdAt) }))}
+				recentMealSlots={mealSlots.map((m) => ({
+					mealType: m.mealType,
+					title: m.title ?? null,
+					createdAt: String(m.createdAt)
+				}))}
+				recentGames={data.tripGames ?? []}
+				recentPolls={data.recentPolls ?? []}
+			/>
+		{/if}
 		{/if}
 {/if}
 

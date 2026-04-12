@@ -24,6 +24,7 @@
 	let newMessage = $state('');
 	let loading = $state(true);
 	let sending = $state(false);
+	let loadError = $state<string | null>(null);
 
 	$effect(() => {
 		selectedWith = $page.url.searchParams.get('with');
@@ -43,11 +44,17 @@
 
 	async function loadConversations() {
 		loading = true;
+		loadError = null;
 		try {
 			const res = await fetch('/api/messages/conversations');
-			if (!res.ok) return;
+			if (!res.ok) {
+				loadError = 'Could not load conversations. Please refresh.';
+				return;
+			}
 			const data = await res.json();
 			conversations = data.conversations ?? [];
+		} catch {
+			loadError = 'Could not load conversations. Please refresh.';
 		} finally {
 			loading = false;
 		}
@@ -55,16 +62,20 @@
 
 	async function loadMessages(withUserId: string) {
 		loading = true;
+		loadError = null;
 		try {
 			const res = await fetch(`/api/messages/${withUserId}`);
 			if (!res.ok) {
 				otherUser = null;
 				messages = [];
+				loadError = 'Could not load messages.';
 				return;
 			}
 			const data = await res.json();
 			otherUser = data.otherUser;
 			messages = data.messages ?? [];
+		} catch {
+			loadError = 'Could not load messages.';
 		} finally {
 			loading = false;
 		}
@@ -76,21 +87,29 @@
 		await loadMessages(withUserId);
 	}
 
+	let sendError = $state<string | null>(null);
+
 	async function sendMessage() {
 		const text = newMessage.trim();
 		if (!text || !selectedWith || sending) return;
 		sending = true;
+		sendError = null;
 		try {
 			const res = await fetch(`/api/messages/${selectedWith}`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ message: text })
 			});
-			if (!res.ok) return;
+			if (!res.ok) {
+				sendError = 'Failed to send message. Please try again.';
+				return;
+			}
 			const data = await res.json();
 			messages = [...messages, data.message];
 			newMessage = '';
 			await loadConversations();
+		} catch {
+			sendError = 'Failed to send message. Please try again.';
 		} finally {
 			sending = false;
 		}
@@ -126,6 +145,8 @@
 		<aside class="conversations-panel">
 			{#if loading && conversations.length === 0}
 				<p class="muted">Loading...</p>
+			{:else if loadError && conversations.length === 0}
+				<p class="muted" style="color: #b91c1c;">{loadError}</p>
 			{:else if conversations.length === 0}
 				<p class="muted">No conversations yet. Message someone from a trip's guest list.</p>
 			{:else}
@@ -215,6 +236,9 @@
 							{/each}
 						{/if}
 					</div>
+					{#if sendError}
+						<p style="color: #b91c1c; font-size: 0.8rem; margin: 0 0 0.25rem; padding: 0 0.5rem;">{sendError}</p>
+					{/if}
 					<form class="message-form" onsubmit={(e) => { e.preventDefault(); sendMessage(); }}>
 						<input
 							type="text"

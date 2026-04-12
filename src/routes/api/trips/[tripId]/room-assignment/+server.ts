@@ -6,17 +6,17 @@ import { prisma } from '$lib/server/prisma.js';
 
 export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
-	if (!user) return json({ error: 'Unauthorized' }, 401);
+	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
 	const tripId = params.tripId;
 	const canManage = await isTripHostOrCoHost(tripId, user.id);
-	if (!canManage) return json({ error: 'Forbidden' }, 403);
+	if (!canManage) return json({ error: 'Forbidden' }, { status: 403 });
 
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON' }, 400);
+		return json({ error: 'Invalid JSON' }, { status: 400 });
 	}
 
 	const d = body as Record<string, unknown>;
@@ -32,7 +32,7 @@ export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 	const bedType = typeof d.bedType === 'string' ? d.bedType.trim() || null : null;
 	const partySize = typeof d.partySize === 'number' && d.partySize >= 1 ? d.partySize : 1;
 
-	if (!userId) return json({ error: 'userId required' }, 400);
+	if (!userId) return json({ error: 'userId required' }, { status: 400 });
 
 	const existing = await prisma.roomAssignment.findFirst({
 		where: { tripId, userId }
@@ -53,7 +53,7 @@ export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 	});
 	if (!room) {
 		console.warn('[room-assignment] Room not found', { roomId: roomIdFinal, tripId });
-		return json({ error: 'Room not found' }, 404);
+		return json({ error: 'Room not found' }, { status: 404 });
 	}
 
 	if (existing) {

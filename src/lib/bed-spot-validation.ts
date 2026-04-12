@@ -52,7 +52,10 @@ export function capacityFieldsForNewBed(bedType: string): { capacity: number; ca
  */
 export function totalSpotsForBeds(bedsById: Map<string, BedLike>, bedIds: string[]): number {
 	let total = 0;
+	const seen = new Set<string>();
 	for (const bedId of bedIds) {
+		if (seen.has(bedId)) continue;
+		seen.add(bedId);
 		const bed = bedsById.get(bedId);
 		if (!bed) continue;
 		total += effectiveSleepSlots(bed);

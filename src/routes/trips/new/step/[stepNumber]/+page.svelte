@@ -7,8 +7,6 @@
 	import Step4 from './Step4.svelte';
 	import PublishPaymentModal from '$lib/components/wizard/PublishPaymentModal.svelte';
 
-	const DISCOUNT_CODE = 'BearsBestFriend#1';
-
 	let { data } = $props();
 	
 	const stepNumber = $derived(() => {
@@ -111,6 +109,7 @@
 	async function handlePublish(opts: {
 		splitCost: boolean;
 		discountWaived: boolean;
+		discountCode?: string;
 		paymentIntentId?: string;
 	}) {
 		const res = await fetch('/api/trips/publish', {
@@ -120,7 +119,7 @@
 				...draft,
 				isPublished: true,
 				splitCost: opts.splitCost,
-				...(opts.discountWaived ? { discountCode: DISCOUNT_CODE } : {}),
+				...(opts.discountCode ? { discountCode: opts.discountCode } : {}),
 				...(opts.paymentIntentId ? { paymentIntentId: opts.paymentIntentId } : {})
 			})
 		});

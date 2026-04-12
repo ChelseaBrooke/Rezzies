@@ -55,11 +55,21 @@ export const actions: Actions = {
 		const tripId = params.tripId;
 		const trip = await prisma.trip.findUnique({
 			where: { id: tripId },
-			select: { id: true, isPublished: true, inviteMode: true }
+			select: { id: true, isPublished: true, inviteMode: true, maxCapacity: true }
 		});
 
 		if (!trip || !trip.isPublished) {
 			throw error(404, 'Trip not found');
+		}
+
+		// Enforce capacity before allowing join
+		if (trip.maxCapacity) {
+			const currentCount = await prisma.tripMember.count({
+				where: { tripId, inviteStatus: 'approved' }
+			});
+			if (currentCount >= trip.maxCapacity) {
+				return { capacityFull: true };
+			}
 		}
 
 		const status = trip.inviteMode === 'open' ? 'approved' : 'pending';

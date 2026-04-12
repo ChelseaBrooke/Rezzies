@@ -14,25 +14,25 @@ const BED_TYPES = ['king', 'queen', 'twin', 'bunk', 'sofa_bed', 'full', 'other']
 
 export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
-	if (!user) return json({ error: 'Unauthorized' }, 401);
+	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
 	const tripId = params.tripId;
 	const roomId = roomIdNum(params.roomId);
-	if (roomId == null) return json({ error: 'Invalid room id' }, 400);
+	if (roomId == null) return json({ error: 'Invalid room id' }, { status: 400 });
 
 	const isHost = await isTripHost(tripId, user.id);
-	if (!isHost) return json({ error: 'Forbidden' }, 403);
+	if (!isHost) return json({ error: 'Forbidden' }, { status: 403 });
 
 	const room = await prisma.room.findFirst({
 		where: { id: roomId, tripId }
 	});
-	if (!room) return json({ error: 'Room not found' }, 404);
+	if (!room) return json({ error: 'Room not found' }, { status: 404 });
 
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON' }, 400);
+		return json({ error: 'Invalid JSON' }, { status: 400 });
 	}
 
 	const d = body as Record<string, unknown>;

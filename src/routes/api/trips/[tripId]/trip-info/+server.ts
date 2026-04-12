@@ -8,20 +8,20 @@ import { prisma } from '$lib/server/prisma.js';
 export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) {
-		return json({ error: 'You must be logged in to update trip info' }, 401);
+		return json({ error: 'You must be logged in to update trip info' }, { status: 401 });
 	}
 
 	const tripId = params.tripId;
 	const isHost = await isTripHost(tripId, user.id);
 	if (!isHost) {
-		return json({ error: 'Only the trip host can update trip info' }, 403);
+		return json({ error: 'Only the trip host can update trip info' }, { status: 403 });
 	}
 
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON body' }, 400);
+		return json({ error: 'Invalid JSON body' }, { status: 400 });
 	}
 
 	const d = body as Record<string, unknown>;
@@ -43,7 +43,7 @@ export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 		houseRules !== undefined;
 
 	if (!hasUpdates) {
-		return json({ error: 'No fields to update' }, 400);
+		return json({ error: 'No fields to update' }, { status: 400 });
 	}
 
 	try {
@@ -64,8 +64,8 @@ export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 	} catch (err) {
 		console.error('Update trip info error:', err);
 		return json(
-			{ error: err instanceof Error ? err.message : 'Failed to update trip info' },
-			500
+		{ error: err instanceof Error ? err.message : 'Failed to update trip info' },
+		{ status: 500 }
 		);
 	}
 };

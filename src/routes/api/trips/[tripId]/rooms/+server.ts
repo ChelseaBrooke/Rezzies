@@ -3,21 +3,22 @@ import type { RequestHandler } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { ROOM_BEDS_ORDER_BY } from '$lib/server/trip-room-order.js';
 import { normalizeRoomTypeFromWizard } from '$lib/room-type-display.js';
 
 export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
-	if (!user) return json({ error: 'Unauthorized' }, 401);
+	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
 	const tripId = params.tripId;
 	const isHost = await isTripHost(tripId, user.id);
-	if (!isHost) return json({ error: 'Forbidden' }, 403);
+	if (!isHost) return json({ error: 'Forbidden' }, { status: 403 });
 
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON' }, 400);
+		return json({ error: 'Invalid JSON' }, { status: 400 });
 	}
 
 	const d = body as Record<string, unknown>;
@@ -41,7 +42,7 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 			privacyFactor,
 			beds: undefined
 		},
-		include: { beds: true }
+		include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
 	});
 
 	return json(room);

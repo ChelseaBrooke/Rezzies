@@ -1,4 +1,5 @@
 import { prisma } from './prisma.js';
+import { ROOM_BEDS_ORDER_BY } from './trip-room-order.js';
 import { calculateReservationPrice } from './pricing-canonical.js';
 
 export interface InvoiceBreakdown {
@@ -35,7 +36,7 @@ export async function calculateInvoiceForUser(tripId: string, userId: string): P
 	const [roomAssignments, activityParticipants, extraSelections, trip] = await Promise.all([
 		prisma.roomAssignment.findMany({
 			where: { tripId, userId },
-			include: { room: { include: { beds: true } } }
+			include: { room: { include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } } } }
 		}),
 		prisma.activityParticipant.findMany({
 			where: {

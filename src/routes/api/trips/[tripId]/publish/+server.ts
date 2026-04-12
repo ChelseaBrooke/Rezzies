@@ -9,20 +9,20 @@ import { isStripeConfigured, verifyPublishPaymentIntent } from '$lib/server/stri
 export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) {
-		return json({ error: 'You must be logged in to publish a trip' }, 401);
+		return json({ error: 'You must be logged in to publish a trip' }, { status: 401 });
 	}
 
 	const tripId = params.tripId;
 	const host = await isTripHost(tripId, user.id);
 	if (!host) {
-		return json({ error: 'Only the trip host can publish this trip' }, 403);
+		return json({ error: 'Only the trip host can publish this trip' }, { status: 403 });
 	}
 
 	let body: Record<string, unknown>;
 	try {
 		body = (await request.json()) as Record<string, unknown>;
 	} catch {
-		return json({ error: 'Invalid JSON body' }, 400);
+		return json({ error: 'Invalid JSON body' }, { status: 400 });
 	}
 
 	const splitCost = body.splitCost === true;
@@ -36,19 +36,19 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
 	});
 
 	if (!trip) {
-		return json({ error: 'Trip not found' }, 404);
+		return json({ error: 'Trip not found' }, { status: 404 });
 	}
 	if (trip.isPublished) {
-		return json({ error: 'Trip is already published' }, 400);
+		return json({ error: 'Trip is already published' }, { status: 400 });
 	}
 
 	if (!waivePlatformFee && isStripeConfigured()) {
 		if (!paymentIntentId) {
-			return json({ error: 'Payment is required before publishing' }, 400);
+			return json({ error: 'Payment is required before publishing' }, { status: 400 });
 		}
 		const verified = await verifyPublishPaymentIntent(paymentIntentId, user.id);
 		if (!verified.ok) {
-			return json({ error: verified.reason }, 400);
+			return json({ error: verified.reason }, { status: 400 });
 		}
 	}
 

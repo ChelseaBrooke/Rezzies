@@ -4,6 +4,7 @@
  */
 
 import { prisma } from './prisma.js';
+import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from './trip-room-order.js';
 import {
 	calculateReservationPrice,
 	calculateNights,
@@ -96,7 +97,10 @@ export async function computeGuestEstimateRange(
 		prisma.trip.findUnique({
 			where: { id: tripId },
 			include: {
-				rooms: { include: { beds: true } },
+				rooms: {
+					orderBy: TRIP_ROOMS_ORDER_BY,
+					include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+				},
 				roomAssignments: true
 			}
 		}),
@@ -106,7 +110,7 @@ export async function computeGuestEstimateRange(
 		}),
 		prisma.roomAssignment.findMany({
 			where: { tripId },
-			include: { room: { include: { beds: true } } }
+			include: { room: { include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } } } }
 		}),
 		prisma.rSVP.findUnique({
 			where: { tripId_userId: { tripId, userId: guestId } }
@@ -306,7 +310,10 @@ export async function computeGuestEstimateWithOverrides(
 		prisma.trip.findUnique({
 			where: { id: tripId },
 			include: {
-				rooms: { include: { beds: true } },
+				rooms: {
+					orderBy: TRIP_ROOMS_ORDER_BY,
+					include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+				},
 				roomAssignments: true
 			}
 		}),

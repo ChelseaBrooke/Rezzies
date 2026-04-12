@@ -9,8 +9,8 @@ test.describe('Room editing (host)', () => {
 
 	test.beforeAll(async () => {
 		const trip = await prisma.trip.findFirst({
-		where: { name: TEST_TRIP.name },
-	});
+			where: { name: TEST_TRIP.name }
+		});
 		tripId = trip!.id;
 	});
 
@@ -26,30 +26,26 @@ test.describe('Room editing (host)', () => {
 		await expect(page.getByText('Master Suite')).toBeVisible({ timeout: 10_000 });
 	});
 
-	test('can navigate to room edit page', async ({ page }) => {
-		await page.goto(`/trips/${tripId}/rooms/edit`);
+	test('Manage rooms opens trip settings step 1', async ({ page }) => {
+		await page.goto(`/trips/${tripId}/rooms`);
 		await page.waitForLoadState('networkidle');
-		await expect(page).toHaveURL(new RegExp(`/trips/${tripId}/rooms/edit`));
+		await page.getByRole('link', { name: 'Manage rooms' }).click();
+		await page.waitForURL(new RegExp(`/trips/${tripId}/settings/step/1`));
+		await expect(page).toHaveURL(new RegExp(`/trips/${tripId}/settings/step/1`));
 	});
 
-	test('room edit page shows existing rooms', async ({ page }) => {
-		await page.goto(`/trips/${tripId}/rooms/edit`);
+	test('trip settings step 1 shows rooms panel and seeded room', async ({ page }) => {
+		await page.goto(`/trips/${tripId}/settings/step/1`);
 		await page.waitForLoadState('networkidle');
 
-		// Room names appear in textbox inputs (placeholder="Room name")
-		const roomInputs = page.locator('input[placeholder="Room name"], textbox');
-		const firstInput = page.getByRole('textbox', { name: 'Room name' }).first();
-		await expect(firstInput).toBeVisible({ timeout: 10_000 });
-		// Verify it contains one of our seeded room names
-		const value = await firstInput.inputValue();
-		expect(['Master Suite', 'Guest Room', 'Bunk Room']).toContain(value);
+		await expect(page.getByRole('heading', { name: /Rooms & Beds/i })).toBeVisible({ timeout: 10_000 });
+		await expect(page.getByText('Master Suite')).toBeVisible();
 	});
 
-	test('can see add room option', async ({ page }) => {
-		await page.goto(`/trips/${tripId}/rooms/edit`);
+	test('trip settings step 1 has Add Room', async ({ page }) => {
+		await page.goto(`/trips/${tripId}/settings/step/1`);
 		await page.waitForLoadState('networkidle');
 
-		const addRoomBtn = page.locator('button, a').filter({ hasText: /add.*room|new.*room/i }).first();
-		await expect(addRoomBtn).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Add Room' })).toBeVisible({ timeout: 10_000 });
 	});
 });

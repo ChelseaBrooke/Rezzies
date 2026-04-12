@@ -33,6 +33,8 @@
 		gamesHref?: string;
 		/** Number of games (for "Z games" line) */
 		gamesCount?: number;
+		/** e.g. "Hosted by Alex" or "Hosted by Alex, Sam, and Jordan" */
+		hostedByLine?: string | null;
 	}
 
 	let {
@@ -51,7 +53,8 @@
 		selectedMode = 'planning',
 		itineraryHref = '',
 		gamesHref = '',
-		gamesCount = 0
+		gamesCount = 0,
+		hostedByLine = null
 	}: Props = $props();
 
 	const mealsCount = $derived(mealSlots.length);
@@ -70,6 +73,8 @@
 		const diff = Math.round((checkIn.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 		return diff > 0 ? diff : null;
 	});
+
+	const daysUntilDigitCount = $derived(daysUntil === null ? 0 : String(daysUntil).length);
 </script>
 
 {#if isCompact}
@@ -106,6 +111,9 @@
 					</div>
 				{/if}
 				<h1 class="compact-name">{trip.name ?? 'Trip'}</h1>
+				{#if hostedByLine}
+					<p class="compact-hosted-by">{hostedByLine}</p>
+				{/if}
 				<div class="compact-meta">
 					{#if calendarAddUrl}
 						<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="compact-meta-link" title="Add to calendar">
@@ -158,7 +166,11 @@
 				<a href={rsvpUrl} class="hero-rsvp-button">RSVP</a>
 			{/if}
 			{#if daysUntil !== null}
-				<div class="hero-countdown" aria-label="{daysUntil} days until the trip">
+				<div
+					class="hero-countdown"
+					style="--countdown-digits: {daysUntilDigitCount}"
+					aria-label="{daysUntil} days until the trip"
+				>
 					<span class="hero-countdown-num">{daysUntil}</span>
 					<span class="hero-countdown-unit">day{daysUntil === 1 ? '' : 's'}</span>
 					<span class="hero-countdown-label">to go</span>
@@ -188,6 +200,9 @@
 					</div>
 				{/if}
 				<h1 class="hero-name">{trip.name ?? 'Trip'}</h1>
+				{#if hostedByLine}
+					<p class="hero-hosted-by">{hostedByLine}</p>
+				{/if}
 				<div class="hero-subline">
 					{#if calendarAddUrl}
 						<a href={calendarAddUrl} target="_blank" rel="noopener noreferrer" class="hero-meta-link" title="Add to calendar">
@@ -308,6 +323,17 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		max-width: 420px;
+	}
+
+	.compact-hosted-by {
+		margin: 0;
+		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: rgba(255, 255, 255, 0.88);
+		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+		line-height: 1.35;
+		max-width: min(420px, 100%);
 	}
 
 	.compact-meta {
@@ -445,59 +471,71 @@
 		color: white;
 	}
 
-	/* ── Countdown badge ── */
+	/* ── Countdown badge (fixed square; number scales with digit count) ── */
 	.hero-countdown {
+		--countdown-box: 7.125rem;
 		position: absolute;
 		top: 1.25rem;
 		right: 1.25rem;
 		z-index: 2;
+		box-sizing: border-box;
+		width: var(--countdown-box);
+		height: var(--countdown-box);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.05rem;
+		justify-content: center;
+		gap: 0.02rem;
 		background: rgba(0, 0, 0, 0.42);
 		backdrop-filter: blur(20px);
 		-webkit-backdrop-filter: blur(20px);
 		border: 1px solid rgba(255, 255, 255, 0.22);
 		border-radius: 1.25rem;
-		padding: 1.125rem 1.625rem 1rem;
+		padding: 0.4rem 0.35rem 0.45rem;
 		box-shadow:
 			0 8px 32px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.12);
-		min-width: 96px;
 		text-align: center;
 		pointer-events: none;
 		user-select: none;
 	}
 
 	.hero-countdown-num {
-		font-size: 4.25rem;
+		/* Shrink glyph size as digit count grows so 1–999 stay inside the square */
+		font-size: clamp(
+			1.35rem,
+			calc(3.35rem / (0.42 + var(--countdown-digits, 2) * 0.52)),
+			3.35rem
+		);
 		font-weight: 800;
-		line-height: 1;
+		line-height: 0.95;
 		color: white;
 		letter-spacing: -0.04em;
 		font-variant-numeric: tabular-nums;
 		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: clip;
 	}
 
 	.hero-countdown-unit {
-		font-size: 0.875rem;
+		font-size: 0.65rem;
 		font-weight: 800;
 		text-transform: uppercase;
-		letter-spacing: 0.1em;
+		letter-spacing: 0.08em;
 		color: var(--warm);
-		margin-top: 0.3rem;
+		margin-top: 0.12rem;
 		line-height: 1;
 	}
 
 	.hero-countdown-label {
-		font-size: 0.625rem;
+		font-size: 0.5625rem;
 		font-weight: 500;
 		text-transform: uppercase;
-		letter-spacing: 0.1em;
+		letter-spacing: 0.08em;
 		color: rgba(255, 255, 255, 0.5);
 		line-height: 1;
-		margin-top: 0.15rem;
+		margin-top: 0.06rem;
 	}
 
 	.hero-overlay {
@@ -560,6 +598,18 @@
 		text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 		letter-spacing: -0.025em;
 		text-align: center;
+	}
+
+	.hero-hosted-by {
+		margin: 0;
+		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+		font-size: 1.0625rem;
+		font-weight: 500;
+		color: rgba(255, 255, 255, 0.92);
+		text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+		line-height: 1.35;
+		text-align: center;
+		max-width: 42rem;
 	}
 
 	.hero-subline {
@@ -646,6 +696,10 @@
 			font-size: 3rem;
 		}
 
+		.hero-hosted-by {
+			font-size: 0.9375rem;
+		}
+
 		.hero-subline {
 			font-size: 0.9375rem;
 		}
@@ -657,12 +711,42 @@
 			min-height: 340px;
 		}
 
+		.hero-countdown {
+			--countdown-box: 6.25rem;
+			top: 1rem;
+			right: 1rem;
+			border-radius: 1rem;
+			padding: 0.35rem 0.3rem 0.4rem;
+		}
+
+		.hero-countdown-num {
+			font-size: clamp(
+				1.15rem,
+				calc(2.85rem / (0.42 + var(--countdown-digits, 2) * 0.52)),
+				2.85rem
+			);
+		}
+
+		.hero-countdown-unit {
+			font-size: 0.5625rem;
+			letter-spacing: 0.06em;
+		}
+
+		.hero-countdown-label {
+			font-size: 0.5rem;
+		}
+
 		.hero-overlay {
 			padding: 1rem 1.25rem;
 		}
 
 		.hero-name {
 			font-size: 2.5rem;
+		}
+
+		.hero-hosted-by {
+			font-size: 0.875rem;
+			padding: 0 0.25rem;
 		}
 
 		.hero-subline {

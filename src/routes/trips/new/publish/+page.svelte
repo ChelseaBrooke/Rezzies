@@ -3,8 +3,6 @@
 	import { tripDraft } from '$lib/stores/tripDraft.js';
 	import PublishTripPaymentPanel from '$lib/components/wizard/PublishTripPaymentPanel.svelte';
 
-	const DISCOUNT_CODE = 'BearsBestFriend#1';
-
 	let draft = $state({ ...$tripDraft });
 
 	$effect(() => {
@@ -17,6 +15,7 @@
 	async function handlePublish(opts: {
 		splitCost: boolean;
 		discountWaived: boolean;
+		discountCode?: string;
 		paymentIntentId?: string;
 	}) {
 		const res = await fetch('/api/trips/publish', {
@@ -26,7 +25,7 @@
 				...draft,
 				isPublished: true,
 				splitCost: opts.splitCost,
-				...(opts.discountWaived ? { discountCode: DISCOUNT_CODE } : {}),
+				...(opts.discountCode ? { discountCode: opts.discountCode } : {}),
 				...(opts.paymentIntentId ? { paymentIntentId: opts.paymentIntentId } : {})
 			})
 		});

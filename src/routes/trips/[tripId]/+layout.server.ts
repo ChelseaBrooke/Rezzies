@@ -3,6 +3,7 @@ import type { LayoutServerLoad } from './$types';
 import { getUserTripMembership, getUserTrips } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 import { computeCommittedFundsFromYesRsvps, getCostAtMaxParticipation } from '$lib/server/pricing-canonical.js';
+import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
 
 export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 	const user = locals.user;
@@ -37,7 +38,10 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals }) => {
 		prisma.trip.findUnique({
 			where: { id: tripId },
 			include: {
-				rooms: { include: { beds: true } },
+				rooms: {
+					orderBy: TRIP_ROOMS_ORDER_BY,
+					include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+				},
 				members: { include: { user: { select: { id: true, email: true, name: true, avatarUrl: true } } } },
 				mealPlan: true,
 				mealSlots: { include: { assignedUser: { select: { id: true, name: true } } } },

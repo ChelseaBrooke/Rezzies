@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
+import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
 import { capacityFieldsForNewBed } from '$lib/bed-spot-validation.js';
 import { normalizeRoomTypeFromWizard } from '$lib/room-type-display.js';
 
@@ -43,13 +44,13 @@ function logTripUpdateError(tripId: string, phase: string, err: unknown) {
 export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) {
-		return json({ error: 'You must be logged in to update a trip' }, 401);
+		return json({ error: 'You must be logged in to update a trip' }, { status: 401 });
 	}
 
 	const tripId = params.tripId;
 	const isHost = await isTripHost(tripId, user.id);
 	if (!isHost) {
-		return json({ error: 'Only the trip host can update this trip' }, 403);
+		return json({ error: 'Only the trip host can update this trip' }, { status: 403 });
 	}
 
 	let body: unknown;
@@ -57,7 +58,7 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 		body = await request.json();
 	} catch (e) {
 		logTripUpdateError(tripId, 'json_parse', e);
-		return json({ error: 'Invalid JSON body' }, 400);
+		return json({ error: 'Invalid JSON body' }, { status: 400 });
 	}
 
 	const d = body as Record<string, unknown>;
@@ -85,25 +86,25 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	const mealsEnabled = d.mealsEnabled === true;
 
 	if (!name) {
-		return json({ error: 'Trip name is required' }, 400);
+		return json({ error: 'Trip name is required' }, { status: 400 });
 	}
 	if (!checkInDateStr || !checkOutDateStr) {
-		return json({ error: 'Check-in and check-out dates are required' }, 400);
+		return json({ error: 'Check-in and check-out dates are required' }, { status: 400 });
 	}
 	// Total cost validation is conditional: required and positive only when cost sharing is on
 	const totalCost = costSharingEnabled
 		? parseFloat(totalTripCostStr.replace(/[$,]/g, ''))
 		: 0;
 	if (costSharingEnabled && (isNaN(totalCost) || totalCost <= 0)) {
-		return json({ error: 'Total trip cost must be a positive number' }, 400);
+		return json({ error: 'Total trip cost must be a positive number' }, { status: 400 });
 	}
 	const checkInDate = new Date(checkInDateStr);
 	const checkOutDate = new Date(checkOutDateStr);
 	if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
-		return json({ error: 'Invalid dates' }, 400);
+		return json({ error: 'Invalid dates' }, { status: 400 });
 	}
 	if (checkOutDate <= checkInDate) {
-		return json({ error: 'Check-out date must be after check-in date' }, 400);
+		return json({ error: 'Check-out date must be after check-in date' }, { status: 400 });
 	}
 	const rsvpByDate = rsvpByDateStr
 		? (() => {
@@ -112,11 +113,11 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 			})()
 		: null;
 	if (rooms.length === 0) {
-		return json({ error: 'At least one room is required' }, 400);
+		return json({ error: 'At least one room is required' }, { status: 400 });
 	}
 
 	if (expectedGuestCount != null && expectedGuestCount < 1) {
-		return json({ error: 'Minimum headcount must be at least 1' }, 400);
+		return json({ error: 'Minimum headcount must be at least 1' }, { status: 400 });
 	}
 
 	try {
@@ -156,7 +157,15 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 		const existingTrip = await prisma.trip.findUnique({
 			where: { id: tripId },
 			include: {
-				rooms: { include: { beds: { select: { id: true, bedType: true } } } }
+				rooms: {
+					orderBy: TRIP_ROOMS_ORDER_BY,
+					include: {
+						beds: {
+							orderBy: ROOM_BEDS_ORDER_BY,
+							select: { id: true, bedType: true }
+						}
+					}
+				}
 			}
 		});
 
@@ -265,6 +274,6 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	} catch (err) {
 		logTripUpdateError(tripId, 'transaction', err);
 		const message = err instanceof Error ? err.message : 'Failed to update trip';
-		return json({ error: message }, 500);
+		return json({ error: message }, { status: 500 });
 	}
 };

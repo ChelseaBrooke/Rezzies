@@ -38,14 +38,14 @@ function parseOptionalInt(v: unknown): number | null {
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) {
-		return json({ error: 'You must be logged in to publish a trip' }, 401);
+		return json({ error: 'You must be logged in to publish a trip' }, { status: 401 });
 	}
 
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON body' }, 400);
+		return json({ error: 'Invalid JSON body' }, { status: 400 });
 	}
 
 	const d = body as Record<string, unknown>;
@@ -91,10 +91,10 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			: 0;
 
 	if (!name) {
-		return json({ error: 'Trip name is required' }, 400);
+		return json({ error: 'Trip name is required' }, { status: 400 });
 	}
 	if (!checkInDateStr || !checkOutDateStr) {
-		return json({ error: 'Check-in and check-out dates are required' }, 400);
+		return json({ error: 'Check-in and check-out dates are required' }, { status: 400 });
 	}
 
 	const totalCost = costSharingEnabled
@@ -102,16 +102,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		: 0;
 
 	if (costSharingEnabled && (isNaN(totalCost) || totalCost <= 0)) {
-		return json({ error: 'Total trip cost must be a positive number' }, 400);
+		return json({ error: 'Total trip cost must be a positive number' }, { status: 400 });
 	}
 
 	const checkInDate = new Date(checkInDateStr);
 	const checkOutDate = new Date(checkOutDateStr);
 	if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
-		return json({ error: 'Invalid dates' }, 400);
+		return json({ error: 'Invalid dates' }, { status: 400 });
 	}
 	if (checkOutDate <= checkInDate) {
-		return json({ error: 'Check-out date must be after check-in date' }, 400);
+		return json({ error: 'Check-out date must be after check-in date' }, { status: 400 });
 	}
 
 	const rsvpByDate = rsvpByDateStr
@@ -122,7 +122,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		: null;
 
 	if (rooms.length === 0) {
-		return json({ error: 'At least one room is required' }, 400);
+		return json({ error: 'At least one room is required' }, { status: 400 });
 	}
 
 	const hasPhotos =
@@ -130,20 +130,20 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		(Array.isArray(d.galleryPhotos) && d.galleryPhotos.length > 0) ||
 		rooms.some((r: { photos?: string[] }) => Array.isArray(r?.photos) && r.photos.length > 0);
 	if (!hasPhotos) {
-		return json({ error: 'Please add at least one photo (cover or room photo)' }, 400);
+		return json({ error: 'Please add at least one photo (cover or room photo)' }, { status: 400 });
 	}
 
 	if (expectedGuestCount == null || expectedGuestCount < 1) {
-		return json({ error: 'Minimum headcount (realistic low) is required' }, 400);
+		return json({ error: 'Minimum headcount (realistic low) is required' }, { status: 400 });
 	}
 
 	if (isPublished && !waivePlatformFee && isStripeConfigured()) {
 		if (!paymentIntentId) {
-			return json({ error: 'Payment is required before publishing' }, 400);
+			return json({ error: 'Payment is required before publishing' }, { status: 400 });
 		}
 		const verified = await verifyPublishPaymentIntent(paymentIntentId, user.id);
 		if (!verified.ok) {
-			return json({ error: verified.reason }, 400);
+			return json({ error: verified.reason }, { status: 400 });
 		}
 	}
 
@@ -239,6 +239,17 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			}
 		}
 
+		// Create MealPlan if meals are enabled in the draft
+		const mealsEnabled = d.mealsEnabled === true;
+		if (mealsEnabled) {
+			await prisma.mealPlan.create({
+				data: {
+					tripId: trip.id,
+					enabled: true
+				}
+			});
+		}
+
 		// Create selected TripGames if games add-on is enabled
 		if (gamesEnabled && selectedGames.length > 0) {
 			for (const gameId of selectedGames) {
@@ -257,6 +268,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		return json({ success: true, tripId: trip.id });
 	} catch (err) {
 		console.error('Publish trip error:', err);
-		return json({ error: err instanceof Error ? err.message : 'Failed to publish trip' }, 500);
+		return json({ error: err instanceof Error ? err.message : 'Failed to publish trip' }, { status: 500 });
 	}
 };

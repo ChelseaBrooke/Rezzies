@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
+	import { normalizeBedType, BED_TYPE_LABELS } from '$lib/bed-types.js';
 	import kingBedIconUrl from '$lib/assets/images/beds/king.svg.svg?url';
 	import queenBedIconUrl from '$lib/assets/images/beds/queen.svg.svg?url';
 	import twinBedIconUrl from '$lib/assets/images/beds/twin.svg.svg?url';
@@ -11,7 +11,8 @@
 	import sofaBedIconUrl from '$lib/assets/images/beds/sofabed.svg.svg?url';
 
 	let { data }: { data: PageData } = $props();
-	let requestSentToast = $state(false);
+	let toastMessage = $state<string | null>(null);
+	let toastType = $state<'success' | 'error'>('success');
 
 	const rooms = $derived(data.rooms ?? []);
 	const roomAssignments = $derived(data.roomAssignments ?? []);
@@ -28,17 +29,18 @@
 		sofa_bed: sofaBedIconUrl,
 		sofa: sofaBedIconUrl,
 		full: queenBedIconUrl,
+		air_mattress: sofaBedIconUrl,
 		other: queenBedIconUrl
 	};
 
-	function normalizeBedType(bt: string | null): string {
-		if (!bt) return 'other';
-		const t = bt.trim().toLowerCase().replace(/\s+/g, '_');
-		return t || 'other';
+	function getBedIcon(bedType: string): string {
+		return BED_ICONS[normalizeBedType(bedType)] ?? queenBedIconUrl;
 	}
 
-	function getBedIcon(bedType: string): string {
-		return BED_ICONS[bedType] ?? BED_ICONS.other ?? queenBedIconUrl;
+	function showToast(msg: string, type: 'success' | 'error' = 'success') {
+		toastMessage = msg;
+		toastType = type;
+		setTimeout(() => (toastMessage = null), 3500);
 	}
 
 	/** Per-room pricing lookup: roomId -> { bedId -> priceDisplay } */
@@ -94,29 +96,44 @@
 		});
 	});
 
-	/** Total beds, claimed beds, and rooms that are full (every bed has someone). */
+	/** Total spots (respecting capacitySlots), claimed, and rooms that are full. */
 	const bedsStats = $derived.by(() => {
-		let total = 0;
+		let totalSpots = 0;
 		let claimed = 0;
 		let fullRooms = 0;
 		for (const { slots } of roomSlots) {
 			let roomClaimed = 0;
-			for (const { user } of slots) {
-				total += 1;
+			let roomSpots = 0;
+			for (const { bed, user } of slots) {
+				const spots = bed.capacitySlots ?? 1;
+				roomSpots += spots;
+				totalSpots += spots;
 				if (user) {
 					claimed += 1;
 					roomClaimed += 1;
 				}
 			}
-			if (slots.length > 0 && roomClaimed === slots.length) fullRooms += 1;
+			if (roomSpots > 0 && roomClaimed >= roomSpots) fullRooms += 1;
 		}
-		return { totalBeds: total, claimedBeds: claimed, totalRooms: rooms.length, fullRooms };
+		return { totalBeds: totalSpots, claimedBeds: claimed, totalRooms: rooms.length, fullRooms };
 	});
 
-	/** Show "Request to join" for any bed that has someone else in it (not you). */
+	const currentUserHasBed = $derived(
+		roomAssignments.some((a) => a.userId === currentUserId)
+	);
+
 	function canRequestToJoin(slot: { user: { id: string } | null }): boolean {
 		if (!currentUserId) return false;
 		return slot.user != null && slot.user.id !== currentUserId;
+	}
+
+	function canClaimBed(slot: { user: { id: string } | null }): boolean {
+		if (!currentUserId || currentUserHasBed) return false;
+		return slot.user == null;
+	}
+
+	function bedLabel(bedType: string): string {
+		return BED_TYPE_LABELS[normalizeBedType(bedType)] ?? bedType;
 	}
 
 	function initials(name: string | null): string {
@@ -126,42 +143,57 @@
 			? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 			: name.slice(0, 2).toUpperCase();
 	}
+
+	function enhanceWithToast(successMsg: string, errorMsg: string) {
+		return () => {
+			return async ({ result, update }: { result: { type: string; data?: { message?: string } }; update: () => Promise<void> }) => {
+				if (result.type === 'success') {
+					showToast(successMsg, 'success');
+					await update();
+				} else if (result.type === 'failure') {
+					showToast((result.data as { message?: string })?.message ?? errorMsg, 'error');
+				} else {
+					showToast(errorMsg, 'error');
+				}
+			};
+		};
+	}
 </script>
 
 <div class="page">
 	<div class="page-header">
 		<h1 class="page-title">Where everyone is staying</h1>
 		{#if isHost}
-			<a href="/trips/{tripId}/settings" class="manage-link">Manage rooms</a>
+			<a href="/trips/{tripId}/settings/step/1" class="manage-link">Manage rooms</a>
 		{/if}
-		<p class="page-subtitle">See who’s in each room and bed. Open spots? Request to join, your bed mate will get a notification to approve. Prices update as more people RSVP.</p>
+		<p class="page-subtitle">See who's in each room and bed. Open spots? Claim a bed or request to share.</p>
 	</div>
 
 	{#if rooms.length === 0}
 		<div class="empty-state">
 			<p>No rooms set up yet.</p>
 			{#if isHost}
-				<a href="/trips/{tripId}/rooms/edit" class="btn-primary">Add rooms</a>
+				<a href="/trips/{tripId}/settings/step/1" class="btn-primary">Add rooms</a>
 			{/if}
 		</div>
 	{:else}
 		<div class="stats-strip">
-			<span class="stats-pill">{bedsStats.claimedBeds} of {bedsStats.totalBeds} beds claimed</span>
-			<span class="stats-pill">{bedsStats.fullRooms} of {bedsStats.totalRooms} rooms full</span>
+			<span class="stats-pill">{bedsStats.claimedBeds} of {bedsStats.totalBeds} spot{bedsStats.totalBeds !== 1 ? 's' : ''} claimed</span>
+			<span class="stats-pill">{bedsStats.fullRooms} of {bedsStats.totalRooms} room{bedsStats.totalRooms !== 1 ? 's' : ''} full</span>
 		</div>
 		<div class="rooms-grid">
 			{#each roomSlots as { roomData, slots }, i (roomData.id)}
-				{@const roomDisplayName = (roomData.name && roomData.name.trim()) || `Bedroom ${i + 1}`}
+				{@const roomDisplayName = roomData.name?.trim() || `Bedroom ${i + 1}`}
 				<article class="room-card">
 					<div class="room-card-photos">
 						{#if (roomData.photoUrls?.length ?? 0) > 0}
-							<img src={roomData.photoUrls[0]} alt="" class="room-card-hero" />
+							<img src={roomData.photoUrls?.[0]} alt="" class="room-card-hero" />
 							<div class="room-card-photo-label">
 								<span class="room-card-photo-label-text">{roomDisplayName}</span>
 							</div>
 							{#if (roomData.photoUrls?.length ?? 0) > 1}
 								<div class="room-card-thumbnails">
-									{#each roomData.photoUrls.slice(1, 4) as url}
+									{#each (roomData.photoUrls ?? []).slice(1, 4) as url}
 										<img src={url} alt="" />
 									{/each}
 								</div>
@@ -199,23 +231,24 @@
 										</div>
 									</div>
 									<div class="bed-slot-info">
-										<span class="bed-slot-type">{bed.bedType}</span>
+										<span class="bed-slot-type">{bedLabel(bed.bedType)}</span>
 										{#if slotsCount > 1}
 											<span class="bed-slot-spots">{slotsCount} spots</span>
 										{/if}
 										{#if priceDisplay}
 											<span class="bed-slot-price">{priceDisplay}</span>
 										{/if}
-										{#if user && canRequestToJoin({ user })}
-											<form method="POST" action="?/requestBedShare" class="bed-request-form" use:enhance={async ({ result }) => {
-												if (result.type === 'success') {
-													requestSentToast = true;
-													setTimeout(() => (requestSentToast = false), 3000);
-													await invalidateAll();
-												}
-											}}>
+										{#if canClaimBed({ user })}
+											<form method="POST" action="?/claimBed" class="bed-request-form"
+												use:enhance={enhanceWithToast('Bed claimed!', 'Could not claim bed')}>
 												<input type="hidden" name="bedId" value={bed.id} />
-												<button type="submit" class="btn-request-join">Request to join</button>
+												<button type="submit" class="btn-claim-bed">Claim this bed</button>
+											</form>
+										{:else if user && canRequestToJoin({ user })}
+											<form method="POST" action="?/requestBedShare" class="bed-request-form"
+												use:enhance={enhanceWithToast("Request sent! They'll get a notification.", 'Could not send request')}>
+												<input type="hidden" name="bedId" value={bed.id} />
+												<button type="submit" class="btn-request-join">Request to share</button>
 											</form>
 										{/if}
 									</div>
@@ -228,8 +261,8 @@
 		</div>
 	{/if}
 
-	{#if requestSentToast}
-		<div class="toast-request-sent" role="status">Request sent! They'll get a notification to approve.</div>
+	{#if toastMessage}
+		<div class="toast" class:toast-error={toastType === 'error'} role="status">{toastMessage}</div>
 	{/if}
 </div>
 
@@ -280,8 +313,8 @@
 	.btn-primary:hover { filter: brightness(1.05); }
 
 	.rooms-grid {
-		display: flex;
-		flex-wrap: wrap;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(320px, 360px));
 		justify-content: center;
 		gap: 1.5rem;
 		width: 100%;
@@ -298,7 +331,6 @@
 		align-items: center;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 		width: 100%;
-		max-width: 360px;
 	}
 
 	.room-card-photos {
@@ -352,7 +384,6 @@
 		display: block;
 	}
 
-
 	.room-card-thumbnails {
 		position: absolute;
 		bottom: 0.5rem;
@@ -381,7 +412,6 @@
 		width: 100%;
 	}
 
-	/* Beds: each bed is a card with visual + info + price + request CTA */
 	.room-card-beds {
 		display: flex;
 		flex-wrap: wrap;
@@ -444,7 +474,6 @@
 	.bed-slot-type {
 		font-size: 0.8125rem;
 		font-weight: 600;
-		text-transform: capitalize;
 		color: var(--text);
 	}
 	.bed-slot-spots {
@@ -457,6 +486,18 @@
 		margin-top: 0.15rem;
 	}
 	.bed-request-form { margin-top: 0.35rem; }
+	.btn-claim-bed {
+		font-size: 0.8125rem;
+		padding: 0.3rem 0.75rem;
+		background: var(--primary);
+		border: none;
+		color: white;
+		cursor: pointer;
+		font-weight: 600;
+		border-radius: var(--radius-sm);
+		transition: filter 0.12s;
+	}
+	.btn-claim-bed:hover { filter: brightness(1.08); }
 	.btn-request-join {
 		font-size: 0.8125rem;
 		padding: 0;
@@ -469,7 +510,7 @@
 	}
 	.btn-request-join:hover { text-decoration: none; opacity: 0.85; }
 
-	.toast-request-sent {
+	.toast {
 		position: fixed;
 		bottom: 1.5rem;
 		left: 50%;
@@ -482,6 +523,9 @@
 		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 		z-index: 10000;
 		animation: toast-in 0.25s ease;
+	}
+	.toast-error {
+		background: #b91c1c;
 	}
 	@keyframes toast-in {
 		from { opacity: 0; transform: translateX(-50%) translateY(0.5rem); }

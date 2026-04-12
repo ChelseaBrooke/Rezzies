@@ -8,6 +8,7 @@
 
 	// Delete confirmation modal state
 	let deletingTrip = $state<{ id: string; name: string } | null>(null);
+	let deleteToast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 
 	function requestDelete(tripId: string, tripName: string, event: Event) {
 		event.stopPropagation();
@@ -19,6 +20,9 @@
 	}
 </script>
 
+{#if deleteToast}
+	<div class="delete-toast delete-toast--{deleteToast.type}" role="status" aria-live="polite">{deleteToast.message}</div>
+{/if}
 <MarketingShell user={data?.user}>
 	<div class="marketing-container trips-container">
 		<div class="marketing-card trips-header-card">
@@ -150,7 +154,16 @@
 					method="POST"
 					action="?/deleteTrip"
 					use:enhance={() => {
-						deletingTrip = null;
+						return async ({ result, update }) => {
+							deletingTrip = null;
+							if (result.type === 'success') {
+								deleteToast = { message: 'Trip deleted.', type: 'success' };
+								await update();
+							} else {
+								deleteToast = { message: 'Failed to delete trip. Please try again.', type: 'error' };
+							}
+							setTimeout(() => (deleteToast = null), 3000);
+						};
 					}}
 				>
 					<input type="hidden" name="tripId" value={deletingTrip.id} />
@@ -426,5 +439,31 @@
 
 	.btn-confirm-delete:hover {
 		background: #b91c1c;
+	}
+
+	:global(.delete-toast) {
+		position: fixed;
+		bottom: 1.5rem;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 2000;
+		padding: 0.7rem 1.25rem;
+		border-radius: 99px;
+		font-size: 0.9rem;
+		font-weight: 500;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+		animation: toast-in 0.25s ease-out;
+	}
+	:global(.delete-toast--success) {
+		background: #166534;
+		color: white;
+	}
+	:global(.delete-toast--error) {
+		background: #991b1b;
+		color: white;
+	}
+	@keyframes toast-in {
+		from { opacity: 0; transform: translateX(-50%) translateY(0.5rem); }
+		to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 	}
 </style>
