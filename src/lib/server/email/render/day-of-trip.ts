@@ -13,7 +13,7 @@ export function renderDayOfTripHtml(d: DayOfTripEmailData): string {
 
 	const body = `
 		<p class="lead">Hi ${recipientName}, today's the day — <strong>${tripName}</strong> starts now.</p>
-		<p class="lead" style="margin-bottom:0">Everything you need is in your trip dashboard. Have an amazing trip.</p>
+		<p class="lead lead--tight">Everything you need is in your trip dashboard. Have an amazing trip.</p>
 	`;
 
 	return renderEmailLayout({

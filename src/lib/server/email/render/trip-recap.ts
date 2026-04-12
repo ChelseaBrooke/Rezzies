@@ -13,7 +13,7 @@ export function renderTripRecapHtml(d: TripRecapEmailData): string {
 
 	const body = `
 		<p class="lead">Hi ${recipientName}, <strong>${tripName}</strong> has come to an end — hope it was a great one.</p>
-		<p class="lead" style="margin-bottom:0">Head back to the trip to relive the highlights, share moments, or settle any outstanding payments.</p>
+		<p class="lead lead--tight">Head back to the trip to relive the highlights, share moments, or settle any outstanding payments.</p>
 	`;
 
 	return renderEmailLayout({

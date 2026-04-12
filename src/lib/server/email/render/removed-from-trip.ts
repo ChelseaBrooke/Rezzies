@@ -12,7 +12,7 @@ export function renderRemovedFromTripHtml(d: RemovedFromTripEmailData): string {
 
 	const body = `
 		<p class="lead">Hi ${guestName}, you no longer have access to <strong>${tripName}</strong>.</p>
-		<p class="lead" style="margin-bottom:0">If you think this was a mistake, please contact the trip host directly.</p>
+		<p class="lead lead--tight">If you think this was a mistake, please contact the trip host directly.</p>
 	`;
 
 	return renderEmailLayout({

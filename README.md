@@ -76,8 +76,9 @@ npm run db:dev
 - `RESEND_API_KEY` - Resend API key (`re_...`) from the project where your domain is verified
 - `RESEND_FROM_EMAIL` - **Required.** Sender address on a domain that shows **Verified** in [Resend → Domains](https://resend.com/domains) (same project as the API key). A default domain in code will not work for your GoDaddy/Resend setup until this matches verification.
 - `RESEND_FROM_NAME` - Display name for sender (optional)
+- `EMAIL_LOGO_URL` (optional) - Absolute HTTPS URL to a logo image for email headers; see **Email (Resend)** below
 - `INTERNAL_API_KEY` - Secret key for protecting write endpoints
-- `APP_BASE_URL` - Base URL of your app (e.g., https://your-app.vercel.app)
+- `APP_BASE_URL` - Base URL of your app (e.g., https://your-app.vercel.app); also used for the **Open Divvi** link in email footers
 - `NODE_ENV` - Environment (development, production)
 
 ## Database Setup
@@ -238,7 +239,19 @@ After deployment:
 
 ## Email (Resend)
 
-Transactional HTML is built in code: trip invites (`src/lib/server/email/render/trip-invite.ts`) and guest confirmations (`render/guest-confirmation.ts`). Configure `RESEND_API_KEY` and set `RESEND_FROM_EMAIL` to an address on your **Resend-verified** domain. If Resend says you can only send to your own email, the `from` domain and API key project do not match verification (or `RESEND_FROM_EMAIL` is unset / wrong—restart dev server after editing `.env`).
+Transactional HTML shares one layout and palette: [`src/lib/server/email/render/shared-layout.ts`](src/lib/server/email/render/shared-layout.ts) and [`src/lib/server/email/brand.ts`](src/lib/server/email/brand.ts) (kept in sync with [`src/styles/theme.css`](src/styles/theme.css)). Per-template bodies live under `src/lib/server/email/render/`.
+
+- **`RESEND_API_KEY`** and **`RESEND_FROM_EMAIL`** — Required for sending; `from` must be on a domain that shows **Verified** in [Resend → Domains](https://resend.com/domains) for the same project as the API key. If Resend says you can only send to your own email, the `from` domain and key project do not match (or env is wrong—restart the dev server after editing `.env`).
+- **`EMAIL_LOGO_URL`** (optional) — Absolute **HTTPS** URL to a PNG or SVG used in the email header. Without it, messages use a Fraunces text wordmark; setting this matches the in-app header feel.
+- **`APP_BASE_URL`** — When set, transactional footers include an **Open Divvi** link to this origin.
+
+### Preview in the browser (development)
+
+With `npm run dev`, open **`/email`** to see every transactional template rendered with sample data (same HTML as Resend). In production, this route returns **404** unless you set **`EMAIL_PREVIEW_ENABLED=true`** (server env).
+
+### Inbox QA (before a big send)
+
+Send test messages to Gmail, Outlook.com, and Apple Mail (desktop and mobile). Custom `<style>` blocks are stripped or altered in some clients (especially Gmail), so expect slight differences—not layout tables, which carry the design. Dark mode may recolor the message independently of our `color-scheme: light` hint; there is no separate dark HTML theme yet.
 
 ## Troubleshooting
 

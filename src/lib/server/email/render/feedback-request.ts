@@ -14,7 +14,7 @@ export function renderFeedbackRequestHtml(d: FeedbackRequestEmailData): string {
 
 	const body = `
 		<p class="lead">Hi ${recipientName}, we hope <strong>${tripName}</strong> was a memorable one.</p>
-		<p class="lead" style="margin-bottom:0">We'd love to hear how it went — your feedback helps us make Divvi better for every trip.</p>
+		<p class="lead lead--tight">We'd love to hear how it went — your feedback helps us make Divvi better for every trip.</p>
 	`;
 
 	return renderEmailLayout({

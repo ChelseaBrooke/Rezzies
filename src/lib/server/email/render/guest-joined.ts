@@ -13,7 +13,7 @@ export function renderGuestJoinedHtml(d: GuestJoinedEmailData): string {
 
 	const body = `
 		<p class="lead">Hi ${guestName}, you've joined <strong>${tripName}</strong>.</p>
-		<p class="lead" style="margin-bottom:0">Next step: RSVP and choose your bed so the host can finalize plans.</p>
+		<p class="lead lead--tight">Next step: RSVP and choose your bed so the host can finalize plans.</p>
 	`;
 
 	return renderEmailLayout({

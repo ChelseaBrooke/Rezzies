@@ -21,18 +21,15 @@ export function renderDailyDigestHtml(d: DailyDigestEmailData): string {
 			? d.events
 					.map(
 						(e) =>
-							`<tr><td style="font-family:'Plus Jakarta Sans',Helvetica,Arial,sans-serif;font-size:15px;padding:8px 0;border-bottom:1px solid rgba(47,119,120,0.10);color:#374151;">
-								• ${escapeHtml(e)}
-							</td></tr>`
+							`<tr><td>• ${escapeHtml(e)}</td></tr>`
 					)
 					.join('')
-			: `<tr><td style="font-family:'Plus Jakarta Sans',Helvetica,Arial,sans-serif;font-size:15px;padding:8px 0;color:#6b7280;">
-					No events scheduled for today — enjoy some free time.
-				</td></tr>`;
+			: `<tr><td>No events scheduled for today — enjoy some free time.</td></tr>`;
 
+	const digestClass = d.events.length > 0 ? 'digest' : 'digest digest--muted';
 	const body = `
 		<p class="lead">Hi ${recipientName}, here's what's on for today on <strong>${tripName}</strong>.</p>
-		<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px;">
+		<table role="presentation" class="${digestClass}" width="100%" cellspacing="0" cellpadding="0" border="0">
 			${eventRows}
 		</table>
 	`;

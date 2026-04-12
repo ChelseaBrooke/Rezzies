@@ -1,3 +1,4 @@
+import { BRAND } from '../brand.js';
 import { escapeHtml } from '../html-escape.js';
 import { renderEmailLayout, metaTable, metaRow } from './shared-layout.js';
 
@@ -35,8 +36,8 @@ export function renderTripInviteHtml(d: TripInviteEmailData): string {
 	`;
 
 	const subheadParts = [
-		`<strong style="color:#fff;">${tripName}</strong>`,
-		...(destination ? [`<br /><span style="opacity:0.95;">${destination}</span>`] : [])
+		`<strong style="color:${BRAND.heroText};">${tripName}</strong>`,
+		...(destination ? [`<br /><span style="color:${BRAND.heroSubtle};">${destination}</span>`] : [])
 	];
 
 	return renderEmailLayout({
@@ -47,7 +48,7 @@ export function renderTripInviteHtml(d: TripInviteEmailData): string {
 		body,
 		ctaUrl: d.inviteUrl,
 		ctaLabel: 'View your invite',
-		finePrint: `This link is personal to you. If you weren't expecting it, you can ignore this email.<br /><br /><span style="word-break:break-all;color:#2f7778;font-size:12px;">Button not working? Paste this into your browser:<br />${inviteUrl}</span>`,
+		finePrint: `This link is personal to you. If you weren't expecting it, you can ignore this email.<br /><br /><span style="word-break:break-all;color:${BRAND.primary};font-size:12px;">Button not working? Paste this into your browser:<br />${inviteUrl}</span>`,
 		footerNote: `You're receiving this because someone invited you to a trip on Divvi.`
 	});
 }

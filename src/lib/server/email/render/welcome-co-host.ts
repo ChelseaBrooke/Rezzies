@@ -15,7 +15,7 @@ export function renderWelcomeCoHostHtml(d: WelcomeCoHostEmailData): string {
 
 	const body = `
 		<p class="lead">Hi ${coHostName}, <strong>${hostName}</strong> has added you as a co-host of <strong>${tripName}</strong>.</p>
-		<p class="lead" style="margin-bottom:0">As co-host you can manage guests, assign rooms, and help run the trip dashboard.</p>
+		<p class="lead lead--tight">As co-host you can manage guests, assign rooms, and help run the trip dashboard.</p>
 	`;
 
 	return renderEmailLayout({

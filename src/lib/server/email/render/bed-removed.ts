@@ -13,7 +13,7 @@ export function renderBedRemovedHtml(d: BedRemovedEmailData): string {
 
 	const body = `
 		<p class="lead">Hi ${guestName}, a bed you had claimed on <strong>${tripName}</strong> has been removed by the host.</p>
-		<p class="lead" style="margin-bottom:0">Please log in and choose a new bed for your stay.</p>
+		<p class="lead lead--tight">Please log in and choose a new bed for your stay.</p>
 	`;
 
 	return renderEmailLayout({

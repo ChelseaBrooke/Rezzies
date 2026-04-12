@@ -1,5 +1,5 @@
 import { escapeHtml } from '../html-escape.js';
-import { BRAND, EMAIL_LOGO_URL } from '../brand.js';
+import { BRAND, resolveEmailLogoUrl } from '../brand.js';
 
 export interface EmailLayoutOptions {
 	/** Hidden preview text shown in inbox before email is opened. */
@@ -37,34 +37,51 @@ img{-ms-interpolation-mode:bicubic;border:0;height:auto;line-height:100%;outline
 body{margin:0!important;padding:0!important;width:100%!important}
 a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
 .wrap{background-color:${B.wrapBg}}
-.card{background-color:${B.cardBg};border-radius:16px;overflow:hidden;box-shadow:0 12px 40px ${B.cardShadow}}
-.accent-strip{height:4px;background:linear-gradient(90deg,${B.sky} 0%,${B.sand} 50%,${B.accent} 100%)}
-.hero-band{background:linear-gradient(135deg,${B.primary} 0%,${B.primaryDark} 48%,${B.primaryMid} 100%);padding:28px 32px 32px}
-.logo-mark{display:inline-block;font-family:${B.fontSerif};font-size:22px;font-weight:700;color:#f4f8f8;letter-spacing:-0.02em;margin-bottom:6px}
-.logo-img{display:block;max-height:32px;width:auto;margin-bottom:10px}
-.kicker{font-family:${B.fontSans};font-size:11px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:rgba(230,245,245,0.88);margin:0 0 10px}
-h1{font-family:${B.fontSerif};font-size:26px;line-height:1.25;font-weight:700;color:#ffffff;margin:0 0 8px;letter-spacing:-0.02em}
-.hero-sub{font-family:${B.fontSans};font-size:15px;line-height:1.5;color:rgba(255,255,255,0.92);margin:0}
+.card{background-color:${B.cardBg};border-radius:${B.radiusCard};overflow:hidden;border:1px solid ${B.cardBorder};box-shadow:${B.cardShadow}}
+.accent-strip{height:5px;background:linear-gradient(90deg,${B.sky} 0%,${B.sand} 38%,${B.carrot} 72%,${B.accent} 100%)}
+.hero-band{background:linear-gradient(135deg,${B.primaryDark} 0%,${B.primary} 50%,${B.primaryDark} 100%);padding:28px 32px 32px}
+.logo-mark{display:inline-block;font-family:${B.fontSerif};font-size:22px;font-weight:700;color:${B.logoMark};letter-spacing:-0.02em;margin-bottom:6px}
+.logo-img{display:block;max-height:36px;width:auto;margin-bottom:10px}
+.kicker{font-family:${B.fontSans};font-size:11px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:${B.heroMuted};margin:0 0 10px}
+h1{font-family:${B.fontSerif};font-size:26px;line-height:1.25;font-weight:700;color:${B.heroText};margin:0 0 8px;letter-spacing:-0.02em}
+.hero-sub{font-family:${B.fontSans};font-size:15px;line-height:1.55;color:${B.heroMuted};margin:0}
 .body-pad{padding:28px 32px 32px}
 .lead{font-family:${B.fontSans};font-size:16px;line-height:1.65;color:${B.textDark};margin:0 0 20px}
+.lead--tight{margin-bottom:0!important}
 .meta-table{width:100%;border-collapse:collapse;margin:0 0 24px}
 .meta-row td{font-family:${B.fontSans};font-size:14px;line-height:1.5;padding:10px 0;border-bottom:1px solid ${B.borderLight};color:${B.textBody}}
 .meta-label{font-weight:600;color:${B.primary};width:38%;padding-right:12px}
-.callout{background:${B.calloutBg};border:1.5px solid ${B.calloutBorder};border-radius:10px;padding:20px 24px;text-align:center;margin:0 0 24px}
+.digest{width:100%;border-collapse:collapse;margin:0 0 24px;border-spacing:0}
+.digest td{font-family:${B.fontSans};font-size:15px;padding:8px 0;color:${B.textBody};border-bottom:1px solid ${B.borderLight}}
+.digest tr:last-child td{border-bottom:none}
+.digest--muted td{color:${B.textLight};border-bottom:none!important}
+.callout{background:${B.calloutBg};border:1.5px solid ${B.calloutBorder};border-radius:${B.radiusCallout};padding:20px 24px;text-align:center;margin:0 0 24px}
 .callout-label{font-family:${B.fontSans};font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:${B.calloutLabel};margin:0 0 8px}
 .callout-value{font-family:${B.fontSerif};font-size:36px;font-weight:700;color:${B.primaryDark};line-height:1.2;margin:0 0 4px}
 .callout-note{font-family:${B.fontSans};font-size:13px;color:${B.textLight};margin:0}
 .btn-wrap{margin:8px 0 28px;text-align:center}
-.btn{display:inline-block;font-family:${B.fontSans};font-size:16px;font-weight:700;line-height:1;text-decoration:none!important;color:#ffffff!important;background-color:${B.accent};border-radius:10px;padding:15px 28px;box-shadow:0 4px 14px rgba(206,86,18,0.35)}
+.btn{display:inline-block;font-family:${B.fontSans};font-size:16px;font-weight:700;line-height:1;text-decoration:none!important;color:${B.heroText}!important;background-color:${B.accent};border-radius:${B.radiusBtn};padding:15px 28px;box-shadow:${B.ctaShadow}}
 .secondary-link{font-family:${B.fontSans};font-size:13px;color:${B.primary};text-align:center;display:block;margin:-12px 0 24px}
 .fine{font-family:${B.fontSans};font-size:13px;line-height:1.55;color:${B.textLight};margin:0 0 16px}
-.footer{font-family:${B.fontSans};font-size:12px;line-height:1.5;color:${B.textMuted};text-align:center;padding:0 24px 32px}
+.footer{font-family:${B.fontSans};font-size:12px;line-height:1.55;color:${B.textMuted};text-align:center;padding:0 24px 28px}
+.footer a{color:${B.primary}!important;text-decoration:underline!important}
 @media screen and (max-width:600px){.hero-band,.body-pad{padding-left:22px!important;padding-right:22px!important}h1{font-size:22px!important}.meta-label{width:42%}.callout-value{font-size:30px!important}}
 `;
 
 const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />`;
+
+function buildFooterHtml(footerNoteEscaped: string): string {
+	const appBase = (typeof process !== 'undefined' ? process.env.APP_BASE_URL?.trim() : '') ?? '';
+	const base = appBase.replace(/\/$/, '');
+	let linkLine = '';
+	if (base.length > 0) {
+		const href = escapeHtml(`${base}/`);
+		linkLine = `<br /><a href="${href}" target="_blank" rel="noopener">Open Divvi</a>`;
+	}
+	return `<p class="footer">${footerNoteEscaped}${linkLine}</p>`;
+}
 
 /** Wrap content in the standard Divvi coastal email template. */
 export function renderEmailLayout(opts: EmailLayoutOptions): string {
@@ -73,13 +90,12 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 	const heading = escapeHtml(opts.heading);
 	const subheading = opts.subheading ?? '';
 
-	const logoBlock = EMAIL_LOGO_URL
-		? `<img src="${escapeHtml(EMAIL_LOGO_URL)}" alt="${B.name}" class="logo-img" />`
+	const logoUrl = resolveEmailLogoUrl();
+	const logoBlock = logoUrl
+		? `<img src="${escapeHtml(logoUrl)}" alt="${B.name}" class="logo-img" />`
 		: `<div class="logo-mark">${B.name}</div>`;
 
-	const calloutBlock = opts.callout
-		? `<div class="callout">${opts.callout}</div>`
-		: '';
+	const calloutBlock = opts.callout ? `<div class="callout">${opts.callout}</div>` : '';
 
 	const ctaBlock =
 		opts.ctaUrl && opts.ctaLabel
@@ -96,9 +112,10 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 			: '';
 
 	const finePrint = opts.finePrint ? `<p class="fine">${opts.finePrint}</p>` : '';
-	const footerNote = opts.footerNote
+	const footerText = opts.footerNote
 		? escapeHtml(opts.footerNote)
-		: `Sent by ${B.name} · ${B.tagline}`;
+		: escapeHtml(`Sent by ${B.name} · ${B.tagline}`);
+	const footerHtml = buildFooterHtml(footerText);
 
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -106,6 +123,8 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<meta name="color-scheme" content="light" />
+	<meta name="supported-color-schemes" content="light" />
 	<title>${heading}</title>
 	${FONTS}
 	<style type="text/css">${CSS}</style>
@@ -135,7 +154,7 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 						</td>
 					</tr>
 				</table>
-				<p class="footer">${footerNote}</p>
+				${footerHtml}
 			</td>
 		</tr>
 	</table>

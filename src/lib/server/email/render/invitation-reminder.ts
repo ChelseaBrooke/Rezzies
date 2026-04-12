@@ -15,7 +15,7 @@ export function renderInvitationReminderHtml(d: InvitationReminderEmailData): st
 
 	const body = `
 		<p class="lead">Hi ${recipientName}, you haven't responded to <strong>${tripName}</strong> yet.</p>
-		<p class="lead" style="margin-bottom:0"><strong>${hostName}</strong> is waiting — spots may fill up soon.</p>
+		<p class="lead lead--tight"><strong>${hostName}</strong> is waiting — spots may fill up soon.</p>
 	`;
 
 	return renderEmailLayout({

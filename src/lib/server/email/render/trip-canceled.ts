@@ -12,7 +12,7 @@ export function renderTripCanceledHtml(d: TripCanceledEmailData): string {
 
 	const body = `
 		<p class="lead">Hi ${recipientName}, <strong>${tripName}</strong> has been canceled by the host.</p>
-		<p class="lead" style="margin-bottom:0">If you have any questions, please reach out to the host directly.</p>
+		<p class="lead lead--tight">If you have any questions, please reach out to the host directly.</p>
 	`;
 
 	return renderEmailLayout({

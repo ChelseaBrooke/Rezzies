@@ -13,7 +13,7 @@ export function renderRsvpUpdatedHtml(d: RsvpUpdatedEmailData): string {
 
 	const body = `
 		<p class="lead">Hi ${guestName}, your RSVP for <strong>${tripName}</strong> has been updated.</p>
-		<p class="lead" style="margin-bottom:0">If you didn't make this change, please contact your trip host.</p>
+		<p class="lead lead--tight">If you didn't make this change, please contact your trip host.</p>
 	`;
 
 	return renderEmailLayout({
