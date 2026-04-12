@@ -24,11 +24,13 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 		return json({ polls: [] }, { status: 200 });
 	}
 
-	// Polls that are open and that this user has not voted on
+	const now = new Date();
+	// Open, not past endAt, and this user has not voted
 	const pollsWithVotes = await prisma.poll.findMany({
 		where: {
 			tripId,
-			status: 'open'
+			status: 'open',
+			AND: [{ OR: [{ endAt: null }, { endAt: { gte: now } }] }]
 		},
 		orderBy: { createdAt: 'asc' },
 		include: {

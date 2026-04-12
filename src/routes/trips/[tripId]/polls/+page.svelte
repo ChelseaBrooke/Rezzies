@@ -213,6 +213,12 @@
 			{/if}
 		</div>
 
+		{#if data.pollsLoadError}
+			<p class="polls-load-error" role="alert">
+				We couldn’t load polls right now. Try refreshing the page. If it keeps happening, check back later.
+			</p>
+		{/if}
+
 		<!-- Filters -->
 		<div class="card-filters">
 			<PollFiltersBar
@@ -454,6 +460,14 @@
 		gap: 1rem;
 		padding: 1.75rem 2rem 1.25rem;
 		border-bottom: 1px solid #f0f2f5;
+	}
+	.polls-load-error {
+		margin: 0;
+		padding: 0.75rem 2rem;
+		font-size: 0.875rem;
+		color: #92400e;
+		background: #fffbeb;
+		border-bottom: 1px solid #fde68a;
 	}
 	.header-left { min-width: 0; }
 	.polls-title {

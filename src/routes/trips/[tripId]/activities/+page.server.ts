@@ -1,4 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
+import type { Prisma } from '@prisma/client';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { isTripMember, isTripHost } from '$lib/server/trip-access.js';
@@ -94,7 +95,7 @@ export const actions: Actions = {
 			const now = new Date();
 			const endAt = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 			try {
-				await (prisma.poll.create as any)({
+				await prisma.poll.create({
 					data: {
 						tripId,
 						createdById: user.id,
@@ -109,7 +110,8 @@ export const actions: Actions = {
 						activityDate: activityDate,
 						activityTime: time,
 						activityLocation: location || null,
-						activitySnapshot: activitySnapshot ?? undefined,
+						activitySnapshot:
+							activitySnapshot != null ? (activitySnapshot as Prisma.InputJsonValue) : undefined,
 						options: {
 							create: [
 								{ label: 'Add to itinerary', sortOrder: 0 },
