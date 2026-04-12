@@ -11,8 +11,8 @@ function getResendClient(): Resend {
 }
 
 function fromAddress(): string {
-	const email = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-	const name = process.env.RESEND_FROM_NAME || 'Divvi';
+	const email = process.env.RESEND_FROM_EMAIL || 'support@divvihq.com';
+	const name = process.env.RESEND_FROM_NAME || 'Divvi Support';
 	return `${name} <${email}>`;
 }
 

@@ -74,7 +74,7 @@ npm run db:dev
 - `DATABASE_URL` - PostgreSQL connection string (use **Connection pooling** in Supabase, port **6543**). Append `?pgbouncer=true` so Prisma works with the pooler (e.g. `...6543/postgres?pgbouncer=true`). Without this you may see "connection forcibly closed" (10054) or timeouts.
 - `DIRECT_URL` - PostgreSQL direct connection string (Supabase **Direct** connection, port **5432**; used for migrations only)
 - `RESEND_API_KEY` - Resend API key (`re_...`)
-- `RESEND_FROM_EMAIL` - Verified sender address (use `onboarding@resend.dev` for testing)
+- `RESEND_FROM_EMAIL` - Verified sender address (use `support@divviHQ.com` for testing)
 - `RESEND_FROM_NAME` - Display name for sender (optional)
 - `INTERNAL_API_KEY` - Secret key for protecting write endpoints
 - `APP_BASE_URL` - Base URL of your app (e.g., https://your-app.vercel.app)
