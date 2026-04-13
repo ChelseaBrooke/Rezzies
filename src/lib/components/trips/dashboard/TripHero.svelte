@@ -475,7 +475,7 @@
 		box-shadow: var(--shadow-soft);
 		height: 460px;
 		min-height: 460px;
-		background: var(--surface2);
+		background: var(--bg);
 		position: relative;
 		z-index: 0;
 		margin-bottom: 0;
@@ -792,16 +792,16 @@
 
 	@media (max-width: 640px) {
 		.compact-hero {
-			margin-left: -1rem;
-			margin-right: -1rem;
-			width: calc(100% + 2rem);
+			margin-left: -0.5rem;
+			margin-right: -0.5rem;
+			width: calc(100% + 1rem);
 			border-radius: 0;
 		}
 
 		.trip-hero {
-			margin-left: -1rem;
-			margin-right: -1rem;
-			width: calc(100% + 2rem);
+			margin-left: -0.5rem;
+			margin-right: -0.5rem;
+			width: calc(100% + 1rem);
 			border-radius: 0;
 			height: 280px;
 			min-height: 280px;

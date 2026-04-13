@@ -941,7 +941,7 @@
 		.main-content {
 			margin: 0;
 			height: 100vh;
-			padding: 0.65rem 1rem 0;
+			padding: 0.65rem 0.5rem 0;
 		}
 	}
 </style>

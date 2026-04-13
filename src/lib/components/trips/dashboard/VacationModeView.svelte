@@ -1067,21 +1067,34 @@
 	.v-quick-link:hover { background: rgba(47,119,120,0.11); }
 	.v-quick-link svg { color: var(--slate); flex-shrink: 0; }
 
-	/* ── Responsive ── */
+	/* ── Responsive ──
+	   Stack the Daily Assistant below 1100px so we do not reserve --v-right on
+	   the main column (that margin pushed the page scrollbar left of the screen edge). */
 	@media (max-width: 1100px) {
-		.v-grid { grid-template-columns: 1fr 1fr; }
-	}
-	@media (max-width: 900px) {
 		.v-main { display: flex; flex-direction: column; }
 		.v-assistant {
-			order: -1; position: static;
-			width: 100%; border-radius: var(--v-radius);
+			order: -1;
+			position: static;
+			width: 100%;
+			border-radius: var(--v-radius);
 			margin-bottom: var(--v-gap);
 			box-shadow: var(--v-lift);
 			border: 1px solid var(--border-soft);
 		}
-		.v-assistant-inner { padding: 1.5rem; }
-		.v-grid { margin-right: 0; padding-right: 0; grid-template-columns: 1fr; }
-		.v-day-badge { top: 1rem; right: 1rem; }
+		.v-assistant-inner {
+			padding: 1.5rem;
+		}
+		.v-grid {
+			margin-right: 0;
+			padding-right: 0;
+			grid-template-columns: 1fr;
+		}
+		.v-day-badge {
+			top: 1rem;
+			right: 1rem;
+		}
+		.v-hero-who {
+			right: 1.25rem;
+		}
 	}
 </style>
