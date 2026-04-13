@@ -4,7 +4,7 @@
 	import PollCardContainer from '$lib/components/trips/polls/PollCardContainer.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import { getTripGames, GAME_DEFS } from '$lib/stores/tripGames.js';
-	import type { TripGame } from '$lib/stores/tripGames.js';
+	import type { TripGame, GameDef } from '$lib/stores/tripGames.js';
 
 	interface Activity {
 		id: string;
@@ -27,6 +27,8 @@
 		bed?: { bedType: string | null } | null;
 		user?: { id: string; name: string | null; avatarUrl?: string | null } | null;
 		userId: string;
+		roomId?: number;
+		partySize?: number;
 	}
 	interface Rsvp {
 		status: string;
@@ -103,6 +105,9 @@
 				return (order[a.mealType] ?? 9) - (order[b.mealType] ?? 9);
 			})
 	);
+
+	const checkInTime = $derived(trip?.checkInTime ?? null);
+	const checkOutTime = $derived(trip?.checkOutTime ?? null);
 
 	type TodayEntry =
 		| { type: 'activity'; data: Activity }
@@ -211,13 +216,24 @@
 
 	const wifiName = $derived(trip?.wifiName ?? null);
 	const wifiPassword = $derived(trip?.wifiPassword ?? null);
-	const doorCode = $derived(trip?.doorCode ?? null);
 	const parkingNotes = $derived(trip?.parkingNotes ?? null);
 	const houseRules = $derived(trip?.houseRules ?? null);
-	const trashInstructions = $derived(trip?.trashInstructions ?? null);
-	const hasHouseInfo = $derived(
-		!!(wifiName || wifiPassword || doorCode || parkingNotes || houseRules || trashInstructions)
-	);
+
+	const houseCheckInDisplay = $derived((checkInTime ?? '').trim() ? formatTime12(checkInTime) : '');
+	const houseCheckOutDisplay = $derived((checkOutTime ?? '').trim() ? formatTime12(checkOutTime) : '');
+	const houseParkingDisplay = $derived((parkingNotes ?? '').trim());
+	const houseAddressDisplay = $derived(address);
+	const houseRulesLines = $derived.by((): string[] => {
+		const raw = (houseRules ?? '').trim();
+		if (!raw) return [];
+		const byNl = raw.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+		if (byNl.length > 1) return byNl;
+		const bySemi = raw.split(/\s*;\s*/).map((l) => l.trim()).filter(Boolean);
+		if (bySemi.length > 1) return bySemi;
+		const byBullet = raw.split(/\s*•\s*|\s*[·•]\s*/).map((l) => l.trim()).filter(Boolean);
+		if (byBullet.length > 1) return byBullet;
+		return [raw];
+	});
 
 	const totalInvited = $derived(members.length);
 	const arrivedCount = $derived(yesRsvps.length);
@@ -230,35 +246,86 @@
 				: ''
 	);
 	const coverPhoto = $derived(trip?.listingCoverPhoto ?? null);
-	const checkInTime = $derived(trip?.checkInTime ?? null);
-	const checkOutTime = $derived(trip?.checkOutTime ?? null);
 
-	// First room photo for current user (my room)
+	function firstToken(name: string | null | undefined): string {
+		const s = name?.trim();
+		if (!s) return '';
+		return (s.split(/\s+/)[0] ?? s).trim();
+	}
+
+	function formatBedDisplay(raw: string | null | undefined): string {
+		const s = raw?.trim();
+		if (!s) return '';
+		const lower = s.toLowerCase();
+		return lower.charAt(0).toUpperCase() + lower.slice(1);
+	}
+
+	/** Second guest first name when full name lists two people (e.g. "Chelsea & Brett Smith"). */
+	function secondGuestFirstFromCombinedName(full: string | null | undefined): string {
+		const s = full?.trim();
+		if (!s) return '';
+		const parts = s.split(/\s*(?:&|\+|\/|,|\band\b)\s*/i).filter(Boolean);
+		if (parts.length < 2) return '';
+		return firstToken(parts[1]);
+	}
+
+	// First room photo for current user (my room); host: any guest room photo as preview
 	const myRoomPhoto = $derived.by(() => {
 		for (const a of myAssignments ?? []) {
 			const url = a.room?.photoUrls?.[0];
 			if (url) return url;
 		}
-		return myAssignment?.room?.photoUrls?.[0] ?? null;
+		const mine = myAssignment?.room?.photoUrls?.[0];
+		if (mine) return mine;
+		if (isHost) {
+			for (const a of roomAssignments ?? []) {
+				const url = a.room?.photoUrls?.[0];
+				if (url) return url;
+			}
+		}
+		return null;
 	});
 	const myRoomName = $derived(myAssignment?.room?.name ?? (myAssignments?.[0]?.room?.name) ?? null);
 	const myBedType = $derived(myAssignment?.bed?.bedType ?? (myAssignments?.[0]?.bed?.bedType) ?? null);
-	const hasMyRoom = $derived(!!(myRoomName || myBedType || myAssignments?.length || myAssignment));
-	/** e.g. "Bedroom 1 - queen" */
-	const myRoomAndBed = $derived.by(() => {
-		const name = myRoomName?.trim() || 'Room';
-		const bed = myBedType?.trim();
-		return bed ? `${name} – ${bed.toLowerCase()}` : name;
-	});
-	/** e.g. "Me & TJ" style: current user name + " & X other(s)" when party > 1 */
-	const myPartyLabel = $derived.by(() => {
-		const name = currentUserName?.trim() || 'Me';
+	const primaryAssignment = $derived(myAssignment ?? myAssignments?.[0] ?? null);
+	const stayPartySize = $derived.by(() => {
+		const ps = primaryAssignment?.partySize;
+		if (typeof ps === 'number' && ps > 0) return ps;
 		const adults = userRsvp?.adultsCount ?? 1;
 		const kids = userRsvp?.kidsCount ?? 0;
-		const total = adults + kids;
-		if (total <= 1) return 'Me';
-		const others = total - 1;
-		return others === 1 ? `${name} & 1 other` : `${name} & ${others} others`;
+		return Math.max(1, adults + kids);
+	});
+	const stayPrimaryFirst = $derived(firstToken(currentUserName) || (isHost ? 'Host' : 'Guest'));
+	const stayPlusFirst = $derived(secondGuestFirstFromCombinedName(currentUserName));
+	const stayShowPlusSlot = $derived(stayPartySize > 1 || !!stayPlusFirst);
+	/** Human-readable room name only; omit awkward aggregates (e.g. host with many rooms). */
+	const stayRoomValue = $derived.by(() => {
+		if (isHost) {
+			const ids = new Set((roomAssignments ?? []).map((a) => a.roomId).filter((id) => id != null));
+			if (ids.size !== 1) return '';
+			return roomAssignments.find((a) => a.room?.name?.trim())?.room?.name?.trim() ?? '';
+		}
+		return myRoomName?.trim() ?? '';
+	});
+	const stayBedValue = $derived(isHost ? '' : formatBedDisplay(myBedType));
+	const stayPartyValue = $derived(String(stayPartySize));
+	const stayCheckInValue = $derived((checkInTime ?? '').trim() ? formatTime12(checkInTime) : '');
+	const stayCheckOutValue = $derived((checkOutTime ?? '').trim() ? formatTime12(checkOutTime) : '');
+	const stayGuestLine = $derived.by(() => {
+		const a = stayPrimaryFirst;
+		if (!stayShowPlusSlot) return a;
+		const b = stayPlusFirst;
+		if (b) return `${a} + ${b}`;
+		return `${a} +`;
+	});
+	/** Single polished line: bed + party (e.g. "Queen bed · 2 guests"). */
+	const stayBedPartySummary = $derived.by(() => {
+		const n = stayPartySize;
+		const guestWord = n === 1 ? 'guest' : 'guests';
+		const partyPart = `${n} ${guestWord}`;
+		const bed = (stayBedValue ?? '').trim();
+		if (bed) return `${bed} · ${partyPart}`;
+		return partyPart;
 	});
 
 	// Trip games: use server data when passed, else fall back to client store (e.g. legacy)
@@ -384,113 +451,131 @@
 	<div class="v-main">
 		<div class="v-grid">
 
-			<!-- ROW 1: My Stay (full width) -->
-			<section class="v-tile v-tile--tripinfo v-tile--combined">
-				<h3 class="v-tile-heading">My Stay</h3>
-				<div class="v-ti-rows">
-					<div class="v-ti-row v-ti-row--check">
-						<span class="v-ti-label">Check-in & out</span>
-						<div class="v-ti-time-chips">
-							<span class="v-ti-time-chip">
-								<span class="v-ti-time-dot in" aria-hidden="true"></span>
-								<span class="v-ti-time-dir">In</span>
-								{checkInTime?.trim() || '—'}
-							</span>
-							<span class="v-ti-time-chip">
-								<span class="v-ti-time-dot out" aria-hidden="true"></span>
-								<span class="v-ti-time-dir">Out</span>
-								{checkOutTime?.trim() || '—'}
-							</span>
-						</div>
+			<!-- My Stay — primary reservation card (warmer, more composed than House Info) -->
+			<section class="v-tile v-suite-stay" aria-labelledby="v-stay-title">
+				<header class="v-suite-head v-suite-head--stay">
+					<h2 class="v-suite-head-title" id="v-stay-title">My Stay</h2>
+					<p class="v-suite-head-dek">Your room and reservation details</p>
+				</header>
+
+				<div class="v-suite-stay-main">
+					<figure class="v-suite-stay-figure">
+						{#if myRoomPhoto}
+							<img src={myRoomPhoto} alt="" class="v-suite-stay-img" />
+						{:else}
+							<div class="v-suite-stay-placeholder" aria-hidden="true">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="40"
+									height="40"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<path d="M3 10.5V20a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-9.5" />
+									<path d="M3 10.5 12 4l9 6.5" />
+									<path d="M9 21v-6h6v6" />
+								</svg>
+							</div>
+						{/if}
+					</figure>
+					<div class="v-suite-stay-panel">
+						<p class="v-suite-stay-room" class:v-suite-stay-room--empty={!stayRoomValue}>
+							{stayRoomValue || '\u2014'}
+						</p>
+						<p
+							class="v-suite-stay-guests"
+							class:v-suite-stay-guests--placeholder={stayShowPlusSlot && !stayPlusFirst}
+						>
+							{stayGuestLine}
+						</p>
+						<p class="v-suite-stay-summary" aria-label="Bed and party size">{stayBedPartySummary}</p>
 					</div>
-					<div class="v-ti-row">
-						<span class="v-ti-label">My room & bed</span>
-						<span class="v-ti-val">
-							{#if isHost}
-								{roomAssignments.length > 0 ? `${roomAssignments.length} room${roomAssignments.length === 1 ? '' : 's'} assigned` : '—'}
-								<a href="/trips/{tripId}/rooms" class="v-ti-link">View →</a>
-							{:else if hasMyRoom}
-								{myRoomAndBed}
-								<a href="/trips/{tripId}/rooms" class="v-ti-link">View →</a>
-							{:else}
-								<span class="v-muted">Not assigned yet</span>
-								<a href="/trips/{tripId}/rooms" class="v-ti-link">View →</a>
-							{/if}
-						</span>
+				</div>
+
+				<div class="v-suite-stay-times" aria-label="Arrival and departure times">
+					<div class="v-suite-stay-time">
+						<span class="v-suite-stay-time-k">Check-in</span>
+						<span class="v-suite-stay-time-v" class:v-suite-stay-time-v--empty={!stayCheckInValue}
+							>{stayCheckInValue || '\u2014'}</span
+						>
 					</div>
-					<div class="v-ti-row">
-						<span class="v-ti-label">My Party</span>
-						<span class="v-ti-val">{myPartyLabel}</span>
-					</div>
-					<div class="v-ti-row">
-						<span class="v-ti-label">Parking</span>
-						<span class="v-ti-val">{(trip?.parkingNotes ?? '').trim() || '—'}</span>
-					</div>
-					<div class="v-ti-row">
-						<span class="v-ti-label">House rules</span>
-						<span class="v-ti-val v-ti-clamp">{(trip?.houseRules ?? '').trim() || '—'}</span>
+					<div class="v-suite-stay-time">
+						<span class="v-suite-stay-time-k">Check-out</span>
+						<span class="v-suite-stay-time-v" class:v-suite-stay-time-v--empty={!stayCheckOutValue}
+							>{stayCheckOutValue || '\u2014'}</span
+						>
 					</div>
 				</div>
 			</section>
 
-			<!-- ROW 2: Trip Games (full width) -->
-			{#if tripGamesList.length > 0}
-				<section class="v-tile v-tile--games v-tile--combined">
-					<div class="v-games-header">
-						<h3 class="v-tile-heading">🎲 Trip Games</h3>
-						<span class="v-games-desc">These are games that have been added to your trip for all guests to play. Click one to be directed to the game page.</span>
-					</div>
-					<div class="v-games-grid">
-						{#each tripGamesList as tg}
-							{@const def = gameDef(tg)}
-							<a href="/trips/{tripId}/games?tab={tg.gameId}" class="v-game-tile v-game-tile--{tg.gameId}" data-trip-game-id={tg.id}>
-								<span class="v-game-tile-icon">{def?.icon ?? '🎮'}</span>
-								<span class="v-game-tile-name">{gameDisplayName(tg)}</span>
-							</a>
-						{/each}
-					</div>
-				</section>
-			{/if}
+			<!-- House Info — secondary guest guide (quieter, flatter) -->
+			<section class="v-tile v-suite-house" aria-labelledby="v-house-title">
+				<header class="v-suite-head v-suite-head--quiet">
+					<h2 class="v-suite-head-title" id="v-house-title">House Info</h2>
+					<p class="v-suite-head-dek">Everything you need during your stay</p>
+				</header>
 
-			<!-- ROW 3: House Info (if present, wifi, door code, etc.) -->
-			{#if hasHouseInfo}
-				<section class="v-tile v-tile--house">
-					<h3 class="v-tile-heading">🏠 House Info</h3>
-					{#if wifiName || wifiPassword}
-						<details class="v-acc">
-							<summary><span>📶</span> WiFi</summary>
-							<div class="v-acc-body">
-								{#if wifiName}<p><strong>Network:</strong> {wifiName}</p>{/if}
-								{#if wifiPassword}<p><strong>Password:</strong> {wifiPassword}</p>{/if}
-							</div>
-						</details>
+				<div class="v-suite-house-grid">
+					<div class="v-suite-kv">
+						<span class="v-suite-k">Check-in</span>
+						<span class="v-suite-v" class:v-suite-v--empty={!houseCheckInDisplay}>{houseCheckInDisplay || '\u2014'}</span>
+					</div>
+					<div class="v-suite-kv">
+						<span class="v-suite-k">Check-out</span>
+						<span class="v-suite-v" class:v-suite-v--empty={!houseCheckOutDisplay}>{houseCheckOutDisplay || '\u2014'}</span>
+					</div>
+					<div class="v-suite-kv v-suite-span2">
+						<span class="v-suite-k">Parking</span>
+						<span class="v-suite-v" class:v-suite-v--empty={!houseParkingDisplay}>{houseParkingDisplay || '\u2014'}</span>
+					</div>
+					<div class="v-suite-kv v-suite-span2 v-suite-kv--wifi">
+						<span class="v-suite-k">Wi-Fi</span>
+						<div class="v-suite-wifi-lines">
+							<p class="v-suite-wifi-line">
+								<span class="v-suite-wifi-label">Network</span>
+								<span class="v-suite-v" class:v-suite-v--empty={!(wifiName ?? '').trim()}
+									>{(wifiName ?? '').trim() || '\u2014'}</span
+								>
+							</p>
+							<p class="v-suite-wifi-line">
+								<span class="v-suite-wifi-label">Password</span>
+								<span class="v-suite-v" class:v-suite-v--empty={!(wifiPassword ?? '').trim()}
+									>{(wifiPassword ?? '').trim() || '\u2014'}</span
+								>
+							</p>
+						</div>
+					</div>
+					<div class="v-suite-kv v-suite-span2">
+						<span class="v-suite-k">Address</span>
+						{#if houseAddressDisplay}
+							{#if mapsUrl}
+								<a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="v-suite-v v-suite-link">{houseAddressDisplay}</a>
+							{:else}
+								<span class="v-suite-v">{houseAddressDisplay}</span>
+							{/if}
+						{:else}
+							<span class="v-suite-v v-suite-v--empty">{'\u2014'}</span>
+						{/if}
+					</div>
+				</div>
+
+				<div class="v-suite-rules">
+					<h3 class="v-suite-rules-title" id="v-house-rules-heading">House rules</h3>
+					{#if houseRulesLines.length > 0}
+						<ul class="v-suite-rules-list" aria-labelledby="v-house-rules-heading">
+							{#each houseRulesLines as line}
+								<li>{line}</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="v-suite-rules-empty">Nothing listed yet. Your host may share notes before you arrive.</p>
 					{/if}
-					{#if doorCode}
-						<details class="v-acc">
-							<summary><span>🔑</span> Door code</summary>
-							<div class="v-acc-body"><p>{doorCode}</p></div>
-						</details>
-					{/if}
-					{#if parkingNotes}
-						<details class="v-acc">
-							<summary><span>🅿️</span> Parking</summary>
-							<div class="v-acc-body"><p>{parkingNotes}</p></div>
-						</details>
-					{/if}
-					{#if trashInstructions}
-						<details class="v-acc">
-							<summary><span>🗑️</span> Trash</summary>
-							<div class="v-acc-body"><p>{trashInstructions}</p></div>
-						</details>
-					{/if}
-					{#if houseRules}
-						<details class="v-acc">
-							<summary><span>📋</span> House rules</summary>
-							<div class="v-acc-body"><p>{houseRules}</p></div>
-						</details>
-					{/if}
-				</section>
-			{/if}
+				</div>
+			</section>
 		</div>
 
 		<!-- RIGHT: Daily Assistant sidebar -->
@@ -561,24 +646,31 @@
 					<a href="/trips/{tripId}/itinerary" class="v-today-link">View full itinerary →</a>
 				</section>
 
-				<!-- Quick nav links -->
-				<div class="v-quick-links">
-					<p class="v-quick-title">Quick Links</p>
-					<a href="/trips/{tripId}/polls" class="v-quick-link">
-						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-						Polls
-					</a>
-					{#if tripGamesList.length > 0}
-						<a href="/trips/{tripId}/games" class="v-quick-link">
-							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3h-4m2-2v4"/><circle cx="8" cy="14" r="1" fill="currentColor"/><circle cx="12" cy="14" r="1" fill="currentColor"/><circle cx="16" cy="14" r="1" fill="currentColor"/></svg>
-							Games
-						</a>
+				<!-- Today's games (same tiles as main Trip Games; vacation sidebar) -->
+				<section class="v-today" aria-labelledby="v-assistant-games-heading">
+					<h3 class="v-today-heading" id="v-assistant-games-heading">Today's games</h3>
+					{#if tripGamesList.length === 0}
+						<div class="v-today-empty">
+							<span class="v-today-empty-icon" aria-hidden="true">🎲</span>
+							<p>No games on this trip yet.</p>
+						</div>
+					{:else}
+						<div class="v-games-grid v-games-grid--assistant">
+							{#each tripGamesList as tg}
+								{@const def = gameDef(tg)}
+								<a
+									href="/trips/{tripId}/games?tab={tg.gameId}"
+									class="v-game-tile v-game-tile--{tg.gameId}"
+									data-trip-game-id={tg.id}
+								>
+									<span class="v-game-tile-icon">{def?.icon ?? '🎮'}</span>
+									<span class="v-game-tile-name">{gameDisplayName(tg)}</span>
+								</a>
+							{/each}
+						</div>
 					{/if}
-					<a href="/trips/{tripId}/rooms" class="v-quick-link">
-						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/></svg>
-						Rooms
-					</a>
-				</div>
+					<a href="/trips/{tripId}/games" class="v-today-link">All games →</a>
+				</section>
 			</div>
 		</aside>
 	</div>
@@ -734,13 +826,19 @@
 		display: block; position: relative; min-height: 0;
 	}
 
-	/* ── Left: 2-col grid ── */
+	/* ── Left: My Stay + House Info side by side (stack on narrow viewports) ── */
 	.v-grid {
 		display: grid;
-		grid-template-columns: 2fr 3fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: var(--v-gap);
 		padding-right: 1.5rem;
 		margin-right: var(--v-right);
+		align-items: stretch;
+	}
+	@media (max-width: 900px) {
+		.v-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	/* ── Shared tile ── */
@@ -758,8 +856,335 @@
 		font-family: 'Fraunces', Georgia, serif;
 		font-size: 0.9375rem; font-weight: 600; color: var(--text);
 	}
-	.v-tile--combined { grid-column: 1 / -1; }
-	.v-tile--house { grid-column: 1 / -1; }
+	/* ── My Stay (primary): warmer, deeper, more composed ── */
+	.v-tile.v-suite-stay {
+		display: flex;
+		flex-direction: column;
+		gap: 1.3rem;
+		padding: 1.5rem 1.55rem 1.55rem;
+		border-radius: 18px;
+		background: linear-gradient(158deg, #fffbf7 0%, #fdf5eb 38%, #f6ebe0 100%);
+		border: 1px solid rgba(118, 78, 48, 0.12);
+		box-shadow:
+			0 1px 0 rgba(255, 255, 255, 0.98) inset,
+			0 0 0 1px rgba(255, 255, 255, 0.45) inset,
+			0 18px 44px rgba(48, 32, 22, 0.11),
+			0 6px 16px rgba(48, 32, 22, 0.07);
+		transition: transform 180ms ease, box-shadow 180ms ease;
+	}
+	.v-tile.v-suite-stay:hover {
+		transform: translateY(-2px);
+		box-shadow:
+			0 1px 0 rgba(255, 255, 255, 0.98) inset,
+			0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+			0 22px 50px rgba(48, 32, 22, 0.13),
+			0 8px 20px rgba(48, 32, 22, 0.08);
+	}
+
+	/* ── House Info (secondary): flatter, lower contrast, utility guide ── */
+	.v-tile.v-suite-house {
+		display: flex;
+		flex-direction: column;
+		gap: 0.85rem;
+		padding: 1.1rem 1.2rem 1.15rem;
+		border-radius: var(--v-radius);
+		background: #f7f6f4;
+		border: 1px solid rgba(62, 58, 52, 0.07);
+		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 6px 22px rgba(30, 28, 26, 0.04);
+		transition: transform 180ms ease, box-shadow 180ms ease;
+	}
+	.v-tile.v-suite-house:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 10px 28px rgba(30, 28, 26, 0.06);
+	}
+
+	.v-suite-head {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.v-suite-head-title {
+		margin: 0;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.0625rem;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		line-height: 1.2;
+		color: #152a2c;
+	}
+	.v-suite-head--stay .v-suite-head-title {
+		font-size: 1.1875rem;
+		letter-spacing: -0.028em;
+		color: #102428;
+	}
+	.v-suite-head--stay .v-suite-head-dek {
+		color: rgba(48, 42, 38, 0.52);
+	}
+	.v-suite-head--quiet .v-suite-head-title {
+		font-size: 0.9375rem;
+		font-weight: 600;
+		color: rgba(38, 44, 43, 0.78);
+	}
+	.v-suite-head--quiet .v-suite-head-dek {
+		font-size: 0.75rem;
+		color: rgba(38, 44, 43, 0.4);
+	}
+	.v-suite-head-dek {
+		margin: 0;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		line-height: 1.45;
+		color: rgba(42, 49, 48, 0.5);
+		max-width: 28rem;
+	}
+	.v-suite-kv {
+		display: flex;
+		flex-direction: column;
+		gap: 0.22rem;
+		min-width: 0;
+	}
+	.v-suite-k {
+		font-size: 0.6875rem;
+		font-weight: 500;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: rgba(42, 49, 48, 0.4);
+	}
+	.v-suite-v {
+		margin: 0;
+		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		font-size: 0.9375rem;
+		font-weight: 600;
+		line-height: 1.45;
+		color: #1a2322;
+		word-break: break-word;
+	}
+	.v-suite-v--empty {
+		color: rgba(26, 35, 34, 0.38);
+		font-weight: 500;
+	}
+	.v-tile.v-suite-house .v-suite-v {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: rgba(34, 40, 39, 0.86);
+	}
+	.v-tile.v-suite-house .v-suite-k {
+		font-size: 0.625rem;
+		letter-spacing: 0.07em;
+		color: rgba(38, 44, 43, 0.34);
+	}
+	.v-tile.v-suite-house .v-suite-v--empty {
+		color: rgba(34, 40, 39, 0.32);
+	}
+	.v-tile.v-suite-house .v-suite-wifi-label {
+		color: rgba(38, 44, 43, 0.36);
+	}
+	.v-suite-link {
+		color: #1a3d3f;
+		text-decoration: none;
+		border-bottom: 1px solid rgba(47, 119, 120, 0.25);
+		transition: color 0.15s ease, border-color 0.15s ease;
+	}
+	.v-suite-link:hover {
+		color: var(--primary);
+		border-bottom-color: rgba(47, 119, 120, 0.45);
+	}
+	.v-tile.v-suite-house .v-suite-link {
+		color: rgba(34, 40, 39, 0.88);
+		border-bottom-color: rgba(47, 119, 120, 0.16);
+	}
+
+	/* My Stay: photo + tinted summary panel */
+	.v-suite-stay-main {
+		display: grid;
+		grid-template-columns: minmax(11rem, 42%) minmax(0, 1fr);
+		gap: 1.15rem 1.25rem;
+		align-items: stretch;
+	}
+	@media (max-width: 520px) {
+		.v-suite-stay-main {
+			grid-template-columns: 1fr;
+		}
+	}
+	.v-suite-stay-figure {
+		margin: 0;
+		border-radius: 16px;
+		overflow: hidden;
+		aspect-ratio: 4 / 3;
+		background: linear-gradient(145deg, #e6d9cc 0%, #d4c4b4 55%, #c9b8a6 100%);
+		box-shadow:
+			0 0 0 1px rgba(92, 62, 40, 0.12) inset,
+			0 10px 28px rgba(42, 28, 18, 0.12);
+		align-self: start;
+	}
+	.v-suite-stay-img {
+		width: 100%;
+		height: 100%;
+		min-height: 9rem;
+		object-fit: cover;
+		display: block;
+	}
+	.v-suite-stay-placeholder {
+		min-height: 9rem;
+		aspect-ratio: 4 / 3;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: rgba(72, 52, 36, 0.28);
+	}
+	.v-suite-stay-panel {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: 0;
+		padding: 1rem 1.1rem 1.05rem;
+		border-radius: 14px;
+		background: linear-gradient(180deg, rgba(255, 252, 248, 0.92) 0%, rgba(250, 242, 232, 0.55) 100%);
+		box-shadow: 0 0 0 1px rgba(118, 78, 48, 0.07) inset;
+	}
+	.v-suite-stay-room {
+		margin: 0 0 0.45rem;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: clamp(1.28rem, 2.6vw, 1.58rem);
+		font-weight: 600;
+		letter-spacing: -0.035em;
+		line-height: 1.14;
+		color: #0e2224;
+		word-break: break-word;
+	}
+	.v-suite-stay-room--empty {
+		color: rgba(14, 34, 36, 0.34);
+		font-weight: 600;
+	}
+	.v-suite-stay-guests {
+		margin: 0 0 0.65rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		line-height: 1.45;
+		color: rgba(42, 38, 34, 0.72);
+	}
+	.v-suite-stay-guests--placeholder {
+		color: rgba(42, 38, 34, 0.52);
+	}
+	.v-suite-stay-summary {
+		margin: 0;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		letter-spacing: 0.03em;
+		color: rgba(52, 44, 38, 0.68);
+		line-height: 1.45;
+	}
+	.v-suite-stay-times {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.75rem 1.25rem;
+		padding: 0.95rem 1.1rem;
+		border-radius: 14px;
+		background: rgba(88, 56, 32, 0.065);
+		box-shadow: 0 0 0 1px rgba(88, 56, 32, 0.06) inset;
+	}
+	.v-suite-stay-time {
+		display: flex;
+		flex-direction: column;
+		gap: 0.18rem;
+		min-width: 0;
+	}
+	.v-suite-stay-time-k {
+		font-size: 0.625rem;
+		font-weight: 500;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: rgba(48, 42, 38, 0.42);
+	}
+	.v-suite-stay-time-v {
+		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		font-size: 0.9375rem;
+		font-weight: 600;
+		line-height: 1.35;
+		color: #1a2322;
+	}
+	.v-suite-stay-time-v--empty {
+		color: rgba(26, 35, 34, 0.36);
+		font-weight: 500;
+	}
+
+	/* House Info: compact two-column essentials + rules */
+	.v-suite-house-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem 1.25rem;
+	}
+	@media (max-width: 560px) {
+		.v-suite-house-grid {
+			grid-template-columns: 1fr;
+		}
+		.v-suite-span2 {
+			grid-column: auto;
+		}
+	}
+	.v-suite-span2 {
+		grid-column: 1 / -1;
+	}
+	.v-suite-kv--wifi .v-suite-wifi-lines {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		margin-top: 0.05rem;
+	}
+	.v-suite-wifi-line {
+		margin: 0;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.35rem 0.55rem;
+		line-height: 1.45;
+	}
+	.v-suite-wifi-label {
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: rgba(42, 49, 48, 0.45);
+		min-width: 4.25rem;
+	}
+	.v-tile.v-suite-house .v-suite-rules {
+		padding-top: 0.75rem;
+		margin-top: 0.1rem;
+		border-top: 1px solid rgba(62, 58, 52, 0.08);
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+	.v-suite-rules-title {
+		margin: 0;
+		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: rgba(38, 44, 43, 0.38);
+	}
+	.v-suite-rules-list {
+		margin: 0;
+		padding: 0 0 0 0.85rem;
+		border-left: 2px solid rgba(47, 119, 120, 0.14);
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.v-suite-rules-list li {
+		font-size: 0.84375rem;
+		font-weight: 500;
+		line-height: 1.52;
+		color: rgba(34, 40, 39, 0.82);
+	}
+	.v-suite-rules-empty {
+		margin: 0;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		line-height: 1.5;
+		color: rgba(38, 44, 43, 0.44);
+	}
 	.v-tile--full { grid-column: 1 / -1; }
 
 	/* ── Pills ── */
@@ -823,25 +1248,14 @@
 		border: none;
 	}
 
-	/* ── Trip Games tile (full-width) ── */
-	.v-tile--games {
-		display: flex; flex-direction: column; gap: 0.875rem;
-		background: var(--surfaceSolid);
-	}
-	.v-games-header {
-		display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;
-	}
-	.v-games-header .v-tile-heading { margin-bottom: 0; flex-shrink: 0; }
-	.v-games-desc {
-		font-size: 0.8125rem; color: var(--muted); line-height: 1.45;
-		border-left: 1px solid var(--border);
-		padding-left: 0.75rem;
-	}
 	.v-games-grid {
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: center;
 		gap: 0.5rem;
+	}
+	.v-games-grid--assistant {
+		justify-content: flex-start;
 	}
 	.v-game-tile {
 		display: flex; flex-direction: column;
@@ -870,70 +1284,6 @@
 		-webkit-line-clamp: 2; -webkit-box-orient: vertical;
 	}
 
-	/* ── Trip Info tile (compact key-value rows, half-width) ── */
-	.v-tile--tripinfo { display: flex; flex-direction: column; gap: 0.5rem; }
-	.v-ti-rows { display: flex; flex-direction: column; gap: 0; }
-	.v-ti-row {
-		display: grid; grid-template-columns: 6.5rem 1fr;
-		align-items: baseline; gap: 0.5rem 0.75rem;
-		padding: 0.4rem 0;
-		border-bottom: 1px solid var(--border-soft);
-	}
-	.v-ti-row:last-child { border-bottom: none; }
-	.v-ti-row--check { align-items: center; }
-	.v-ti-time-chips {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-	}
-	.v-ti-time-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: var(--text);
-		background: var(--surface2);
-		border: 1px solid var(--border-soft);
-		border-radius: 6px;
-		padding: 0.25rem 0.625rem;
-		width: fit-content;
-	}
-	.v-ti-time-dot {
-		width: 5px;
-		height: 5px;
-		border-radius: 50%;
-		flex-shrink: 0;
-	}
-	.v-ti-time-dot.in { background: #22c55e; }
-	.v-ti-time-dot.out { background: #f97316; }
-	.v-ti-time-dir {
-		font-size: 0.5625rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--muted);
-	}
-	.v-ti-label {
-		font-size: 0.625rem; font-weight: 700; text-transform: uppercase;
-		letter-spacing: 0.07em; color: var(--muted);
-		white-space: nowrap; flex-shrink: 0;
-	}
-	.v-ti-val {
-		font-size: 0.875rem; color: var(--text); line-height: 1.45;
-		display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
-	}
-	.v-ti-clamp {
-		overflow: hidden; display: -webkit-box;
-		-webkit-line-clamp: 2; -webkit-box-orient: vertical;
-	}
-	.v-ti-link {
-		font-size: 0.75rem; font-weight: 600; color: var(--slate);
-		text-decoration: none; white-space: nowrap;
-	}
-	.v-ti-link:hover { text-decoration: underline; }
-	.v-tripinfo-link { font-size: 0.875rem; color: var(--slate); font-weight: 500; text-decoration: none; }
-	.v-tripinfo-link:hover { text-decoration: underline; }
 	.v-badge {
 		padding: 0.15rem 0.5rem; border-radius: 9999px;
 		background: rgba(47,119,120,0.1); color: var(--slate);
@@ -941,18 +1291,6 @@
 	}
 
 	/* ── House Info accordion ── */
-	.v-acc { border-bottom: 1px solid var(--border-soft); }
-	.v-acc:last-child { border-bottom: none; }
-	.v-acc summary {
-		display: flex; align-items: center; gap: 0.5rem;
-		padding: 0.625rem 0; font-size: 0.875rem; font-weight: 600;
-		color: var(--text); cursor: pointer; list-style: none;
-	}
-	.v-acc summary::-webkit-details-marker { display: none; }
-	.v-acc summary span { font-size: 1rem; }
-	.v-acc-body { padding: 0 0 0.75rem 1.5rem; }
-	.v-acc-body p { margin: 0 0 0.25rem; font-size: 0.875rem; color: var(--muted); line-height: 1.5; }
-
 	/* ── Right: Daily Assistant ── */
 	.v-assistant {
 		position: fixed; top: 0; right: 0; bottom: 0;
@@ -1001,6 +1339,9 @@
 		padding: 1rem 1.125rem;
 		display: flex; flex-direction: column;
 	}
+	.v-assistant-inner > .v-today ~ .v-today {
+		margin-top: 0;
+	}
 	.v-today-heading {
 		margin: 0 0 0.75rem;
 		font-family: 'Fraunces', Georgia, serif;
@@ -1047,25 +1388,6 @@
 		text-decoration: none;
 	}
 	.v-today-link:hover { text-decoration: underline; }
-
-	/* Quick links */
-	.v-quick-links { display: flex; flex-direction: column; gap: 0.3rem; }
-	.v-quick-title {
-		font-size: 0.625rem; font-weight: 700; text-transform: uppercase;
-		letter-spacing: 0.07em; color: var(--muted); margin: 0 0 0.25rem;
-	}
-	.v-quick-link {
-		display: inline-flex; align-items: center; gap: 0.5rem;
-		padding: 0.5rem 0.75rem;
-		border-radius: 10px;
-		font-size: 0.875rem; font-weight: 500;
-		color: var(--text); text-decoration: none;
-		background: rgba(47,119,120,0.05);
-		border: 1px solid rgba(47,119,120,0.08);
-		transition: background 140ms ease;
-	}
-	.v-quick-link:hover { background: rgba(47,119,120,0.11); }
-	.v-quick-link svg { color: var(--slate); flex-shrink: 0; }
 
 	/* ── Responsive ──
 	   Stack the Daily Assistant below 1100px so we do not reserve --v-right on

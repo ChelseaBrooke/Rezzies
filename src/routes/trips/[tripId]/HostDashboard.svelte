@@ -102,6 +102,7 @@
 	const hostedByLine = $derived(formatHostedByLine(trip?.members ?? []));
 
 	const myAssignment = $derived(user ? roomAssignments.find((a) => a.userId === user.id) : null);
+	const myAssignments = $derived(user ? roomAssignments.filter((a) => a.userId === user.id) : []);
 	const myPaidTotal = $derived(
 		userInvoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0)
 	);
@@ -232,6 +233,7 @@
 			{rsvps}
 			{members}
 			{myAssignment}
+			{myAssignments}
 		/>
 		{:else if dashboardMode === 'recap'}
 		<RecapModeView
