@@ -1,11 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 
 	interface ProfileData {
 		displayName: string;
 		avatarUrl: string | null;
 		travelStyle: string | null;
 		homeCity: string | null;
+		isSelf?: boolean;
+		friendshipStatus?: 'self' | 'none' | 'friends' | 'pending_sent' | 'pending_received';
 	}
 
 	let {
@@ -21,6 +25,8 @@
 	let show = $state(false);
 	let profile = $state<ProfileData | null>(initialProfile);
 	let loading = $state(false);
+	let actionLoading = $state(false);
+	let actionMessage = $state<string | null>(null);
 	let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
 	let tooltipEl: HTMLDivElement;
 
@@ -41,7 +47,9 @@
 					displayName: data.displayName,
 					avatarUrl: data.avatarUrl,
 					travelStyle: data.travelStyle,
-					homeCity: data.homeCity
+					homeCity: data.homeCity,
+					isSelf: data.isSelf,
+					friendshipStatus: data.friendshipStatus
 				};
 			}
 		} finally {
@@ -65,6 +73,39 @@
 			hoverTimeout = null;
 		}
 		show = false;
+		actionMessage = null;
+		actionLoading = false;
+	}
+
+	async function addFriend() {
+		if (actionLoading) return;
+		actionLoading = true;
+		actionMessage = null;
+		try {
+			const res = await fetch('/api/friends/request', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ toUserId: userId })
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				actionMessage = data?.error || 'Could not send request';
+				return;
+			}
+			if (profile) profile = { ...profile, friendshipStatus: 'pending_sent' };
+			actionMessage = 'Friend request sent';
+		} finally {
+			actionLoading = false;
+		}
+	}
+
+	function openDirectMessage() {
+		goto(`/messages?with=${userId}`);
+	}
+
+	function openBlockAction() {
+		// Blocking flow currently lives in profile actions.
+		openProfileCard(userId);
 	}
 
 	$effect(() => {
@@ -105,6 +146,35 @@
 				{#if profile.homeCity}
 					<p class="profile-tooltip-city">{profile.homeCity}</p>
 				{/if}
+				{#if !profile.isSelf}
+					<div class="profile-tooltip-actions">
+						<button type="button" class="profile-tooltip-btn profile-tooltip-btn--primary" onclick={openDirectMessage}>
+							Direct message
+						</button>
+						{#if profile.friendshipStatus === 'friends'}
+							<span class="profile-tooltip-pill">Friends</span>
+						{:else if profile.friendshipStatus === 'pending_sent'}
+							<span class="profile-tooltip-pill">Request sent</span>
+						{:else if profile.friendshipStatus === 'pending_received'}
+							<span class="profile-tooltip-pill">Pending request</span>
+						{:else}
+							<button
+								type="button"
+								class="profile-tooltip-btn profile-tooltip-btn--ghost"
+								onclick={addFriend}
+								disabled={actionLoading}
+							>
+								{actionLoading ? 'Adding...' : 'Add friend'}
+							</button>
+						{/if}
+						<button type="button" class="profile-tooltip-btn profile-tooltip-btn--ghost" onclick={openBlockAction}>
+							Block
+						</button>
+					</div>
+					{#if actionMessage}
+						<p class="profile-tooltip-note">{actionMessage}</p>
+					{/if}
+				{/if}
 			{/if}
 		</div>
 	{/if}
@@ -132,7 +202,7 @@
 		box-shadow: 0 4px 12px rgba(0, 27, 46, 0.15);
 		border: 1px solid var(--border, #e2e8f0);
 		z-index: 100001;
-		pointer-events: none;
+		pointer-events: auto;
 		text-align: center;
 	}
 	.profile-tooltip-avatar-wrap {
@@ -176,5 +246,50 @@
 		font-size: 0.875rem;
 		color: var(--muted);
 		margin: 0;
+	}
+	.profile-tooltip-actions {
+		margin-top: 0.55rem;
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.35rem;
+	}
+	.profile-tooltip-btn,
+	.profile-tooltip-pill {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.22rem 0.5rem;
+		border-radius: 999px;
+		font-size: 0.68rem;
+		font-weight: 600;
+		line-height: 1.2;
+	}
+	.profile-tooltip-btn {
+		border: 1px solid transparent;
+		cursor: pointer;
+		font: inherit;
+	}
+	.profile-tooltip-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	.profile-tooltip-btn--primary {
+		background: var(--primary, #2f7778);
+		color: #fff;
+	}
+	.profile-tooltip-btn--ghost {
+		background: rgba(15, 23, 42, 0.06);
+		border-color: rgba(15, 23, 42, 0.14);
+		color: var(--text, #0f172a);
+	}
+	.profile-tooltip-pill {
+		background: rgba(15, 23, 42, 0.08);
+		color: var(--muted, #64748b);
+	}
+	.profile-tooltip-note {
+		margin: 0.35rem 0 0;
+		font-size: 0.66rem;
+		color: var(--muted, #64748b);
 	}
 </style>

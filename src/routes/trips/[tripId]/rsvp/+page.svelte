@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import { browser } from '$app/environment';
 	import { enhance, deserialize, applyAction } from '$app/forms';
 	import { invalidateAll, goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -185,6 +186,7 @@
 	const guestEstimate = $derived(liveEstimate ?? guestEstimateFromServer);
 
 	$effect(() => {
+		if (!browser) return;
 		if (!isYes) {
 			liveEstimate = null;
 			return;
@@ -490,7 +492,7 @@
 						<p class="no-rooms">No rooms available yet. The host will add rooms soon.</p>
 					{:else if data.isPerRoomPricing}
 						<p class="room-pricing-intro helper-text">
-							This trip splits the total evenly by room. Reserve one whole room for your party (one reservation per room).
+							This trip splits the total evenly by room. Choose one whole room for your party (one room assignment per room).
 						</p>
 						<div class="spots-counter">
 							<span>Party size: <strong>{partySize}</strong></span>

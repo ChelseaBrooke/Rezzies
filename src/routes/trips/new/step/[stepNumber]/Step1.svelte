@@ -169,7 +169,7 @@
 						<span class="field-label-sub">(Capacity Limit)</span>
 					</label>
 					<p class="field-hint" id="maxOccupancy-hint">
-						The most the trip can accommodate (based on beds, rules, or the property listing).
+						The most you can accommodate (based on beds, rules, or the property listing).
 					</p>
 					<input
 						type="number"

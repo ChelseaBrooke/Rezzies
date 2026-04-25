@@ -19,7 +19,7 @@
 		<p class="subtitle">Your room selection has been submitted</p>
 
 		<div class="summary-card">
-			<h2>Reservation Summary</h2>
+			<h2>Trip Summary</h2>
 			<div class="summary-details">
 				{#if data.confirmation.tripName}
 					<div class="detail-row">
@@ -75,7 +75,7 @@
 				<strong>What's next?</strong>
 			</p>
 			<p>
-				This is a reservation request, not a payment. We'll follow up with you soon with
+				This confirms your trip spot request, not a payment. We'll follow up with you soon with
 				details about payment and any additional information you need.
 			</p>
 			<p>
@@ -90,7 +90,7 @@
 				</a>
 			{/if}
 			<a href={signupUrl} class="btn-cta btn-secondary-cta">
-				Create a Divvi account to track your reservation
+				Create a Divvi account to track your trip details
 			</a>
 		</div>
 	</div>

@@ -1,16 +1,35 @@
 <script lang="ts">
-	// Simple top bar with notification and user icons
+	import { page } from '$app/stores';
+	import NotificationTray from '$lib/components/NotificationTray.svelte';
+	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 </script>
 
 <div class="topbar">
 	<div class="topbar-content">
 		<div class="topbar-actions">
-			<button class="icon-btn" type="button" aria-label="Notifications">
-				<span>🔔</span>
-			</button>
-			<button class="icon-btn" type="button" aria-label="User profile">
-				<span>👤</span>
-			</button>
+			{#if $page.data?.user}
+				<div class="topbar-msg-bell">
+					<a href="/messages" class="topbar-icon-btn" title="Messages" aria-label="Messages">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" />
+						</svg>
+					</a>
+					<span class="topbar-bell-wrap">
+						<NotificationTray />
+					</span>
+				</div>
+				<AvatarMenu user={$page.data.user} />
+			{/if}
 		</div>
 	</div>
 </div>
@@ -34,26 +53,35 @@
 	
 	.topbar-actions {
 		display: flex;
-		gap: 0.75rem;
+		gap: 0.25rem;
 		align-items: center;
 	}
-	
-	.icon-btn {
-		width: 2.5rem;
-		height: 2.5rem;
-		border: none;
-		background: transparent;
-		border-radius: 0.5rem;
-		cursor: pointer;
+
+	.topbar-msg-bell {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		transition: background 0.2s ease;
-		font-size: 1.25rem;
-		color: var(--text);
+		gap: 0.125rem;
 	}
-	
-	.icon-btn:hover {
-		background: rgba(0, 0, 0, 0.05);
+
+	.topbar-icon-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		border-radius: var(--radius-sm);
+		color: var(--muted);
+		text-decoration: none;
+		transition: all var(--transition-fast);
+	}
+
+	.topbar-icon-btn:hover {
+		color: var(--text);
+		background: var(--surface2);
+	}
+
+	.topbar-bell-wrap {
+		display: inline-flex;
+		align-items: center;
 	}
 </style>

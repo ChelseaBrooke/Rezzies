@@ -118,7 +118,7 @@
 			<a href={rsvpEditHref} class="cta-btn cta-ghost">Update RSVP</a>
 		</div>
 	{:else}
-		<!-- Reservation-style summary (always shown; placeholder when incomplete). -->
+		<!-- Trip-stay summary (always shown; placeholder when incomplete). -->
 		<section class="grsvp-reservation" aria-label="Room and bed">
 			<div class="grsvp-res-thumb">
 				{#if rsvpFullyComplete && roomPhotoUrl}

@@ -87,6 +87,13 @@
 		await loadMessages(withUserId);
 	}
 
+	function backToConversations() {
+		selectedWith = null;
+		otherUser = null;
+		messages = [];
+		goto('/messages', { replaceState: true });
+	}
+
 	let sendError = $state<string | null>(null);
 
 	async function sendMessage() {
@@ -144,7 +151,7 @@
 			<p class="messages-subheading">For 1:1 chats with guests. Trip-wide conversation stays in each trip's Chat tab.</p>
 		</div>
 	</div>
-	<div class="messages-layout">
+	<div class="messages-layout" class:show-chat={!!selectedWith}>
 		<aside class="conversations-panel">
 			<p class="panel-helper">This inbox is only for one-on-one messages. For group updates, use trip chat.</p>
 			{#if loading && conversations.length === 0}
@@ -193,6 +200,10 @@
 				{#if otherUser}
 				<div class="chat-header">
 					<div class="chat-header-user">
+						<button type="button" class="mobile-back-btn" onclick={backToConversations} aria-label="Back to conversations">
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+							<span>Conversations</span>
+						</button>
 						<ProfileTooltip
 							userId={otherUser.id}
 							name={otherUser.name}
@@ -415,6 +426,20 @@
 		border-bottom: 1px solid var(--border, #e5e7eb);
 	}
 	.chat-header-user { display: flex; align-items: center; gap: 0.75rem; }
+	.mobile-back-btn {
+		display: none;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.35rem 0.55rem;
+		border: 1px solid var(--border, #e5e7eb);
+		border-radius: 999px;
+		background: white;
+		color: var(--text, #111827);
+		cursor: pointer;
+		font-size: 0.75rem;
+		font-weight: 600;
+		line-height: 1;
+	}
 	.chat-avatar-btn {
 		border: none;
 		background: none;
@@ -497,4 +522,59 @@
 		color: var(--muted);
 	}
 	.muted { color: var(--muted); font-size: 0.875rem; }
+
+	@media (max-width: 820px) {
+		.messages-page {
+			min-height: calc(100vh - 72px);
+		}
+
+		.messages-topbar {
+			padding: 0.75rem 0.75rem 0.45rem;
+		}
+
+		.messages-layout {
+			height: calc(100vh - 140px);
+			max-width: none;
+			border-top: 1px solid var(--border, #e5e7eb);
+		}
+
+		.conversations-panel,
+		.chat-panel {
+			width: 100%;
+			flex: 1 1 auto;
+		}
+
+		.messages-layout .chat-panel {
+			display: none;
+		}
+
+		.messages-layout.show-chat .conversations-panel {
+			display: none;
+		}
+
+		.messages-layout.show-chat .chat-panel {
+			display: flex;
+		}
+
+		.mobile-back-btn {
+			display: inline-flex;
+			flex-shrink: 0;
+		}
+
+		.chat-header {
+			padding: 0.7rem 0.75rem;
+		}
+
+		.messages-container {
+			padding: 0.75rem;
+		}
+
+		.message-form {
+			padding: 0.75rem;
+		}
+
+		.chat-header-name-btn {
+			font-size: 0.95rem;
+		}
+	}
 </style>

@@ -86,7 +86,7 @@ export const GUEST_TOOLTIPS: TooltipDef[] = [
 	{
 		key: 'guest_rsvp_card',
 		title: 'Your RSVP',
-		body: 'See your reservation details, room assignment, and what you owe at a glance.',
+		body: 'See your trip details, room assignment, and what you owe at a glance.',
 		role: 'guest',
 		position: 'right',
 		align: 'start'

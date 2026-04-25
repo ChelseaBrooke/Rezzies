@@ -40,7 +40,9 @@
 	const members = $derived(trip?.members ?? []);
 	const rsvps = $derived(trip?.rsvps ?? []);
 	// Prefer page-loaded assignments (fresh after host assigns beds on guests page)
-	const roomAssignments = $derived('roomAssignments' in data && Array.isArray(data.roomAssignments) ? data.roomAssignments : (trip?.roomAssignments ?? []));
+	const roomAssignments = $derived(
+		Array.isArray(data.roomAssignments) ? data.roomAssignments : (trip?.roomAssignments ?? [])
+	);
 	const rooms = $derived(trip?.rooms ?? []);
 	const activities = $derived(trip?.activities ?? []);
 	const mealSlots = $derived(trip?.mealSlots ?? []);
@@ -221,7 +223,7 @@
 		<VacationModeView
 			tripId={trip.id}
 			isHost={true}
-			tripGames={data.tripGames ?? []}
+			hostName={hostName}
 			trip={{
 				fullAddress: trip.fullAddress,
 				location: trip.location,
@@ -230,13 +232,14 @@
 				description: trip.description,
 				listingCoverPhoto: trip.listingCoverPhoto,
 				checkInTime: trip.checkInTime,
-				checkOutTime: trip.checkOutTime
+				checkOutTime: trip.checkOutTime,
+				wifiName: trip.wifiName,
+				wifiPassword: trip.wifiPassword
 			}}
 			tripName={trip.name ?? ''}
 			tripLocation={trip.location ?? ''}
 			checkInDate={trip.checkInDate ?? ''}
 			checkOutDate={trip.checkOutDate ?? ''}
-			{hostName}
 			currentUserName={user?.name ?? ''}
 			userRsvp={userRsvp ? { adultsCount: userRsvp.adultsCount, kidsCount: userRsvp.kidsCount } : null}
 			{activities}
@@ -246,6 +249,11 @@
 			{members}
 			{myAssignment}
 			{myAssignments}
+			stayRoomLookup={(rooms ?? []).map((r) => ({
+				id: r.id,
+				name: r.name ?? null,
+				roomType: r.roomType ?? null
+			}))}
 		/>
 		{:else if dashboardMode === 'recap'}
 		<RecapModeView

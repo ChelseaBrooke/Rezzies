@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import type { PageData } from './$types';
 
@@ -25,9 +24,6 @@
 			body: JSON.stringify({ profileVisibility, friendsListVisibility })
 		});
 	}
-	let hideEmail = $state(false);
-	let hidePhone = $state(false);
-	let hideStats = $state(false);
 	const sessions = $state([{ device: 'This device', location: 'Current', lastActive: 'Active now' }]);
 </script>
 
@@ -55,12 +51,6 @@
 				onclick={() => activeTab = 'security'}
 			>
 				Security & password
-			</button>
-			<button 
-				class="tab {activeTab === 'blocked' ? 'active' : ''}"
-				onclick={() => { activeTab = 'blocked'; goto('/settings?tab=blocked', { replaceState: true }); }}
-			>
-				Block list
 			</button>
 		</div>
 
@@ -214,11 +204,6 @@
 						<hr class="section-divider" />
 						<h3>Two-factor & sessions</h3>
 						<div class="field-row">
-							<span class="field-label">Two-factor auth</span>
-							<span class="field-value">Off</span>
-							<button type="button" class="btn btn-ghost btn-sm">Set up MFA</button>
-						</div>
-						<div class="field-row">
 							<span class="field-label">Active sessions</span>
 							<ul class="sessions-list">
 								{#each sessions as session}
@@ -246,37 +231,11 @@
 								<option value="private">Private</option>
 							</select>
 						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Hide email from others</span>
-							<button type="button" class="toggle" class:on={hideEmail} onclick={() => (hideEmail = !hideEmail)} aria-pressed={hideEmail}><span class="toggle-thumb"></span></button>
-						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Hide phone from others</span>
-							<button type="button" class="toggle" class:on={hidePhone} onclick={() => (hidePhone = !hidePhone)} aria-pressed={hidePhone}><span class="toggle-thumb"></span></button>
-						</div>
-						<div class="field-row switch-row">
-							<span class="field-label">Hide stats on profile</span>
-							<button type="button" class="toggle" class:on={hideStats} onclick={() => (hideStats = !hideStats)} aria-pressed={hideStats}><span class="toggle-thumb"></span></button>
-						</div>
 						<hr class="section-divider" />
 						<div class="button-row">
-							<button type="button" class="btn btn-secondary">Export data</button>
 							<button type="button" class="btn btn-destructive" onclick={() => data.user?.id && openProfileCard(data.user.id)}>Open profile</button>
 						</div>
 					</div>
-				</section>
-			{:else if activeTab === 'blocked'}
-				<section class="settings-section" id="block-list" aria-labelledby="block-list-title">
-					<h2 id="block-list-title">Block list</h2>
-					{#if (data.blocked?.length ?? 0) === 0}
-						<p class="section-muted">You haven’t blocked anyone. Blocked users won’t be able to invite you or see your profile.</p>
-					{:else}
-						<ul class="blocked-list">
-							{#each data.blocked as item}
-								<li>{item}</li>
-							{/each}
-						</ul>
-					{/if}
 				</section>
 			{/if}
 		</div>
@@ -461,36 +420,6 @@
 		color: var(--color-text-light);
 		font-size: 0.875rem;
 	}
-	.security-body .switch-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	}
-	.security-body .toggle {
-		width: 2.5rem;
-		height: 1.25rem;
-		border-radius: 999px;
-		background: var(--color-border);
-		border: none;
-		cursor: pointer;
-		padding: 2px;
-		transition: background 0.2s;
-	}
-	.security-body .toggle .toggle-thumb {
-		display: block;
-		width: 1rem;
-		height: 1rem;
-		border-radius: 50%;
-		background: white;
-		box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-		transition: transform 0.2s;
-	}
-	.security-body .toggle.on {
-		background: var(--color-primary);
-	}
-	.security-body .toggle.on .toggle-thumb {
-		transform: translateX(1.25rem);
-	}
 	.security-body .select {
 		padding: var(--spacing-sm);
 		border: 1px solid var(--color-border);
@@ -515,23 +444,5 @@
 	}
 	.security-body .btn-destructive:hover {
 		opacity: 0.9;
-	}
-
-	.section-muted {
-		color: var(--color-text-light);
-		margin: 0 0 var(--spacing-md) 0;
-		font-size: 0.9375rem;
-	}
-	.blocked-list {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-	}
-	.blocked-list li {
-		padding: var(--spacing-xs) 0;
-		border-bottom: 1px solid var(--color-border);
-	}
-	.blocked-list li:last-child {
-		border-bottom: none;
 	}
 </style>

@@ -1,13 +1,10 @@
 <script lang="ts">
 	import type { LayoutData } from './$types';
 	import type { Snippet } from 'svelte';
-	import { onMount } from 'svelte';
 	import AppShell from '$lib/components/trips/dashboard/AppShell.svelte';
 	import TripChat from '$lib/components/trips/TripChat.svelte';
-	import { onboardingStore } from '$lib/stores/onboarding.js';
+	import FeatureTourModal from '$lib/components/ui/FeatureTourModal.svelte';
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
-
-	onMount(() => { onboardingStore.init(data.isHost); });
 
 	// Trip is in recap (past checkout), disable editing (e.g. hide Settings)
 	const tripLockedForRecap = $derived.by(() => {
@@ -51,6 +48,10 @@
 		{/if}
 	{/snippet}
 </AppShell>
+
+{#if data.featureTourVariant}
+	<FeatureTourModal variant={data.featureTourVariant} />
+{/if}
 
 {#if data.canChat && data.user}
 	<TripChat tripId={data.trip.id} userId={data.user.id} />

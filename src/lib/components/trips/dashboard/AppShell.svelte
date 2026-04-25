@@ -485,6 +485,13 @@
 		box-sizing: border-box;
 		overflow-y: auto;
 		overflow-x: hidden;
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+	.rail-nav-wrap::-webkit-scrollbar {
+		display: none;
+		width: 0;
+		height: 0;
 	}
 
 	.rail-nav {
@@ -828,6 +835,13 @@
 		flex-direction: column;
 		overflow-y: auto;
 		overflow-x: hidden;
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+	.main-content-inner::-webkit-scrollbar {
+		display: none;
+		width: 0;
+		height: 0;
 	}
 
 	@media (max-width: 1024px) {

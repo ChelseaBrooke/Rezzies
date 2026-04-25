@@ -24,6 +24,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 
 	const inviteTokenResolved = (inviteFromQuery || cookies.get(inviteCookieName)?.trim() || '').trim();
 	const user = locals.user;
+	type FeatureTourVariant = 'first-trip' | 'first-rsvp' | null;
 
 	const isTripDashboardRoot =
 		url.pathname === `/trips/${tripId}` || url.pathname === `/trips/${tripId}/`;
@@ -137,7 +138,8 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			pollsBadgeCount: 0,
 			tripGames: [],
 			recentPolls: [],
-			tripGalleryFiles: []
+			tripGalleryFiles: [],
+			featureTourVariant: null as FeatureTourVariant
 		};
 	}
 
@@ -164,7 +166,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 	}
 
 	const isHost = membership.role === 'host';
-	const [trip, , tripsResult, userRsvp, committedFunds, costAtMaxParticipation] = await Promise.all([
+	const [trip, , tripsResult, userRsvp, committedFunds, costAtMaxParticipation, userOnboardingData] = await Promise.all([
 		prisma.trip.findUnique({
 			where: { id: tripId },
 			include: {
@@ -206,7 +208,11 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			where: { tripId_userId: { tripId, userId: user.id } }
 		}),
 		computeCommittedFundsFromYesRsvps(tripId),
-		isHost ? getCostAtMaxParticipation(tripId) : Promise.resolve(null)
+		isHost ? getCostAtMaxParticipation(tripId) : Promise.resolve(null),
+		prisma.user.findUnique({
+			where: { id: user.id },
+			select: { dismissedTooltips: true }
+		})
 	]);
 
 	if (!trip) {
@@ -261,6 +267,31 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 		});
 	}
 
+	const dismissedTourKeys = Array.isArray(userOnboardingData?.dismissedTooltips)
+		? (userOnboardingData.dismissedTooltips as string[])
+		: [];
+	const hasSeenFirstTripTour = dismissedTourKeys.includes('feature-tour:first-trip');
+	const hasSeenFirstRsvpTour = dismissedTourKeys.includes('feature-tour:first-rsvp');
+
+	let featureTourVariant: FeatureTourVariant = null;
+	if (isHost && !hasSeenFirstTripTour) {
+		const hostedTripCount = await prisma.tripMember.count({
+			where: { userId: user.id, role: 'host', inviteStatus: 'approved' }
+		});
+		if (hostedTripCount === 1) {
+			featureTourVariant = 'first-trip';
+		}
+	}
+
+	if (!featureTourVariant && !isHost && userRsvp?.status === 'yes' && !hasSeenFirstRsvpTour) {
+		const yesRsvpCount = await prisma.rSVP.count({
+			where: { userId: user.id, status: 'yes' }
+		});
+		if (yesRsvpCount === 1) {
+			featureTourVariant = 'first-rsvp';
+		}
+	}
+
 	return {
 		user,
 		invitePreview: false as const,
@@ -280,6 +311,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 		pollsBadgeCount,
 		tripGames,
 		recentPolls,
-		tripGalleryFiles
+		tripGalleryFiles,
+		featureTourVariant
 	};
 };

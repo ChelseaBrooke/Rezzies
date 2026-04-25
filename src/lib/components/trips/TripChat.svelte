@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { onMount, onDestroy } from 'svelte';
 
 	interface Props {
@@ -184,8 +185,9 @@
 		}
 	});
 
-	// Update polling interval when isOpen changes
+	// Update polling interval when isOpen changes (client only — SSR would otherwise call fetch)
 	$effect(() => {
+		if (!browser) return;
 		if (pollInterval) {
 			clearInterval(pollInterval);
 		}

@@ -204,14 +204,6 @@
 						: 'Create polls, cast your vote, and see what the group thinks.'}
 				</p>
 			</div>
-			{#if canCreatePoll}
-				<button class="btn-new-poll" onclick={() => (showCreateModal = true)}>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-						<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-					</svg>
-					New Poll
-				</button>
-			{/if}
 		</div>
 
 		{#if data.pollsLoadError}
@@ -239,9 +231,7 @@
 			<div class="empty-state">
 				<div class="empty-icon" aria-hidden="true">🗳️</div>
 				<p class="empty-title">No polls yet</p>
-				<p class="empty-hint">
-					Click "New Poll" above to get started.
-				</p>
+				<p class="empty-hint">Use New Poll next to Sort above to get started.</p>
 			</div>
 		{:else}
 			<div class="polls-body">
@@ -483,23 +473,6 @@
 		color: #64748b;
 		margin: 0;
 	}
-	.btn-new-poll {
-		display: inline-flex;
-		align-items: center;
-		gap: .4rem;
-		padding: .55rem 1.1rem;
-		background: #E85D26;
-		color: white;
-		border: none;
-		border-radius: 10px;
-		font-size: .875rem;
-		font-weight: 600;
-		cursor: pointer;
-		white-space: nowrap;
-		flex-shrink: 0;
-		transition: background .15s, transform .15s;
-	}
-	.btn-new-poll:hover { background: #d04e1f; transform: translateY(-1px); }
 
 	/* ── Filters strip ── */
 	.card-filters {

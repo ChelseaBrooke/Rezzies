@@ -97,17 +97,18 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	);
 	const selectedActivities = trip.activities.filter((a) => a.participants.length > 0);
 
-	// Cost commitment: estimate range when user has or is choosing YES
+	// Cost commitment: estimate range only when already YES (per-bed may be null until a bed is picked)
 	let guestEstimate: Awaited<ReturnType<typeof computeGuestEstimateRange>> | null = null;
 	let guestEstimateError: string | null = null;
-	if (currentRsvp?.status === 'yes' || true) {
+	if (currentRsvp?.status === 'yes') {
 		try {
 			guestEstimate = await computeGuestEstimateRange(tripId, user.id);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Unknown error';
 			guestEstimateError = message;
-			// Log so host/dev can see why estimate failed (e.g. no rooms, per-bed without bed selection)
-			console.warn('[RSVP] computeGuestEstimateRange failed:', message);
+			if (message !== 'Guest has not selected a bed yet') {
+				console.warn('[RSVP] computeGuestEstimateRange failed:', message);
+			}
 		}
 	}
 	const reconfirmPolicy = parseReconfirmPolicy(null);

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import PollCard from './PollCard.svelte';
 	import OnboardingTooltip from '$lib/components/ui/OnboardingTooltip.svelte';
 	import { getTooltip } from '$lib/config/onboardingTooltips.js';
@@ -46,7 +47,8 @@
 	}
 
 	$effect(() => {
-		if (tripId) fetchUnanswered();
+		if (!browser || !tripId) return;
+		fetchUnanswered();
 	});
 
 	async function submitVote(pollId: string, optionId: string) {

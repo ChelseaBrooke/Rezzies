@@ -38,7 +38,10 @@
 
 	const members = $derived(trip?.members ?? []);
 	const rsvps = $derived(trip?.rsvps ?? []);
-	const roomAssignments = $derived(trip?.roomAssignments ?? []);
+	// Prefer page-loaded assignments (same as host dash) so room/bed picks stay fresh after RSVP or nav
+	const roomAssignments = $derived(
+		Array.isArray(data.roomAssignments) ? data.roomAssignments : (trip?.roomAssignments ?? [])
+	);
 	const rooms = $derived(trip?.rooms ?? []);
 	const activities = $derived(trip?.activities ?? []);
 	const mealSlots = $derived(trip?.mealSlots ?? []);
@@ -71,13 +74,13 @@
 	const hostName = $derived(hostMember?.user?.name ?? hostMember?.user?.email ?? 'Host');
 	const hostedByLine = $derived(formatHostedByLine(trip?.members ?? []));
 
-	const myAssignment = $derived(user ? roomAssignments.find((a) => a.userId === user.id) : null);
-	// Page load includes bed on assignments; use for guest RSVP summary card
-	const myAssignments = $derived(
-		user && data.roomAssignments
-			? data.roomAssignments.filter((a) => a.userId === user.id)
-			: []
-	);
+	const myAssignments = $derived.by(() => {
+		if (!user) return [];
+		const g = data.guestRoomAssignments;
+		if (Array.isArray(g) && g.length > 0) return g;
+		return roomAssignments.filter((a) => a.userId === user.id);
+	});
+	const myAssignment = $derived(user ? (myAssignments[0] ?? null) : null);
 	const myPaidTotal = $derived(
 		userInvoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0)
 	);
@@ -186,7 +189,7 @@
 		<VacationModeView
 			tripId={trip.id}
 			isHost={false}
-			tripGames={data.tripGames ?? []}
+			hostName={hostName}
 			trip={{
 				fullAddress: trip.fullAddress,
 				location: trip.location,
@@ -195,13 +198,14 @@
 				description: trip.description,
 				listingCoverPhoto: trip.listingCoverPhoto,
 				checkInTime: trip.checkInTime,
-				checkOutTime: trip.checkOutTime
+				checkOutTime: trip.checkOutTime,
+				wifiName: trip.wifiName,
+				wifiPassword: trip.wifiPassword
 			}}
 			tripName={trip.name ?? ''}
 			tripLocation={trip.location ?? ''}
 			checkInDate={trip.checkInDate ?? ''}
 			checkOutDate={trip.checkOutDate ?? ''}
-			{hostName}
 			currentUserName={user?.name ?? ''}
 			userRsvp={userRsvp ? { adultsCount: userRsvp.adultsCount, kidsCount: userRsvp.kidsCount } : null}
 			{activities}
@@ -211,6 +215,12 @@
 			{members}
 			{myAssignment}
 			{myAssignments}
+			stayRoomLookup={(rooms ?? []).map((r) => ({
+				id: r.id,
+				name: r.name ?? null,
+				roomType: r.roomType ?? null
+			}))}
+			serverStayRoomLabel={data.vacationStayRoomLabel ?? null}
 		/>
 		{:else if dashboardMode === 'recap'}
 		<RecapModeView

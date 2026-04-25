@@ -22,10 +22,12 @@ function writeLocalStorage(keys: string[]) {
 
 const dismissed = writable<string[]>([]);
 const role = writable<'host' | 'guest'>('host');
+const enabled = writable(false);
 let initialized = false;
 
 async function init(isHost: boolean) {
 	role.set(isHost ? 'host' : 'guest');
+	enabled.set(true);
 
 	if (initialized) return;
 	initialized = true;
@@ -63,6 +65,7 @@ function dismiss(key: string) {
 
 function resetAll() {
 	dismissed.set([]);
+	enabled.set(false);
 	writeLocalStorage([]);
 	initialized = false;
 }
@@ -71,7 +74,8 @@ function resetAll() {
  * The single tooltip key that should be visible right now.
  * Walks the ordered sequence for the current role, returns the first undismissed key.
  */
-const activeKey = derived([dismissed, role], ([$dismissed, $role]) => {
+const activeKey = derived([dismissed, role, enabled], ([$dismissed, $role, $enabled]) => {
+	if (!$enabled) return null;
 	const sequence = $role === 'host' ? HOST_TOOLTIPS : GUEST_TOOLTIPS;
 	for (const tip of sequence) {
 		if (!$dismissed.includes(tip.key)) return tip.key;

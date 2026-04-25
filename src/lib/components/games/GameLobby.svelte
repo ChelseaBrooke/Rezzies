@@ -13,6 +13,12 @@
 	interface Props {
 		onNavigate: (gameId: string) => void;
 		activityItems?: ActivityItem[];
+		/** Dashboard widget: shorter cards, no page header / activity strip, no descriptions */
+		compact?: boolean;
+		/** When set, only these games (in this order). Omit for full lobby. */
+		allowedGameIds?: string[] | null;
+		/** Per-game one-line status for compact mode (e.g. "Round 2 in progress") */
+		gameStatusLines?: Record<string, string> | null;
 	}
 
 	interface ActivityItem {
@@ -21,7 +27,24 @@
 		action: string;
 	}
 
-	let { onNavigate, activityItems = [] }: Props = $props();
+	let {
+		onNavigate,
+		activityItems = [],
+		compact = false,
+		allowedGameIds = null,
+		gameStatusLines = null
+	}: Props = $props();
+
+	const visibleCards = $derived.by((): GameCard[] => {
+		if (!allowedGameIds?.length) return GAME_CARDS;
+		const byId = new Map(GAME_CARDS.map((c) => [c.id, c]));
+		return allowedGameIds.map((id) => byId.get(id)).filter((c): c is GameCard => Boolean(c));
+	});
+
+	function statusFor(cardId: string, fallback: string): string {
+		const custom = gameStatusLines?.[cardId]?.trim();
+		return custom || fallback;
+	}
 
 	const GAME_CARDS: GameCard[] = [
 		{
@@ -67,34 +90,36 @@
 	];
 </script>
 
-<div class="lobby">
-	<!-- Page header -->
-	<header class="lobby-header">
-		<h1 class="lobby-title">Games</h1>
-		<p class="lobby-sub">Play together, wherever you are. Bragging rights await.</p>
-	</header>
+<div class="lobby" class:lobby--compact={compact}>
+	{#if !compact}
+		<!-- Page header -->
+		<header class="lobby-header">
+			<h1 class="lobby-title">Games</h1>
+			<p class="lobby-sub">Play together, wherever you are. Bragging rights await.</p>
+		</header>
 
-	<!-- Activity strip -->
-	<div class="activity-strip-wrap" aria-label="Recent game activity">
-		<div class="activity-strip">
-			{#if activityItems.length === 0}
-				<div class="activity-pill activity-pill--empty">
-					No activity yet — be the first to play
-				</div>
-			{:else}
-				{#each activityItems.slice(0, 6) as item}
-					<div class="activity-pill">
-						<span class="ap-avatar" aria-hidden="true">{item.initials}</span>
-						<span class="ap-text"><strong>{item.name}</strong> {item.action}</span>
+		<!-- Activity strip -->
+		<div class="activity-strip-wrap" aria-label="Recent game activity">
+			<div class="activity-strip">
+				{#if activityItems.length === 0}
+					<div class="activity-pill activity-pill--empty">
+						No activity yet — be the first to play
 					</div>
-				{/each}
-			{/if}
+				{:else}
+					{#each activityItems.slice(0, 6) as item}
+						<div class="activity-pill">
+							<span class="ap-avatar" aria-hidden="true">{item.initials}</span>
+							<span class="ap-text"><strong>{item.name}</strong> {item.action}</span>
+						</div>
+					{/each}
+				{/if}
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	<!-- Game cards 2×2 -->
 	<div class="games-grid">
-		{#each GAME_CARDS as card}
+		{#each visibleCards as card}
 			<button
 				type="button"
 				class="game-card"
@@ -114,8 +139,10 @@
 				<div class="card-body">
 					<div class="card-body-main">
 						<h2 class="card-name">{card.name}</h2>
-						<p class="card-desc">{card.description}</p>
-						<p class="card-status">{card.statusLine}</p>
+						{#if !compact}
+							<p class="card-desc">{card.description}</p>
+						{/if}
+						<p class="card-status">{compact ? statusFor(card.id, 'Start playing →') : card.statusLine}</p>
 					</div>
 					<span class="card-chevron" aria-hidden="true">→</span>
 				</div>
@@ -252,6 +279,30 @@
 		justify-content: center;
 		flex-shrink: 0;
 	}
+	.lobby--compact .card-art {
+		height: 70px;
+	}
+	.lobby--compact .card-art-emoji {
+		font-size: 1.85rem;
+	}
+	.lobby--compact .card-art-circle--1 {
+		width: 72px;
+		height: 72px;
+		top: -24px;
+		left: -16px;
+	}
+	.lobby--compact .card-art-circle--2 {
+		width: 48px;
+		height: 48px;
+		bottom: -12px;
+		right: -6px;
+	}
+	.lobby--compact .card-art-circle--3 {
+		width: 32px;
+		height: 32px;
+		top: 6px;
+		right: 18px;
+	}
 
 	.card-art-circle {
 		position: absolute;
@@ -331,6 +382,13 @@
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		font-weight: 600;
+	}
+	.lobby--compact .card-status {
+		font-size: 12px;
+		text-transform: none;
+		letter-spacing: normal;
+		font-weight: 500;
+		color: #64748b;
 	}
 
 	.card-chevron {

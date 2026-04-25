@@ -34,11 +34,10 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
 	});
 
 	const tab = url.searchParams.get('tab');
-	const openTab = tab === 'blocked' ? 'blocked' : null;
+	const openTab = tab === 'notifications' || tab === 'security' ? tab : null;
 
 	return {
 		user: userData,
-		blocked: [] as string[],
 		openTab
 	};
 };
