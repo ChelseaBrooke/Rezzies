@@ -41,6 +41,15 @@
 		hostedByLine?: string | null;
 		/** Hide share/edit quick-action buttons (e.g. invite preview) */
 		hideQuickActions?: boolean;
+		/** Host or co-host: full share menu */
+		canHostShare?: boolean;
+		/** Guest primary: plus-one link when unclaimed proxies exist */
+		householdShare?: {
+			householdId: string;
+			hasUnclaimedProxyMembers: boolean;
+			unclaimedFirstNames: string[];
+			primaryFirstName: string;
+		} | null;
 	}
 
 	let {
@@ -61,7 +70,9 @@
 		gamesHref = '',
 		gamesCount = 0,
 		hostedByLine = null,
-		hideQuickActions = false
+		hideQuickActions = false,
+		canHostShare = false,
+		householdShare = null
 	}: Props = $props();
 
 	const quickActionsTip = $derived(isHost ? getTooltip('host_quick_actions') : null);
@@ -166,6 +177,8 @@
 			onInvite={quickActions.onInvite}
 			showToast={quickActions.showToast}
 			{isHost}
+			{canHostShare}
+			{householdShare}
 		/>
 	</div>
 		{/if}
@@ -258,6 +271,8 @@
 					onInvite={quickActions.onInvite}
 					showToast={quickActions.showToast}
 					{isHost}
+					{canHostShare}
+					{householdShare}
 				/>
 				{#if quickActionsTip}
 					<OnboardingTooltip
@@ -290,8 +305,8 @@
 		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
 		box-shadow: var(--shadow-soft);
 		margin-bottom: 0;
-		/* Match Planning: gap under pill before main photo section */
-		margin-top: 3rem;
+		/* Top clearance comes from AppShell .main-content-inner padding when the floating bar is present */
+		margin-top: 0;
 	}
 
 	.compact-bg-img {
@@ -446,6 +461,23 @@
 	.compact-actions :global(.action-btn:hover) {
 		background: rgba(255, 255, 255, 0.3);
 	}
+	.compact-actions :global(.quick-actions .sh-btn) {
+		color: white;
+		background: rgba(255, 255, 255, 0.15);
+		border-radius: var(--radius-md);
+		border: none;
+		width: 28px;
+		height: 28px;
+		min-height: 28px;
+		padding: 0;
+		font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+		font-size: 0.8125rem;
+		font-weight: 500;
+	}
+	.compact-actions :global(.quick-actions .sh-btn:hover) {
+		background: rgba(255, 255, 255, 0.3);
+		color: white;
+	}
 
 	@media (max-width: 768px) {
 		.compact-hero {
@@ -466,9 +498,12 @@
 
 	/* ════════════════════════════════════
 	   FULL HERO (Planning)
+	   On trip dashboard: first pixel of cover photo sits `--trip-dash-hero-offset` below the top
+	   of `.main-content-inner` (floating mode pill + messages row). margin-top stays 0 — do not
+	   duplicate that offset here; vacation/recap dashboard roots follow the same rule.
 	   ════════════════════════════════════ */
 	.trip-hero {
-		margin-top: 3rem;
+		margin-top: 0;
 		font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
 		border-radius: var(--radius-3xl);
 		overflow: hidden;
@@ -759,6 +794,22 @@
 	}
 
 	.hero-center-actions :global(.action-btn:hover) {
+		background: rgba(255, 255, 255, 0.35);
+		color: white;
+	}
+
+	/* ShareButton uses .sh-btn — match .action-btn (My RSVP / Edit trip); chain .quick-actions for specificity over ShareButton.svelte */
+	.hero-center-actions :global(.quick-actions .sh-btn) {
+		color: white;
+		background: rgba(255, 255, 255, 0.2);
+		border-radius: var(--radius-md);
+		border: none;
+		transition: opacity var(--transition-fast);
+		font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+		font-size: 0.8125rem;
+		font-weight: 500;
+	}
+	.hero-center-actions :global(.quick-actions .sh-btn:hover) {
 		background: rgba(255, 255, 255, 0.35);
 		color: white;
 	}

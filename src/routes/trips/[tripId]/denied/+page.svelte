@@ -13,14 +13,25 @@
 				<line x1="9" y1="9" x2="15" y2="15"/>
 			</svg>
 		</div>
-		<h1 class="denied-title">You're not approved to join this trip</h1>
-		{#if data.trip}
-			<p class="denied-trip">{data.trip.name}</p>
+		{#if data.fromCostReapproval}
+			<h1 class="denied-title">You've been removed from this trip</h1>
+			{#if data.trip}
+				<p class="denied-trip">{data.trip.name}</p>
+			{/if}
+			<p class="denied-desc">
+				You chose to leave after your cost share changed. If this wasn't intentional, contact your host.
+			</p>
+			<a href="/" class="denied-home">Go to Divvi →</a>
+		{:else}
+			<h1 class="denied-title">You're not approved to join this trip</h1>
+			{#if data.trip}
+				<p class="denied-trip">{data.trip.name}</p>
+			{/if}
+			<p class="denied-desc">
+				Your request to join was not approved by the host. Please contact your host if you believe this is a mistake.
+			</p>
+			<a href="/" class="denied-home">Back to home</a>
 		{/if}
-		<p class="denied-desc">
-			Your request to join was not approved by the host. Please contact your host if you believe this is a mistake.
-		</p>
-		<a href="/" class="denied-home">Back to home</a>
 	</div>
 </div>
 

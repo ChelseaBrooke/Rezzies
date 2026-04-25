@@ -198,7 +198,11 @@ export const actions: Actions = {
 		if (!member) throw error(403, 'You must be a member of this trip');
 
 		const formData = await request.formData();
-		const costCommitmentAccepted = formData.get('costCommitmentAccepted') === 'true' || formData.get('costCommitmentAccepted') === '1';
+		const costCommitmentAccepted =
+			formData.get('costCommitmentAccepted') === 'true' ||
+			formData.get('costCommitmentAccepted') === '1';
+		const costRangeAcknowledged =
+			formData.get('costRangeAcknowledged') === 'true' || formData.get('costRangeAcknowledged') === '1';
 		const arrivalDateRaw = (formData.get('arrivalDate') as string | null)?.trim() || '';
 		const departureDateRaw = (formData.get('departureDate') as string | null)?.trim() || '';
 
@@ -249,7 +253,7 @@ export const actions: Actions = {
 				select: { costSharingEnabled: true }
 			});
 			const costSharingEnabled = tripForCostCheck?.costSharingEnabled ?? false;
-			if (costSharingEnabled && !costCommitmentAccepted) {
+			if (costSharingEnabled && !costCommitmentAccepted && !costRangeAcknowledged) {
 				return fail(400, { error: 'Please agree to the cost estimate below to submit YES RSVP.' });
 			}
 			let estimate;
@@ -262,9 +266,24 @@ export const actions: Actions = {
 			// Preserve existing notes (e.g. plus-one dietary JSON from updateDietary)
 			const existingRsvp = await prisma.rSVP.findUnique({
 				where: { tripId_userId: { tripId, userId: user.id } },
-				select: { notes: true }
+				select: {
+					notes: true,
+					originalRangeMinCents: true,
+					originalRangeMaxCents: true
+				}
 			});
 			const preservedNotes = existingRsvp?.notes ?? null;
+			const bindOriginalRange =
+				existingRsvp?.originalRangeMinCents == null || existingRsvp?.originalRangeMaxCents == null;
+			const originalRangePatch = bindOriginalRange
+				? {
+						originalRangeMinCents: estimate.lowCents,
+						originalRangeMaxCents: estimate.highCents,
+						approvedCostShareCents: estimate.highCents,
+						costApprovalStatus: 'approved',
+						costApprovalMethod: 'self'
+					}
+				: {};
 
 			await prisma.rSVP.upsert({
 				where: { tripId_userId: { tripId, userId: user.id } },
@@ -288,7 +307,12 @@ export const actions: Actions = {
 				latestEstimateUpdatedAt: now,
 				waitlistPosition: null,
 				waitlistJoinedAt: null,
-				claimWindowExpiresAt: null
+				claimWindowExpiresAt: null,
+				originalRangeMinCents: estimate.lowCents,
+				originalRangeMaxCents: estimate.highCents,
+				approvedCostShareCents: estimate.highCents,
+				costApprovalStatus: 'approved',
+				costApprovalMethod: 'self'
 			},
 			update: {
 				...validation.data,
@@ -308,7 +332,8 @@ export const actions: Actions = {
 				latestEstimateUpdatedAt: now,
 				waitlistPosition: null,
 				waitlistJoinedAt: null,
-				claimWindowExpiresAt: null
+				claimWindowExpiresAt: null,
+				...originalRangePatch
 			}
 			});
 		await checkAndSetReconfirmRequired(tripId);
@@ -345,7 +370,16 @@ export const actions: Actions = {
 				reconfirmDeadlineAt: null,
 				latestEstimateLowCents: null,
 				latestEstimateHighCents: null,
-				latestEstimateUpdatedAt: null
+				latestEstimateUpdatedAt: null,
+				originalRangeMinCents: null,
+				originalRangeMaxCents: null,
+				approvedCostShareCents: null,
+				costApprovalStatus: 'approved',
+				costApprovalMethod: null,
+				costReapprovalReason: null,
+				reApprovalRequiredAt: null,
+				reApprovalDeadline: null,
+				hostCostApprovalAt: null
 			}
 		});
 

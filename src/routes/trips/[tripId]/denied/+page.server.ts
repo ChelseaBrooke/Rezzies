@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
 
-export const load: PageServerLoad = async ({ params, cookies }) => {
+export const load: PageServerLoad = async ({ params, cookies, url }) => {
 	const user = await getSessionUser(cookies);
 
 	if (!user) {
@@ -32,5 +32,9 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		select: { id: true, name: true }
 	});
 
-	return { trip, user };
+	return {
+		trip,
+		user,
+		fromCostReapproval: url.searchParams.get('from') === 'cost-reapproval'
+	};
 };

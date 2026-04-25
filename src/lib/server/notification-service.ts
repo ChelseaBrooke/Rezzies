@@ -30,6 +30,10 @@ import { renderRemovedFromTripHtml } from './email/render/removed-from-trip.js';
 import { renderTripCanceledHtml } from './email/render/trip-canceled.js';
 import { renderWelcomeCoHostHtml } from './email/render/welcome-co-host.js';
 import { renderBedRemovedHtml } from './email/render/bed-removed.js';
+import {
+	renderCostShareReapprovalGuestHtml,
+	renderGuestApprovedCostShareHostHtml
+} from './email/render/cost-share-reapproval.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,6 +46,26 @@ function tripUrl(tripId: string): string {
 
 function guestsUrl(tripId: string): string {
 	return `${tripUrl(tripId)}/guests`;
+}
+
+function formatMoneyCents(cents: number): string {
+	return new Intl.NumberFormat('en-US', {
+		style: 'currency',
+		currency: 'USD',
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 0
+	}).format(cents / 100);
+}
+
+function formatReapprovalDeadlineEmail(d: Date): string {
+	return d.toLocaleString('en-US', {
+		weekday: 'short',
+		month: 'short',
+		day: 'numeric',
+		hour: 'numeric',
+		minute: '2-digit',
+		hour12: true
+	});
 }
 
 async function getTrip(tripId: string) {
@@ -386,5 +410,110 @@ export async function sendBedRemovedEmails(
 		);
 	} catch (err) {
 		console.error('[notification-service] sendBedRemovedEmails failed:', err);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Cost re-approval (share increased beyond agreed ceiling)
+// ---------------------------------------------------------------------------
+
+export type CostShareReapprovalEmailParams = {
+	tripId: string;
+	userId: string;
+	tripName: string;
+	originalLowCents: number;
+	originalHighCents: number;
+	newShareCents: number;
+	reason: string;
+	deadline: Date;
+	reminder: boolean;
+};
+
+/**
+ * Guest email for cost re-approval.
+ * TODO: Wire native mobile push using the same copy as the in-app notification.
+ */
+export async function sendCostShareReapprovalToGuest(p: CostShareReapprovalEmailParams): Promise<void> {
+	try {
+		const user = await getUser(p.userId);
+		if (!user?.email) return;
+
+		const guestName = user.name ?? 'Guest';
+		const deadlineFormatted = formatReapprovalDeadlineEmail(p.deadline);
+		const html = renderCostShareReapprovalGuestHtml({
+			guestName,
+			tripName: p.tripName,
+			tripUrl: tripUrl(p.tripId),
+			originalLowCents: p.originalLowCents,
+			originalHighCents: p.originalHighCents,
+			newShareCents: p.newShareCents,
+			reason: p.reason,
+			deadlineFormatted,
+			reminder: p.reminder
+		});
+
+		const baseSubject = `Your cost share for "${p.tripName}" has increased — action needed`;
+		const subject = p.reminder ? `Reminder: ${baseSubject}` : baseSubject;
+
+		await sendHtmlEmail({
+			to: user.email,
+			subject,
+			html,
+			templateKey: p.reminder
+				? TEMPLATE_KEYS.COST_SHARE_REAPPROVAL_GUEST_REMINDER
+				: TEMPLATE_KEYS.COST_SHARE_REAPPROVAL_GUEST,
+			tags: [{ name: 'category', value: 'billing' }]
+		});
+	} catch (err) {
+		console.error('[notification-service] sendCostShareReapprovalToGuest failed:', err);
+	}
+}
+
+/** In-app + email to hosts when a guest self-approves a higher share. */
+export async function sendGuestApprovedCostShareToHosts(params: {
+	tripId: string;
+	guestUserId: string;
+	amountCents: number;
+}): Promise<void> {
+	try {
+		const [trip, guest] = await Promise.all([getTrip(params.tripId), getUser(params.guestUserId)]);
+		if (!trip) return;
+		const guestName = guest?.name ?? 'A guest';
+		const amountFormatted = formatMoneyCents(params.amountCents);
+
+		const hosts = await prisma.tripMember.findMany({
+			where: { tripId: params.tripId, inviteStatus: 'approved', role: { in: ['host', 'co-host'] } },
+			include: { user: { select: { id: true, name: true, email: true } } }
+		});
+
+		for (const m of hosts) {
+			if (!m.user?.id || m.userId === params.guestUserId) continue;
+			await prisma.notification.create({
+				data: {
+					userId: m.user.id,
+					type: 'cost_share_guest_approved',
+					title: 'Guest confirmed cost share',
+					message: `${guestName} approved their updated cost share of ${amountFormatted} for "${trip.name}".`,
+					relatedTripId: params.tripId
+				}
+			});
+			if (!m.user.email) continue;
+			const html = renderGuestApprovedCostShareHostHtml({
+				hostName: m.user.name ?? 'Host',
+				guestName,
+				tripName: trip.name,
+				tripGuestsUrl: guestsUrl(params.tripId),
+				amountFormatted
+			});
+			await sendHtmlEmail({
+				to: m.user.email,
+				subject: `${guestName} confirmed their updated share for "${trip.name}"`,
+				html,
+				templateKey: TEMPLATE_KEYS.GUEST_APPROVED_NEW_COST_SHARE,
+				tags: [{ name: 'category', value: 'billing' }]
+			});
+		}
+	} catch (err) {
+		console.error('[notification-service] sendGuestApprovedCostShareToHosts failed:', err);
 	}
 }

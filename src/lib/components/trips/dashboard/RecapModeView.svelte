@@ -718,7 +718,8 @@
 		--r-radius: 14px;
 		--r-lift: 0 2px 12px rgba(0,0,0,0.06);
 		--r-lift-hover: 0 6px 24px rgba(0,0,0,0.11);
-		padding-top: 3.75rem;
+		/* Match planning: hero top uses only AppShell `--trip-dash-hero-offset`, not extra root padding */
+		padding-top: 0;
 		width: 100%;
 	}
 

@@ -31,6 +31,16 @@
 	--dangerHover: #8a3a0b;
 	--sticky: #e8ecf0;
 
+	/*
+	 * Trip dashboard (AppShell + planning / vacation / recap): vertical distance from the
+	 * top of scrollable `.main-content-inner` to the top edge of the hero cover photo when
+	 * `.main-content--floating-top` is on (mode pill + messages + bell sit in that band).
+	 * Planning `TripHero` uses margin-top: 0 — only this offset. Vacation `VacationModeView`
+	 * and recap `RecapModeView` must not add extra padding-top on their roots, or the hero
+	 * sits lower than planning.
+	 */
+	--trip-dash-hero-offset: calc(0.5rem + 2.75rem + 0.35rem);
+
 	/* Legacy aliases for components that reference these */
 	--primary-accent: var(--slate);
 	--sidebar-width: 280px;

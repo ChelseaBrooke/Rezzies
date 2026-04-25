@@ -3,6 +3,11 @@ import type { Actions, PageServerLoad } from './$types';
 import { createUser } from '$lib/server/user-auth.js';
 import { createSession } from '$lib/server/session.js';
 import { linkPendingInvitesForUser } from '$lib/server/invite-service.js';
+import {
+	HOUSEHOLD_CLAIM_COOKIE,
+	mergeHouseholdProxyToUser,
+	type HouseholdClaimPayload
+} from '$lib/server/household-claim.js';
 import { TRAVEL_STYLE_OPTIONS, isValidTravelStyle } from '$lib/travel-style.js';
 import { z } from 'zod';
 
@@ -86,6 +91,23 @@ export const actions: Actions = {
 
 			// Create session
 			await createSession(cookies, user.id);
+
+			const claimRaw = cookies.get(HOUSEHOLD_CLAIM_COOKIE);
+			if (claimRaw) {
+				try {
+					const parsed = JSON.parse(claimRaw) as HouseholdClaimPayload;
+					if (parsed.v === 1 && parsed.householdMemberId) {
+						await mergeHouseholdProxyToUser({
+							householdMemberId: parsed.householdMemberId,
+							userId: user.id,
+							userName: user.name
+						});
+					}
+				} catch {
+					// ignore bad cookie
+				}
+				cookies.delete(HOUSEHOLD_CLAIM_COOKIE, { path: '/' });
+			}
 
 			const raw = url.searchParams.get('redirect') ?? '';
 			const redirectTo =

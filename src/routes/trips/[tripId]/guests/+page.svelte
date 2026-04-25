@@ -760,7 +760,7 @@
 						<div class="gp-add-wrap">
 						<button
 							type="button"
-							class="gp-btn gp-btn--primary gp-btn--sm"
+							class="gp-btn gp-btn--primary gp-btn--sm gp-btn--add-guest"
 							bind:this={addGuestTriggerEl}
 							onmouseenter={onAddGuestMouseEnter}
 							onmouseleave={scheduleAddGuestClose}
@@ -770,7 +770,7 @@
 						>
 							<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
 							<span>Add Guest</span>
-							<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+							<svg class="gp-btn--add-guest-caret" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
 						</button>
 						{#if addGuestOpen}
 							<div use:portal class="add-guest-portal" role="presentation">
@@ -840,13 +840,13 @@
 								</th>
 							{/if}
 							<th class="gp-th gp-th--sortable" onclick={() => toggleSort('name')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('name')}>
-								Guest {#if sortBy === 'name'}<span class="gp-sort-arrow" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								<span class="gp-th-sort-inner">Guest {#if sortBy === 'name'}<span class="gp-sort-arrow" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}</span>
 							</th>
 							<th class="gp-th gp-th--sortable" onclick={() => toggleSort('rsvp')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('rsvp')}>
-								RSVP {#if sortBy === 'rsvp'}<span class="gp-sort-arrow" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								<span class="gp-th-sort-inner">RSVP {#if sortBy === 'rsvp'}<span class="gp-sort-arrow" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}</span>
 							</th>
 							<th class="gp-th gp-th--sortable" onclick={() => toggleSort('party-size')} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && toggleSort('party-size')}>
-								Party {#if sortBy === 'party-size'}<span class="gp-sort-arrow" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}
+								<span class="gp-th-sort-inner">Party {#if sortBy === 'party-size'}<span class="gp-sort-arrow" aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>{/if}</span>
 							</th>
 							<th class="gp-th">Room / Bed</th>
 							<th class="gp-th">Amount</th>
@@ -970,8 +970,13 @@
 								<td class="gp-td gp-td--center">
 									{#if row.type === 'member' && row.userId && (row.rsvpStatus === 'yes' || row.priceApproved != null)}
 										{#if row.priceApproved}
-											<span class="gp-check" aria-label="Approved">
-												<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+											<span class="gp-check-wrap">
+												<span class="gp-check" aria-label="Approved">
+													<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+												</span>
+												{#if row.costApprovalStatus === 'hostApproved'}
+													<sup class="gp-host-override" title="Manually approved by host">H</sup>
+												{/if}
 											</span>
 										{:else}
 											<span class="gp-cross" aria-label="Not approved">
@@ -1344,7 +1349,7 @@
 
 <style lang="css">
 	/* ── Shell ── */
-	.gp { display: flex; flex-direction: column; gap: 1.25rem; padding: 0; }
+	.gp { display: flex; flex-direction: column; gap: 1.5rem; padding: 0; }
 
 	/* ── Page header (title + meta) ── */
 	.gp-header {
@@ -1367,12 +1372,17 @@
 		justify-content: space-between;
 		gap: 1rem 1.5rem;
 		flex-wrap: wrap;
-		padding-bottom: 0.25rem;
+		padding-bottom: 0.75rem;
+		margin-bottom: 0.15rem;
 		border-bottom: 1px solid var(--border-soft, #e5e7eb);
 	}
-	.gp-page-head__main { flex: 1; min-width: 12rem; }
+	.gp-page-head__main {
+		flex: 1;
+		min-width: 0;
+		max-width: 100%;
+	}
 	.gp-page-head__lede {
-		margin: 0.35rem 0 0;
+		margin: 0.4rem 0 0;
 		font-size: 0.875rem;
 		line-height: 1.45;
 		color: var(--muted, #64748b);
@@ -1382,8 +1392,11 @@
 		display: flex;
 		flex-direction: column;
 		align-items: flex-end;
-		gap: 0.1rem;
+		gap: 0.2rem;
 		text-align: right;
+		flex-shrink: 0;
+		padding-top: 0.15rem;
+		min-width: 8.5rem;
 	}
 	.gp-page-head__meta-label {
 		font-size: 0.65rem;
@@ -1409,7 +1422,20 @@
 			display: grid;
 			grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
 			gap: 1rem 1.25rem;
-			align-items: start;
+			align-items: stretch;
+		}
+		.gp-summary-grid--split .gp-rsvp-card,
+		.gp-summary-grid--split .gp-hc-card {
+			min-height: 100%;
+			display: flex;
+			flex-direction: column;
+		}
+		.gp-summary-grid--split .gp-ov-chips {
+			margin-top: auto;
+			padding-top: 0.4rem;
+		}
+		.gp-summary-grid--split .gp-hc-card .gp-hc-meta {
+			margin-top: auto;
 		}
 	}
 
@@ -1638,6 +1664,18 @@
 	.gp-btn--danger { background: #dc2626; color: #fff; }
 	.gp-btn--danger:hover { background: #b91c1c; }
 	.gp-btn--sm { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
+	.gp-btn--add-guest {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding-left: 0.7rem;
+		padding-right: 0.6rem;
+	}
+	.gp-btn--add-guest .gp-btn--add-guest-caret {
+		flex-shrink: 0;
+		margin-left: 0.15rem;
+		opacity: 0.95;
+	}
 
 	/* Add guest dropdown */
 	.gp-add-wrap { position: relative; display: inline-flex; }
@@ -1713,15 +1751,23 @@
 
 	/* Controls bar, filters */
 	.gp-controls {
-		display: flex; align-items: center; justify-content: space-between;
-		gap: 1rem; flex-wrap: nowrap;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem 1rem;
+		flex-wrap: wrap;
 		padding: 0.75rem 1.25rem;
 		background: var(--surface2);
 		border-bottom: 1px solid var(--border-soft);
+		min-height: 2.85rem;
 	}
 	.gp-filters-row {
-		display: flex; align-items: center; gap: 0 1rem;
-		flex-wrap: nowrap;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem 1rem;
+		flex: 1 1 auto;
+		min-width: 0;
+		flex-wrap: wrap;
 	}
 	.gp-filter-label {
 		display: inline-flex; align-items: center; gap: 0.5rem;
@@ -1741,8 +1787,13 @@
 	}
 	.gp-select:hover { border-color: var(--slate); }
 	.gp-controls-actions {
-		display: flex; align-items: center; gap: 0.5rem;
-		flex-shrink: 0; flex-wrap: wrap;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-shrink: 0;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		margin-left: auto;
 	}
 	.gp-result-count { font-size: 0.8125rem; font-weight: 600; color: var(--muted); flex-shrink: 0; }
 
@@ -1766,9 +1817,15 @@
 	}
 	.gp-th--sortable { cursor: pointer; user-select: none; }
 	.gp-th--sortable:hover { color: var(--text); }
-	.gp-th--center { text-align: center; }
+	.gp-th--center { text-align: center; min-width: 4.5rem; }
 	.gp-th--actions { width: 1%; white-space: nowrap; }
-	.gp-sort-arrow { margin-left: 0.2rem; font-size: 0.7rem; }
+	.gp-th-sort-inner {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		white-space: nowrap;
+	}
+	.gp-sort-arrow { margin-left: 0; font-size: 0.72rem; opacity: 0.88; }
 	.gp-row { background: var(--surfaceSolid); transition: background 120ms; }
 	.gp-row:hover { background: var(--surface2); }
 	.gp-row--selected { background: rgba(47,119,120,0.06); }
@@ -1781,7 +1838,7 @@
 		color: var(--text);
 	}
 	.gp-td--guest { min-width: 14rem; }
-	.gp-td--center { text-align: center; }
+	.gp-td--center { text-align: center; vertical-align: middle; }
 	.gp-td--actions { white-space: nowrap; }
 
 	/* Guest cell */
@@ -1852,7 +1909,7 @@
 		text-transform: uppercase; letter-spacing: 0.03em;
 	}
 	.gp-badge--reconfirm { background: rgba(245,158,11,0.2); color: #b45309; }
-	.gp-hint { display: block; font-size: 0.7rem; color: var(--muted); margin-top: 0.15rem; }
+	.gp-hint { display: block; font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; line-height: 1.35; }
 
 	/* Room label */
 	.gp-room-label { font-size: 0.8125rem; color: var(--text); }
@@ -1863,7 +1920,7 @@
 	.gp-muted { color: var(--muted); font-size: 0.8125rem; }
 
 	/* Amount cell + payment badges */
-	.gp-amount-cell { display: flex; flex-direction: column; gap: 0.2rem; }
+	.gp-amount-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 0.35rem; }
 	.gp-amount-plain { font-weight: 600; color: var(--text); }
 	.gp-payment-badge {
 		display: inline-block;
@@ -1884,22 +1941,44 @@
 	.gp-amount-btn:hover { color: var(--warm); }
 
 	/* Check/cross */
+	.gp-check-wrap {
+		position: relative;
+		display: inline-flex;
+		align-items: flex-start;
+		justify-content: center;
+	}
+	.gp-host-override {
+		position: absolute;
+		right: -2px;
+		top: -1px;
+		font-size: 0.55rem;
+		font-weight: 700;
+		color: var(--muted, #6b7280);
+		line-height: 1;
+		user-select: none;
+	}
 	.gp-check {
 		display: inline-flex; align-items: center; justify-content: center;
-		width: 22px; height: 22px; border-radius: 50%;
+		width: 26px; height: 26px; border-radius: 50%;
 		background: rgba(34,197,94,0.12); color: #16a34a;
+	}
+	.gp-check :global(svg) {
+		width: 15px; height: 15px;
 	}
 	.gp-cross {
 		display: inline-flex; align-items: center; justify-content: center;
-		width: 22px; height: 22px; border-radius: 50%;
+		width: 26px; height: 26px; border-radius: 50%;
 		background: var(--surface2); color: var(--muted);
+	}
+	.gp-cross :global(svg) {
+		width: 15px; height: 15px;
 	}
 
 	/* Action icon buttons */
 	.gp-actions { display: flex; align-items: center; gap: 0.3rem; justify-content: flex-end; }
 	.gp-icon-btn {
 		display: inline-flex; align-items: center; justify-content: center;
-		width: 30px; height: 30px; border-radius: 7px;
+		width: 32px; height: 32px; border-radius: 7px;
 		border: 1px solid var(--border-soft); background: var(--surfaceSolid);
 		color: var(--muted); cursor: pointer; text-decoration: none;
 		transition: background 130ms, color 130ms, border-color 130ms;
@@ -1918,7 +1997,7 @@
 
 	/* Card footer */
 	.gp-card-footer {
-		padding: 0.75rem 1.25rem;
+		padding: 0.85rem 1.25rem 1rem;
 		border-top: 1px solid var(--border-soft);
 	}
 	.gp-empty { color: var(--muted); font-size: 0.875rem; padding: 1.5rem 1.25rem; margin: 0; }

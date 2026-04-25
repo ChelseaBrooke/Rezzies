@@ -111,6 +111,9 @@
 		!!(checkInDate && checkOutDate && isDashboardPage && !invitePreviewMode)
 	);
 
+	/** When true, messages/notifications (and maybe mode pill) float over main; inner scroll must clear them on desktop. */
+	const hasFloatingTopBar = $derived(showModePillOnDashboard || !hideMessagesAndNotifications);
+
 	function navHref(itemHref: string): string {
 		if (invitePreviewMode && inviteToken && itemHref === `/trips/${tripId}`) {
 			return `${itemHref}?invite=${encodeURIComponent(inviteToken)}`;
@@ -285,7 +288,7 @@
 			</button>
 		</div>
 	</aside>
-	<main class="main-content" bind:this={mainContentEl}>
+	<main class="main-content" class:main-content--floating-top={hasFloatingTopBar} bind:this={mainContentEl}>
 		<div
 			class="trip-sticky-header"
 			class:trip-sticky-header--with-bar={showModePillOnDashboard || !hideMessagesAndNotifications}
@@ -837,6 +840,19 @@
 		overflow-x: hidden;
 		scrollbar-width: none;
 		-ms-overflow-style: none;
+	}
+
+	/*
+	 * Desktop: .trip-sticky-header uses display: contents, and .top-actions is position:absolute,
+	 * so it does not reserve space — page content was scrolling underneath messages / notifications.
+	 * Reserve a band equal to the floating action row (top offset + 44px controls + breathing room).
+	 * Token: --trip-dash-hero-offset (theme.css) — same band used for “mode pill → hero top” on
+	 * planning, vacation, and recap; dashboard heroes must not add duplicate top padding.
+	 */
+	@media (min-width: 641px) {
+		.main-content--floating-top .main-content-inner {
+			padding-top: var(--trip-dash-hero-offset, calc(0.5rem + 2.75rem + 0.35rem));
+		}
 	}
 	.main-content-inner::-webkit-scrollbar {
 		display: none;

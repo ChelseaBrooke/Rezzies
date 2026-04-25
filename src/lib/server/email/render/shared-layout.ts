@@ -40,11 +40,12 @@ a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important
 .card{background-color:${B.cardBg};border-radius:${B.radiusCard};overflow:hidden;border:1px solid ${B.cardBorder};box-shadow:${B.cardShadow}}
 .accent-strip{height:5px;background:linear-gradient(90deg,${B.sky} 0%,${B.sand} 38%,${B.carrot} 72%,${B.accent} 100%)}
 .hero-band{background:linear-gradient(135deg,${B.primaryDark} 0%,${B.primary} 50%,${B.primaryDark} 100%);padding:28px 32px 32px}
-.logo-mark{display:inline-block;font-family:${B.fontSerif};font-size:22px;font-weight:700;color:${B.logoMark};letter-spacing:-0.02em;margin-bottom:6px}
-.logo-img{display:block;max-height:36px;width:auto;margin-bottom:10px}
-.kicker{font-family:${B.fontSans};font-size:11px;font-weight:600;letter-spacing:0.22em;text-transform:uppercase;color:${B.heroMuted};margin:0 0 10px}
-h1{font-family:${B.fontSerif};font-size:26px;line-height:1.25;font-weight:700;color:${B.heroText};margin:0 0 8px;letter-spacing:-0.02em}
-.hero-sub{font-family:${B.fontSans};font-size:15px;line-height:1.55;color:${B.heroMuted};margin:0}
+.logo-mark{display:inline-block;font-family:${B.fontSerif};font-size:22px;font-weight:800;color:${B.logoMark};letter-spacing:-0.02em;margin:0 0 10px}
+.logo-img{display:block;max-height:52px;width:auto;margin:0 0 16px}
+.hero-kicker{margin:0 0 12px}
+.eyebrow{display:inline-block;font-family:${B.fontSans};font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.95);background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.24);border-radius:999px;padding:5px 11px}
+h1{font-family:${B.fontSerif};font-size:26px;line-height:1.15;font-weight:800;color:${B.heroText};margin:0 0 8px;letter-spacing:-0.025em}
+.hero-sub{font-family:${B.fontSans};font-size:15px;line-height:1.55;color:${B.heroMuted};margin:0;font-weight:500}
 .body-pad{padding:28px 32px 32px}
 .lead{font-family:${B.fontSans};font-size:16px;line-height:1.65;color:${B.textDark};margin:0 0 20px}
 .lead--tight{margin-bottom:0!important}
@@ -55,9 +56,9 @@ h1{font-family:${B.fontSerif};font-size:26px;line-height:1.25;font-weight:700;co
 .digest td{font-family:${B.fontSans};font-size:15px;padding:8px 0;color:${B.textBody};border-bottom:1px solid ${B.borderLight}}
 .digest tr:last-child td{border-bottom:none}
 .digest--muted td{color:${B.textLight};border-bottom:none!important}
-.callout{background:${B.calloutBg};border:1.5px solid ${B.calloutBorder};border-radius:${B.radiusCallout};padding:20px 24px;text-align:center;margin:0 0 24px}
+.callout{background:${B.calloutBg};border:1.5px solid ${B.calloutBorder};border-radius:${B.radiusCallout};padding:20px 24px;text-align:center;margin:0 0 24px;box-shadow:0 4px 14px -8px rgba(47,119,120,0.35)}
 .callout-label{font-family:${B.fontSans};font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:${B.calloutLabel};margin:0 0 8px}
-.callout-value{font-family:${B.fontSerif};font-size:36px;font-weight:700;color:${B.primaryDark};line-height:1.2;margin:0 0 4px}
+.callout-value{font-family:${B.fontSerif};font-size:36px;font-weight:800;color:${B.navyHeading};line-height:1.2;margin:0 0 4px}
 .callout-note{font-family:${B.fontSans};font-size:13px;color:${B.textLight};margin:0}
 .btn-wrap{margin:8px 0 28px;text-align:center}
 .btn{display:inline-block;font-family:${B.fontSans};font-size:16px;font-weight:700;line-height:1;text-decoration:none!important;color:${B.heroText}!important;background-color:${B.accent};border-radius:${B.radiusBtn};padding:15px 28px;box-shadow:${B.ctaShadow}}
@@ -70,7 +71,7 @@ h1{font-family:${B.fontSerif};font-size:26px;line-height:1.25;font-weight:700;co
 
 const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />`;
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />`;
 
 function buildFooterHtml(footerNoteEscaped: string): string {
 	const appBase = (typeof process !== 'undefined' ? process.env.APP_BASE_URL?.trim() : '') ?? '';
@@ -92,8 +93,8 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 
 	const logoUrl = resolveEmailLogoUrl();
 	const logoBlock = logoUrl
-		? `<img src="${escapeHtml(logoUrl)}" alt="${B.name}" class="logo-img" />`
-		: `<div class="logo-mark">${B.name}</div>`;
+		? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(B.name)}" class="logo-img" />`
+		: `<div class="logo-mark">${escapeHtml(B.name)}</div>`;
 
 	const calloutBlock = opts.callout ? `<div class="callout">${opts.callout}</div>` : '';
 
@@ -139,7 +140,7 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 					<tr>
 						<td class="hero-band">
 							${logoBlock}
-							<p class="kicker">${kicker}</p>
+							<div class="hero-kicker"><span class="eyebrow">${kicker}</span></div>
 							<h1>${heading}</h1>
 							${subheading ? `<p class="hero-sub">${subheading}</p>` : ''}
 						</td>

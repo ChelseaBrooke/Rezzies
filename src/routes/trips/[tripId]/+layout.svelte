@@ -4,6 +4,7 @@
 	import AppShell from '$lib/components/trips/dashboard/AppShell.svelte';
 	import TripChat from '$lib/components/trips/TripChat.svelte';
 	import FeatureTourModal from '$lib/components/ui/FeatureTourModal.svelte';
+	import CostReapprovalModal from '$lib/components/trips/CostReapprovalModal.svelte';
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
 	// Trip is in recap (past checkout), disable editing (e.g. hide Settings)
@@ -27,6 +28,11 @@
 	}
 </script>
 
+{#if data.publicHouseholdClaim}
+	{#if safeChildren}
+		{@render safeChildren()}
+	{/if}
+{:else}
 <AppShell
 		tripId={data.trip.id}
 		user={data.user}
@@ -48,12 +54,16 @@
 		{/if}
 	{/snippet}
 </AppShell>
+	{#if data.costReapprovalBlock}
+		<CostReapprovalModal tripId={data.trip.id} block={data.costReapprovalBlock} />
+	{/if}
+{/if}
 
-{#if data.featureTourVariant}
+{#if !data.publicHouseholdClaim && data.featureTourVariant}
 	<FeatureTourModal variant={data.featureTourVariant} />
 {/if}
 
-{#if data.canChat && data.user}
+{#if !data.publicHouseholdClaim && data.canChat && data.user}
 	<TripChat tripId={data.trip.id} userId={data.user.id} />
 {/if}
 

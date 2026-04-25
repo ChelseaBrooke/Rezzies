@@ -35,17 +35,6 @@
 		gameStatusLines = null
 	}: Props = $props();
 
-	const visibleCards = $derived.by((): GameCard[] => {
-		if (!allowedGameIds?.length) return GAME_CARDS;
-		const byId = new Map(GAME_CARDS.map((c) => [c.id, c]));
-		return allowedGameIds.map((id) => byId.get(id)).filter((c): c is GameCard => Boolean(c));
-	});
-
-	function statusFor(cardId: string, fallback: string): string {
-		const custom = gameStatusLines?.[cardId]?.trim();
-		return custom || fallback;
-	}
-
 	const GAME_CARDS: GameCard[] = [
 		{
 			id: 'scavenger-bingo',
@@ -88,6 +77,17 @@
 			statusLine: 'Host-led trivia for the group',
 		},
 	];
+
+	const visibleCards = $derived.by((): GameCard[] => {
+		if (!allowedGameIds?.length) return GAME_CARDS;
+		const byId = new Map(GAME_CARDS.map((c) => [c.id, c]));
+		return allowedGameIds.map((id) => byId.get(id)).filter((c): c is GameCard => Boolean(c));
+	});
+
+	function statusFor(cardId: string, fallback: string): string {
+		const custom = gameStatusLines?.[cardId]?.trim();
+		return custom || fallback;
+	}
 </script>
 
 <div class="lobby" class:lobby--compact={compact}>

@@ -619,6 +619,8 @@
 		grid-column: 1;
 		grid-row: 1;
 		min-width: 0;
+		min-height: 0;
+		height: 100%;
 		z-index: 10;
 		position: relative;
 		overflow: visible;
@@ -646,6 +648,8 @@
 		grid-column: 2;
 		grid-row: 1;
 		min-width: 0;
+		min-height: 0;
+		height: 100%;
 		align-self: stretch;
 		display: flex;
 		flex-direction: column;
@@ -656,6 +660,7 @@
 		grid-column: 3;
 		grid-row: 1 / 3;
 		min-width: 0;
+		min-height: 0;
 		align-self: stretch;
 		display: flex;
 		flex-direction: column;
@@ -669,7 +674,9 @@
 	}
 
 	.goals-cell :global(.dashboard-card) {
-		flex: 1;
+		flex: 1 1 0;
+		min-height: 0;
+		height: 100%;
 		display: flex;
 		flex-direction: column;
 		overflow: visible;
@@ -683,13 +690,14 @@
 		overflow: visible;
 	}
 
-	/* Recent Activity card, limited height so it doesn’t collide with Chat */
+	/* Recent Activity: fill the spanned cell; list scrolls inside (don’t cap shorter than row 1 + guests) */
 	.recent-cell :global(.dashboard-card) {
-		flex: 1;
+		flex: 1 1 0;
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
-		max-height: 320px;
+		max-height: 100%;
+		height: 100%;
 		overflow: hidden;
 	}
 
@@ -726,7 +734,10 @@
 	/* Trip info card wrapper, fills goals-cell so card stretches to row 1 height */
 	.goals-card-wrap {
 		min-width: 0;
-		flex: 1;
+		min-height: 0;
+		flex: 1 1 0;
+		align-self: stretch;
+		width: 100%;
 		display: flex;
 		flex-direction: column;
 	}

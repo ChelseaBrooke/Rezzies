@@ -191,17 +191,20 @@ export async function createInvoiceForUser(tripId: string, userId: string) {
 
 	if (existing) {
 		// Update existing invoice
-		return prisma.invoice.update({
+		const updated = await prisma.invoice.update({
 			where: { id: existing.id },
 			data: {
 				totalAmount: breakdown.total,
 				breakdownJson: JSON.stringify(breakdown)
 			}
 		});
+		const { evaluateCostReapprovalForTrip } = await import('./cost-reapproval.js');
+		await evaluateCostReapprovalForTrip(tripId).catch((e) => console.warn('[invoice] cost reapproval eval:', e));
+		return updated;
 	}
 
 	// Create new invoice
-	return prisma.invoice.create({
+	const created = await prisma.invoice.create({
 		data: {
 			tripId,
 			userId,
@@ -211,4 +214,7 @@ export async function createInvoiceForUser(tripId: string, userId: string) {
 			breakdownJson: JSON.stringify(breakdown)
 		}
 	});
+	const { evaluateCostReapprovalForTrip } = await import('./cost-reapproval.js');
+	await evaluateCostReapprovalForTrip(tripId).catch((e) => console.warn('[invoice] cost reapproval eval:', e));
+	return created;
 }

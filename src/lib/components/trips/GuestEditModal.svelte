@@ -10,6 +10,8 @@
 		rsvpStatus?: string | null;
 		partySize?: number;
 		priceApproved?: boolean | null;
+		costApprovalStatus?: string | null;
+		reApprovalDeadlineAt?: string | null;
 		invoicePaid?: boolean | null;
 		assignedBedIds?: string[];
 		arrivalDate?: string | null;
@@ -63,6 +65,8 @@
 	let roleError = $state<string | null>(null);
 	let roleSuccess = $state(false);
 	let savingRole = $state(false);
+	let savingCostHostApprove = $state(false);
+	let costHostApproveError = $state<string | null>(null);
 
 	$effect(() => {
 		if (open && row) {
@@ -75,6 +79,7 @@
 			submitError = null;
 			roleError = null;
 			roleSuccess = false;
+			costHostApproveError = null;
 		}
 	});
 
@@ -82,6 +87,52 @@
 	const roleChanged = $derived(formRole !== (row?.role === 'co-host' ? 'co-host' : 'guest'));
 
 	const roleActionUrl = $derived(`/trips/${tripId}/guests?/updateMemberRole`);
+	const markCostHostActionUrl = $derived(`/trips/${tripId}/guests?/markCostShareHostApproved`);
+
+	const costReapprovalPending = $derived(row?.costApprovalStatus === 'pending');
+	const costShareDisplay = $derived(
+		row?.toPayTotal != null && row.toPayTotal > 0
+			? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(
+					row.toPayTotal
+				)
+			: '—'
+	);
+	const reApprovalDeadlineLabel = $derived.by(() => {
+		const raw = row?.reApprovalDeadlineAt;
+		if (!raw) return '—';
+		const d = new Date(raw);
+		return d.toLocaleString('en-US', {
+			weekday: 'short',
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true
+		});
+	});
+
+	async function handleMarkCostHostApproved() {
+		if (!row?.userId || savingCostHostApprove) return;
+		costHostApproveError = null;
+		savingCostHostApprove = true;
+		try {
+			const fd = new FormData();
+			fd.set('userId', row.userId);
+			const res = await fetch(markCostHostActionUrl, { method: 'POST', body: fd });
+			const result = deserialize(await res.text());
+			if (result.type === 'success') {
+				await invalidateAll();
+				onClose();
+			} else if (result.type === 'failure' && result.data) {
+				costHostApproveError =
+					(result.data as { message?: string }).message ?? 'Could not mark as approved.';
+			}
+		} catch (err) {
+			costHostApproveError = err instanceof Error ? err.message : 'Request failed.';
+		} finally {
+			savingCostHostApprove = false;
+		}
+	}
 
 	async function handleRoleChange() {
 		if (!row?.userId || savingRole) return;
@@ -220,7 +271,29 @@
 					</div>
 				</div>
 
-			{#if row.rsvpStatus === 'yes' || row.priceApproved != null}
+			{#if costReapprovalPending}
+				<div class="cost-reapproval-section">
+					<div class="cost-reapproval-title">Cost Re-Approval</div>
+					<hr class="cost-reapproval-rule" />
+					<p class="cost-reapproval-copy">
+						This guest hasn't approved their updated share of {costShareDisplay}.
+					</p>
+					<p class="cost-reapproval-deadline">Deadline: {reApprovalDeadlineLabel}</p>
+					{#if costHostApproveError}
+						<p class="form-error" role="alert">{costHostApproveError}</p>
+					{/if}
+					<button
+						type="button"
+						class="modal-btn modal-btn--primary cost-reapproval-btn"
+						disabled={savingCostHostApprove}
+						onclick={handleMarkCostHostApproved}
+					>
+						{savingCostHostApprove ? 'Saving…' : 'Mark as approved'}
+					</button>
+				</div>
+			{/if}
+
+			{#if (row.rsvpStatus === 'yes' || row.priceApproved != null) && !costReapprovalPending}
 				<div class="form-group">
 					<label class="checkbox-label">
 						<input type="checkbox" bind:checked={formPriceApproved} />
@@ -451,6 +524,40 @@
 	.modal-btn--primary:hover:not(:disabled) {
 		background: var(--chocolate, #a84510);
 		transform: translateY(-1px);
+	}
+	.cost-reapproval-section {
+		margin-top: 0.25rem;
+		padding: 1rem 0 0.25rem 0;
+		border-top: 1px solid var(--border-soft, #eee);
+	}
+	.cost-reapproval-title {
+		font-size: 0.8125rem;
+		font-weight: 700;
+		color: var(--text, #222);
+		letter-spacing: 0.02em;
+		text-transform: uppercase;
+		margin-bottom: 0.35rem;
+	}
+	.cost-reapproval-rule {
+		border: none;
+		border-top: 1px solid var(--border, #ddd);
+		margin: 0 0 0.75rem 0;
+	}
+	.cost-reapproval-copy,
+	.cost-reapproval-deadline {
+		font-size: 0.875rem;
+		color: var(--muted, #666);
+		margin: 0 0 0.35rem 0;
+		line-height: 1.45;
+	}
+	.cost-reapproval-btn.modal-btn--primary {
+		width: 100%;
+		margin-top: 0.35rem;
+		background: var(--teal, #0d9488);
+		box-shadow: 0 3px 12px rgba(13, 148, 136, 0.25);
+	}
+	.cost-reapproval-btn.modal-btn--primary:hover:not(:disabled) {
+		background: #0f766e;
 	}
 	.modal-btn--secondary {
 		background: var(--surface2, #f3f4f6);

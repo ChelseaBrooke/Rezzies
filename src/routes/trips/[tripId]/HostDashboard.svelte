@@ -307,6 +307,8 @@
 			gamesHref={trip ? `/trips/${trip.id}/games` : ''}
 			gamesCount={data.tripGames?.length ?? 0}
 			{hostedByLine}
+			canHostShare={data.canHostShare ?? false}
+			householdShare={data.householdShare ?? null}
 			/>
 			<PollCardContainer tripId={trip.id} placement="hero" isHost={true} />
 		</div>

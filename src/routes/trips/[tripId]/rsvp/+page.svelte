@@ -661,7 +661,15 @@
 						<div id="cost-commitment" class="cost-commitment-module">
 								{#if guestEstimate}
 									<div class="estimate-lines">
-										<p class="estimate-range"><strong>My estimated share: {guestEstimate.displayCents != null ? formatCents(guestEstimate.displayCents) : formatRange(guestEstimate.lowCents, guestEstimate.highCents)}</strong></p>
+										<p class="estimate-range">
+											<strong>
+												Your estimated share:{' '}
+												{guestEstimate.displayCents != null
+													? formatCents(guestEstimate.displayCents)
+													: formatRange(guestEstimate.lowCents, guestEstimate.highCents)}
+											</strong>
+										</p>
+										<p class="estimate-secondary estimate-secondary--muted">Based on current and expected guest count.</p>
 										<p class="estimate-secondary">
 											{#if data.isPerRoomPricing}
 												Each room pays an equal share of the trip total; your dates prorate that amount.
@@ -679,14 +687,16 @@
 									<div class="form-group commitment-checkbox">
 										<label class="commitment-label">
 											<span class="commitment-line-one">
-												<input type="checkbox" bind:checked={costCommitmentChecked} name="costCommitmentAccepted" value="true" form="yes-confirm-form" class="commitment-checkbox-input" />
-												<span>I agree to share the trip costs.</span>
+												<input type="checkbox" bind:checked={costCommitmentChecked} name="costRangeAcknowledged" value="true" form="yes-confirm-form" class="commitment-checkbox-input" />
+												<span>I understand my share may fall anywhere in this range and agree to pay accordingly.</span>
 											</span>
-											<span class="commitment-rest">I understand the final amount depends on the number of guests. If the estimate changes outside your accepted range, you’ll be asked to review and confirm.</span>
 										</label>
 									</div>
 
 									<form id="yes-confirm-form" method="POST" action="?/updateRsvp" use:enhance={enhanceRsvpSubmit} class="submit-form">
+										{#if costCommitmentChecked}
+											<input type="hidden" name="costCommitmentAccepted" value="true" />
+										{/if}
 										<input type="hidden" name="status" value="yes" />
 										<input type="hidden" name="arrivalDate" value={fullStayArrival} />
 										<input type="hidden" name="departureDate" value={fullStayDeparture} />
@@ -1215,6 +1225,7 @@
 	.estimate-lines { text-align: center; margin-bottom: 0.5rem; }
 	.estimate-lines .estimate-range { margin: 0 0 0.1rem; font-size: 0.975rem; }
 	.estimate-lines .estimate-secondary { margin: 0; font-size: 0.82rem; color: var(--color-text-light); }
+	.estimate-lines .estimate-secondary--muted { margin-bottom: 0.25rem; font-weight: 500; color: var(--color-text-muted, #6b7280); }
 	.estimate-range { margin: 0 0 0.2rem; }
 	.estimate-headcount { margin: 0; font-size: 0.85rem; color: var(--color-text-light); }
 	.estimate-microcopy { margin: 0 0 0.4rem; font-size: 0.82rem; color: var(--color-text-light); }

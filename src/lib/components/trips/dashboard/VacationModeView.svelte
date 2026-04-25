@@ -414,14 +414,6 @@
 			<div class="v-hero-overlay" aria-hidden="true"></div>
 		</div>
 
-		<!-- Day counter badge -->
-		{#if dayNumber !== null && totalDays !== null}
-			<div class="v-day-badge">
-				<span class="v-day-num">{dayNumber}</span>
-				<span class="v-day-label">of {totalDays}<br/>days</span>
-			</div>
-		{/if}
-
 		<div class="v-hero-body">
 			<div class="v-hero-title-stack">
 				<h1 class="v-hero-title">{displayTripName}</h1>
@@ -665,7 +657,8 @@
 					</p>
 				</header>
 
-				<!-- Today's schedule -->
+				<!-- Today's schedule + day badge overlapping card top -->
+				<div class="v-today-with-badge">
 				<section class="v-today">
 					<h3 class="v-today-heading">Today's Schedule</h3>
 					{#if todayItinerary.length === 0}
@@ -719,6 +712,15 @@
 					{/if}
 					<a href="/trips/{tripId}/itinerary" class="v-today-link">View full itinerary →</a>
 				</section>
+				{#if dayNumber !== null && totalDays !== null}
+					<div class="v-sidebar-day-wrap">
+						<div class="v-day-badge" aria-label="Trip day {dayNumber} of {totalDays}">
+							<span class="v-day-num">{dayNumber}</span>
+							<span class="v-day-label">of {totalDays}<br/>days</span>
+						</div>
+					</div>
+				{/if}
+				</div>
 			</div>
 		</aside>
 	</div>
@@ -808,15 +810,28 @@
 <!-- ════════════════ STYLES ════════════════ -->
 <style>
 	/* ── Shell ── */
+	/* One canvas for main column + assistant (must match .v-assistant exactly) */
+	.v,
+	.v-assistant {
+		background: linear-gradient(175deg, #fdf5e6 0%, #fdf8f0 40%, #ffffff 70%);
+		background-attachment: fixed;
+	}
+
 	.v {
 		--v-right: min(360px, 32vw);
 		--v-gap: 1.25rem;
 		--v-radius: 14px;
 		--v-lift: 0 2px 10px rgba(0,0,0,0.06);
 		--v-lift-hover: 0 6px 24px rgba(0,0,0,0.10);
-		padding-top: 3.75rem;
+		/*
+		 * Match planning dash: top of `.v-hero` photo = only AppShell
+		 * `--trip-dash-hero-offset` on `.main-content-inner` — do not stack extra padding here.
+		 */
+		padding-top: 0;
 		position: relative;
 		width: 100%;
+		min-height: 100%;
+		box-sizing: border-box;
 	}
 
 	.v-checkout-banner {
@@ -872,11 +887,31 @@
 		pointer-events: none;
 	}
 
-	/* Day counter badge, top-right corner of hero */
-	.v-day-badge {
+	/* Day badge: overlaps top edge of Today's Schedule card (assistant column) */
+	.v-today-with-badge {
+		position: relative;
+		margin-top: 0.75rem;
+	}
+	.v-today-with-badge .v-today {
+		margin-top: 0;
+	}
+	.v-sidebar-day-wrap {
 		position: absolute;
-		top: 4.8rem;
-		right: 1.75rem;
+		top: 0;
+		right: 1.1rem;
+		z-index: 7;
+		display: flex;
+		justify-content: flex-end;
+		width: auto;
+		margin: 0;
+		padding: 0;
+		transform: translateY(calc(-50% + 3px));
+		pointer-events: none;
+	}
+	.v-sidebar-day-wrap .v-day-badge {
+		pointer-events: auto;
+	}
+	.v-day-badge {
 		display: flex;
 		align-items: baseline;
 		gap: 0.4rem;
@@ -884,7 +919,7 @@
 		border-radius: 16px;
 		padding: 0.75rem 1.125rem 0.75rem 1rem;
 		box-shadow: 0 4px 20px rgba(206,86,18,0.4);
-		z-index: 2;
+		flex-shrink: 0;
 	}
 	.v-day-num {
 		font-family: 'Fraunces', Georgia, serif;
@@ -1011,7 +1046,8 @@
 
 	/* ── Shared tile ── */
 	.v-tile {
-		background: var(--surfaceSolid);
+		/* Slightly warm white so card faces match vacation sand, not cool gray-white */
+		background: linear-gradient(180deg, #fffefb 0%, #fffdf9 100%);
 		border-radius: var(--v-radius);
 		padding: 1.25rem;
 		box-shadow: var(--v-lift);
@@ -1205,7 +1241,7 @@
 		gap: 0.85rem;
 		padding: 1.1rem 1.2rem 1.15rem;
 		border-radius: var(--v-radius);
-		background: #f7f6f4;
+		background: linear-gradient(180deg, #faf7f2 0%, #f4efe8 100%);
 		border: 1px solid rgba(62, 58, 52, 0.07);
 		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 6px 22px rgba(30, 28, 26, 0.04);
 		transition: transform 180ms ease, box-shadow 180ms ease;
@@ -1758,20 +1794,28 @@
 	.v-assistant {
 		position: fixed; top: 0; right: 0; bottom: 0;
 		width: var(--v-right);
-		/* Warm desert sand feel matching the divvi coastal palette, fully opaque */
-		background: linear-gradient(175deg,
-			#fdf5e6 0%,
-			#fdf8f0 40%,
-			#ffffff 70%
-		);
+		/* background: shared with .v above — same gradient + fixed attachment */
 		border-left: 1px solid rgba(227,206,170,0.55);
 		box-shadow: -5px 0 28px rgba(0,0,0,0.05);
-		overflow-y: auto; z-index: 1;
+		overflow-y: auto;
+		/* Stay under AppShell .top-actions (z-index 5) so messages / bell stay clickable */
+		z-index: 1;
 	}
 	.v-assistant-inner {
-		padding: 3.75rem 1.5rem 2rem;
-		display: flex; flex-direction: column; gap: 1.375rem;
+		padding: 1.125rem 1.5rem 1.5rem;
+		display: flex; flex-direction: column; gap: 1rem;
 		min-height: 100%;
+	}
+	/*
+	 * Fixed sidebar starts at viewport top; AppShell top-actions float in the same band.
+	 * Mirror .main-content--floating-top .main-content-inner padding-top so the greeting
+	 * never sits under messages / notifications.
+	 */
+	@media (min-width: 1101px) {
+		.v-assistant-inner {
+			/* Same floating band as main column + small buffer under icons (see theme --trip-dash-hero-offset) */
+			padding-top: calc(var(--trip-dash-hero-offset, calc(0.5rem + 2.75rem + 0.35rem)) + 0.5rem);
+		}
 	}
 
 	/* Greeting */
@@ -1794,8 +1838,8 @@
 
 	/* Today card */
 	.v-today {
-		margin-top: 1.5rem;
-		background: var(--surfaceSolid);
+		margin-top: 0.75rem;
+		background: linear-gradient(180deg, #fffefb 0%, #fffdf9 100%);
 		border-radius: var(--v-radius);
 		box-shadow: var(--v-lift);
 		border: 1px solid var(--border-soft);
@@ -1825,7 +1869,7 @@
 		gap: 0.5rem; align-items: start;
 		padding: 0.5rem 0.625rem;
 		border-radius: 9px;
-		background: rgba(244,245,247,0.7);
+		background: rgba(255, 252, 247, 0.92);
 		border-left: 3px solid transparent;
 	}
 	.v-today-item--activity { border-left-color: var(--slate); }
@@ -1873,10 +1917,6 @@
 			margin-right: 0;
 			padding-right: 0;
 			grid-template-columns: 1fr;
-		}
-		.v-day-badge {
-			top: 1rem;
-			right: 1rem;
 		}
 		.v-hero-who {
 			right: 1.25rem;

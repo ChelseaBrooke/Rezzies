@@ -1,9 +1,12 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { getUserTripMembership, getUserTrips } from '$lib/server/trip-access.js';
+import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
+import { firstNameFromUserName } from '$lib/server/household-claim.js';
 import { computeCommittedFundsFromYesRsvps, getCostAtMaxParticipation } from '$lib/server/pricing-canonical.js';
 import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
+import type { InvoiceBreakdown } from '$lib/server/invoice-calculator.js';
 
 const INVITE_COOKIE_PREFIX = 'trip_invite_';
 
@@ -116,6 +119,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 		};
 
 		return {
+			publicHouseholdClaim: false as const,
 			user: null,
 			invitePreview: true as const,
 			inviteToken: inviteTokenResolved,
@@ -130,8 +134,12 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			allTrips: [],
 			membership: null,
 			isHost: false,
+			isCoHost: false,
+			canHostShare: false,
+			householdShare: null,
 			costAtMaxParticipation: null,
 			userRsvp: null,
+			costReapprovalBlock: null,
 			canChat: false,
 			pendingMemberCount: 0,
 			committedFundsFromYesRsvps: 0,
@@ -139,6 +147,52 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			tripGames: [],
 			recentPolls: [],
 			tripGalleryFiles: [],
+			featureTourVariant: null as FeatureTourVariant
+		};
+	}
+
+	/** Unauthenticated (or not yet on trip) claim flow — skip membership gate */
+	const isPublicHouseholdJoin = url.pathname.includes('/join/household/');
+	if (isPublicHouseholdJoin) {
+		const sUser = await getSessionUser(cookies);
+		const t = await prisma.trip.findUnique({
+			where: { id: tripId },
+			select: {
+				id: true,
+				name: true,
+				isPublished: true,
+				checkInDate: true,
+				checkOutDate: true,
+				listingCoverPhoto: true,
+				locationCity: true
+			}
+		});
+		if (!t || !t.isPublished) throw error(404, 'Trip not found');
+		return {
+			user: sUser,
+			publicHouseholdClaim: true as const,
+			invitePreview: false as const,
+			inviteToken: null as string | null,
+			inviteStatus: null as string | null,
+			previewHostName: null as string | null,
+			previewCounts: null as { meals: number; activities: number; games: number } | null,
+			trip: t,
+			allTrips: [] as { id: string; name: string; listingCoverPhoto?: string | null }[],
+			membership: null,
+			isHost: false,
+			isCoHost: false,
+			canHostShare: false,
+			householdShare: null,
+			costAtMaxParticipation: null,
+			userRsvp: null,
+			costReapprovalBlock: null,
+			canChat: false,
+			pendingMemberCount: 0,
+			committedFundsFromYesRsvps: 0,
+			pollsBadgeCount: 0,
+			tripGames: [] as { id: string; name: string }[],
+			recentPolls: [] as { id: string; title: string; createdAt: string }[],
+			tripGalleryFiles: [] as { id: string; name: string; url: string }[],
 			featureTourVariant: null as FeatureTourVariant
 		};
 	}
@@ -166,6 +220,8 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 	}
 
 	const isHost = membership.role === 'host';
+	const isCoHost = membership.role === 'co-host';
+	const canHostShare = isHost || isCoHost;
 	const [trip, , tripsResult, userRsvp, committedFunds, costAtMaxParticipation, userOnboardingData] = await Promise.all([
 		prisma.trip.findUnique({
 			where: { id: tripId },
@@ -292,7 +348,78 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 		}
 	}
 
+	let householdShare: {
+		householdId: string;
+		hasUnclaimedProxyMembers: boolean;
+		unclaimedFirstNames: string[];
+		primaryFirstName: string;
+	} | null = null;
+	let costReapprovalBlock: {
+		tripName: string;
+		originalRangeMinCents: number;
+		originalRangeMaxCents: number;
+		currentShareCents: number;
+		reasonLine: string;
+		reApprovalDeadline: string;
+		breakdown: { rooms?: { amount: number; nights: number }[] } | null;
+	} | null = null;
+	if (
+		userRsvp?.status === 'yes' &&
+		userRsvp.costApprovalStatus === 'pending' &&
+		trip.costSharingEnabled &&
+		!isHost &&
+		membership?.role !== 'co-host'
+	) {
+		const inv = trip.invoices?.find((i) => i.userId === user.id && i.status === 'due');
+		const origMin = userRsvp.originalRangeMinCents ?? userRsvp.acceptedEstimateLowCents;
+		const origMax = userRsvp.originalRangeMaxCents ?? userRsvp.acceptedEstimateHighCents;
+		const deadline = userRsvp.reApprovalDeadline;
+		if (inv && origMin != null && origMax != null && deadline) {
+			let breakdown: InvoiceBreakdown | null = null;
+			if (inv.breakdownJson) {
+				try {
+					breakdown = JSON.parse(inv.breakdownJson) as InvoiceBreakdown;
+				} catch {
+					breakdown = null;
+				}
+			}
+			const reasonLine =
+				userRsvp.costReapprovalReason?.trim() ||
+				`The group's cost split has changed for "${trip.name}".`;
+			costReapprovalBlock = {
+				tripName: trip.name,
+				originalRangeMinCents: origMin,
+				originalRangeMaxCents: origMax,
+				currentShareCents: Math.round(inv.totalAmount * 100),
+				reasonLine,
+				reApprovalDeadline: deadline.toISOString(),
+				breakdown: breakdown
+					? { rooms: breakdown.rooms?.map((r) => ({ amount: r.amount, nights: r.nights })) }
+					: null
+			};
+		}
+	}
+
+	if (!canHostShare) {
+		const hh = await prisma.household.findUnique({
+			where: { tripId_primaryUserId: { tripId, primaryUserId: user.id } },
+			include: { members: true }
+		});
+		if (hh) {
+			const unclaimed = hh.members.filter(
+				(m) => m.ageGroup !== 'child' && m.accountStatus === 'none' && !m.userId
+			);
+			householdShare = {
+				householdId: hh.id,
+				hasUnclaimedProxyMembers: unclaimed.length > 0,
+				unclaimedFirstNames: unclaimed.map((m) => m.firstName),
+				primaryFirstName: firstNameFromUserName(user.name) || 'You'
+			};
+		}
+	}
+
 	return {
+		publicHouseholdClaim: false as const,
 		user,
 		invitePreview: false as const,
 		inviteToken: null as string | null,
@@ -303,8 +430,12 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 		allTrips,
 		membership,
 		isHost,
+		isCoHost,
+		canHostShare,
+		householdShare,
 		costAtMaxParticipation: costAtMaxParticipation ?? null,
 		userRsvp,
+		costReapprovalBlock,
 		canChat: userRsvp?.status === 'yes' || membership?.role === 'host',
 		pendingMemberCount,
 		committedFundsFromYesRsvps: committedFunds,

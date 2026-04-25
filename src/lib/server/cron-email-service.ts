@@ -440,3 +440,20 @@ export async function sendFeedbackRequestEmails(): Promise<{ sent: number; skipp
 
 	return { sent, skipped };
 }
+
+/**
+ * Reminder (24h before deadline) for guests with pending cost re-approval.
+ * TODO: Query RSVPs with costApprovalStatus=pending, reApprovalDeadline in window,
+ * send COST_SHARE_REAPPROVAL_GUEST_REMINDER via sendCostShareReapprovalToGuest, dedupe in EmailLog.
+ */
+export async function sendCostReapprovalReminderEmails(): Promise<{ sent: number; skipped: number }> {
+	return { sent: 0, skipped: 0 };
+}
+
+/**
+ * Guests still pending after reApprovalDeadline — notify hosts (email + in-app).
+ * TODO: Implement query, send COST_SHARE_REAPPROVAL_HOST_OVERDUE, dedupe, and native push.
+ */
+export async function sendCostReapprovalOverdueHostEmails(): Promise<{ sent: number; skipped: number }> {
+	return { sent: 0, skipped: 0 };
+}

@@ -393,15 +393,16 @@
 		border-bottom: 1px solid var(--border-soft, rgba(0,0,0,0.06));
 	}
 
-	/* 2-column grid for the 4 info fields */
+	/* 2-column grid for the 4 info fields — equal row heights so the top two cells match */
 	.tic-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
+		grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
 		gap: 0.5rem 1rem;
 		flex: 1;
 		min-height: 0;
 		overflow: hidden;
-		align-content: space-evenly;
+		align-content: stretch;
 	}
 
 	.tic-cell {

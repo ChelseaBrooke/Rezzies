@@ -26,7 +26,9 @@ import {
 	sendDayOfTripEmails,
 	sendDailyDigestEmails,
 	sendTripRecapEmails,
-	sendFeedbackRequestEmails
+	sendFeedbackRequestEmails,
+	sendCostReapprovalReminderEmails,
+	sendCostReapprovalOverdueHostEmails
 } from '$lib/server/cron-email-service.js';
 
 export const GET: RequestHandler = async ({ request }) => {
@@ -41,7 +43,9 @@ export const GET: RequestHandler = async ({ request }) => {
 		{ name: 'dayOfTrip', fn: sendDayOfTripEmails },
 		{ name: 'dailyDigest', fn: sendDailyDigestEmails },
 		{ name: 'tripRecap', fn: sendTripRecapEmails },
-		{ name: 'feedbackRequest', fn: sendFeedbackRequestEmails }
+		{ name: 'feedbackRequest', fn: sendFeedbackRequestEmails },
+		{ name: 'costReapprovalReminders', fn: sendCostReapprovalReminderEmails },
+		{ name: 'costReapprovalOverdueHosts', fn: sendCostReapprovalOverdueHostEmails }
 	];
 
 	for (const job of jobs) {

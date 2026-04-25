@@ -11,6 +11,7 @@
 	import { dashboardModeByTripId } from '$lib/stores/dashboardMode.js';
 	import type { DashboardMode } from '$lib/stores/dashboardMode.js';
 	import { formatHostedByLine } from '$lib/format-hosted-by.js';
+	import { page } from '$app/stores';
 
 	let { data }: { data: PageData } = $props();
 
@@ -34,6 +35,21 @@
 	const dashboardMode = $derived(($dashboardModeByTripId)[trip?.id ?? ''] ?? modeFromDate);
 	const user = $derived(data.user);
 	const userRsvp = $derived(data.userRsvp);
+
+	let householdWelcomeShown = $state(false);
+	$effect(() => {
+		if (householdWelcomeShown) return;
+		if ($page.url.searchParams.get('householdWelcome') !== '1') return;
+		if (!trip?.name) return;
+		householdWelcomeShown = true;
+		const first = user?.name?.split(/\s+/)[0] ?? 'there';
+		quickActions?.showToast?.(`Welcome to ${trip.name}, ${first}! 🎉`);
+		if (typeof window !== 'undefined') {
+			const url = new URL(window.location.href);
+			url.searchParams.delete('householdWelcome');
+			history.replaceState({}, '', url);
+		}
+	});
 	const userInvoices = $derived(data.userInvoices ?? []);
 
 	const members = $derived(trip?.members ?? []);
@@ -275,6 +291,8 @@
 			gamesHref={trip ? `/trips/${trip.id}/games` : ''}
 			gamesCount={data.tripGames?.length ?? 0}
 			{hostedByLine}
+			canHostShare={data.canHostShare ?? false}
+			householdShare={data.householdShare ?? null}
 		/>
 			<PollCardContainer tripId={trip.id} placement="hero" isHost={false} />
 		</div>

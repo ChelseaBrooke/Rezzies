@@ -1,39 +1,36 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onDestroy } from 'svelte';
-
-	/** Move this element to document.body so it's never clipped by overflow/transform. */
-	function portal(node: HTMLElement) {
-		document.body.appendChild(node);
-		return {
-			destroy() {
-				if (node.parentNode) node.parentNode.removeChild(node);
-			}
-		};
-	}
+	import ShareButton from '$lib/components/ShareButton.svelte';
 
 	let {
 		tripId,
 		onInvite,
 		showToast,
-		isHost = false
+		isHost = false,
+		canHostShare = false,
+		householdShare = null
 	}: {
 		tripId: string;
 		onInvite?: () => void;
 		showToast?: (msg: string) => void;
+		/** @deprecated use canHostShare from layout; kept for My RSVP / Edit */
 		isHost?: boolean;
+		canHostShare?: boolean;
+		householdShare?: {
+			householdId: string;
+			hasUnclaimedProxyMembers: boolean;
+			unclaimedFirstNames: string[];
+			primaryFirstName: string;
+		} | null;
 	} = $props();
 
-	let shareOpen = $state(false);
 	let editOpen = $state(false);
 
-	let shareTriggerEl: HTMLButtonElement | null = $state(null);
 	let editTriggerEl: HTMLButtonElement | null = $state(null);
 
-	let shareMenuEl: HTMLDivElement | null = $state(null);
 	let editMenuEl: HTMLDivElement | null = $state(null);
 
-	let shareMenuStyle = $state<{ top: string; left: string } | null>(null);
 	let editMenuStyle = $state<{ top: string; left: string } | null>(null);
 
 	const CLOSE_DELAY_MS = 250;
@@ -56,10 +53,6 @@
 
 	function handleDocumentClick(e: MouseEvent) {
 		const target = e.target as Node;
-		if (shareOpen && shareTriggerEl && !shareTriggerEl.contains(target) && shareMenuEl && !shareMenuEl.contains(target)) {
-			shareOpen = false;
-			shareMenuStyle = null;
-		}
 		if (editOpen && editTriggerEl && !editTriggerEl.contains(target) && editMenuEl && !editMenuEl.contains(target)) {
 			editOpen = false;
 			editMenuStyle = null;
@@ -79,7 +72,7 @@
 	}
 
 	$effect(() => {
-		if (shareOpen || editOpen) {
+		if (editOpen) {
 			bindDocumentClick();
 		} else {
 			unbindDocumentClick();
@@ -101,23 +94,6 @@
 		});
 	}
 
-	function getTripLink(): string {
-		const origin = typeof window !== 'undefined' ? window.location.origin : '';
-		return `${origin}/trips/${tripId}`;
-	}
-
-	function handleCopyLink() {
-		const link = getTripLink();
-		if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-			navigator.clipboard.writeText(link).then(() => {
-				showToast?.('Link copied to clipboard');
-			});
-		} else {
-			showToast?.('Copy link: ' + link);
-		}
-		shareOpen = false;
-	}
-
 	function handleEdit() {
 		goto(`/trips/${tripId}/settings`);
 		editOpen = false;
@@ -129,47 +105,14 @@
 	}
 
 	function closeAll() {
-		shareOpen = false;
 		editOpen = false;
-		shareMenuStyle = null;
 		editMenuStyle = null;
-	}
-
-	function openShare() {
-		clearCloseSchedule();
-		editOpen = false;
-		shareOpen = true;
-		positionMenu(shareTriggerEl, (s) => (shareMenuStyle = s));
 	}
 
 	function openEdit() {
 		clearCloseSchedule();
-		shareOpen = false;
 		editOpen = true;
 		positionMenu(editTriggerEl, (s) => (editMenuStyle = s));
-	}
-
-	/** Hover opens share menu; click toggles. */
-	function onShareMouseEnter() {
-		clearCloseSchedule();
-		openShare();
-		requestAnimationFrame(() => {
-			positionMenu(shareTriggerEl, (s) => (shareMenuStyle = s));
-		});
-	}
-
-	function onShareClick(e: MouseEvent) {
-		e.preventDefault();
-		e.stopPropagation();
-		if (shareOpen) {
-			shareOpen = false;
-			shareMenuStyle = null;
-			return;
-		}
-		openShare();
-		requestAnimationFrame(() => {
-			positionMenu(shareTriggerEl, (s) => (shareMenuStyle = s));
-		});
 	}
 
 	function onEditClick() {
@@ -178,56 +121,13 @@
 </script>
 
 <div class="quick-actions">
-	<!-- Share: single button is the only hit target; one child span so no internal boundaries -->
-	<div class="dropdown-wrap">
-		<button
-			type="button"
-			class="action-btn"
-			title="Share trip"
-			bind:this={shareTriggerEl}
-			onmouseenter={onShareMouseEnter}
-			onmouseleave={scheduleClose}
-			onclick={onShareClick}
-			aria-expanded={shareOpen}
-			aria-haspopup="menu"
-		>
-			<span class="action-content" aria-hidden="true">
-				<span class="action-icon">
-					<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-				</span>
-				<span class="action-label">Share</span>
-			</span>
-		</button>
-		{#if shareOpen}
-			<!-- Portal menu to body so it's never clipped; click-outside handled by document listener -->
-			<div
-				use:portal
-				class="share-menu-portal"
-				role="presentation"
-			>
-				<div
-					class="dropdown-backdrop dropdown-backdrop-modal"
-					aria-hidden="true"
-					onclick={() => { shareOpen = false; shareMenuStyle = null; }}
-					role="button"
-					tabindex="-1"
-				></div>
-				<div
-					bind:this={shareMenuEl}
-					class="dropdown-menu dropdown-menu-fixed dropdown-menu-portaled"
-					role="menu"
-					style={shareMenuStyle ? `top: ${shareMenuStyle.top}; left: ${shareMenuStyle.left};` : ''}
-					onmouseenter={clearCloseSchedule}
-					onmouseleave={scheduleClose}
-				>
-					{#if onInvite}
-						<button type="button" class="dropdown-item" role="menuitem" onclick={() => { onInvite?.(); shareOpen = false; shareMenuStyle = null; }}>Invite guests</button>
-					{/if}
-					<button type="button" class="dropdown-item" role="menuitem" onclick={handleCopyLink}>Copy link</button>
-				</div>
-			</div>
-		{/if}
-	</div>
+	<ShareButton
+		{tripId}
+		{canHostShare}
+		{householdShare}
+		onInvite={onInvite ?? (() => {})}
+		showToast={showToast ?? (() => {})}
+	/>
 
 	<!-- My RSVP: for hosts/co-hosts to set their own RSVP, party size, room, etc. -->
 	{#if isHost}
@@ -360,20 +260,6 @@
 		inset: 0;
 		z-index: 9998;
 		pointer-events: none; /* don't block hover on trigger or menu */
-	}
-
-	.share-menu-portal {
-		position: fixed;
-		inset: 0;
-		z-index: 10000;
-		pointer-events: none;
-	}
-	/* Backdrop must not capture pointer or it covers the trigger and causes hover flicker */
-	.share-menu-portal .dropdown-backdrop-modal {
-		pointer-events: none;
-	}
-	.share-menu-portal .dropdown-menu-portaled {
-		pointer-events: auto;
 	}
 
 	.dropdown-menu {

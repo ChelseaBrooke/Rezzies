@@ -49,6 +49,9 @@ export type GuestRow = {
 	priceApproved: boolean | null;
 	/** Host override for price approved (null = use yesSubstatus). */
 	priceApprovedByHost: boolean | null;
+	/** Cost re-approval state from RSVP (approved | pending | hostApproved). */
+	costApprovalStatus?: string | null;
+	reApprovalDeadlineAt?: string | null;
 	/** All invoices for this user are paid (only relevant when they have amount due). */
 	invoicePaid: boolean | null;
 	/** Invoice breakdown for modal (host/co-host only). */
@@ -193,14 +196,22 @@ export const load: PageServerLoad = async ({ parent }) => {
 		const toPayTotal = uid ? (toPayByUserId.get(uid) ?? null) : null;
 		const invoiceBreakdown = uid && canManageGuests ? (breakdownByUserId.get(uid) ?? null) : null;
 		const priceApprovedByHost = rsvp?.priceApprovedByHost ?? null;
+		const costPending = rsvp?.costApprovalStatus === 'pending';
+		const costHostOk = rsvp?.costApprovalStatus === 'hostApproved';
 		const priceApproved =
-			priceApprovedByHost !== null
-				? priceApprovedByHost
-				: status === 'yes' && rsvp?.yesSubstatus === 'confirmed'
-					? true
-					: status === 'yes' && rsvp?.yesSubstatus === 'reconfirm_required'
-						? false
-						: null;
+			status !== 'yes'
+				? null
+				: costPending
+					? false
+					: costHostOk
+						? true
+						: priceApprovedByHost !== null
+							? priceApprovedByHost
+							: rsvp?.yesSubstatus === 'confirmed'
+								? true
+								: rsvp?.yesSubstatus === 'reconfirm_required'
+									? false
+									: null;
 		const invoicePaid =
 			uid && assignments.length > 0 ? (toPayTotal === null || toPayTotal === 0) : null;
 		const assignedBedIds: string[] = [];
@@ -287,6 +298,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 			toPayTotal: null,
 			priceApproved: null,
 			priceApprovedByHost: null,
+			costApprovalStatus: null,
+			reApprovalDeadlineAt: null,
 			invoicePaid: null,
 			assignedBedIds: []
 		});
@@ -935,6 +948,53 @@ export const actions: Actions = {
 		});
 		return { markInvoiceUnpaidSuccess: true };
 	},
+	markCostShareHostApproved: async ({ params, cookies, request }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) return fail(401, { message: 'Not logged in' });
+		const canManage = await isTripHostOrCoHost(params.tripId, user.id);
+		if (!canManage) return fail(403, { message: 'Only host or co-host can approve cost share' });
+		const formData = await request.formData();
+		const targetUserId = (formData.get('userId') as string)?.trim();
+		if (!targetUserId) return fail(400, { message: 'Missing user' });
+		const tripId = params.tripId;
+
+		const rsvp = await prisma.rSVP.findUnique({
+			where: { tripId_userId: { tripId, userId: targetUserId } },
+			select: {
+				costApprovalStatus: true,
+				originalRangeMaxCents: true,
+				acceptedEstimateHighCents: true
+			}
+		});
+		if (rsvp?.costApprovalStatus !== 'pending') {
+			return fail(400, { message: 'This guest is not awaiting cost re-approval.' });
+		}
+
+		const inv = await prisma.invoice.findFirst({
+			where: { tripId, userId: targetUserId, status: 'due' },
+			select: { totalAmount: true }
+		});
+		const cents =
+			inv != null
+				? Math.round(inv.totalAmount * 100)
+				: (rsvp.originalRangeMaxCents ?? rsvp.acceptedEstimateHighCents ?? null);
+
+		await prisma.rSVP.update({
+			where: { tripId_userId: { tripId, userId: targetUserId } },
+			data: {
+				costApprovalStatus: 'hostApproved',
+				costApprovalMethod: 'host_override',
+				approvedCostShareCents: cents,
+				hostCostApprovalAt: new Date(),
+				costReapprovalReason: null,
+				reApprovalRequiredAt: null,
+				reApprovalDeadline: null
+			}
+		});
+
+		return { markCostShareHostApprovedSuccess: true };
+	},
+
 	updatePriceApproved: async ({ params, cookies, request }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(401, { message: 'Not logged in' });
