@@ -130,7 +130,7 @@
 </script>
 
 <svelte:head>
-	<title>Messages - Divvi</title>
+	<title>Direct Messages - Divvi</title>
 </svelte:head>
 
 <div class="messages-page">
@@ -139,10 +139,14 @@
 			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
 			Back
 		</button>
-		<h1 class="messages-heading">Messages</h1>
+		<div class="messages-title-block">
+			<h1 class="messages-heading">Direct Messages</h1>
+			<p class="messages-subheading">For 1:1 chats with guests. Trip-wide conversation stays in each trip's Chat tab.</p>
+		</div>
 	</div>
 	<div class="messages-layout">
 		<aside class="conversations-panel">
+			<p class="panel-helper">This inbox is only for one-on-one messages. For group updates, use trip chat.</p>
 			{#if loading && conversations.length === 0}
 				<p class="muted">Loading...</p>
 			{:else if loadError && conversations.length === 0}
@@ -257,7 +261,7 @@
 				{/if}
 			{:else}
 				<div class="chat-empty">
-					<p>Select a conversation or use the message button on a trip's guest list to start one.</p>
+					<p>Select a direct message thread, or use the message button on a trip's guest list to start a 1:1 chat. For group conversation, open that trip's Chat tab.</p>
 				</div>
 			{/if}
 		</main>
@@ -305,6 +309,17 @@
 		color: var(--navy, #1d4d4e);
 		margin: 0;
 	}
+	.messages-title-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+	.messages-subheading {
+		margin: 0;
+		font-size: 0.82rem;
+		line-height: 1.4;
+		color: var(--muted);
+	}
 	.messages-layout {
 		display: flex;
 		height: calc(100vh - 80px);
@@ -319,6 +334,15 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+	}
+	.panel-helper {
+		margin: 0;
+		padding: 0.75rem 1rem;
+		font-size: 0.78rem;
+		line-height: 1.35;
+		color: var(--muted);
+		background: color-mix(in srgb, var(--surface2, #e5e7eb) 45%, white);
+		border-bottom: 1px solid var(--border, #e5e7eb);
 	}
 	.conversations-panel h2 {
 		padding: 1rem;

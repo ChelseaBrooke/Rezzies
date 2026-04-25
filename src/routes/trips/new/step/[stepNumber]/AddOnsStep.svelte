@@ -3,6 +3,7 @@
 	import { getDefaultMealsConfig, effectiveMaxForDraft } from '$lib/stores/tripDraft.js';
 	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
 	import { SCAVENGER_BINGO_ITEMS } from '$lib/games/scavengerBingoItems.js';
+	import divviLogo from '$lib/assets/images/divvi logo.png';
 
 	/** Faux "photo" squares on the add-ons bingo preview (indices match SCAVENGER_BINGO_ITEMS). */
 	const GAMES_BINGO_MOCK_PHOTOS = new Set([0, 8, 19]);
@@ -11,8 +12,15 @@
 		draft = $bindable(),
 		autosave,
 		/** When false, hide the page title row (e.g. edit trip — stepper already shows the step name). */
-		showHeader = true
-	}: { draft: TripDraft; autosave: () => void; showHeader?: boolean } = $props();
+	showHeader = true,
+	/** Keep legacy add-on cards in code but hidden by default. */
+	showLegacyAddOns = false
+	}: {
+		draft: TripDraft;
+		autosave: () => void;
+		showHeader?: boolean;
+		showLegacyAddOns?: boolean;
+	} = $props();
 
 	let bedBreakdownModalOpen = $state(false);
 
@@ -241,117 +249,230 @@
 	}}
 />
 
-<div class="addons-screen" class:addons-screen--compact-top={!showHeader}>
-	{#if showHeader}
+<div
+	class="addons-screen"
+	class:addons-screen--compact-top={!showHeader}
+	class:addons-screen--cost={!showLegacyAddOns}
+>
+	{#if showHeader && showLegacyAddOns}
 		<div class="addons-header">
-			<h2 class="addons-title">Trip Features<span class="addons-title-divider" aria-hidden="true">|</span><span class="addons-subtitle">Included with every trip — opt in to cost sharing if needed.</span></h2>
+			<h2 class="addons-title">Trip Features<span class="addons-title-divider" aria-hidden="true">|</span><span class="addons-subtitle">Included with every trip. Opt in to cost sharing if needed.</span></h2>
 		</div>
 	{/if}
 
+	{#if !showLegacyAddOns}
+		<!-- ─── Redesigned Cost Sharing (Divvi differentiator) ───────────── -->
+		<section class="cs-page" class:cs-page--off={!costEnabled}>
+			<header class="cs-hero">
+				<div class="cs-hero-bg" aria-hidden="true">
+					<span class="cs-hero-blob cs-hero-blob--a"></span>
+					<span class="cs-hero-blob cs-hero-blob--b"></span>
+					<span class="cs-hero-grid"></span>
+				</div>
+
+				<div class="cs-hero-copy">
+					<span class="cs-eyebrow">
+						<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<path d="M12 2 14.5 9.5 22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z" />
+						</svg>
+						The Divvi difference
+					</span>
+					<h2 class="cs-hero-title">
+						Make money the <em>easiest</em> part of the trip.
+					</h2>
+					<p class="cs-hero-sub">
+						Split the trip total fairly per person, per room, or per bed. Guests see a clear estimate when they RSVP, so the awkward Venmo chase ends before it starts.
+					</p>
+
+					<div class="cs-toggle-card" class:cs-toggle-card--on={costEnabled}>
+						<label class="cs-toggle" onclick={(e) => e.stopPropagation()}>
+							<input
+								type="checkbox"
+								checked={costEnabled}
+								onchange={toggleCostSharing}
+								aria-label="Enable cost sharing"
+							/>
+							<span class="cs-toggle-track"><span class="cs-toggle-thumb"></span></span>
+						</label>
+						<div class="cs-toggle-meta">
+							<strong class="cs-toggle-label">Cost sharing is {costEnabled ? 'on' : 'off'}</strong>
+							<span class="cs-toggle-help">
+								{costEnabled
+									? "Each guest will see their share when they RSVP."
+									: 'Turn it on to enable shared billing for this trip.'}
+							</span>
+						</div>
+						<span class="cs-toggle-pill" class:cs-toggle-pill--on={costEnabled}>
+							{costEnabled ? 'Enabled' : 'Off'}
+						</span>
+					</div>
+				</div>
+
+				<aside class="cs-hero-art" aria-hidden="true">
+					<div class="cs-receipt cs-receipt--back"></div>
+					<div class="cs-receipt cs-receipt--mid"></div>
+					<div class="cs-receipt cs-receipt--front">
+						<header class="cs-receipt-head">
+							<img src={divviLogo} alt="Divvi" class="cs-receipt-brand-img" />
+							<span class="cs-receipt-doc">Guest estimate</span>
+						</header>
+						<p class="cs-receipt-trip">Lake house weekend</p>
+						<p class="cs-receipt-dates">Mar 14 – Mar 16 · 3 nights</p>
+						<div class="cs-receipt-divider"></div>
+						<ul class="cs-receipt-lines">
+							<li><span>Lodging share</span><strong>$598</strong></li>
+							<li><span>Cleaning &amp; fees</span><strong>$19</strong></li>
+							<li><span>Food fund</span><strong>$42</strong></li>
+						</ul>
+						<div class="cs-receipt-divider"></div>
+						<div class="cs-receipt-total">
+							<span>Estimated share</span>
+							<strong>$659</strong>
+						</div>
+						<p class="cs-receipt-foot">Preview · final amount depends on headcount &amp; model.</p>
+					</div>
+				</aside>
+			</header>
+
+			<section class="cs-card">
+				<div class="cs-card-head">
+					<div class="cs-card-titles">
+						<h3 class="cs-card-title">Choose how guests split it</h3>
+						<p class="cs-card-sub">Pick the model that feels fair for your group. Math updates as you go.</p>
+					</div>
+					<div class="cs-total-block">
+						<label
+							class="cs-total-label"
+							for="totalTripCost"
+							title="trip fees and taxes that all guests will split"
+						>
+							Total trip cost
+						</label>
+						<div class="cs-total-input">
+							<span class="cs-total-sym">$</span>
+							<input
+								id="totalTripCost"
+								type="number"
+								class="cs-total-field"
+								bind:value={draft.totalTripCost}
+								oninput={autosave}
+								placeholder="0.00"
+								step="0.01"
+								min="0"
+								title="trip fees and taxes that all guests will split"
+							/>
+						</div>
+					</div>
+				</div>
+
+				<div
+					class="pricing-section cs-table-shell"
+					class:pricing-section--disabled={!costEnabled}
+				>
+					<div class="pricing-table-wrap cs-table-wrap">
+						<table class="pricing-table cs-pricing-table">
+							<thead>
+								<tr>
+									<th></th>
+									<th>Model</th>
+									<th>Cost</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr
+									class="pt-row"
+									class:pt-selected={draft.pricingModel === 'per-person'}
+									onclick={() => selectModel('per-person')}
+									role="button"
+									tabindex="0"
+									onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectModel('per-person')}
+								>
+									<td class="pt-radio"><span class="radio-dot" class:radio-dot-on={draft.pricingModel === 'per-person'}></span></td>
+									<td class="pt-model">Per Person</td>
+									<td class="pt-val pt-val--dual">
+										{#if total > 0}
+											<div class="pt-cost-dual">
+												<div class="pt-cost-line">
+													<span class="pt-cost-label">Min ({expected} {expected === 1 ? 'person' : 'people'})</span>
+													<span class="pt-amount">${roundUsd(ppExpected)} <span class="pt-cost-unit">per person</span></span>
+												</div>
+												<div class="pt-cost-dual-divider" aria-hidden="true"></div>
+												<div class="pt-cost-line">
+													<span class="pt-cost-label">Max ({maxG} {maxG === 1 ? 'person' : 'people'})</span>
+													<span class="pt-amount">${roundUsd(ppMax)} <span class="pt-cost-unit">per person</span></span>
+												</div>
+											</div>
+										{:else}
+											<span class="cs-empty-cell">Add a trip total above to see your share</span>
+										{/if}
+									</td>
+								</tr>
+								<tr
+									class="pt-row"
+									class:pt-selected={draft.pricingModel === 'per-room'}
+									onclick={() => selectModel('per-room')}
+									role="button"
+									tabindex="0"
+									onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectModel('per-room')}
+								>
+									<td class="pt-radio"><span class="radio-dot" class:radio-dot-on={draft.pricingModel === 'per-room'}></span></td>
+									<td class="pt-model">Per Room</td>
+									<td class="pt-val pt-val--single">
+										{#if totalRooms > 0 && total > 0}
+											<span class="pt-amount">${roundUsd(perRoomShare)} per room</span>
+											<p class="pt-cost-sub">Trip total ÷ {totalRooms} room{totalRooms === 1 ? '' : 's'} (whole-room RSVP)</p>
+										{:else}
+											<span class="cs-empty-cell">Add a trip total above to see your share</span>
+										{/if}
+									</td>
+								</tr>
+								<tr
+									class="pt-row"
+									class:pt-selected={draft.pricingModel === 'per-bed'}
+									onclick={() => selectModel('per-bed')}
+									role="button"
+									tabindex="0"
+									onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectModel('per-bed')}
+								>
+									<td class="pt-radio"><span class="radio-dot" class:radio-dot-on={draft.pricingModel === 'per-bed'}></span></td>
+									<td class="pt-model">Per Bed</td>
+									<td class="pt-val pt-val--bed-summary">
+										<div class="bed-summary-copy">
+											<p class="bed-summary-text">
+												What each guest pays depends on <strong>which bed they choose</strong>. Open the{' '}
+												<button
+													type="button"
+													class="bed-summary-link bed-summary-link--inline"
+													onclick={openBedBreakdownModal}
+												>
+													room-by-room breakdown
+												</button>
+												{' '}for estimated ranges by room and bed.
+											</p>
+										</div>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</section>
+
+		</section>
+	{:else}
 	<div class="addons-grid">
 		<div class="addons-column">
 		<!-- ── Cost-sharing ─────────────────────────────────── -->
 		<div
 			class="addon-card addon-card--cost addon-card--tall"
-			class:addon-card--fullmock-mock-end={!costEnabled}
 			class:active={costEnabled}
 			onclick={toggleCostSharing}
 			role="button"
 			tabindex="0"
 			onkeydown={(e) => e.key === 'Enter' && toggleCostSharing()}
 		>
-			{#if !costEnabled}
-				<div class="addon-fullmock-layer addon-fullmock-layer--end" aria-hidden="true">
-					<div class="cost-receipt-mock-fade">
-						<div class="cost-receipt-mock">
-							<header class="cost-receipt-mock-header">
-								<span class="cost-receipt-mock-brand">Divvi</span>
-								<span class="cost-receipt-mock-doc">Receipt preview</span>
-							</header>
-							<div class="cost-receipt-mock-trip">Lake house weekend · Mar 14–16</div>
-							<div class="cost-receipt-mock-meta">
-								<span class="cost-receipt-mock-guest">Alex Chen</span>
-								<span class="cost-receipt-mock-status">RSVP Yes</span>
-							</div>
-							<div class="cost-receipt-mock-ref-row">
-								<span class="cost-receipt-mock-ref-lbl">Confirmation</span>
-								<span class="cost-receipt-mock-ref-val">DV-48291 · Lake House</span>
-							</div>
-							<div class="cost-receipt-mock-divider" aria-hidden="true"></div>
-							<section class="cost-receipt-mock-block" aria-label="Room and beds">
-								<div class="cost-receipt-mock-kicker">Your assignment</div>
-								<div class="cost-receipt-mock-room">Oceanview primary</div>
-								<div class="cost-receipt-mock-bed-row">
-									<span class="cost-receipt-mock-bed-pill">Bed A</span>
-									<span class="cost-receipt-mock-bed-pill">King</span>
-									<span class="cost-receipt-mock-bed-pill cost-receipt-mock-bed-pill--soft">private bath</span>
-								</div>
-								<div class="cost-receipt-mock-bed-row">
-									<span class="cost-receipt-mock-bed-pill">Bed B</span>
-									<span class="cost-receipt-mock-bed-pill cost-receipt-mock-bed-pill--soft">Twin</span>
-									<span class="cost-receipt-mock-bed-pill cost-receipt-mock-bed-pill--soft">shared bath</span>
-								</div>
-							</section>
-							<div class="cost-receipt-mock-divider cost-receipt-mock-divider--light" aria-hidden="true"></div>
-							<div class="cost-receipt-mock-kicker cost-receipt-mock-kicker--lines">Charges (your share)</div>
-							<ul class="cost-receipt-mock-lines">
-								<li class="cost-receipt-mock-line">
-									<span class="cost-receipt-mock-line-label">
-										Lodging &amp; trip total
-										<span class="cost-receipt-mock-line-hint">per-bed split · 8 guests</span>
-									</span>
-									<span class="cost-receipt-mock-line-amt">$598.00</span>
-								</li>
-								<li class="cost-receipt-mock-line cost-receipt-mock-line--subtle">
-									<span class="cost-receipt-mock-line-label">
-										Cleaning &amp; fees
-										<span class="cost-receipt-mock-line-hint">group pool</span>
-									</span>
-									<span class="cost-receipt-mock-line-amt">$18.75</span>
-								</li>
-								<li class="cost-receipt-mock-line cost-receipt-mock-line--subtle">
-									<span class="cost-receipt-mock-line-label">
-										Taxes &amp; processing
-										<span class="cost-receipt-mock-line-hint">est.</span>
-									</span>
-									<span class="cost-receipt-mock-line-amt">$36.20</span>
-								</li>
-								<li class="cost-receipt-mock-line">
-									<span class="cost-receipt-mock-line-label">
-										Shared food fund
-										<span class="cost-receipt-mock-line-hint">meal-planning · your portion</span>
-									</span>
-									<span class="cost-receipt-mock-line-amt">$42.50</span>
-								</li>
-								<li class="cost-receipt-mock-line cost-receipt-mock-line--subtle">
-									<span class="cost-receipt-mock-line-label">
-										Activity kit
-										<span class="cost-receipt-mock-line-hint">optional add-on</span>
-									</span>
-									<span class="cost-receipt-mock-line-amt">$12.00</span>
-								</li>
-							</ul>
-							<div class="cost-receipt-mock-divider cost-receipt-mock-divider--light" aria-hidden="true"></div>
-							<div class="cost-receipt-mock-subtotal">
-								<span class="cost-receipt-mock-subtotal-lbl">Subtotal</span>
-								<span class="cost-receipt-mock-subtotal-amt">$707.45</span>
-							</div>
-							<div class="cost-receipt-mock-divider" aria-hidden="true"></div>
-							<div class="cost-receipt-mock-total-row">
-								<span class="cost-receipt-mock-total-lbl">Estimated total</span>
-								<span class="cost-receipt-mock-total-amt">$707.45</span>
-							</div>
-							<p class="cost-receipt-mock-foot">
-								Pricing model, headcount, and add-ons can change this summary. Not a final invoice.
-							</p>
-						</div>
-					</div>
-				</div>
-			{/if}
-
 			<div
 				class="addon-header addon-header--split"
-				class:addon-header--over-mock-end={!costEnabled}
 			>
 				<div class="addon-title-group">
 					<span class="addon-icon cost-icon">
@@ -359,7 +480,7 @@
 							<circle cx="12" cy="12" r="10"/><path d="M12 6v2m0 8v2M9.17 9.17A4 4 0 1 0 14.83 14.83"/>
 						</svg>
 					</span>
-					<span class="addon-title">Cost-sharing</span>
+					<span class="addon-title">Cost Sharing</span>
 				</div>
 				<label class="addon-toggle" class:checked={costEnabled} onclick={(e) => e.stopPropagation()}>
 					<input
@@ -370,20 +491,16 @@
 					/>
 					<span class="toggle-track"><span class="toggle-thumb"></span></span>
 				</label>
-				<span class="addon-mock-spacer-end" aria-hidden="true"></span>
 			</div>
 
-			<div class="addon-body" class:addon-body--over-mock-end={!costEnabled}>
-				{#if !costEnabled}
-					<div class="addon-pane unchecked-pane cost-unchecked-pane addon-unchecked-pane-beside-mock--end">
-						<p class="addon-desc addon-unchecked-desc-beside-mock addon-unchecked-desc-beside-mock--end">
-							Split the trip total fairly—per person, per room, or per bed. When guests RSVP <strong>Yes</strong>, they’ll see their share (or a clear estimate) on the RSVP flow so they know what to expect before they commit.
+			<div class="addon-body">
+				<div class="addon-pane checked-pane cost-checked-pane" onclick={(e) => e.stopPropagation()} role="none">
+					<div class="cost-content-stack">
+						<p class="addon-desc cost-checked-desc">
+							Split the trip total fairly per person, per room, or per bed. When guests RSVP <strong>Yes</strong>, they’ll see their share (or a clear estimate) on the RSVP flow so they know what to expect before they commit.
 						</p>
-					</div>
-				{:else}
-					<div class="addon-pane checked-pane cost-checked-pane" onclick={(e) => e.stopPropagation()} role="none">
 						<!-- Pricing model comparison table -->
-						<div class="pricing-section">
+						<div class="pricing-section" class:pricing-section--disabled={!costEnabled}>
 							<div class="cost-pricing-toolbar">
 								<div class="pricing-model-header">
 									<span class="pricing-table-title">Choose pricing model</span>
@@ -487,10 +604,43 @@
 							</div>
 						</div>
 					</div>
-				{/if}
+				</div>
 			</div>
 		</div>
 
+		{#if !showLegacyAddOns}
+			<aside class="cost-visual-panel" aria-label="Cost sharing preview">
+				<div class="cost-visual-card">
+					<header class="cost-visual-header">
+						<span class="cost-visual-brand">Divvi</span>
+						<span class="cost-visual-doc">Guest estimate</span>
+					</header>
+					<p class="cost-visual-trip">Lake house weekend · Mar 14 to Mar 16</p>
+					<div class="cost-visual-meta">
+						<span>Alex Chen</span>
+						<span>RSVP Yes</span>
+					</div>
+					<div class="cost-visual-divider"></div>
+					<ul class="cost-visual-lines">
+						<li><span>Lodging share</span><strong>$598.00</strong></li>
+						<li><span>Cleaning and fees</span><strong>$18.75</strong></li>
+						<li><span>Taxes and processing</span><strong>$36.20</strong></li>
+						<li><span>Food fund</span><strong>$42.50</strong></li>
+						<li><span>Optional activity kit</span><strong>$12.00</strong></li>
+					</ul>
+					<div class="cost-visual-divider"></div>
+					<div class="cost-visual-total">
+						<span>Estimated total</span>
+						<strong>$707.45</strong>
+					</div>
+					<p class="cost-visual-footnote">
+						Preview only. Final amount depends on headcount, selected model, and room choices.
+					</p>
+				</div>
+			</aside>
+		{/if}
+
+		{#if showLegacyAddOns}
 		<!-- ── Activity-planning (left column, below cost — always included) ──── -->
 		<div class="addon-card addon-card--compact addon-card--always-on active">
 			<div class="addon-header addon-header--split">
@@ -529,8 +679,10 @@
 				</div>
 			</div>
 		</div>
+		{/if}
 		</div>
 
+		{#if showLegacyAddOns}
 		<div class="addons-column">
 		<!-- ── Meal-planning (always included — configure mode below) ──── -->
 		<div class="addon-card addon-card--compact addon-card--always-on active">
@@ -717,7 +869,9 @@
 			</div>
 		</div>
 		</div>
+		{/if}
 	</div>
+	{/if}
 
 	{#if bedBreakdownModalOpen}
 		<div class="bed-modal-backdrop" onclick={closeBedBreakdownModal} role="presentation"></div>
@@ -865,6 +1019,167 @@
 		align-items: flex-start;
 		gap: 1rem;
 		margin-top: 0.5rem;
+	}
+
+	.addons-grid--cost-only {
+		display: flex;
+		justify-content: center;
+		max-width: 100%;
+		margin-top: 0.25rem;
+	}
+
+	.addons-grid--cost-only .addons-column {
+		flex: 0 1 75rem;
+		max-width: 75rem;
+		width: 100%;
+		display: grid;
+		grid-template-columns: minmax(0, 2.1fr) minmax(260px, 1fr);
+		gap: 1rem;
+		align-items: stretch;
+	}
+
+	.addons-grid--cost-only .addon-card--tall .addon-body {
+		height: 372px;
+	}
+
+	.addons-grid--cost-only .addon-card--tall {
+		height: 100%;
+	}
+
+	.addons-grid--cost-only .addon-header--split .addon-title {
+		font-size: 1.25rem;
+	}
+
+	.addons-grid--cost-only .addon-desc {
+		font-size: 1rem;
+		line-height: 1.6;
+	}
+
+	.addons-grid--cost-only .pricing-table-title {
+		font-size: 1.18rem;
+	}
+
+	.addons-grid--cost-only .pricing-table th {
+		font-size: 0.875rem;
+	}
+
+	.addons-grid--cost-only .pt-model {
+		font-size: 0.95rem;
+	}
+
+	.addons-grid--cost-only .pt-val {
+		font-size: 0.95rem;
+	}
+
+	.addons-grid--cost-only .pt-cost-label {
+		font-size: 0.8rem;
+	}
+
+	.addons-grid--cost-only .bed-summary-text {
+		font-size: 0.9rem;
+		line-height: 1.32;
+	}
+
+	.cost-visual-panel {
+		background: #f3f4f6;
+		border: 1.5px solid rgba(15, 23, 42, 0.1);
+		border-radius: 1rem;
+		padding: 0.85rem;
+		display: flex;
+		min-height: 0;
+	}
+
+	.cost-visual-card {
+		background: #fff;
+		border: 1px solid rgba(15, 23, 42, 0.12);
+		border-radius: 0.8rem;
+		padding: 0.75rem;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 0.38rem;
+	}
+
+	.cost-visual-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 0.5rem;
+	}
+
+	.cost-visual-brand {
+		font-size: 0.9rem;
+		font-weight: 800;
+		color: var(--primary);
+	}
+
+	.cost-visual-doc {
+		font-size: 0.62rem;
+		color: var(--muted);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		font-weight: 700;
+	}
+
+	.cost-visual-trip {
+		margin: 0;
+		font-size: 0.72rem;
+		color: var(--text);
+		font-weight: 600;
+	}
+
+	.cost-visual-meta {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.66rem;
+		color: var(--muted);
+		font-weight: 600;
+	}
+
+	.cost-visual-divider {
+		height: 1px;
+		background: rgba(15, 23, 42, 0.1);
+	}
+
+	.cost-visual-lines {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.24rem;
+	}
+
+	.cost-visual-lines li {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+		font-size: 0.72rem;
+		color: var(--text);
+	}
+
+	.cost-visual-lines strong {
+		font-size: 0.72rem;
+	}
+
+	.cost-visual-total {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		font-size: 0.8rem;
+		font-weight: 700;
+	}
+
+	.cost-visual-total strong {
+		font-size: 0.95rem;
+		color: var(--primary);
+	}
+
+	.cost-visual-footnote {
+		margin: 0.15rem 0 0;
+		font-size: 0.64rem;
+		line-height: 1.35;
+		color: var(--muted);
 	}
 
 	.addons-column {
@@ -2925,6 +3240,28 @@
 	.cost-checked-pane {
 		gap: 0.45rem;
 		overflow: visible;
+		position: relative;
+		inset: auto;
+		padding: 1rem 1.125rem;
+	}
+
+	.cost-content-stack {
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+		min-height: 0;
+	}
+
+	.cost-checked-desc {
+		font-size: 0.92rem;
+		line-height: 1.55;
+		color: var(--text);
+		margin: 0;
+	}
+
+	.pricing-section--disabled {
+		opacity: 0.62;
+		pointer-events: none;
 	}
 
 	.cost-input-label {
@@ -3558,8 +3895,738 @@
 			flex-direction: column;
 		}
 
+		.addons-grid--cost-only .addons-column {
+			grid-template-columns: 1fr;
+		}
+
 		.bed-modal-columns {
 			grid-template-columns: 1fr;
+		}
+	}
+
+	/* ════════════════════════════════════════════════════════════════
+	 * Cost Sharing — Divvi differentiator redesign
+	 * Hero + receipt visual + branded pricing model picker + value props
+	 * ════════════════════════════════════════════════════════════════ */
+
+	.addons-screen--cost {
+		gap: 1.25rem;
+	}
+
+	.cs-page {
+		display: flex;
+		flex-direction: column;
+		gap: 0.8rem;
+		max-width: 76rem;
+		width: 100%;
+		margin: 0 auto;
+	}
+
+	/* ─── HERO ──────────────────────────────────────────────────── */
+	.cs-hero {
+		position: relative;
+		overflow: hidden;
+		display: grid;
+		grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+		gap: 1.2rem;
+		align-items: center;
+		padding: 1.2rem 1.35rem;
+		border-radius: 1.25rem;
+		background:
+			linear-gradient(135deg, rgba(227, 206, 170, 0.55) 0%, rgba(227, 206, 170, 0.18) 55%, rgba(255, 255, 255, 0.95) 100%);
+		border: 1px solid rgba(47, 119, 120, 0.18);
+		box-shadow: 0 18px 40px -22px rgba(47, 119, 120, 0.35);
+		isolation: isolate;
+	}
+
+	.cs-hero-bg {
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		pointer-events: none;
+	}
+
+	.cs-hero-blob {
+		position: absolute;
+		border-radius: 50%;
+		filter: blur(60px);
+		opacity: 0.55;
+	}
+
+	.cs-hero-blob--a {
+		width: 320px;
+		height: 320px;
+		background: radial-gradient(circle, rgba(122, 206, 211, 0.55), transparent 65%);
+		top: -120px;
+		left: -90px;
+	}
+
+	.cs-hero-blob--b {
+		width: 280px;
+		height: 280px;
+		background: radial-gradient(circle, rgba(247, 170, 41, 0.45), transparent 65%);
+		bottom: -100px;
+		right: -60px;
+	}
+
+	.cs-hero-grid {
+		position: absolute;
+		inset: 0;
+		background-image:
+			radial-gradient(rgba(47, 119, 120, 0.12) 1px, transparent 1px);
+		background-size: 22px 22px;
+		mask-image: linear-gradient(to right, transparent 0%, black 35%, black 65%, transparent 100%);
+		opacity: 0.5;
+	}
+
+	.cs-hero-copy {
+		display: flex;
+		flex-direction: column;
+		gap: 0.85rem;
+		min-width: 0;
+		max-width: 38rem;
+	}
+
+	.cs-eyebrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		align-self: flex-start;
+		padding: 0.3rem 0.7rem;
+		font-size: 0.75rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--warm);
+		background: rgba(206, 86, 18, 0.1);
+		border: 1px solid rgba(206, 86, 18, 0.25);
+		border-radius: 999px;
+	}
+
+	.cs-eyebrow svg {
+		stroke: var(--warm);
+	}
+
+	.cs-hero-title {
+		margin: 0;
+		font-size: clamp(1.45rem, 2vw, 1.95rem);
+		line-height: 1.12;
+		font-weight: 800;
+		color: var(--navy);
+		letter-spacing: -0.025em;
+	}
+
+	.cs-hero-title em {
+		font-style: italic;
+		font-weight: 800;
+		color: var(--warm);
+		background: linear-gradient(180deg, transparent 60%, rgba(247, 170, 41, 0.45) 60%);
+		padding: 0 0.05em;
+	}
+
+	.cs-hero-sub {
+		margin: 0;
+		font-size: 0.93rem;
+		line-height: 1.42;
+		color: var(--text);
+		opacity: 0.85;
+		max-width: 34rem;
+	}
+
+	/* Toggle card */
+	.cs-toggle-card {
+		margin-top: 0.4rem;
+		display: flex;
+		align-items: center;
+		gap: 0.85rem;
+		padding: 0.55rem 0.8rem;
+		background: #fff;
+		border: 1.5px solid rgba(47, 119, 120, 0.2);
+		border-radius: 0.85rem;
+		box-shadow: 0 4px 14px -8px rgba(47, 119, 120, 0.35);
+		transition: border-color 200ms ease, box-shadow 200ms ease;
+		max-width: 32rem;
+	}
+
+	.cs-toggle-card--on {
+		border-color: var(--primary);
+		box-shadow: 0 6px 18px -8px rgba(47, 119, 120, 0.5);
+	}
+
+	.cs-toggle {
+		position: relative;
+		display: inline-flex;
+		flex-shrink: 0;
+		cursor: pointer;
+	}
+
+	.cs-toggle input {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.cs-toggle-track {
+		display: inline-block;
+		width: 44px;
+		height: 24px;
+		border-radius: 999px;
+		background: #cbd5e1;
+		position: relative;
+		transition: background 180ms ease;
+	}
+
+	.cs-toggle-thumb {
+		position: absolute;
+		top: 3px;
+		left: 3px;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: #fff;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+		transition: transform 180ms ease;
+	}
+
+	.cs-toggle input:checked ~ .cs-toggle-track {
+		background: var(--primary);
+	}
+
+	.cs-toggle input:checked ~ .cs-toggle-track .cs-toggle-thumb {
+		transform: translateX(20px);
+	}
+
+	.cs-toggle input:focus-visible ~ .cs-toggle-track {
+		box-shadow: 0 0 0 3px var(--focusRing);
+	}
+
+	.cs-toggle-meta {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.cs-toggle-label {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: var(--text);
+		letter-spacing: -0.01em;
+	}
+
+	.cs-toggle-help {
+		font-size: 0.8125rem;
+		color: var(--muted);
+		line-height: 1.35;
+	}
+
+	.cs-toggle-pill {
+		flex-shrink: 0;
+		padding: 0.25rem 0.65rem;
+		font-size: 0.7rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		border-radius: 999px;
+		background: rgba(100, 116, 139, 0.15);
+		color: var(--muted);
+	}
+
+	.cs-toggle-pill--on {
+		background: rgba(47, 119, 120, 0.15);
+		color: var(--primary);
+	}
+
+	/* ─── Receipt visual ────────────────────────────────────────── */
+	.cs-hero-art {
+		position: relative;
+		min-height: 228px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.cs-receipt {
+		position: absolute;
+		width: 78%;
+		max-width: 240px;
+		background: #fff;
+		border-radius: 14px;
+		border: 1px solid rgba(47, 119, 120, 0.18);
+		box-shadow: 0 18px 32px -18px rgba(29, 77, 78, 0.35);
+		padding: 0.8rem 0.9rem;
+		font-family: 'Inter', system-ui, sans-serif;
+	}
+
+	.cs-receipt--back {
+		transform: rotate(-7deg) translate(-18%, 12%);
+		opacity: 0.4;
+		filter: blur(0.4px);
+		height: 80%;
+		background: linear-gradient(180deg, #fff, #f8f3e8);
+	}
+
+	.cs-receipt--mid {
+		transform: rotate(4deg) translate(20%, -8%);
+		opacity: 0.6;
+		height: 86%;
+		background: linear-gradient(180deg, #fff, #fdf4e3);
+	}
+
+	.cs-receipt--front {
+		position: relative;
+		transform: rotate(-2deg);
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		opacity: 1;
+	}
+
+	/* Decorative ticket-edge cut on the receipt bottom */
+	.cs-receipt--front::after {
+		content: '';
+		position: absolute;
+		left: 6px;
+		right: 6px;
+		bottom: -7px;
+		height: 8px;
+		background:
+			radial-gradient(circle at 6px 0, transparent 4px, #fff 4.5px) 0 0/12px 8px repeat-x;
+		filter: drop-shadow(0 6px 8px rgba(29, 77, 78, 0.18));
+	}
+
+	.cs-receipt-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.cs-receipt-brand-img {
+		display: block;
+		height: 2.35rem;
+		width: auto;
+		max-width: 9.6rem;
+		object-fit: contain;
+		border: 0;
+		/* Normalize the logo to Divvi alloy-orange on the receipt */
+		filter: brightness(0) saturate(100%) invert(41%) sepia(90%) saturate(2010%) hue-rotate(8deg) brightness(94%) contrast(91%);
+	}
+
+	.cs-receipt-doc {
+		font-size: 0.65rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--muted);
+	}
+
+	.cs-receipt-trip {
+		margin: 0;
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: var(--navy);
+		letter-spacing: -0.01em;
+	}
+
+	.cs-receipt-dates {
+		margin: 0;
+		font-size: 0.72rem;
+		color: var(--muted);
+		letter-spacing: 0.02em;
+	}
+
+	.cs-receipt-divider {
+		height: 1px;
+		background-image: linear-gradient(to right, rgba(47, 119, 120, 0.35) 50%, transparent 50%);
+		background-size: 6px 1px;
+		background-repeat: repeat-x;
+	}
+
+	.cs-receipt-lines {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.32rem;
+	}
+
+	.cs-receipt-lines li {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 1rem;
+		font-size: 0.78rem;
+	}
+
+	.cs-receipt-lines li span {
+		color: var(--text);
+		opacity: 0.78;
+	}
+
+	.cs-receipt-lines li strong {
+		font-weight: 700;
+		color: var(--text);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.cs-receipt-total {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 1rem;
+	}
+
+	.cs-receipt-total span {
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--muted);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.cs-receipt-total strong {
+		font-size: 1.2rem;
+		font-weight: 800;
+		color: var(--primary);
+		letter-spacing: -0.02em;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.cs-receipt-foot {
+		margin: 0.15rem 0 0;
+		font-size: 0.62rem;
+		color: var(--muted);
+		opacity: 0.75;
+		line-height: 1.35;
+		text-align: center;
+		font-style: italic;
+	}
+
+	/* ─── Card with table ──────────────────────────────────────── */
+	.cs-card {
+		background: #fff;
+		border: 1px solid var(--border);
+		border-radius: 1.1rem;
+		padding: 1rem 1.1rem 1.1rem;
+		box-shadow: 0 8px 24px -16px rgba(29, 77, 78, 0.2);
+	}
+
+	.cs-card-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-end;
+		gap: 0.8rem;
+		flex-wrap: wrap;
+		padding-bottom: 0.7rem;
+		border-bottom: 1px solid var(--border-soft);
+		margin-bottom: 0.15rem;
+	}
+
+	.cs-card-titles {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		min-width: 0;
+		flex: 1 1 22rem;
+	}
+
+	.cs-card-title {
+		margin: 0;
+		font-size: 1.05rem;
+		font-weight: 800;
+		color: var(--navy);
+		letter-spacing: -0.02em;
+	}
+
+	.cs-card-sub {
+		margin: 0;
+		font-size: 0.8rem;
+		line-height: 1.3;
+		color: var(--muted);
+	}
+
+	.cs-total-block {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		flex: 0 0 auto;
+		min-width: 200px;
+	}
+
+	.cs-total-label {
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		color: var(--muted);
+		cursor: help;
+	}
+
+	.cs-total-input {
+		position: relative;
+		display: flex;
+		align-items: stretch;
+		background: #fff;
+		border: 1.5px solid var(--border);
+		border-radius: 0.6rem;
+		transition: border-color 150ms ease, box-shadow 150ms ease;
+		overflow: hidden;
+	}
+
+	.cs-total-input:focus-within {
+		border-color: var(--primary);
+		box-shadow: 0 0 0 3px var(--focusRing);
+	}
+
+	.cs-total-sym {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 0.7rem;
+		font-size: 1.05rem;
+		font-weight: 700;
+		color: var(--primary);
+		background: rgba(47, 119, 120, 0.08);
+		border-right: 1px solid var(--border-soft);
+	}
+
+	.cs-total-field {
+		flex: 1;
+		min-width: 0;
+		padding: 0.45rem 0.7rem;
+		font-size: 1rem;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		color: var(--navy);
+		border: 0;
+		background: transparent;
+		outline: none;
+		letter-spacing: -0.01em;
+	}
+
+	.cs-total-field::placeholder {
+		font-weight: 500;
+		color: var(--muted);
+		opacity: 0.6;
+	}
+
+	/* Pricing table re-skin (preserves existing table markup + math) */
+	.cs-table-shell {
+		margin-top: 0.55rem;
+		border-radius: 0.9rem;
+		overflow: hidden;
+		border: 1px solid var(--border-soft);
+		background: linear-gradient(180deg, rgba(227, 206, 170, 0.08), rgba(255, 255, 255, 1) 60%);
+	}
+
+	.cs-table-wrap {
+		padding: 0;
+		overflow-x: auto;
+	}
+
+	.cs-pricing-table {
+		font-size: 0.9rem;
+	}
+
+	.cs-pricing-table thead th {
+		background: rgba(47, 119, 120, 0.06);
+		color: var(--primary);
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		padding: 0.55rem 0.6rem;
+		border-bottom: 1px solid var(--border-soft);
+	}
+
+	.cs-pricing-table th:first-child {
+		width: 2.5rem;
+	}
+
+	.cs-pricing-table th:nth-child(2) {
+		width: 24%;
+		text-align: left;
+		padding-left: 1rem;
+	}
+
+	.cs-pricing-table th:nth-child(2),
+	.cs-pricing-table td:nth-child(2) {
+		border-right: 1px dashed rgba(47, 119, 120, 0.18);
+	}
+
+	.cs-pricing-table tbody .pt-row td {
+		padding: 0.68rem 0.5rem;
+		border-bottom: 1px solid var(--border-soft);
+		transition: background 150ms ease;
+	}
+
+	.cs-pricing-table tbody tr:last-child td {
+		border-bottom: 0;
+	}
+
+	.cs-pricing-table .pt-radio {
+		padding-left: 1rem !important;
+	}
+
+	.cs-pricing-table .pt-model {
+		text-align: left;
+		padding-left: 1rem !important;
+		font-size: 0.92rem;
+		font-weight: 700;
+		color: var(--navy);
+		letter-spacing: -0.01em;
+	}
+
+	.cs-pricing-table .pt-row:hover {
+		background: rgba(47, 119, 120, 0.045);
+	}
+
+	.cs-pricing-table .pt-row.pt-selected {
+		background: linear-gradient(90deg, rgba(247, 170, 41, 0.12), rgba(206, 86, 18, 0.05));
+		box-shadow: inset 4px 0 0 var(--warm);
+	}
+
+	.cs-pricing-table .pt-row.pt-selected .pt-model {
+		color: var(--warm);
+	}
+
+	.cs-pricing-table .radio-dot {
+		width: 18px;
+		height: 18px;
+		border-color: rgba(47, 119, 120, 0.4);
+	}
+
+	.cs-pricing-table .pt-row.pt-selected .radio-dot {
+		border-color: var(--warm);
+		box-shadow: inset 0 0 0 3px white, inset 0 0 0 9px var(--warm);
+	}
+
+	.cs-pricing-table .pt-amount {
+		font-size: 0.95rem;
+		font-weight: 800;
+		color: var(--primary);
+		letter-spacing: -0.01em;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.cs-pricing-table .pt-cost-unit {
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--muted);
+		letter-spacing: 0;
+	}
+
+	.cs-pricing-table .pt-cost-label {
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--muted);
+	}
+
+	.cs-pricing-table .pt-cost-sub {
+		font-size: 0.78rem;
+		color: var(--muted);
+		font-weight: 500;
+	}
+
+	.cs-pricing-table .bed-summary-text {
+		font-size: 0.82rem;
+		line-height: 1.32;
+		color: var(--text);
+	}
+
+	.cs-pricing-table .bed-summary-link {
+		color: var(--warm);
+		font-weight: 700;
+	}
+
+	.cs-pricing-table .bed-summary-link:hover {
+		color: var(--chocolate);
+	}
+
+	.cs-empty-cell {
+		display: inline-block;
+		font-size: 0.85rem;
+		color: var(--muted);
+		font-weight: 500;
+		font-style: italic;
+	}
+
+	/* Disabled state when cost-sharing toggle is off */
+	.cs-page--off .cs-card,
+	.cs-page--off .cs-table-shell {
+		opacity: 0.65;
+	}
+
+	.cs-page--off .cs-table-shell .pt-row {
+		pointer-events: none;
+	}
+
+	/* ─── Responsive ────────────────────────────────────────────── */
+	@media (max-width: 900px) {
+		.cs-hero {
+			grid-template-columns: 1fr;
+			padding: 1rem 1rem 0.7rem;
+		}
+
+		.cs-hero-art {
+			min-height: 180px;
+		}
+
+		.cs-receipt {
+			max-width: 240px;
+		}
+
+		.cs-card {
+			padding: 0.9rem 0.9rem 1rem;
+		}
+
+		.cs-card-head {
+			align-items: stretch;
+		}
+
+		.cs-total-block {
+			width: 100%;
+		}
+
+	}
+
+	@media (max-width: 600px) {
+		.cs-hero {
+			padding: 1.25rem 1.1rem 0.75rem;
+		}
+
+		.cs-hero-title {
+			font-size: 1.6rem;
+		}
+
+		.cs-hero-sub {
+			font-size: 0.95rem;
+		}
+
+		.cs-toggle-card {
+			flex-wrap: wrap;
+			gap: 0.55rem;
+		}
+
+		.cs-toggle-pill {
+			margin-left: auto;
+		}
+
+		.cs-pricing-table th:nth-child(2) {
+			width: 30%;
+		}
+
+		.cs-pricing-table .pt-model {
+			font-size: 0.92rem;
+		}
+
+		.cs-pricing-table .pt-amount {
+			font-size: 0.98rem;
 		}
 	}
 </style>

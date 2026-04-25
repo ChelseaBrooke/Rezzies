@@ -15,7 +15,6 @@
 		<div class="nav-links">
 			<a href="/" class="nav-link" class:active={$page.url.pathname === '/'}>Home</a>
 			<a href="/our-services" class="nav-link" class:active={$page.url.pathname === '/our-services'}>Our Services</a>
-			<a href="/find-vacation" class="nav-link" class:active={$page.url.pathname === '/find-vacation'}>Find a Trip</a>
 			<a href="/trips/new" class="nav-link" class:active={$page.url.pathname === '/trips/new'}>Host a Trip</a>
 		</div>
 		

@@ -56,11 +56,14 @@
 	<div class="panel panel--basics">
 		<div class="panel-header">
 			<span class="panel-icon">
-				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 					<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
 				</svg>
 			</span>
-			<h3 class="panel-title">Trip Basics</h3>
+			<div class="panel-title-group">
+				<span class="panel-eyebrow">The essentials</span>
+				<h3 class="panel-title">Trip Basics</h3>
+			</div>
 		</div>
 
 		<div class="form-stack">
@@ -78,7 +81,7 @@
 					/>
 				</div>
 				<div class="field">
-					<label for="address-autocomplete-input" class="field-label">Destination</label>
+					<label for="address-autocomplete-input" class="field-label">Destination <span class="req">*</span></label>
 					<AddressAutocomplete
 						bind:value={draft.destinationCity}
 						onSelect={handleAddressSelect}
@@ -174,8 +177,9 @@
 						class="field-input"
 						bind:value={draft.maxOccupancy}
 						oninput={autosave}
-						min="0"
-						placeholder="Optional"
+						min="1"
+						required
+						placeholder="e.g. 12"
 						aria-describedby="maxOccupancy-hint"
 					/>
 				</div>
@@ -186,12 +190,15 @@
 	<!-- ── Right: Rooms & Beds ────────────────────────────── -->
 	<div class="panel panel--rooms">
 		<div class="panel-header">
-			<span class="panel-icon">
-				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<span class="panel-icon panel-icon--accent">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 					<path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 20h20"/><path d="M2 12V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6"/>
 				</svg>
 			</span>
-			<h3 class="panel-title">Rooms &amp; Beds</h3>
+			<div class="panel-title-group">
+				<span class="panel-eyebrow panel-eyebrow--accent">Sleeping arrangements</span>
+				<h3 class="panel-title">Rooms &amp; Beds</h3>
+			</div>
 		</div>
 		<div class="rooms-inner">
 			<RoomBedPicker bind:draft {autosave} />
@@ -235,44 +242,86 @@
 
 	/* ── Panels ───────────────────────────────────────────── */
 	.panel {
-		background: #f8f9fb;
-		border: 1.5px solid rgba(15, 23, 42, 0.08);
-		border-radius: 1rem;
+		background: linear-gradient(180deg, rgba(227, 206, 170, 0.12) 0%, rgba(255, 255, 255, 1) 38%);
+		border: 1px solid var(--border);
+		border-radius: 1.1rem;
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
 		height: 100%;
 		max-height: 100%;
+		box-shadow: 0 8px 24px -16px rgba(29, 77, 78, 0.18);
+		transition: border-color 200ms ease, box-shadow 200ms ease;
+	}
+
+	.panel:hover {
+		border-color: rgba(47, 119, 120, 0.32);
 	}
 
 	.panel-header {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.85rem 1.1rem 0.8rem;
-		border-bottom: 1px solid rgba(15, 23, 42, 0.07);
-		background: white;
+		gap: 0.65rem;
+		padding: 0.9rem 1.1rem 0.85rem;
+		border-bottom: 1px solid var(--border-soft);
+		background:
+			linear-gradient(90deg, rgba(47, 119, 120, 0.05) 0%, rgba(255, 255, 255, 0) 70%),
+			#fff;
+	}
+
+	.panel--rooms .panel-header {
+		background:
+			linear-gradient(90deg, rgba(206, 86, 18, 0.05) 0%, rgba(255, 255, 255, 0) 70%),
+			#fff;
 	}
 
 	.panel-icon {
-		width: 26px;
-		height: 26px;
+		width: 30px;
+		height: 30px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: 0.45rem;
-		background: rgba(47, 119, 120, 0.1);
+		border-radius: 0.55rem;
+		background: rgba(47, 119, 120, 0.12);
 		color: var(--primary);
 		flex-shrink: 0;
+		box-shadow: inset 0 0 0 1px rgba(47, 119, 120, 0.18);
+	}
+
+	.panel-icon--accent {
+		background: rgba(206, 86, 18, 0.12);
+		color: var(--warm);
+		box-shadow: inset 0 0 0 1px rgba(206, 86, 18, 0.18);
+	}
+
+	.panel-title-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.05rem;
+		min-width: 0;
+		line-height: 1.1;
+	}
+
+	.panel-eyebrow {
+		font-size: 0.6rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.09em;
+		color: var(--primary);
+		opacity: 0.8;
+	}
+
+	.panel-eyebrow--accent {
+		color: var(--warm);
 	}
 
 	.panel-title {
 		margin: 0;
-		font-size: 0.875rem;
-		font-weight: 700;
-		color: var(--text);
-		letter-spacing: -0.01em;
+		font-size: 1.05rem;
+		font-weight: 800;
+		color: var(--navy);
+		letter-spacing: -0.02em;
 	}
 
 	/* ── Form inside basics panel ─────────────────────────── */
@@ -318,10 +367,11 @@
 
 	.field-label {
 		font-size: 0.7rem;
-		font-weight: 600;
+		font-weight: 700;
 		text-transform: uppercase;
-		letter-spacing: 0.07em;
-		color: var(--muted);
+		letter-spacing: 0.08em;
+		color: var(--primary);
+		opacity: 0.78;
 	}
 
 	.field-label--stacked {
@@ -342,14 +392,14 @@
 	}
 
 	.req {
-		color: var(--danger);
-		font-weight: 700;
+		color: var(--warm);
+		font-weight: 800;
 	}
 
 	.field-input {
-		padding: 0.46rem 0.6rem;
-		border: 1.5px solid rgba(15, 23, 42, 0.12);
-		border-radius: 0.5rem;
+		padding: 0.5rem 0.65rem;
+		border: 1.5px solid var(--border);
+		border-radius: 0.55rem;
 		font-size: 0.875rem;
 		font-family: inherit;
 		color: var(--text);
@@ -357,6 +407,10 @@
 		width: 100%;
 		transition: border-color 0.15s ease, box-shadow 0.15s ease;
 		outline: none;
+	}
+
+	.field-input:hover {
+		border-color: rgba(47, 119, 120, 0.35);
 	}
 
 	.field-input:focus {

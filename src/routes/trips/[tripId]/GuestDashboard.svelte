@@ -127,10 +127,26 @@
 		return addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}` : null;
 	});
 
-	const tripInfoContent = $derived(
-		'Check-in is 4pm. Keys at the lockbox, code in your confirmation.\n\n' +
-		'Wi‑Fi, Check-in, and Rules are in the itinerary.'
-	);
+	const tripInfoContent = $derived.by(() => {
+		const lines: string[] = [];
+		const checkInTime = trip?.checkInTime?.trim();
+		const checkOutTime = trip?.checkOutTime?.trim();
+		const parkingNotes = trip?.parkingNotes?.trim();
+		const houseRules = trip?.houseRules?.trim();
+		if (checkInTime || checkOutTime) {
+			lines.push(
+				[
+					checkInTime ? `Check-in: ${checkInTime}` : null,
+					checkOutTime ? `Check-out: ${checkOutTime}` : null
+				]
+					.filter(Boolean)
+					.join(' • ')
+			);
+		}
+		if (parkingNotes) lines.push(`Parking: ${parkingNotes}`);
+		if (houseRules) lines.push(`House rules: ${houseRules}`);
+		return lines.join('\n\n');
+	});
 	
 	// Compute guest checklist stats
 	const guestMealsContributed = $derived(
@@ -214,7 +230,7 @@
 			{members}
 			userInvoices={userInvoices}
 			totalCost={totalCost}
-			costSharingEnabled={trip.costSharingEnabled ?? true}
+			costSharingEnabled={trip.costSharingEnabled ?? false}
 			{rsvps}
 			tripGalleryFiles={data.tripGalleryFiles ?? []}
 		/>
@@ -299,7 +315,7 @@
 					houseRules: trip?.houseRules
 				}}
 				tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
-				costSharingEnabled={trip.costSharingEnabled ?? true}
+				costSharingEnabled={trip.costSharingEnabled ?? false}
 				recentActivities={activities.map((a) => ({ title: a.title, createdAt: String(a.createdAt) }))}
 				recentMealSlots={mealSlots.map((m) => ({
 					mealType: m.mealType,

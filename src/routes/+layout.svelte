@@ -23,7 +23,7 @@
 		$page.url.pathname.startsWith('/trips/new/step')
 	);
 	const isMarketingOrAuth = $derived(
-		/^\/(login|signup|our-services|find-vacation|sitemap)?$/.test($page.url.pathname) ||
+		/^\/(login|signup|our-services|sitemap)?$/.test($page.url.pathname) ||
 		$page.url.pathname === '/trips'
 	);
 	const showNav = $derived(!isTripPortal && !isNewTripWizardFlow && !isMarketingOrAuth);

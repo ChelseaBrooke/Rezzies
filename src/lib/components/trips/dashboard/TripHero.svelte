@@ -532,27 +532,27 @@
 		color: white;
 	}
 
-	/* ── Countdown badge (fixed square; number scales with digit count) ── */
+	/* ── Countdown badge (auto-height; number scales with digit count) ── */
 	.hero-countdown {
-		--countdown-box: 8rem;
+		--countdown-box: 6rem;
 		position: absolute;
 		top: 1.25rem;
 		right: 1.25rem;
 		z-index: 2;
 		box-sizing: border-box;
 		width: var(--countdown-box);
-		height: var(--countdown-box);
+		height: auto;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 0.02rem;
+		gap: 0.1rem;
 		background: rgba(0, 0, 0, 0.42);
 		backdrop-filter: blur(20px);
 		-webkit-backdrop-filter: blur(20px);
 		border: 1px solid rgba(255, 255, 255, 0.22);
 		border-radius: 1.25rem;
-		padding: 0.4rem 0.35rem 0.45rem;
+		padding: 0.6rem 0.5rem 0.65rem;
 		box-shadow:
 			0 8px 32px rgba(0, 0, 0, 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.12);
@@ -808,11 +808,11 @@
 		}
 
 		.hero-countdown {
-			--countdown-box: 5rem;
+			--countdown-box: 4.5rem;
 			top: 0.75rem;
 			right: 0.75rem;
 			border-radius: 0.75rem;
-			padding: 0.28rem 0.22rem 0.32rem;
+			padding: 0.45rem 0.35rem 0.5rem;
 		}
 
 		.hero-countdown-num {

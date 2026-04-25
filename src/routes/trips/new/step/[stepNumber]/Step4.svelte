@@ -151,19 +151,29 @@
 	);
 </script>
 
-<div class="review-root">
+<div class="rev-page">
 
 	<!-- ── Hero ──────────────────────────────────────────────── -->
-	<div class="review-hero" class:review-hero--no-photo={!heroPhoto}>
+	<section
+		class="rev-hero"
+		class:rev-hero--no-photo={!heroPhoto}
+		class:rev-hero--with-notes={!!draft.description}
+	>
 		{#if heroPhoto}
-			<img class="review-hero-img" src={heroPhoto} alt={draft.name || 'Trip photo'} />
+			<img class="rev-hero-img" src={heroPhoto} alt={draft.name || 'Trip photo'} />
 		{/if}
-		<div class="review-hero-overlay">
-			<div class="review-hero-content">
-				<p class="review-hero-eyebrow">Review your trip</p>
-				<h2 class="review-hero-title">{draft.name || 'Untitled Trip'}</h2>
+		<div class="rev-hero-overlay"></div>
+		<div class="rev-hero-content">
+			<div class="rev-hero-main">
+				<span class="rev-hero-eyebrow">
+					<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<path d="M12 2 14.5 9.5 22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z" />
+					</svg>
+					Almost there!
+				</span>
+				<h2 class="rev-hero-title">{draft.name || 'Untitled Trip'}</h2>
 				{#if locationDisplay}
-					<p class="review-hero-location">
+					<p class="rev-hero-location">
 						<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 							<path d="M20 10c0 6-8 13-8 13s-8-7-8-13a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
 						</svg>
@@ -171,118 +181,92 @@
 					</p>
 				{/if}
 				{#if draft.checkInDate && draft.checkOutDate}
-					<p class="review-hero-dates">
+					<p class="rev-hero-dates">
 						{fmtDateShort(draft.checkInDate)} – {fmtDate(draft.checkOutDate)}
 					</p>
 				{/if}
 				{#if showHeroHeadcountMeta}
-					<div class="review-hero-meta">
+					<div class="rev-hero-meta">
 						{#if heroMetaNights > 0}
-							<div class="review-hero-meta-item">
-								<span class="review-hero-meta-label">Nights</span>
-								<span class="review-hero-meta-value">
+							<div class="rev-hero-meta-item">
+								<span class="rev-hero-meta-label">Nights</span>
+								<span class="rev-hero-meta-value">
 									{heroMetaNights} night{heroMetaNights !== 1 ? 's' : ''}
 								</span>
 							</div>
 						{/if}
 						{#if draft.expectedGuestCount}
-							<div class="review-hero-meta-item review-hero-meta-item--min" title="Minimum Headcount (Realistic Low)">
-								<span class="review-hero-meta-label">Min headcount</span>
-								<span class="review-hero-meta-value">{draft.expectedGuestCount}</span>
+							<div class="rev-hero-meta-item" title="Minimum Headcount (Realistic Low)">
+								<span class="rev-hero-meta-label">Min headcount</span>
+								<span class="rev-hero-meta-value">{draft.expectedGuestCount}</span>
 							</div>
 						{/if}
 						{#if Number(draft.maxOccupancy) > 0}
-							<div class="review-hero-meta-item" title="Maximum Headcount (Capacity Limit)">
-								<span class="review-hero-meta-label">Max headcount</span>
-								<span class="review-hero-meta-value">{draft.maxOccupancy}</span>
+							<div class="rev-hero-meta-item" title="Maximum Headcount (Capacity Limit)">
+								<span class="rev-hero-meta-label">Max headcount</span>
+								<span class="rev-hero-meta-value">{draft.maxOccupancy}</span>
 							</div>
 						{:else if bedSpotsForCapacity > 0}
-							<div class="review-hero-meta-item" title="Pricing uses bed spot count when you leave max headcount blank">
-								<span class="review-hero-meta-label">Max headcount</span>
-								<span class="review-hero-meta-value">
+							<div class="rev-hero-meta-item" title="Pricing uses bed spot count when you leave max headcount blank">
+								<span class="rev-hero-meta-label">Max headcount</span>
+								<span class="rev-hero-meta-value">
 									{bedSpotsForCapacity}
-									<span class="review-hero-meta-note">from beds</span>
+									<span class="rev-hero-meta-note">from beds</span>
 								</span>
 							</div>
 						{/if}
 					</div>
 				{/if}
 			</div>
+
+			{#if draft.description}
+				<aside class="rev-hero-notes" aria-label="Trip notes">
+					<span class="rev-hero-notes-label">
+						<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>
+						</svg>
+						What you told your guests
+					</span>
+					<p class="rev-hero-notes-body">{draft.description}</p>
+				</aside>
+			{/if}
 		</div>
-	</div>
+	</section>
 
-	<!-- ── Rooms ──────────────────────────────────────────────── -->
-	{#if draft.rooms.length > 0}
-		<section class="review-section">
-			<h3 class="review-section-title">Rooms &amp; beds</h3>
-			<div class="rooms-scroll">
-				{#each draft.rooms as room (room.id)}
-					<div class="room-card">
-						{#if room.photos && room.photos.length > 0}
-							<div class="room-card-photo-wrap">
-								<img class="room-card-photo" src={room.photos[0]} alt={room.name} />
-							</div>
-						{:else}
-							<div class="room-card-photo-wrap room-card-photo-wrap--empty">
-								<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-									<path d="M2 20v-2a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v2"/><path d="M3 10h18"/><path d="M3 10V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4"/>
-								</svg>
-							</div>
-						{/if}
-						<div class="room-card-body">
-							<div class="room-card-head">
-								<span class="room-card-name">{room.name || 'Unnamed Room'}</span>
-								<span class="room-card-type-pill room-card-type-pill--{room.type}">{room.type}</span>
-							</div>
-							{#if room.beds.length > 0}
-								<ul class="room-bed-list">
-									{#each room.beds as bed (bed.id)}
-										<li class="room-bed-item">
-											<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-												<path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 20h20"/><path d="M2 12V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6"/>
-											</svg>
-											{bed.count > 1 ? `${bed.count}× ` : ''}{labelBed(bed.bedType)}
-										</li>
-									{/each}
-								</ul>
-							{:else}
-								<p class="room-no-beds">No beds configured</p>
-							{/if}
-						</div>
-					</div>
-				{/each}
-			</div>
-		</section>
-	{/if}
+	<!-- ── Main row: Hype (left) + Rooms/CTA (right) ────────── -->
+	<div class="rev-main-row">
 
-	<!-- ── Add-ons ────────────────────────────────────────────── -->
-	<section class="review-section">
-		<h3 class="review-section-title">Trip add-ons</h3>
-		<div class="addon-chips-grid">
+	<!-- ── HYPE: What's Included With Every Trip ─────────────── -->
+	<section class="rev-hype">
+		<header class="rev-hype-head">
+			<span class="rev-label">Included with every trip</span>
+			<h3 class="rev-section-title">Everything you and your guests get</h3>
+			<p class="rev-section-sub">Divvi quietly takes care of the planning, splitting, and logistics so you can be a guest at your own trip.</p>
+		</header>
+		<div class="rev-hype-grid">
 			{#each addons as addon (addon.key)}
-				<div
-					class="addon-chip {addon.colorClass}"
-					class:addon-chip--on={addon.enabled}
-					class:addon-chip--off={!addon.enabled}
+				<article
+					class="rev-feature rev-feature--{addon.key}"
+					class:rev-feature--off={!addon.enabled}
 				>
-					<span class="addon-chip-icon">
+					<span class="rev-feature-icon">
 						{#if addon.key === 'cost'}
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<circle cx="12" cy="12" r="10"/><path d="M12 6v2m0 8v2M9.17 9.17A4 4 0 1 0 14.83 14.83"/>
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<circle cx="12" cy="12" r="10"/><path d="M12 6v12M9 9h4.5a2.5 2.5 0 0 1 0 5H9m0 0h5"/>
 							</svg>
 						{:else if addon.key === 'meals'}
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 								<path d="M3 2v7c0 1.1.9 2 2 2h0c1.1 0 2-.9 2-2V2"/>
 								<path d="M7 2v20"/>
 								<path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h0"/>
 								<path d="M21 15v7"/>
 							</svg>
 						{:else if addon.key === 'activities'}
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 								<polygon points="3 11 22 2 13 21 11 13 3 11"/>
 							</svg>
 						{:else if addon.key === 'games'}
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 								<rect x="4" y="4" width="16" height="16" rx="2"/>
 								<circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none"/>
 								<circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none"/>
@@ -292,499 +276,849 @@
 							</svg>
 						{/if}
 					</span>
-					<span class="addon-chip-label">{addon.label}</span>
-					{#if addon.enabled}
-						<span class="addon-chip-badge">On</span>
-					{:else}
-						<span class="addon-chip-badge addon-chip-badge--off">Off</span>
-					{/if}
-
-					{#if addon.enabled && addon.key === 'cost' && costPricingChipLine}
-						<div class="addon-chip-detail">
-							<span class="addon-chip-summary">{costPricingChipLine}</span>
+					<div class="rev-feature-body">
+						<div class="rev-feature-row">
+							<h4 class="rev-feature-title">
+								{#if addon.key === 'cost'}Cost Sharing
+								{:else if addon.key === 'meals'}Meal Planning
+								{:else if addon.key === 'activities'}Activity Planning
+								{:else}Trip Games
+								{/if}
+							</h4>
+							<span class="rev-status" class:rev-status--on={addon.enabled} class:rev-status--off={!addon.enabled}>
+								{addon.enabled ? 'On' : 'Off'}
+							</span>
 						</div>
-					{/if}
-					{#if addon.enabled && addon.key === 'meals' && mealChipLine}
-						<div class="addon-chip-detail">
-							<span class="addon-chip-summary">{mealChipLine}</span>
-						</div>
-					{/if}
-					{#if addon.enabled && addon.key === 'games' && gamesChipLine}
-						<div class="addon-chip-detail">
-							<span class="addon-chip-summary">{gamesChipLine}</span>
-						</div>
-					{/if}
-					{#if addon.enabled && addon.key === 'activities' && activitiesConfig?.items?.length}
-						<div class="addon-chip-detail">
-							<span class="addon-chip-tag addon-chip-tag--neutral">{activitiesConfig.items.length} activit{activitiesConfig.items.length !== 1 ? 'ies' : 'y'}</span>
-						</div>
-					{/if}
-				</div>
+						<p class="rev-feature-copy">
+							{#if addon.key === 'cost'}
+								{#if addon.enabled}
+									Guests see what they owe before they say yes, split per person, room, or bed.
+								{:else}
+									Want shared billing? Turn on cost sharing in Step 2 to split fairly per person, room, or bed.
+								{/if}
+							{:else if addon.key === 'meals'}
+								Sign-up for meals or pool a shared food fund. No more "who's bringing breakfast?" texts.
+							{:else if addon.key === 'activities'}
+								Discover places, build a shared itinerary, run polls, and lock in plans together.
+							{:else}
+								Caption This, Scavenger Bingo, Alphabet Hunt &amp; Daily Trivia keep the group laughing.
+							{/if}
+						</p>
+						{#if addon.enabled && addon.key === 'cost' && costPricingChipLine}
+							<span class="rev-feature-chip">Pricing model · {costPricingChipLine}</span>
+						{/if}
+						{#if addon.enabled && addon.key === 'meals' && mealChipLine}
+							<span class="rev-feature-chip">{mealChipLine}</span>
+						{/if}
+						{#if addon.enabled && addon.key === 'activities' && activitiesConfig?.items?.length}
+							<span class="rev-feature-chip">{activitiesConfig.items.length} activit{activitiesConfig.items.length !== 1 ? 'ies' : 'y'} planned</span>
+						{/if}
+						{#if addon.enabled && addon.key === 'games' && gamesChipLine}
+							<span class="rev-feature-chip">{gamesChipLine}</span>
+						{/if}
+					</div>
+				</article>
 			{/each}
 		</div>
 	</section>
 
-	<!-- ── Description ────────────────────────────────────────── -->
-	{#if draft.description}
-		<section class="review-section">
-			<h3 class="review-section-title">Description</h3>
-			<p class="review-description">{draft.description}</p>
+	<!-- Right column: rooms (top) + compact CTA (bottom) -->
+	<div class="rev-right-col" class:rev-right-col--no-rooms={draft.rooms.length === 0}>
+		{#if draft.rooms.length > 0}
+			<section class="rev-rooms">
+				<header class="rev-section-head">
+					<span class="rev-label">Sleeping arrangements</span>
+					<h3 class="rev-section-title">{draft.rooms.length} room{draft.rooms.length === 1 ? '' : 's'} ready</h3>
+				</header>
+				<div class="rev-rooms-scroll">
+					{#each draft.rooms as room (room.id)}
+						<div class="rev-room-card">
+							{#if room.photos && room.photos.length > 0}
+								<div class="rev-room-photo-wrap">
+									<img class="rev-room-photo" src={room.photos[0]} alt={room.name} />
+								</div>
+							{:else}
+								<div class="rev-room-photo-wrap rev-room-photo-wrap--empty">
+									<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+										<path d="M2 20v-2a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v2"/><path d="M3 10h18"/><path d="M3 10V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4"/>
+									</svg>
+								</div>
+							{/if}
+							<div class="rev-room-body">
+								<div class="rev-room-head">
+									<span class="rev-room-name">{room.name || 'Unnamed Room'}</span>
+									<span class="rev-room-pill rev-room-pill--{room.type}">{room.type}</span>
+								</div>
+								{#if room.beds.length > 0}
+									<ul class="rev-bed-list">
+										{#each room.beds as bed (bed.id)}
+											<li class="rev-bed-item">
+												<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+													<path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 20h20"/><path d="M2 12V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6"/>
+												</svg>
+												{bed.count > 1 ? `${bed.count}× ` : ''}{labelBed(bed.bedType)}
+											</li>
+										{/each}
+									</ul>
+								{:else}
+									<p class="rev-room-empty">No beds configured</p>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
+			</section>
+		{/if}
+
+		<!-- Compact final CTA bar -->
+		<section class="rev-cta rev-cta--compact" aria-label="Ready to publish">
+			<div class="rev-cta-shine" aria-hidden="true"></div>
+			<div class="rev-cta-text">
+				<span class="rev-cta-eyebrow">Last step</span>
+				<strong class="rev-cta-headline">Ready to bring your guests in?</strong>
+			</div>
+			<div class="rev-cta-arrow" aria-hidden="true">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M12 5v14"/><path d="m5 12 7 7 7-7"/>
+				</svg>
+			</div>
 		</section>
-	{/if}
+	</div>
+
+	</div><!-- /rev-main-row -->
 
 </div>
 
 <style>
-	/* ── CSS vars (mirror AddOnsStep accent palette) ─────── */
-	:root {
-		--review-cost-color: #2f7778;
-		--review-cost-bg: rgba(47, 119, 120, 0.09);
-		--review-cost-glow: rgba(47, 119, 120, 0.55);
-		--review-meals-color: #ea580c;
-		--review-meals-bg: rgba(249, 115, 22, 0.09);
-		--review-meals-glow: rgba(234, 88, 12, 0.55);
-		--review-activities-color: #1e40af;
-		--review-activities-bg: rgba(30, 58, 138, 0.08);
-		--review-activities-glow: rgba(59, 130, 246, 0.55);
-		--review-games-color: #7850b4;
-		--review-games-bg: rgba(120, 80, 180, 0.09);
-		--review-games-glow: rgba(120, 80, 180, 0.6);
-	}
+	/* ════════════════════════════════════════════════════════════════
+	 * Step 3 (Review) — Divvi hype-and-confirm redesign
+	 * ════════════════════════════════════════════════════════════════ */
 
-	.review-root {
+	.rev-page {
 		display: flex;
 		flex-direction: column;
-		gap: 1.75rem;
+		gap: 1.2rem;
+		max-width: 100%;
+		width: 100%;
+		margin: 0 auto;
 	}
 
 	/* ── Hero ─────────────────────────────────────────────── */
-	.review-hero {
+	.rev-hero {
 		position: relative;
-		border-radius: 0.875rem;
+		border-radius: 1rem;
 		overflow: hidden;
-		min-height: 200px;
-		background: #e8eaef;
+		min-height: 240px;
+		background: linear-gradient(135deg, var(--navy) 0%, var(--primary) 60%, var(--warm) 130%);
+		isolation: isolate;
+		box-shadow: 0 14px 32px -22px rgba(29, 77, 78, 0.45);
+		border: 1px solid rgba(47, 119, 120, 0.25);
 	}
 
-	.review-hero--no-photo {
-		min-height: 120px;
-		background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+	.rev-hero--no-photo {
+		min-height: 155px;
 	}
 
-	.review-hero-img {
+	.rev-hero-img {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 		display: block;
+		z-index: 0;
 	}
 
-	.review-hero-overlay {
-		position: relative;
+	.rev-hero-overlay {
+		position: absolute;
+		inset: 0;
 		z-index: 1;
-		min-height: 200px;
-		display: flex;
-		align-items: flex-end;
 		background: linear-gradient(
-			to top,
-			rgba(10, 15, 35, 0.78) 0%,
-			rgba(10, 15, 35, 0.38) 46%,
-			transparent 72%
+			180deg,
+			rgba(20, 35, 35, 0.15) 0%,
+			rgba(20, 35, 35, 0.55) 55%,
+			rgba(15, 28, 28, 0.88) 100%
 		);
-		padding: 1.25rem 1.25rem 1.4rem;
 	}
 
-	.review-hero--no-photo .review-hero-overlay {
-		background: none;
-		align-items: center;
-		min-height: 120px;
-		padding: 1.5rem;
+	.rev-hero--no-photo .rev-hero-overlay {
+		background: linear-gradient(135deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.18) 100%);
 	}
 
-	.review-hero-content {
+	.rev-hero-content {
+		position: relative;
+		z-index: 2;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1.1rem;
+		padding: 1.4rem 1.5rem 1.5rem;
+		min-height: inherit;
+		align-items: stretch;
+	}
+
+	.rev-hero--with-notes .rev-hero-content {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	}
+
+	@media (max-width: 820px) {
+		.rev-hero--with-notes .rev-hero-content {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
+	.rev-hero-main {
 		display: flex;
 		flex-direction: column;
-		gap: 0.18rem;
+		gap: 0.25rem;
+		justify-content: flex-end;
 	}
 
-	.review-hero-eyebrow {
+	.rev-hero-notes {
+		align-self: stretch;
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		padding: 0.95rem 1.1rem 1.05rem;
+		background: rgba(255, 255, 255, 0.12);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: 0.85rem;
+		max-height: 15.5rem;
+		overflow: hidden;
+		position: relative;
+	}
+
+	.rev-hero-notes::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 2.2rem;
+		background: linear-gradient(to top, rgba(20, 35, 35, 0.55), transparent);
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 200ms ease;
+	}
+
+	.rev-hero-notes--clipped::after {
+		opacity: 1;
+	}
+
+	.rev-hero-notes-label {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.62rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: rgba(255, 255, 255, 0.78);
+	}
+
+	.rev-hero-notes-body {
 		margin: 0;
+		font-size: 0.86rem;
+		line-height: 1.6;
+		color: rgba(255, 255, 255, 0.94);
+		white-space: pre-wrap;
+		overflow-y: auto;
+		max-height: 11.5rem;
+		padding-right: 0.25rem;
+		scrollbar-width: thin;
+		scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+	}
+
+	.rev-hero-notes-body::-webkit-scrollbar {
+		width: 5px;
+	}
+	.rev-hero-notes-body::-webkit-scrollbar-thumb {
+		background: rgba(255, 255, 255, 0.35);
+		border-radius: 999px;
+	}
+
+	.rev-hero-eyebrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		align-self: flex-start;
+		padding: 0.28rem 0.7rem;
 		font-size: 0.7rem;
-		font-weight: 600;
+		font-weight: 800;
 		text-transform: uppercase;
 		letter-spacing: 0.09em;
-		color: rgba(255, 255, 255, 0.62);
+		color: var(--carrot);
+		background: rgba(247, 170, 41, 0.14);
+		border: 1px solid rgba(247, 170, 41, 0.45);
+		border-radius: 999px;
+		margin-bottom: 0.2rem;
+		backdrop-filter: blur(4px);
 	}
 
-	.review-hero-title {
+	.rev-hero-title {
 		margin: 0;
-		font-size: 1.45rem;
+		font-size: clamp(1.65rem, 2.4vw, 2.15rem);
 		font-weight: 800;
 		letter-spacing: -0.025em;
 		color: #fff;
 		line-height: 1.15;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 	}
 
-	.review-hero-location {
-		margin: 0;
-		font-size: 0.8125rem;
-		color: rgba(255, 255, 255, 0.75);
+	.rev-hero-location {
+		margin: 0.25rem 0 0;
+		font-size: 0.85rem;
+		color: rgba(255, 255, 255, 0.86);
 		display: flex;
 		align-items: center;
-		gap: 0.28rem;
-		margin-top: 0.15rem;
+		gap: 0.32rem;
 	}
 
-	.review-hero-dates {
-		margin: 0;
-		margin-top: 0.12rem;
-		font-size: 0.8rem;
-		color: rgba(255, 255, 255, 0.7);
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
+	.rev-hero-dates {
+		margin: 0.05rem 0 0;
+		font-size: 0.85rem;
+		color: rgba(255, 255, 255, 0.78);
+		font-weight: 600;
+		letter-spacing: 0.01em;
 	}
 
-	.review-hero-meta {
+	.rev-hero-meta {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.45rem;
-		margin-top: 0.55rem;
+		margin-top: 0.85rem;
 	}
 
-	.review-hero-meta-item {
+	.rev-hero-meta-item {
 		display: flex;
 		flex-direction: column;
-		gap: 0.06rem;
-		padding: 0.35rem 0.55rem;
-		background: rgba(255, 255, 255, 0.14);
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		border-radius: 0.55rem;
-		min-width: 3.25rem;
+		gap: 0.08rem;
+		padding: 0.42rem 0.6rem;
+		background: rgba(255, 255, 255, 0.16);
+		border: 1px solid rgba(255, 255, 255, 0.18);
+		border-radius: 0.6rem;
+		backdrop-filter: blur(4px);
+		min-width: 3.5rem;
 	}
 
-	.review-hero-meta-item--min {
-		padding: 0.32rem 0.5rem;
-	}
-
-	.review-hero-meta-label {
+	.rev-hero-meta-label {
 		font-size: 0.58rem;
-		font-weight: 600;
+		font-weight: 700;
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: rgba(255, 255, 255, 0.55);
+		letter-spacing: 0.07em;
+		color: rgba(255, 255, 255, 0.7);
 		line-height: 1.15;
 	}
 
-	.review-hero-meta-value {
-		font-size: 0.88rem;
-		font-weight: 700;
+	.rev-hero-meta-value {
+		font-size: 0.95rem;
+		font-weight: 800;
 		color: #fff;
 		letter-spacing: -0.02em;
 		line-height: 1.2;
+		font-variant-numeric: tabular-nums;
 	}
 
-	.review-hero-meta-note {
+	.rev-hero-meta-note {
 		margin-left: 0.25rem;
 		font-size: 0.68rem;
 		font-weight: 600;
-		color: rgba(255, 255, 255, 0.55);
+		color: rgba(255, 255, 255, 0.6);
 		text-transform: none;
 		letter-spacing: 0;
 	}
 
-	.review-hero--no-photo .review-hero-meta-item {
-		background: rgba(255, 255, 255, 0.12);
-		border-color: rgba(255, 255, 255, 0.18);
-	}
-
-	/* ── Section ──────────────────────────────────────────── */
-	.review-section {
+	/* ── Shared section bits ─────────────────────────────── */
+	.rev-section-head,
+	.rev-hype-head {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.22rem;
+		margin-bottom: 0.95rem;
 	}
 
-	.review-section-title {
-		margin: 0;
-		font-size: 0.8125rem;
+	.rev-eyebrow {
+		display: inline-flex;
+		align-items: center;
+		align-self: flex-start;
+		font-size: 0.7rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.09em;
+		color: var(--warm);
+		background: rgba(206, 86, 18, 0.1);
+		border: 1px solid rgba(206, 86, 18, 0.25);
+		border-radius: 999px;
+		padding: 0.22rem 0.65rem;
+		margin-bottom: 0.15rem;
+	}
+
+	/* Quieter label for in-content section heads (no chip) */
+	.rev-label {
+		display: inline-flex;
+		align-items: center;
+		align-self: flex-start;
+		font-size: 0.66rem;
 		font-weight: 700;
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
+		letter-spacing: 0.12em;
 		color: var(--muted);
+		opacity: 0.65;
 	}
 
-	/* ── Add-on chips ─────────────────────────────────────── */
-	.addon-chips-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 0.75rem;
-	}
-
-	@media (min-width: 560px) {
-		.addon-chips-grid {
-			grid-template-columns: repeat(4, 1fr);
-		}
-	}
-
-	.addon-chip {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		padding: 0.85rem 0.9rem 0.8rem;
-		border-radius: 0.875rem;
-		border: 1.5px solid transparent;
-		background: #f3f4f6;
-		transition: box-shadow 0.2s ease, background 0.2s ease;
-		position: relative;
-	}
-
-	.addon-chip-icon {
-		width: 32px;
-		height: 32px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 0.5rem;
-		flex-shrink: 0;
-	}
-
-	.addon-chip-label {
-		font-size: 0.8125rem;
-		font-weight: 700;
-		color: var(--text);
+	.rev-section-title {
+		margin: 0;
+		font-size: 1.12rem;
+		font-weight: 800;
+		color: var(--navy);
+		letter-spacing: -0.02em;
 		line-height: 1.2;
 	}
 
-	.addon-chip-badge {
+	.rev-section-sub {
+		margin: 0;
+		font-size: 0.86rem;
+		color: var(--muted);
+		line-height: 1.45;
+		max-width: 48rem;
+	}
+
+	/* ── Main row: hype (left) + rooms/CTA (right) ───────── */
+	.rev-main-row {
+		display: grid;
+		grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+		gap: 0.85rem;
+		align-items: stretch;
+	}
+
+	@media (max-width: 1100px) {
+		.rev-main-row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
+	.rev-right-col {
+		display: flex;
+		flex-direction: column;
+		gap: 1.15rem;
+		min-width: 0;
+	}
+
+	/* ── HYPE: feature cards ─────────────────────────────── */
+	.rev-hype {
+		background: #fff;
+		border: 1px solid var(--border);
+		border-radius: 1rem;
+		padding: 1.3rem 1.4rem 1.4rem;
+		box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02), 0 8px 28px -20px rgba(29, 77, 78, 0.18);
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	.rev-hype-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1rem;
+		flex: 1;
+	}
+
+	.rev-feature {
+		position: relative;
+		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		gap: 0.9rem;
+		padding: 1.05rem 1.15rem 1.1rem;
+		background: #fff;
+		border: 1px solid var(--border-soft);
+		border-radius: 0.95rem;
+		transition: border-color 200ms ease, box-shadow 200ms ease;
+	}
+
+	.rev-feature:hover {
+		border-color: rgba(47, 119, 120, 0.25);
+		box-shadow: 0 6px 16px -12px rgba(29, 77, 78, 0.25);
+	}
+
+	.rev-feature--cost {
+		--rev-color: var(--primary);
+		--rev-tint: rgba(47, 119, 120, 0.12);
+		--rev-glow: rgba(47, 119, 120, 0.45);
+	}
+
+	.rev-feature--meals {
+		--rev-color: var(--warm);
+		--rev-tint: rgba(206, 86, 18, 0.12);
+		--rev-glow: rgba(206, 86, 18, 0.45);
+	}
+
+	.rev-feature--activities {
+		--rev-color: #1f6e8a;
+		--rev-tint: rgba(122, 206, 211, 0.22);
+		--rev-glow: rgba(122, 206, 211, 0.6);
+	}
+
+	.rev-feature--games {
+		--rev-color: #b07a0a;
+		--rev-tint: rgba(247, 170, 41, 0.18);
+		--rev-glow: rgba(247, 170, 41, 0.6);
+	}
+
+	.rev-feature-icon {
 		display: inline-flex;
 		align-items: center;
-		width: fit-content;
-		padding: 0.14rem 0.42rem;
-		font-size: 0.65rem;
+		justify-content: center;
+		width: 44px;
+		height: 44px;
+		border-radius: 12px;
+		color: var(--rev-color);
+		background: var(--rev-tint);
+		flex-shrink: 0;
+	}
+
+	.rev-feature-body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.42rem;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.rev-feature-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.rev-feature-title {
+		margin: 0;
+		font-size: 1.02rem;
+		font-weight: 800;
+		color: var(--navy);
+		letter-spacing: -0.01em;
+		line-height: 1.2;
+	}
+
+	.rev-status {
+		flex-shrink: 0;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.32rem;
+		font-size: 0.62rem;
 		font-weight: 700;
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		border-radius: 999px;
-	}
-
-	.addon-chip-badge--off {
-		background: rgba(15, 23, 42, 0.07);
-		color: #94a3b8;
-	}
-
-	/* On-state: per-color glow */
-	.addon-chip--on.addon-chip--cost {
-		background: var(--review-cost-bg);
-		box-shadow: 0 0 0 1.5px rgba(47, 119, 120, 0.52), 0 0 16px rgba(47, 119, 120, 0.16);
-	}
-	.addon-chip--on.addon-chip--cost .addon-chip-icon {
-		background: rgba(47, 119, 120, 0.14);
-		color: var(--review-cost-color);
-	}
-	.addon-chip--on.addon-chip--cost .addon-chip-badge {
-		background: rgba(47, 119, 120, 0.14);
-		color: var(--review-cost-color);
-	}
-
-	.addon-chip--on.addon-chip--meals {
-		background: var(--review-meals-bg);
-		box-shadow: 0 0 0 1.5px rgba(234, 88, 12, 0.52), 0 0 16px rgba(249, 115, 22, 0.16);
-	}
-	.addon-chip--on.addon-chip--meals .addon-chip-icon {
-		background: rgba(249, 115, 22, 0.14);
-		color: var(--review-meals-color);
-	}
-	.addon-chip--on.addon-chip--meals .addon-chip-badge {
-		background: rgba(249, 115, 22, 0.14);
-		color: var(--review-meals-color);
-	}
-
-	.addon-chip--on.addon-chip--activities {
-		background: var(--review-activities-bg);
-		box-shadow: 0 0 0 1.5px rgba(59, 130, 246, 0.52), 0 0 16px rgba(59, 130, 246, 0.16);
-	}
-	.addon-chip--on.addon-chip--activities .addon-chip-icon {
-		background: rgba(30, 58, 138, 0.12);
-		color: var(--review-activities-color);
-	}
-	.addon-chip--on.addon-chip--activities .addon-chip-badge {
-		background: rgba(30, 58, 138, 0.12);
-		color: var(--review-activities-color);
-	}
-
-	.addon-chip--on.addon-chip--games {
-		background: var(--review-games-bg);
-		box-shadow: 0 0 0 1.5px rgba(120, 80, 180, 0.55), 0 0 16px rgba(120, 80, 180, 0.18);
-	}
-	.addon-chip--on.addon-chip--games .addon-chip-icon {
-		background: rgba(120, 80, 180, 0.12);
-		color: var(--review-games-color);
-	}
-	.addon-chip--on.addon-chip--games .addon-chip-badge {
-		background: rgba(120, 80, 180, 0.12);
-		color: var(--review-games-color);
-	}
-
-	/* Off-state icons */
-	.addon-chip--off .addon-chip-icon {
-		background: rgba(15, 23, 42, 0.05);
-		color: #94a3b8;
-	}
-	.addon-chip--off .addon-chip-label {
-		color: #94a3b8;
-	}
-
-	.addon-chip-detail {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.25rem;
-		margin-top: 0.1rem;
-	}
-
-	.addon-chip-summary {
-		display: block;
-		font-size: 0.8125rem;
-		font-weight: 500;
+		letter-spacing: 0.08em;
+		line-height: 1.3;
 		color: var(--muted);
-		line-height: 1.35;
-		width: 100%;
 	}
 
-	.addon-chip-tag {
-		font-size: 0.62rem;
-		font-weight: 600;
-		padding: 0.1rem 0.32rem;
-		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.55);
-		color: inherit;
-		border: 1px solid currentColor;
-		opacity: 0.7;
+	.rev-status::before {
+		content: '';
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: currentColor;
+		opacity: 0.5;
 	}
 
-	.addon-chip-tag--neutral {
-		background: rgba(15, 23, 42, 0.07);
-		color: var(--muted);
-		border-color: transparent;
+	.rev-status--on {
+		color: var(--rev-color);
+	}
+
+	.rev-status--on::before {
 		opacity: 1;
 	}
 
-	/* ── Rooms scroll ─────────────────────────────────────── */
-	.rooms-scroll {
-		display: flex;
-		flex-direction: row;
-		flex-wrap: wrap;
-		justify-content: center;
-		gap: 0.75rem;
+	.rev-status--off {
+		color: var(--muted);
+		opacity: 0.55;
 	}
 
-	.room-card {
-		flex: 0 0 auto;
-		width: 180px;
-		background: #f3f4f6;
-		border: 1.5px solid rgba(15, 23, 42, 0.08);
-		border-radius: 0.875rem;
+	.rev-feature-copy {
+		margin: 0;
+		font-size: 0.86rem;
+		color: var(--muted);
+		line-height: 1.5;
+	}
+
+	.rev-feature-chip {
+		display: inline-flex;
+		align-self: flex-start;
+		max-width: 100%;
+		font-size: 0.66rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		padding: 0.18rem 0.5rem;
+		border-radius: 999px;
+		background: var(--rev-tint);
+		color: var(--rev-color);
+		line-height: 1.25;
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+		margin-top: 0.15rem;
+	}
+
+	/* Off state: muted + remove glow */
+	.rev-feature--off {
+		opacity: 0.78;
+	}
+	.rev-feature--off .rev-feature-icon {
+		background: rgba(15, 23, 42, 0.05);
+		color: #94a3b8;
+		box-shadow: none;
+	}
+	.rev-feature--off::before {
+		opacity: 0;
+	}
+	.rev-feature--off .rev-feature-title {
+		color: var(--muted);
+	}
+
+	/* ── Rooms scroll ─────────────────────────────────────── */
+	.rev-rooms {
+		background: transparent;
+		padding: 0.4rem 0.25rem 0.25rem;
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.rev-rooms-scroll {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+		gap: 0.85rem;
+		flex: 1;
+		min-width: 0;
+		align-content: start;
+		overflow-y: auto;
+		min-height: 0;
+		padding-right: 0.15rem;
+		scrollbar-width: thin;
+		scrollbar-color: rgba(47, 119, 120, 0.35) transparent;
+	}
+
+	.rev-rooms-scroll::-webkit-scrollbar {
+		width: 5px;
+	}
+	.rev-rooms-scroll::-webkit-scrollbar-thumb {
+		background: rgba(47, 119, 120, 0.35);
+		border-radius: 999px;
+	}
+
+	.rev-room-card {
+		background: #fff;
+		border: 1px solid var(--border-soft);
+		border-radius: 0.75rem;
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+		min-width: 0;
 	}
 
-	.room-card-photo-wrap {
-		height: 100px;
-		background: #e8eaef;
+	.rev-room-photo-wrap {
+		height: 110px;
+		background: linear-gradient(135deg, rgba(227, 206, 170, 0.5), rgba(122, 206, 211, 0.25));
 		overflow: hidden;
 		flex-shrink: 0;
 	}
 
-	.room-card-photo-wrap--empty {
+	.rev-room-photo-wrap--empty {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: #94a3b8;
+		color: rgba(47, 119, 120, 0.55);
 	}
 
-	.room-card-photo {
+	.rev-room-photo {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
 		display: block;
 	}
 
-	.room-card-body {
-		padding: 0.65rem 0.7rem 0.7rem;
+	.rev-room-body {
+		padding: 0.75rem 0.85rem 0.9rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.35rem;
+		gap: 0.45rem;
 	}
 
-	.room-card-head {
+	.rev-room-head {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 0.35rem;
+		gap: 0.4rem;
 	}
 
-	.room-card-name {
-		font-size: 0.825rem;
-		font-weight: 700;
-		color: var(--text);
+	.rev-room-name {
+		font-size: 0.84rem;
+		font-weight: 800;
+		color: var(--navy);
+		letter-spacing: -0.01em;
 		line-height: 1.2;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
 
-	.room-card-type-pill {
+	.rev-room-pill {
 		font-size: 0.58rem;
 		font-weight: 700;
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		padding: 0.12rem 0.32rem;
-		border-radius: 999px;
+		letter-spacing: 0.08em;
 		flex-shrink: 0;
-	}
-
-	.room-card-type-pill--private {
-		background: rgba(30, 58, 138, 0.1);
-		color: var(--primary);
-	}
-
-	.room-card-type-pill--shared {
-		background: rgba(15, 23, 42, 0.07);
 		color: var(--muted);
+		opacity: 0.7;
 	}
 
-	.room-bed-list {
+	.rev-bed-list {
 		margin: 0;
 		padding: 0;
 		list-style: none;
 		display: flex;
 		flex-direction: column;
-		gap: 0.22rem;
+		gap: 0.25rem;
 	}
 
-	.room-bed-item {
+	.rev-bed-item {
 		font-size: 0.75rem;
-		color: var(--muted);
+		color: var(--text);
 		display: flex;
 		align-items: center;
-		gap: 0.3rem;
+		gap: 0.32rem;
+		opacity: 0.85;
 	}
 
-	.room-no-beds {
+	.rev-bed-item svg {
+		color: var(--primary);
+		opacity: 0.7;
+	}
+
+	.rev-room-empty {
 		margin: 0;
 		font-size: 0.75rem;
-		color: #94a3b8;
+		color: var(--muted);
 		font-style: italic;
+		opacity: 0.7;
 	}
 
-	/* ── Description ──────────────────────────────────────── */
-	.review-description {
-		margin: 0;
-		font-size: 0.9rem;
-		color: var(--muted);
-		line-height: 1.65;
-		white-space: pre-wrap;
+	/* ── Final CTA banner ────────────────────────────────── */
+	.rev-cta {
+		position: relative;
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		gap: 1rem;
+		padding: 1.05rem 1.3rem;
+		border-radius: 1.1rem;
+		background: linear-gradient(135deg, var(--warm) 0%, #b8480d 55%, var(--chocolate) 100%);
+		color: #fff;
+		overflow: hidden;
+		isolation: isolate;
+		box-shadow: 0 16px 32px -18px rgba(206, 86, 18, 0.55);
+		min-width: 0;
+	}
+
+	.rev-cta--compact {
+		padding: 0.85rem 1.05rem 0.9rem;
+		gap: 0.85rem;
+		border-radius: 0.9rem;
+		flex-shrink: 0;
+	}
+
+	.rev-cta--compact .rev-cta-eyebrow {
+		font-size: 0.6rem;
+		letter-spacing: 0.13em;
+	}
+
+	.rev-cta--compact .rev-cta-headline {
+		font-size: 1rem;
+		line-height: 1.2;
+	}
+
+	.rev-cta--compact .rev-cta-arrow {
+		width: 36px;
+		height: 36px;
+	}
+
+	.rev-cta-shine {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		background:
+			radial-gradient(circle at 20% 20%, rgba(247, 170, 41, 0.45), transparent 55%),
+			radial-gradient(circle at 90% 70%, rgba(255, 255, 255, 0.18), transparent 60%);
+		pointer-events: none;
+	}
+
+	.rev-cta-text {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.18rem;
+		flex: 1;
+		min-width: 0;
+	}
+
+	.rev-cta-eyebrow {
+		font-size: 0.65rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: rgba(255, 255, 255, 0.85);
+	}
+
+	.rev-cta-headline {
+		font-size: 1.15rem;
+		font-weight: 800;
+		letter-spacing: -0.015em;
+		line-height: 1.2;
+	}
+
+	.rev-cta-sub {
+		font-size: 0.85rem;
+		color: rgba(255, 255, 255, 0.88);
+		line-height: 1.4;
+	}
+
+	.rev-cta-arrow {
+		position: relative;
+		z-index: 1;
+		flex-shrink: 0;
+		width: 42px;
+		height: 42px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(255, 255, 255, 0.16);
+		border: 1.5px solid rgba(255, 255, 255, 0.35);
+		color: #fff;
+		animation: rev-bounce 2s ease-in-out infinite;
+	}
+
+	@keyframes rev-bounce {
+		0%, 100% { transform: translateY(0); }
+		50% { transform: translateY(4px); }
+	}
+
+	@media (max-width: 700px) {
+		.rev-hype {
+			padding: 1.1rem 1.1rem 1.2rem;
+		}
+
+		.rev-rooms-scroll {
+			max-height: none;
+		}
+
+		.rev-section-title {
+			font-size: 1.1rem;
+		}
 	}
 </style>

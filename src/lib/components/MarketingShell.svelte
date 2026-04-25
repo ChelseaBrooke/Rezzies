@@ -164,7 +164,7 @@
 		overflow-y: auto;
 	}
 
-	/* Shared content styles for marketing pages (used by our-services, trips, find-vacation) */
+	/* Shared content styles for marketing pages (used by our-services and sitemap) */
 	.marketing-main :global(.marketing-container) {
 		max-width: 1200px;
 		margin: 0 auto;

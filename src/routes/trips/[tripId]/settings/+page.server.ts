@@ -3,6 +3,13 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ parent, params }) => {
 	const parentData = await parent();
+	const checkOutDate = parentData.trip?.checkOutDate ? new Date(parentData.trip.checkOutDate) : null;
+	if (checkOutDate) {
+		checkOutDate.setHours(23, 59, 59, 999);
+		if (Date.now() > checkOutDate.getTime()) {
+			throw redirect(303, `/trips/${params.tripId}`);
+		}
+	}
 	if (!parentData.isHost) {
 		return { trip: parentData.trip, isHost: false };
 	}

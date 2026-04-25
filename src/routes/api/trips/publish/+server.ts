@@ -96,6 +96,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	if (!checkInDateStr || !checkOutDateStr) {
 		return json({ error: 'Check-in and check-out dates are required' }, { status: 400 });
 	}
+	if (!locationCity) {
+		return json({ error: 'Location is required' }, { status: 400 });
+	}
 
 	const totalCost = costSharingEnabled
 		? parseFloat(totalTripCostStr.replace(/[$,]/g, ''))
@@ -135,6 +138,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
 	if (expectedGuestCount == null || expectedGuestCount < 1) {
 		return json({ error: 'Minimum headcount (realistic low) is required' }, { status: 400 });
+	}
+	if (maxOccupancy == null || maxOccupancy < 1) {
+		return json({ error: 'Maximum headcount (capacity limit) is required' }, { status: 400 });
 	}
 
 	if (isPublished && !waivePlatformFee && isStripeConfigured()) {

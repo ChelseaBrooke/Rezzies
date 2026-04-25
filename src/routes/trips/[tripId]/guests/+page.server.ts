@@ -74,6 +74,12 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const trip = parentData.trip;
 	const members = parentData.trip?.members ?? [];
 	const rsvps = parentData.trip?.rsvps ?? [];
+	const isHost = parentData.isHost ?? false;
+	const canManageGuests = isHost || parentData.membership?.role === 'co-host';
+	if (!canManageGuests) {
+		throw redirect(303, tripId ? `/trips/${tripId}` : '/trips');
+	}
+
 	// Fetch room assignments directly so we always get latest from DB (avoids layout merge/serialization issues)
 	const roomAssignments =
 		tripId ?
@@ -88,9 +94,6 @@ export const load: PageServerLoad = async ({ parent }) => {
 				}
 			})
 		:	[];
-	const isHost = parentData.isHost ?? false;
-	const canManageGuests = isHost || parentData.membership?.role === 'co-host';
-
 	const memberEmails = new Set(
 		members.map((m) => m.user?.email?.trim()?.toLowerCase()).filter(Boolean)
 	);

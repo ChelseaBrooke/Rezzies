@@ -1,4 +1,6 @@
-import { fail } from '@sveltejs/kit';
+import { dev } from '$app/environment';
+import { env } from '$env/dynamic/private';
+import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import {
 	computePerBedEstimateFromInputs,
@@ -9,6 +11,14 @@ import {
 const BED_TYPES = ['king', 'queen', 'twin', 'bunk', 'full', 'sofa', 'other'] as const;
 
 export const load: PageServerLoad = async () => {
+	if (!dev) {
+		const enabled = env.QC_PAGE_ENABLED?.trim().toLowerCase();
+		const allowed = enabled === '1' || enabled === 'true' || enabled === 'yes';
+		if (!allowed) {
+			throw error(404, 'Not found');
+		}
+	}
+
 	return {
 		bedTypeOptions: BED_TYPES,
 		defaultBedWeights: DEFAULT_BED_WEIGHTS

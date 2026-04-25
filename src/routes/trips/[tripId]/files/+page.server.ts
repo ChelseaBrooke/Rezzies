@@ -9,8 +9,10 @@ export const load: PageServerLoad = async ({ parent, cookies, params }) => {
 	if (!user) throw redirect(303, '/login');
 
 	const { tripId } = params;
+	const canManageFiles =
+		parentData.membership?.role === 'host' || parentData.membership?.role === 'co-host';
 
-	const tripFiles = await prisma.tripFile.findMany({
+	const tripFilesRaw = await prisma.tripFile.findMany({
 		where: { tripId },
 		include: {
 			uploadedBy: { select: { id: true, name: true } },
@@ -18,10 +20,15 @@ export const load: PageServerLoad = async ({ parent, cookies, params }) => {
 		},
 		orderBy: { createdAt: 'desc' }
 	});
+	const tripFiles = tripFilesRaw.map((f) => ({
+		...f,
+		canDelete: canManageFiles || f.uploadedBy.id === user.id
+	}));
 
 	return {
 		trip: parentData.trip,
 		user,
-		tripFiles
+		tripFiles,
+		canManageFiles
 	};
 };

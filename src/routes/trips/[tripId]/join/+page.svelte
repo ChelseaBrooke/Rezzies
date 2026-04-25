@@ -5,9 +5,12 @@
 
 	const INVITE_STORAGE_KEY = 'divvi_invite_token';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: { capacityFull?: boolean; message?: string } | null } = $props();
 
 	const trip = data.trip;
+	const isTripFull = data.isTripFull ?? false;
+	const approvedCount = data.approvedCount ?? null;
+	const maxCapacity = data.maxCapacity ?? null;
 	const formatDate = (d: Date | string) =>
 		new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -49,12 +52,25 @@
 			</p>
 
 			<p class="join-desc">
-				{#if trip.inviteMode === 'open'}
+				{#if isTripFull}
+					This trip is currently full. If spots open, waitlisted guests are admitted first come, first served.
+				{:else if trip.inviteMode === 'open'}
 					You'll be added to the trip immediately.
 				{:else}
 					Once you request to join, the host will review your request. You'll be able to RSVP and participate once you're approved.
 				{/if}
 			</p>
+
+			{#if isTripFull}
+				<p class="join-alert" role="status">
+					Trip full{#if approvedCount !== null && maxCapacity !== null}: {approvedCount}/{maxCapacity} spots filled{/if}.
+				</p>
+			{/if}
+			{#if form?.capacityFull}
+				<p class="join-alert join-alert--error" role="alert">
+					{form.message ?? 'This trip filled up just now. Please try again if a spot opens.'}
+				</p>
+			{/if}
 
 			<form method="POST" action="?/join" use:enhance={() => {
 				return async ({ update }) => {
@@ -65,8 +81,12 @@
 				{#if resolvedToken}
 					<input type="hidden" name="inviteToken" value={resolvedToken} />
 				{/if}
-				<button type="submit" class="join-btn">
-					{trip.inviteMode === 'open' ? 'Join Trip' : 'Request to Join'}
+				<button type="submit" class="join-btn" disabled={isTripFull}>
+					{#if isTripFull}
+						Trip Full
+					{:else}
+						{trip.inviteMode === 'open' ? 'Join Trip' : 'Request to Join'}
+					{/if}
 				</button>
 			</form>
 		</div>
@@ -156,5 +176,26 @@
 
 	.join-btn:hover {
 		background: var(--primaryHover, #a03d24);
+	}
+
+	.join-btn:disabled {
+		background: #9ca3af;
+		cursor: not-allowed;
+	}
+
+	.join-alert {
+		margin: 0 0 1rem;
+		padding: 0.75rem 0.875rem;
+		border-radius: 10px;
+		font-size: 0.875rem;
+		color: #1f2937;
+		background: #f3f4f6;
+		border: 1px solid #e5e7eb;
+	}
+
+	.join-alert--error {
+		color: #92400e;
+		background: #fffbeb;
+		border-color: #fde68a;
 	}
 </style>

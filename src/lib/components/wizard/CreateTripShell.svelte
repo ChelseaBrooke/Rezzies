@@ -10,7 +10,7 @@
 
 	const DEFAULT_STEPS: Step[] = [
 		{ number: 1, label: 'Basics & Rooms' },
-		{ number: 2, label: 'Trip Add-Ons', optional: true },
+	{ number: 2, label: 'Cost Sharing', optional: true },
 		{ number: 3, label: 'Review & Publish' }
 	];
 

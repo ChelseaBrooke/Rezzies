@@ -9,6 +9,8 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 	const parentData = await parent();
 	const tripId = params.tripId ?? '';
 	const rooms = parentData.trip?.rooms ?? [];
+	const canViewPricingWhenCostSharingOff =
+		parentData.isHost === true || parentData.membership?.role === 'co-host';
 
 	const [roomAssignments, pricing] = await Promise.all([
 		prisma.roomAssignment.findMany({
@@ -18,7 +20,9 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 				room: { select: { id: true, name: true } }
 			}
 		}),
-		calculatePricingDisplay(tripId).catch(() => ({ roomPricing: [], perPersonPrice: undefined, perPersonPerNightPrice: undefined }))
+		calculatePricingDisplay(tripId, {
+			includeWhenCostSharingDisabled: canViewPricingWhenCostSharingOff
+		}).catch(() => ({ roomPricing: [], perPersonPrice: undefined, perPersonPerNightPrice: undefined }))
 	]);
 
 	return {

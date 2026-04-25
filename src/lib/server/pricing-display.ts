@@ -26,7 +26,10 @@ export interface BedPricingDisplay {
 /**
  * Calculate pricing display for a trip based on its pricing model
  */
-export async function calculatePricingDisplay(tripId: string): Promise<{
+export async function calculatePricingDisplay(
+	tripId: string,
+	options?: { includeWhenCostSharingDisabled?: boolean }
+): Promise<{
 	roomPricing: RoomPricingDisplay[];
 	perPersonPrice?: number;
 	perPersonPerNightPrice?: number;
@@ -44,6 +47,10 @@ export async function calculatePricingDisplay(tripId: string): Promise<{
 	});
 
 	if (!trip || trip.rooms.length === 0) {
+		return { roomPricing: [] };
+	}
+	const includeWhenCostSharingDisabled = options?.includeWhenCostSharingDisabled ?? false;
+	if (!trip.costSharingEnabled && !includeWhenCostSharingDisabled) {
 		return { roomPricing: [] };
 	}
 

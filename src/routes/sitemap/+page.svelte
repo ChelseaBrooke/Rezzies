@@ -22,7 +22,7 @@
 		{ label: 'Sign up or Log in', options: [{ label: 'Sign up', path: '/signup' }, { label: 'Log in', path: '/login' }] },
 		{ label: 'My Trips', path: '/trips' },
 		{ label: 'Host a trip', path: '/trips/new' },
-		{ label: 'New trip wizard (steps 1–6)', path: '/trips/new/step/[n]' },
+		{ label: 'New trip wizard', path: '/trips/new/step/1' },
 		{
 			label: 'Trip dashboard',
 			path: '/trips/[tripId]',
@@ -31,7 +31,7 @@
 	];
 
 	const guestJourney: (Step | StepHub)[] = [
-		{ label: 'Trip link', path: '/trips/[tripId]/join' },
+		{ label: 'Trip link from host (email/text)' },
 		{ label: 'Request to join / View trip' },
 		{
 			label: 'Trip dashboard (guest)',
@@ -41,7 +41,7 @@
 	];
 
 	const otherPages: StepSingle[] = [
-		{ label: 'Confirmation (room selection success)', path: '/confirmation/[id]' },
+		{ label: 'Confirmation (room selection success)' },
 		{ label: 'Account settings', path: '/settings' },
 	];
 </script>

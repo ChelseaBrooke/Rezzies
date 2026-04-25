@@ -134,10 +134,6 @@
 		return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
 	}
 
-	function nudgePending() {
-		quickActions?.showToast?.('Nudge sent to pending guests');
-	}
-
 	/** Google Calendar "Add event" URL for trip dates (all-day). */
 	const calendarAddUrl = $derived.by(() => {
 		if (!trip?.checkInDate || !trip?.checkOutDate) return null;
@@ -156,10 +152,26 @@
 		return addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}` : null;
 	});
 
-	const tripInfoContent = $derived(
-		'Check-in is 4pm. Keys at the lockbox, code in your confirmation.\n\n' +
-		'Wi‑Fi, Check-in, and Rules are in the itinerary.'
-	);
+	const tripInfoContent = $derived.by(() => {
+		const lines: string[] = [];
+		const checkInTime = trip?.checkInTime?.trim();
+		const checkOutTime = trip?.checkOutTime?.trim();
+		const parkingNotes = trip?.parkingNotes?.trim();
+		const houseRules = trip?.houseRules?.trim();
+		if (checkInTime || checkOutTime) {
+			lines.push(
+				[
+					checkInTime ? `Check-in: ${checkInTime}` : null,
+					checkOutTime ? `Check-out: ${checkOutTime}` : null
+				]
+					.filter(Boolean)
+					.join(' • ')
+			);
+		}
+		if (parkingNotes) lines.push(`Parking: ${parkingNotes}`);
+		if (houseRules) lines.push(`House rules: ${houseRules}`);
+		return lines.join('\n\n');
+	});
 
 	const pendingPaymentTotal = $derived(Math.max(0, totalCost - committedFunds));
 	const mealSlotsCount = $derived(mealSlots.length);
@@ -253,7 +265,7 @@
 			{members}
 			userInvoices={userInvoices}
 			totalCost={totalCost}
-			costSharingEnabled={trip.costSharingEnabled ?? true}
+			costSharingEnabled={trip.costSharingEnabled ?? false}
 			{rsvps}
 			tripGalleryFiles={data.tripGalleryFiles ?? []}
 		/>
@@ -322,7 +334,6 @@
 				guestsHref={`/trips/${trip.id}/guests`}
 				roomsHref={`/trips/${trip.id}/rooms`}
 				paymentsHref={`/trips/${trip.id}/guests`}
-				{nudgePending}
 				{checklistStats}
 				tripDescription={trip?.description ?? null}
 				extraCostRules={trip?.extraCostRules ?? []}
@@ -338,7 +349,7 @@
 				}}
 				tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
 				costAtMaxParticipation={data.costAtMaxParticipation ?? null}
-				costSharingEnabled={trip.costSharingEnabled ?? true}
+				costSharingEnabled={trip.costSharingEnabled ?? false}
 				expectedPeopleCount={trip.expectedPeopleCount ?? null}
 				planningMaxHeadcount={planningMaxHeadcount}
 				recentActivities={activities.map((a) => ({ title: a.title, createdAt: String(a.createdAt) }))}

@@ -14,6 +14,7 @@
 		createdAt: string;
 		uploadedBy: { id: string; name: string | null };
 		mealSlot: { id: string; mealType: string; title: string | null; date: string } | null;
+		canDelete?: boolean;
 	};
 
 	let dbFiles = $state<TripFile[]>((data.tripFiles as TripFile[]) ?? []);
@@ -29,7 +30,13 @@
 
 	const tripId = $derived(data.trip?.id ?? '');
 
+	function canDeleteFile(fileId: string): boolean {
+		const f = dbFiles.find((file) => file.id === fileId);
+		return !!f?.canDelete;
+	}
+
 	async function deleteFile(fileId: string) {
+		if (!canDeleteFile(fileId)) return;
 		deletingFileId = fileId;
 		const res = await fetch(`/api/trips/${tripId}/files/${fileId}`, { method: 'DELETE' });
 		deletingFileId = null;
@@ -39,7 +46,7 @@
 		if (lightboxMedia?.id === fileId) lightboxMedia = null;
 	}
 	const canDeleteSelected = $derived(
-		lightboxMedia != null && dbFiles.some((f) => f.id === lightboxMedia!.id)
+		lightboxMedia != null && canDeleteFile(lightboxMedia.id)
 	);
 	const lightboxDeleting = $derived(lightboxMedia != null && deletingFileId === lightboxMedia.id);
 
@@ -124,7 +131,8 @@
 		const newFile: TripFile = {
 			...json.file,
 			uploadedBy: { id: data.user?.id ?? '', name: data.user?.name ?? null },
-			mealSlot: null
+			mealSlot: null,
+			canDelete: true
 		};
 		dbFiles = [newFile, ...dbFiles];
 		if (isPhoto && optimisticPhotoId) {
@@ -238,19 +246,21 @@
 								<span class="file-meta">
 									{#if f.sizeBytes}{formatSize(f.sizeBytes)} · {/if}{f.uploadedBy.name ?? 'Guest'}
 								</span>
-								<button
-									type="button"
-									class="file-delete-btn"
-									title="Delete file"
-									disabled={deletingFileId === f.id}
-									onclick={() => deleteFile(f.id)}
-								>
-									{#if deletingFileId === f.id}
-										<span class="spinner"></span>
-									{:else}
-										<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-									{/if}
-								</button>
+								{#if f.canDelete}
+									<button
+										type="button"
+										class="file-delete-btn"
+										title="Delete file"
+										disabled={deletingFileId === f.id}
+										onclick={() => deleteFile(f.id)}
+									>
+										{#if deletingFileId === f.id}
+											<span class="spinner"></span>
+										{:else}
+											<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+										{/if}
+									</button>
+								{/if}
 							</li>
 						{/each}
 					</ul>
@@ -281,19 +291,21 @@
 									{/if}
 								</div>
 								<span class="file-meta">{formatSize(f.sizeBytes)}</span>
-								<button
-									type="button"
-									class="file-delete-btn"
-									title="Delete file"
-									disabled={deletingFileId === f.id}
-									onclick={() => deleteFile(f.id)}
-								>
-									{#if deletingFileId === f.id}
-										<span class="spinner"></span>
-									{:else}
-										<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-									{/if}
-								</button>
+								{#if f.canDelete}
+									<button
+										type="button"
+										class="file-delete-btn"
+										title="Delete file"
+										disabled={deletingFileId === f.id}
+										onclick={() => deleteFile(f.id)}
+									>
+										{#if deletingFileId === f.id}
+											<span class="spinner"></span>
+										{:else}
+											<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+										{/if}
+									</button>
+								{/if}
 							</li>
 						{/each}
 					</ul>
@@ -391,6 +403,14 @@
 </div>
 
 <style>
+	:global(.main-content-inner) {
+		-ms-overflow-style: none;
+		scrollbar-width: none;
+	}
+	:global(.main-content-inner::-webkit-scrollbar) {
+		width: 0;
+		height: 0;
+	}
 	.page { padding: 0; width: 100%; max-width: 80rem; margin: 0 auto; }
 	.page-header { margin-bottom: 1.5rem; }
 	.page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 .25rem; }

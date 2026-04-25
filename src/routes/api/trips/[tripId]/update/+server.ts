@@ -92,6 +92,9 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	if (!checkInDateStr || !checkOutDateStr) {
 		return json({ error: 'Check-in and check-out dates are required' }, { status: 400 });
 	}
+	if (!locationCityPayload) {
+		return json({ error: 'Location is required' }, { status: 400 });
+	}
 	// Total cost validation is conditional: required and positive only when cost sharing is on
 	const totalCost = costSharingEnabled
 		? parseFloat(totalTripCostStr.replace(/[$,]/g, ''))
@@ -119,6 +122,9 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 
 	if (expectedGuestCount != null && expectedGuestCount < 1) {
 		return json({ error: 'Minimum headcount must be at least 1' }, { status: 400 });
+	}
+	if (maxOccupancy == null || maxOccupancy < 1) {
+		return json({ error: 'Maximum headcount (capacity limit) is required' }, { status: 400 });
 	}
 
 	try {

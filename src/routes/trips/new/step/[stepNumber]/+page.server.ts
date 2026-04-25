@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 	
 	const stepNumber = parseInt(params.stepNumber || '1');
 	
-	if (stepNumber < 1 || stepNumber > 6) {
+	if (stepNumber < 1 || stepNumber > 3) {
 		throw redirect(303, '/trips/new/step/1');
 	}
 	

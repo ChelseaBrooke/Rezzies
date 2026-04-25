@@ -178,7 +178,7 @@
 	});
 	const isYes = $derived(rsvpStatus === 'yes');
 	// Add-on feature flags — default true so nothing breaks for existing trips
-	const costSharingOn = $derived(data.trip?.costSharingEnabled ?? true);
+	const costSharingOn = $derived(data.trip?.costSharingEnabled ?? false);
 
 	const guestEstimateFromServer = $derived(data.guestEstimate ?? null);
 	let liveEstimate = $state<{ lowCents: number; highCents: number; hmin: number; hmax: number } | null>(null);
@@ -670,7 +670,7 @@
 													Range {formatRange(guestEstimate.lowCents, guestEstimate.highCents)} depending on final headcount.
 												{/if}
 											{:else}
-												Least if {guestEstimate.hmax} people attend (max headcount, capacity limit); most if {guestEstimate.hmin} attend (min headcount, realistic low). Final amount depends on the number of attendees.
+												Least if {guestEstimate.hmax} people attend (max headcount, capacity limit); most if {guestEstimate.hmin} attend (min headcount, realistic low). Final amount depends on the number of guests.
 											{/if}
 										</p>
 									</div>
@@ -680,7 +680,7 @@
 												<input type="checkbox" bind:checked={costCommitmentChecked} name="costCommitmentAccepted" value="true" form="yes-confirm-form" class="commitment-checkbox-input" />
 												<span>I agree to share the trip costs.</span>
 											</span>
-											<span class="commitment-rest">I understand the final amount depends on the number of attendees. If the estimate changes outside your accepted range, you’ll be asked to review and confirm.</span>
+											<span class="commitment-rest">I understand the final amount depends on the number of guests. If the estimate changes outside your accepted range, you’ll be asked to review and confirm.</span>
 										</label>
 									</div>
 

@@ -566,7 +566,7 @@
 							</div>
 							<div class="action-links">
 								{#if result.booking_url}
-									<a href={result.booking_url} target="_blank" rel="noopener" class="btn btn-primary btn-sm">Book</a>
+									<a href={result.booking_url} target="_blank" rel="noopener" class="btn btn-primary btn-sm">View provider</a>
 								{/if}
 								{#if result.website}
 									<a href={result.website} target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Website</a>
@@ -604,7 +604,7 @@
 		<!-- Initial State -->
 		<div class="empty-state">
 			<div class="empty-icon" aria-hidden="true">🗺️</div>
-			<p>Discover events and activities</p>
+			<p>Discover activities near your trip</p>
 			<p class="empty-hint">Search by keyword or hit Discover to see what's happening near your trip.</p>
 			<button type="button" class="btn-discover-cta" onclick={() => discoverActivities(1)}>
 				Discover Activities
@@ -656,7 +656,7 @@
 
 					<input type="hidden" name="additionType" value="planned" />
 
-					<p class="add-modal-note">Adding an activity to your itinerary does not book or reserve anything with the provider. Tickets and bookings still need to be made through the activity provider’s website.</p>
+					<p class="add-modal-note">Adding an activity to your itinerary does not reserve anything with the provider. Any tickets still need to be purchased on the provider’s website.</p>
 
 					<div class="add-modal-actions">
 						<button type="button" class="btn btn-secondary" onclick={closeAddModal}>Cancel</button>

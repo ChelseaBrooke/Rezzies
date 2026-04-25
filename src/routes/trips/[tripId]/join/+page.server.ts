@@ -1,4 +1,4 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
@@ -46,7 +46,20 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 		throw error(404, 'Trip not found');
 	}
 
-	return { trip, user, inviteToken: inviteFromQuery || null };
+	const approvedCount = await prisma.tripMember.count({
+		where: { tripId, inviteStatus: 'approved' }
+	});
+	const maxCapacity = trip.maxCapacity ?? null;
+	const isTripFull = maxCapacity !== null && approvedCount >= maxCapacity;
+
+	return {
+		trip,
+		user,
+		inviteToken: inviteFromQuery || null,
+		approvedCount,
+		maxCapacity,
+		isTripFull
+	};
 };
 
 export const actions: Actions = {
@@ -74,7 +87,12 @@ export const actions: Actions = {
 				where: { tripId, inviteStatus: 'approved' }
 			});
 			if (currentCount >= trip.maxCapacity) {
-				return { capacityFull: true };
+				return fail(409, {
+					capacityFull: true,
+					message:
+						'This trip is currently full. Join the waitlist to be notified when a spot opens.',
+					canJoinWaitlist: true
+				});
 			}
 		}
 

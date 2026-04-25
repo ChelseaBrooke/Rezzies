@@ -11,7 +11,7 @@ function getStoragePathFromPublicUrl(url: string): string | null {
 	return match ? decodeURIComponent(match[1]) : null;
 }
 
-/** DELETE /api/trips/[tripId]/files/[fileId], delete a trip file (trip member only) and remove from Supabase Storage */
+/** DELETE /api/trips/[tripId]/files/[fileId], delete a trip file and remove from Supabase Storage */
 export const DELETE: RequestHandler = async ({ cookies, params }) => {
 	const user = await getSessionUser(cookies);
 	if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
@@ -27,6 +27,11 @@ export const DELETE: RequestHandler = async ({ cookies, params }) => {
 		where: { id: fileId, tripId }
 	});
 	if (!file) return json({ error: 'File not found' }, { status: 404 });
+	const canManageFiles = member.role === 'host' || member.role === 'co-host';
+	const canDelete = canManageFiles || file.uploadedById === user.id;
+	if (!canDelete) {
+		return json({ error: 'You can only delete files you uploaded' }, { status: 403 });
+	}
 
 	await prisma.tripFile.delete({ where: { id: fileId } });
 

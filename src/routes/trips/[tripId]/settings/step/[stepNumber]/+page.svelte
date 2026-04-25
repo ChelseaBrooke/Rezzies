@@ -77,7 +77,13 @@
 			if (!draft.name || !draft.checkInDate || !draft.checkOutDate || draft.rooms.length === 0) {
 				return false;
 			}
+			if (!draft.locationCity || !String(draft.locationCity).trim()) {
+				return false;
+			}
 			if (!(Number(draft.expectedGuestCount) >= 1)) {
+				return false;
+			}
+			if (!(Number(draft.maxOccupancy) >= 1)) {
 				return false;
 			}
 			return true;
@@ -94,9 +100,25 @@
 				draft.checkInDate &&
 				draft.checkOutDate &&
 				draft.rooms.length > 0 &&
+				(!draft.locationCity || !String(draft.locationCity).trim())
+			) {
+				validationError = 'Please enter a destination.';
+			} else if (
+				draft.name &&
+				draft.checkInDate &&
+				draft.checkOutDate &&
+				draft.rooms.length > 0 &&
 				!(Number(draft.expectedGuestCount) >= 1)
 			) {
 				validationError = 'Please enter a minimum headcount (realistic low).';
+			} else if (
+				draft.name &&
+				draft.checkInDate &&
+				draft.checkOutDate &&
+				draft.rooms.length > 0 &&
+				!(Number(draft.maxOccupancy) >= 1)
+			) {
+				validationError = 'Please enter a maximum headcount (capacity limit).';
 			} else {
 				validationError = null;
 			}
@@ -199,7 +221,7 @@
 		{#if saveError}
 			<div class="validation-error validation-error--footer">{saveError}</div>
 		{/if}
-		<div class="card-footer" class:card-footer--addons={stepNumber === 2}>
+		<div class="card-footer">
 			<button type="button" class="btn-back" onclick={prevStep} disabled={stepNumber === 1}>
 				Back
 			</button>
@@ -300,12 +322,6 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-	}
-
-	/* Trip Add-Ons (step 2): no divider line */
-	.card-footer--addons {
-		border-top: none;
-		padding-top: 0.5rem;
 	}
 
 	.footer-right {

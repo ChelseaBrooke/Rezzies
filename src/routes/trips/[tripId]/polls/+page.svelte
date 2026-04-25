@@ -20,6 +20,7 @@
 	const tripId = $derived(data.trip?.id ?? '');
 	const isHost = $derived(data.isHost ?? false);
 	const currentUserId = $derived(data.currentUserId ?? '');
+	const canCreatePoll = true;
 
 	let searchQuery = $state('');
 	let category = $state<PollCategory>('All');
@@ -200,10 +201,10 @@
 				<p class="polls-subtitle">
 					{isHost
 						? 'Create polls, track votes, and see what the group decides.'
-						: 'Cast your vote and see what the group thinks.'}
+						: 'Create polls, cast your vote, and see what the group thinks.'}
 				</p>
 			</div>
-			{#if isHost}
+			{#if canCreatePoll}
 				<button class="btn-new-poll" onclick={() => (showCreateModal = true)}>
 					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
 						<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -229,7 +230,7 @@
 				{sort}
 				onSortChange={(s) => (sort = s)}
 				onAddNewPoll={() => (showCreateModal = true)}
-				canCreate={false}
+				canCreate={canCreatePoll}
 			/>
 		</div>
 
@@ -239,7 +240,7 @@
 				<div class="empty-icon" aria-hidden="true">🗳️</div>
 				<p class="empty-title">No polls yet</p>
 				<p class="empty-hint">
-					{isHost ? 'Click "New Poll" above to get started.' : 'Check back later for new polls.'}
+					Click "New Poll" above to get started.
 				</p>
 			</div>
 		{:else}
