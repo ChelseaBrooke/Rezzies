@@ -9,7 +9,6 @@
 	import ActivityLogModal from '$lib/components/trips/dashboard/ActivityLogModal.svelte';
 	import GuestEditModal from '$lib/components/trips/GuestEditModal.svelte';
 	import GuestInvoiceModal from '$lib/components/trips/GuestInvoiceModal.svelte';
-	import CapacitySnapshot from '$lib/components/trips/CapacitySnapshot.svelte';
 	import { buildTripActivityLog } from '$lib/trip-activity-log.js';
 	import pokeIcon from '$lib/assets/images/poke.png';
 
@@ -325,30 +324,52 @@
 		data.maxOccupancy != null && data.maxOccupancy > 0 ? data.maxOccupancy : totalBedCapacity
 	);
 
-	const rsvpVisual = $derived.by(() => {
-		const going = data.summary?.goingPartySize ?? 0;
-		const notGoing = data.summary?.notGoingCount ?? 0;
-		const unresponded = data.summary?.unrespondedCount ?? 0;
-		const total = going + notGoing + unresponded;
-		return { total, going, notGoing, unresponded };
+	const guestOverview = $derived.by(() => {
+		const s = data.summary;
+		const onList = s?.totalInvited ?? 0;
+		const rsvpYes = s?.goingCount ?? 0;
+		const rsvpNo = s?.notGoingCount ?? 0;
+		const awaiting = s?.unrespondedCount ?? 0;
+		const peopleIn = s?.goingPartySize ?? 0;
+		const cap = capacity;
+		const openSlots = cap > 0 ? Math.max(0, cap - peopleIn) : null;
+		const overCap = cap > 0 && peopleIn > cap;
+		const expected = data.trip?.expectedPeopleCount ?? null;
+		const targetPct =
+			cap > 0 && expected != null && expected > 0
+				? Math.min(100, (expected / cap) * 100)
+				: null;
+		const pct = (n: number) => (onList > 0 ? (n / onList) * 100 : 0);
+		const headcountPct = cap > 0 ? Math.min(100, (peopleIn / cap) * 100) : 0;
+		return {
+			onList,
+			rsvpYes,
+			rsvpNo,
+			awaiting,
+			peopleIn,
+			cap,
+			openSlots,
+			overCap,
+			expected,
+			targetPct,
+			yesListPct: pct(rsvpYes),
+			noListPct: pct(rsvpNo),
+			waitListPct: pct(awaiting),
+			headcountPct
+		};
 	});
 
-	const attentionCounts = $derived.by(() => {
-		const rows = data.guestRows ?? [];
-		let noResponse = 0;
-		let reconfirm = 0;
-		let unpaid = 0;
-		let noRoom = 0;
-		let notApproved = 0;
-		for (const r of rows) {
-			if (r.rsvpStatus !== 'yes' && r.rsvpStatus !== 'no') noResponse++;
-			if (r.rsvpStatus === 'yes' && r.yesSubstatus === 'reconfirm_required') reconfirm++;
-			if (r.type === 'member' && r.userId && (r.toPayTotal ?? 0) > 0 && !r.invoicePaid) unpaid++;
-			if (r.type === 'member' && (r.assignedBedIds?.length ?? 0) === 0) noRoom++;
-			if (r.type === 'member' && r.userId && r.rsvpStatus === 'yes' && r.priceApproved === false) notApproved++;
+	function toggleRsvpFilter(v: 'all' | 'yes' | 'no' | 'no-response') {
+		if (filterRsvp === v) {
+			filterRsvp = 'all';
+		} else {
+			filterRsvp = v;
+			filterAssignment = 'all';
+			filterDietary = 'all';
+			filterPayment = 'all';
+			filterApproval = 'all';
 		}
-		return { noResponse, reconfirm, unpaid, noRoom, notApproved };
-	});
+	}
 
 	const filteredAndSorted = $derived.by(() => {
 		let rows = [...(data.guestRows ?? [])];
@@ -517,58 +538,140 @@
 
 <div class="gp">
 
-	<!-- ── PAGE HEADER ──────────────────────────────────────────────────── -->
-	<div class="gp-header">
-		<div class="gp-header-left">
+	<!-- ── PAGE HEADER ─────────────────────────────────────────────────── -->
+	<header class="gp-page-head">
+		<div class="gp-page-head__main">
 			<h1 class="gp-title">Guests</h1>
-			{#if data.trip?.rsvpByDate}
-				<span class="gp-rsvp-by">RSVP by <strong>{new Date(data.trip.rsvpByDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong></span>
-			{/if}
+			<p class="gp-page-head__lede">Invites and RSVPs by guest list entry — each row is a household or pending invite.</p>
 		</div>
-	</div>
+		{#if data.trip?.rsvpByDate}
+			<div class="gp-page-head__meta">
+				<span class="gp-page-head__meta-label">RSVP by</span>
+				<time class="gp-page-head__meta-date" datetime={data.trip.rsvpByDate}
+					>{new Date(data.trip.rsvpByDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</time
+				>
+			</div>
+		{/if}
+	</header>
 
-	<!-- ── STAT CARDS ──────────────────────────────────────────────────── -->
-	<div class="gp-stats-row">
-		<div class="gp-stat-card">
-			<span class="gp-stat-value gp-stat-value--going">{rsvpVisual.going}</span>
-			<span class="gp-stat-label">Going</span>
-			{#if rsvpVisual.total > 0}
-				<span class="gp-stat-pct">{Math.round(100 * rsvpVisual.going / rsvpVisual.total)}%</span>
+	<!-- ── RSVP SUMMARY + STANDALONE HEADCOUNT ────────────────────────── -->
+	<div
+		class="gp-summary-grid"
+		class:gp-summary-grid--split={guestOverview.onList > 0}
+	>
+		<section class="gp-rsvp-card" aria-label="RSVP status on the guest list">
+			<div class="gp-rsvp-card__head">
+				<h2 class="gp-rsvp-card__title">RSVPs</h2>
+			</div>
+			{#if guestOverview.onList > 0}
+				<div
+					class="gp-rsvp-bar"
+					role="img"
+					aria-label="Of {guestOverview.onList} on the guest list: {guestOverview.rsvpYes} RSVP yes, {guestOverview.rsvpNo} RSVP no, {guestOverview.awaiting} still waiting for a response"
+				>
+					<div class="gp-rsvp-bar__track">
+						{#if guestOverview.yesListPct > 0}
+							<div class="gp-rsvp-bar__seg gp-rsvp-bar__seg--yes" style="width: {guestOverview.yesListPct}%"></div>
+						{/if}
+						{#if guestOverview.noListPct > 0}
+							<div class="gp-rsvp-bar__seg gp-rsvp-bar__seg--no" style="width: {guestOverview.noListPct}%"></div>
+						{/if}
+						{#if guestOverview.waitListPct > 0}
+							<div class="gp-rsvp-bar__seg gp-rsvp-bar__seg--wait" style="width: {guestOverview.waitListPct}%"></div>
+						{/if}
+					</div>
+				</div>
+			{:else}
+				<p class="gp-rsvp-card__empty">No one on the list yet. Use Add guest to invite people.</p>
 			{/if}
-		</div>
-		<div class="gp-stat-card">
-			<span class="gp-stat-value gp-stat-value--no">{rsvpVisual.notGoing}</span>
-			<span class="gp-stat-label">Not going</span>
-			{#if rsvpVisual.total > 0}
-				<span class="gp-stat-pct">{Math.round(100 * rsvpVisual.notGoing / rsvpVisual.total)}%</span>
-			{/if}
-		</div>
-		<div class="gp-stat-card">
-			<span class="gp-stat-value gp-stat-value--pending">{rsvpVisual.unresponded}</span>
-			<span class="gp-stat-label">No response</span>
-			{#if rsvpVisual.total > 0}
-				<span class="gp-stat-pct">{Math.round(100 * rsvpVisual.unresponded / rsvpVisual.total)}%</span>
-			{/if}
-		</div>
-		<div class="gp-stat-card gp-stat-card--total">
-			<span class="gp-stat-value">{rsvpVisual.total}</span>
-			<span class="gp-stat-label">Invited</span>
-			{#if (data.summary?.goingPartySize ?? 0) > rsvpVisual.going}
-				<span class="gp-stat-pct">{data.summary?.goingPartySize} people total</span>
-			{/if}
-		</div>
-	</div>
 
-	<!-- ── CAPACITY SNAPSHOT ────────────────────────────────────────────── -->
-	{#if data.canManageGuests}
-		<CapacitySnapshot
-			capacity={capacity}
-			confirmedCount={rsvpVisual.going}
-			pendingCount={rsvpVisual.unresponded}
-			declinedCount={rsvpVisual.notGoing}
-			invitedTotal={rsvpVisual.total}
-		/>
-	{/if}
+			<div class="gp-ov-chips" role="group" aria-label="Filter by RSVP">
+				<button
+					type="button"
+					class="gp-ov-chip"
+					class:gp-ov-chip--active={filterRsvp === 'yes'}
+					onclick={() => toggleRsvpFilter('yes')}
+				>
+					<span class="gp-ov-chip__n gp-ov-chip__n--yes">{guestOverview.rsvpYes}</span>
+					<span class="gp-ov-chip__txt">RSVP yes</span>
+				</button>
+				<button
+					type="button"
+					class="gp-ov-chip"
+					class:gp-ov-chip--active={filterRsvp === 'no'}
+					onclick={() => toggleRsvpFilter('no')}
+				>
+					<span class="gp-ov-chip__n gp-ov-chip__n--no">{guestOverview.rsvpNo}</span>
+					<span class="gp-ov-chip__txt">RSVP no</span>
+				</button>
+				<button
+					type="button"
+					class="gp-ov-chip"
+					class:gp-ov-chip--active={filterRsvp === 'no-response'}
+					onclick={() => toggleRsvpFilter('no-response')}
+				>
+					<span class="gp-ov-chip__n gp-ov-chip__n--wait">{guestOverview.awaiting}</span>
+					<span class="gp-ov-chip__txt">Waiting</span>
+				</button>
+				<div
+					class="gp-ov-chip gp-ov-chip--static"
+					role="status"
+					aria-label="Total guest list entries: {guestOverview.onList}"
+				>
+					<span class="gp-ov-chip__n" aria-hidden="true">{guestOverview.onList}</span>
+					<span class="gp-ov-chip__txt" aria-hidden="true">On list</span>
+				</div>
+			</div>
+		</section>
+
+		{#if guestOverview.cap > 0}
+			<section
+				class="gp-hc-card"
+				class:gp-hc-card--risk={guestOverview.overCap}
+				aria-label="Headcount versus maximum capacity"
+			>
+				<div class="gp-hc-card__head">
+					<h2 class="gp-hc-card__title">Headcount vs. capacity</h2>
+					<p class="gp-hc-card__sub">
+						{guestOverview.peopleIn} {guestOverview.peopleIn === 1 ? 'person' : 'people'} coming
+						<span class="gp-hc-card__sep" aria-hidden="true">·</span>
+						<span>max {guestOverview.cap} people</span>
+					</p>
+				</div>
+				<div
+					class="gp-hc-bar"
+					role="img"
+					aria-label="{guestOverview.peopleIn} of {guestOverview.cap} headcount committed"
+				>
+					<div class="gp-hc-bar__track">
+						<div class="gp-hc-bar__fill" style="width: {guestOverview.headcountPct}%"></div>
+						{#if guestOverview.targetPct !== null}
+							<div class="gp-hc-bar__marker" style="left: {guestOverview.targetPct}%">
+								<span class="gp-hc-bar__marker-lbl">Expected min</span>
+							</div>
+						{/if}
+					</div>
+				</div>
+				<div class="gp-hc-meta">
+					{#if guestOverview.overCap}
+						<span class="gp-hc-pill gp-hc-pill--risk">Over max headcount</span>
+					{:else if guestOverview.openSlots !== null && guestOverview.openSlots > 0}
+						<span class="gp-hc-pill gp-hc-pill--open"
+							>{guestOverview.openSlots} open {guestOverview.openSlots === 1 ? 'slot' : 'slots'}</span
+						>
+					{:else}
+						<span class="gp-hc-pill gp-hc-pill--full">At max headcount</span>
+					{/if}
+				</div>
+			</section>
+		{:else if guestOverview.onList > 0}
+			<aside class="gp-hc-card gp-hc-card--muted" aria-label="Headcount">
+				<p class="gp-hc-card__fallback">
+					Set <strong>max guests</strong> on the trip (or room caps) to compare headcount against a limit.
+				</p>
+			</aside>
+		{/if}
+	</div>
 
 	<!-- ── WAITLIST PANEL (host/co-host only) ───────────────────────────── -->
 	{#if data.canManageGuests && (data.waitlistCount ?? 0) > 0}
@@ -594,86 +697,6 @@
 				{/each}
 			</div>
 		</div>
-	{/if}
-
-	<!-- ── NEEDS ATTENTION (host only) ───────────────────────────────────── -->
-	{#if data.canManageGuests && (data.guestRows?.length ?? 0) > 0}
-		{@const attention = attentionCounts}
-		{#if attention.noResponse > 0 || attention.reconfirm > 0 || attention.unpaid > 0 || attention.noRoom > 0 || attention.notApproved > 0}
-			<div class="gp-card gp-card--attention">
-				<div class="gp-attention-head">
-					<span class="gp-attention-title">Needs Attention</span>
-					<span class="gp-attention-sub">Click to filter; click again to clear</span>
-				</div>
-				<div class="gp-attention-chips">
-					{#if attention.noResponse > 0}
-						<button
-							type="button"
-							class="gp-attention-chip"
-							class:gp-attention-chip--active={filterRsvp === 'no-response'}
-							onclick={() => {
-								if (filterRsvp === 'no-response') filterRsvp = 'all';
-								else { filterRsvp = 'no-response'; filterAssignment = 'all'; filterDietary = 'all'; filterPayment = 'all'; filterApproval = 'all'; }
-							}}
-						>
-							No response ({attention.noResponse})
-						</button>
-					{/if}
-					{#if attention.reconfirm > 0}
-						<button
-							type="button"
-							class="gp-attention-chip"
-							class:gp-attention-chip--active={filterRsvp === 'reconfirm'}
-							onclick={() => {
-								if (filterRsvp === 'reconfirm') filterRsvp = 'all';
-								else { filterRsvp = 'reconfirm'; filterAssignment = 'all'; filterDietary = 'all'; filterPayment = 'all'; filterApproval = 'all'; }
-							}}
-						>
-							Needs reconfirm ({attention.reconfirm})
-						</button>
-					{/if}
-					{#if attention.unpaid > 0}
-						<button
-							type="button"
-							class="gp-attention-chip"
-							class:gp-attention-chip--active={filterPayment === 'unpaid'}
-							onclick={() => {
-								if (filterPayment === 'unpaid') filterPayment = 'all';
-								else { filterPayment = 'unpaid'; filterRsvp = 'all'; filterAssignment = 'all'; filterDietary = 'all'; filterApproval = 'all'; }
-							}}
-						>
-							Unpaid ({attention.unpaid})
-						</button>
-					{/if}
-					{#if attention.noRoom > 0}
-						<button
-							type="button"
-							class="gp-attention-chip"
-							class:gp-attention-chip--active={filterAssignment === 'unassigned'}
-							onclick={() => {
-								if (filterAssignment === 'unassigned') filterAssignment = 'all';
-								else { filterAssignment = 'unassigned'; filterRsvp = 'all'; filterDietary = 'all'; filterPayment = 'all'; filterApproval = 'all'; }
-							}}
-						>
-							No room/bed ({attention.noRoom})
-						</button>
-					{/if}
-					{#if attention.notApproved > 0}
-						<button
-							type="button"
-							class="gp-attention-chip"
-							class:gp-attention-chip--active={filterApproval === 'not-approved'}
-							onclick={() => {
-								if (filterApproval === 'not-approved') filterApproval = 'all';
-								else { filterApproval = 'not-approved'; filterRsvp = 'all'; filterAssignment = 'all'; filterDietary = 'all'; filterPayment = 'all'; }
-							}}
-						>
-							Not approved ({attention.notApproved})
-						</button>
-					{/if}
-				</div>
-			</div>
-		{/if}
 	{/if}
 
 	<!-- ── GUEST TABLE CARD ──────────────────────────────────────────────── -->
@@ -1323,7 +1346,7 @@
 	/* ── Shell ── */
 	.gp { display: flex; flex-direction: column; gap: 1.25rem; padding: 0; }
 
-	/* ── Page header ── */
+	/* ── Page header (title + meta) ── */
 	.gp-header {
 		display: flex; align-items: flex-start; justify-content: space-between;
 		flex-wrap: wrap; gap: 0.75rem;
@@ -1337,6 +1360,262 @@
 	}
 	.gp-rsvp-by { font-size: 0.8125rem; color: var(--muted); }
 	.gp-rsvp-by strong { color: var(--text); }
+
+	.gp-page-head {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 1rem 1.5rem;
+		flex-wrap: wrap;
+		padding-bottom: 0.25rem;
+		border-bottom: 1px solid var(--border-soft, #e5e7eb);
+	}
+	.gp-page-head__main { flex: 1; min-width: 12rem; }
+	.gp-page-head__lede {
+		margin: 0.35rem 0 0;
+		font-size: 0.875rem;
+		line-height: 1.45;
+		color: var(--muted, #64748b);
+		max-width: 36rem;
+	}
+	.gp-page-head__meta {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.1rem;
+		text-align: right;
+	}
+	.gp-page-head__meta-label {
+		font-size: 0.65rem;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--muted, #94a3b8);
+	}
+	.gp-page-head__meta-date {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: var(--navy, var(--text));
+	}
+
+	/* ── Two-column: RSVPs + headcount card ── */
+	.gp-summary-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+	@media (min-width: 880px) {
+		.gp-summary-grid--split {
+			display: grid;
+			grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+			gap: 1rem 1.25rem;
+			align-items: start;
+		}
+	}
+
+	.gp-rsvp-card {
+		background: var(--surfaceSolid, #fff);
+		border: 1px solid var(--border-soft, #e5e7eb);
+		border-radius: 14px;
+		padding: 1rem 1.15rem 1.1rem;
+		box-shadow: 0 1px 8px rgba(0, 0, 0, 0.04);
+	}
+	.gp-rsvp-card__head { margin-bottom: 0.65rem; }
+	.gp-rsvp-card__title {
+		margin: 0;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.1rem;
+		font-weight: 700;
+		color: var(--navy, var(--text));
+		letter-spacing: -0.02em;
+	}
+	.gp-rsvp-card__empty {
+		margin: 0 0 0.65rem;
+		font-size: 0.875rem;
+		color: var(--muted, #64748b);
+	}
+	.gp-rsvp-bar { width: 100%; }
+	.gp-rsvp-bar__track {
+		display: flex;
+		height: 12px;
+		border-radius: 999px;
+		overflow: hidden;
+		background: var(--surface2, #f1f5f9);
+	}
+	.gp-rsvp-bar__seg { min-width: 0; transition: width 400ms cubic-bezier(0.4, 0, 0.2, 1); }
+	.gp-rsvp-bar__seg--yes {
+		background: linear-gradient(90deg, #22c55e, #16a34a);
+	}
+	.gp-rsvp-bar__seg--no { background: linear-gradient(90deg, #94a3b8, #64748b); }
+	.gp-rsvp-bar__seg--wait {
+		background: repeating-linear-gradient(
+			90deg,
+			rgba(206, 86, 18, 0.55) 0px,
+			rgba(206, 86, 18, 0.55) 5px,
+			rgba(206, 86, 18, 0.18) 5px,
+			rgba(206, 86, 18, 0.18) 8px
+		);
+	}
+	.gp-ov-chips {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 0.5rem;
+	}
+	@media (min-width: 640px) {
+		.gp-ov-chips { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+	}
+	.gp-ov-chip {
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+		padding: 0.55rem 0.7rem;
+		border-radius: 10px;
+		border: 1px solid var(--border-soft, #e5e7eb);
+		background: var(--surfaceSolid, #fff);
+		font-family: inherit;
+		font-size: 0.8125rem;
+		text-align: left;
+		cursor: pointer;
+		transition: border-color 140ms, background 140ms, box-shadow 140ms;
+	}
+	.gp-ov-chip:hover {
+		border-color: rgba(47, 119, 120, 0.45);
+		background: rgba(47, 119, 120, 0.04);
+	}
+	.gp-ov-chip--active {
+		border-color: var(--slate, #2d3a3f);
+		background: var(--slate, #2d3a3f);
+		color: #fff;
+		box-shadow: 0 2px 10px rgba(45, 58, 63, 0.2);
+	}
+	.gp-ov-chip--active:hover { background: var(--navy, #1e2938); color: #fff; border-color: var(--navy, #1e2938); }
+	.gp-ov-chip--static {
+		cursor: default;
+		background: rgba(206, 86, 18, 0.06);
+		border-color: rgba(206, 86, 18, 0.2);
+	}
+	.gp-ov-chip--static:hover { background: rgba(206, 86, 18, 0.06); border-color: rgba(206, 86, 18, 0.2); }
+	.gp-ov-chip__n {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.35rem;
+		font-weight: 800;
+		letter-spacing: -0.03em;
+		line-height: 1;
+	}
+	.gp-ov-chip__n--yes { color: #15803d; }
+	.gp-ov-chip__n--no { color: #64748b; }
+	.gp-ov-chip__n--wait { color: #b45309; }
+	.gp-ov-chip--active .gp-ov-chip__n--yes,
+	.gp-ov-chip--active .gp-ov-chip__n--no,
+	.gp-ov-chip--active .gp-ov-chip__n--wait { color: #fff; }
+	.gp-ov-chip--active .gp-ov-chip__n { color: #fff; }
+	.gp-ov-chip__txt { font-weight: 600; color: var(--text, #1e293b); }
+	.gp-ov-chip--active .gp-ov-chip__txt { color: #fff; }
+	.gp-hc-bar { width: 100%; }
+	.gp-hc-bar__track {
+		position: relative;
+		height: 11px;
+		border-radius: 999px;
+		background: var(--surface2, #f1f5f9);
+	}
+	.gp-hc-bar__fill {
+		position: absolute;
+		left: 0;
+		top: 0;
+		height: 100%;
+		border-radius: 999px;
+		background: linear-gradient(90deg, #2f7778, #1d5c5d);
+		z-index: 1;
+		transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+	.gp-hc-bar__marker {
+		position: absolute;
+		top: -3px;
+		bottom: -3px;
+		width: 2px;
+		background: #94a3b8;
+		border-radius: 1px;
+		transform: translateX(-50%);
+		z-index: 2;
+	}
+	.gp-hc-bar__marker-lbl {
+		position: absolute;
+		bottom: calc(100% + 4px);
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 0.6rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		white-space: nowrap;
+		color: var(--muted, #94a3b8);
+	}
+	.gp-hc-meta { margin-top: 0.45rem; }
+	.gp-hc-pill {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.2rem 0.55rem;
+		border-radius: 999px;
+		font-size: 0.75rem;
+		font-weight: 600;
+	}
+	.gp-hc-pill--open {
+		background: rgba(34, 197, 94, 0.12);
+		color: #15803d;
+		border: 1px solid rgba(34, 197, 94, 0.25);
+	}
+	.gp-hc-pill--full {
+		background: var(--surface2, #f1f5f9);
+		color: var(--muted, #64748b);
+		border: 1px solid var(--border-soft, #e5e7eb);
+	}
+	.gp-hc-pill--risk {
+		background: rgba(245, 158, 11, 0.12);
+		color: #b45309;
+		border: 1px solid rgba(245, 158, 11, 0.35);
+	}
+
+	/* Standalone headcount card */
+	.gp-hc-card {
+		background: linear-gradient(165deg, rgba(47, 119, 120, 0.09) 0%, var(--surfaceSolid, #fff) 50%);
+		border: 1px solid rgba(47, 119, 120, 0.22);
+		border-radius: 14px;
+		padding: 1.05rem 1.2rem 1.15rem;
+		box-shadow: 0 2px 14px rgba(29, 92, 93, 0.08);
+	}
+	.gp-hc-card--risk {
+		background: rgba(255, 251, 235, 0.85);
+		border-color: rgba(217, 119, 6, 0.4);
+		box-shadow: 0 2px 12px rgba(180, 83, 9, 0.08);
+	}
+	.gp-hc-card--muted {
+		background: var(--surface2, #f8fafc);
+		border: 1px dashed var(--border-soft, #e2e8f0);
+		box-shadow: none;
+	}
+	.gp-hc-card__head { margin-bottom: 0.75rem; }
+	.gp-hc-card__title {
+		margin: 0;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.1rem;
+		font-weight: 700;
+		color: var(--teal, #1d5c5d);
+		letter-spacing: -0.02em;
+	}
+	.gp-hc-card--risk .gp-hc-card__title { color: #b45309; }
+	.gp-hc-card__sub {
+		margin: 0.25rem 0 0;
+		font-size: 0.8125rem;
+		line-height: 1.4;
+		color: var(--text, #334155);
+	}
+	.gp-hc-card__sep { color: var(--muted, #94a3b8); margin: 0 0.25rem; }
+	.gp-hc-card__fallback {
+		margin: 0;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		color: var(--muted, #64748b);
+	}
 
 	/* ── Buttons ── */
 	.gp-btn {
@@ -1389,79 +1668,6 @@
 		border-radius: 9999px;
 	}
 	.gp-toast--success { background: rgba(34,197,94,0.1); color: #16a34a; }
-
-	/* ── Stat cards row ── */
-	.gp-stats-row {
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: 0.875rem;
-	}
-	.gp-stat-card {
-		background: var(--surfaceSolid);
-		border: 1px solid var(--border-soft);
-		border-radius: 14px;
-		padding: 1.125rem 1.25rem 1rem;
-		display: flex; flex-direction: column; gap: 0.2rem;
-		box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-	}
-	.gp-stat-card--total {
-		background: linear-gradient(140deg, rgba(47,119,120,0.06) 0%, var(--surfaceSolid) 100%);
-		border-color: rgba(47,119,120,0.2);
-	}
-	.gp-stat-value {
-		font-family: 'Fraunces', Georgia, serif;
-		font-size: 2rem; font-weight: 800; line-height: 1;
-		letter-spacing: -0.04em; color: var(--navy, var(--text));
-	}
-	.gp-stat-value--going  { color: #16a34a; }
-	.gp-stat-value--no     { color: var(--muted); }
-	.gp-stat-value--pending { color: #b45309; }
-	.gp-stat-label {
-		font-size: 0.8125rem; font-weight: 600; color: var(--muted);
-		text-transform: uppercase; letter-spacing: 0.04em;
-	}
-	.gp-stat-pct { font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
-
-	/* ── Needs Attention panel ── */
-	.gp-card--attention {
-		padding: 1rem 1.25rem;
-	}
-	.gp-attention-head {
-		display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem;
-		margin-bottom: 0.75rem;
-	}
-	.gp-attention-title {
-		font-family: 'Fraunces', Georgia, serif;
-		font-size: 1rem; font-weight: 700; color: var(--navy, var(--text));
-	}
-	.gp-attention-sub { font-size: 0.75rem; color: var(--muted); }
-	.gp-attention-chips {
-		display: flex; flex-wrap: wrap; gap: 0.5rem;
-	}
-	.gp-attention-chip {
-		display: inline-flex; align-items: center;
-		padding: 0.4rem 0.75rem;
-		font-size: 0.8125rem; font-weight: 600;
-		border-radius: 9999px;
-		border: 1px solid var(--border-soft);
-		background: var(--surfaceSolid);
-		color: var(--text);
-		cursor: pointer;
-		transition: background 120ms, border-color 120ms, color 120ms;
-	}
-	.gp-attention-chip:hover {
-		background: var(--surface2);
-		border-color: var(--slate);
-	}
-	.gp-attention-chip--active {
-		background: var(--slate);
-		border-color: var(--slate);
-		color: #fff;
-	}
-	.gp-attention-chip--active:hover {
-		background: var(--navy);
-		border-color: var(--navy);
-	}
 
 	/* ── Bulk selection (in controls row) ── */
 	.gp-bulk-count { font-size: 0.875rem; font-weight: 600; color: var(--navy, var(--text)); }
@@ -1867,17 +2073,20 @@
 
 	/* ── Responsive ── */
 	@media (max-width: 900px) {
-		.gp-stats-row { grid-template-columns: repeat(2, 1fr); }
+		.gp-rsvp-card,
+		.gp-hc-card { padding: 0.95rem 1rem 1.05rem; }
 	}
 	@media (max-width: 768px) {
-		.gp-stats-row { grid-template-columns: repeat(2, 1fr); }
+		.gp-page-head { align-items: flex-start; }
+		.gp-page-head__meta { align-items: flex-start; text-align: left; }
 		.gp-controls { flex-wrap: wrap; }
 		.gp-filters-row { flex-wrap: wrap; gap: 0.5rem; }
 		.gp-modal { width: calc(100vw - 2rem); min-width: 0; }
 	}
 	@media (max-width: 560px) {
-		.gp-stats-row { grid-template-columns: repeat(2, 1fr); }
 		.gp-filter-label { min-width: 0; }
 		.gp-select { min-width: 7rem; }
+		.gp-rsvp-card,
+		.gp-hc-card { padding: 0.85rem 0.9rem 0.95rem; }
 	}
 </style>

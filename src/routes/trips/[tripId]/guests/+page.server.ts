@@ -368,8 +368,9 @@ export const load: PageServerLoad = async ({ parent }) => {
 					name: trip.name,
 					rsvpByDate: trip.rsvpByDate ? trip.rsvpByDate.toISOString().slice(0, 10) : null,
 					allowPartialStays: trip.allowPartialStays ?? false,
-				checkInDate: trip.checkInDate ? trip.checkInDate.toISOString().slice(0, 10) : null,
-					checkOutDate: trip.checkOutDate ? trip.checkOutDate.toISOString().slice(0, 10) : null
+					checkInDate: trip.checkInDate ? trip.checkInDate.toISOString().slice(0, 10) : null,
+					checkOutDate: trip.checkOutDate ? trip.checkOutDate.toISOString().slice(0, 10) : null,
+					expectedPeopleCount: trip?.expectedPeopleCount ?? null
 				}
 			: null,
 		guestRows,
