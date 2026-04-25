@@ -27,6 +27,8 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const isCoHost = membership?.role === 'co-host';
 	const canRemoveGames = isHost;
 	const tabParam = url.searchParams.get('tab');
+	// New redesign: ?game=<gameId> (e.g. scavenger-bingo) routes into individual game views
+	const gameParam = url.searchParams.get('game');
 
 	// Fetch trip games here so we always have fresh data after add-game redirect (layout may not re-run)
 	const tripGamesRows = trip
@@ -84,6 +86,12 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		};
 	}
 
+	// Members for leaderboard / player lists
+	const members = (trip?.members ?? []).map((m: { user?: { id?: string; name?: string | null } | null; role?: string }) => ({
+		userId: m.user?.id ?? '',
+		name: m.user?.name ?? null,
+	}));
+
 	return {
 		trip,
 		user,
@@ -91,8 +99,10 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		isCoHost,
 		canRemoveGames,
 		tabParam,
+		gameParam,
 		tripGames,
-		captionThis
+		captionThis,
+		members
 	};
 };
 
