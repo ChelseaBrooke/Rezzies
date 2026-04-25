@@ -183,37 +183,33 @@ export const actions: Actions = {
 				return newTrip;
 			});
 
-			// Create meal plan if enabled (outside transaction to avoid timeout)
-			if (data.enableMeals) {
-				try {
-					await prisma.mealPlan.create({
-						data: {
-							tripId: trip.id,
-							enabled: true,
-							mode: 'slots'
-						}
-					});
+			// Meal planning is always on for new trips (outside transaction to avoid timeout)
+			try {
+				await prisma.mealPlan.create({
+					data: {
+						tripId: trip.id,
+						enabled: true,
+						mode: 'slots'
+					}
+				});
 
-					// Create meal slots if meals are provided
-					if (data.meals && data.meals.length > 0) {
-						for (const mealData of data.meals) {
-							if (mealData.date && mealData.name) {
-								await prisma.mealSlot.create({
-									data: {
-										tripId: trip.id,
-										mealType: 'dinner', // Default, can be customized
-										date: new Date(mealData.date),
-										menuText: mealData.name,
-										capacityServings: null
-									}
-								});
-							}
+				if (data.meals && data.meals.length > 0) {
+					for (const mealData of data.meals) {
+						if (mealData.date && mealData.name) {
+							await prisma.mealSlot.create({
+								data: {
+									tripId: trip.id,
+									mealType: 'dinner',
+									date: new Date(mealData.date),
+									menuText: mealData.name,
+									capacityServings: null
+								}
+							});
 						}
 					}
-				} catch (mealError) {
-					console.error('Error creating meal plan:', mealError);
-					// Non-critical, continue
 				}
+			} catch (mealError) {
+				console.error('Error creating meal plan:', mealError);
 			}
 
 			// Send invites if requested (outside transaction to avoid timeout)

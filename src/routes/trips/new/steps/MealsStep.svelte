@@ -17,6 +17,8 @@
 	if (!formData.meals) {
 		formData.meals = [];
 	}
+	// Meal planning is always on for new trips (legacy wizard path).
+	formData.enableMeals = true;
 	
 	function addMeal() {
 		const newMeal: Meal = {
@@ -38,22 +40,10 @@
 	<p class="step-subtitle">Optionally plan and track meal costs for your trip</p>
 	
 	<div class="meals-form">
-		<!-- Enable Meals Toggle -->
-		<div class="form-section">
-			<label class="toggle-label">
-				<input
-					type="checkbox"
-					bind:checked={formData.enableMeals}
-					class="toggle-input"
-				/>
-				<span class="toggle-content">
-					<span class="toggle-title">Enable Meal Planning</span>
-					<span class="toggle-description">Track meals and allow guest contributions</span>
-				</span>
-			</label>
-		</div>
-		
-		{#if formData.enableMeals}
+		<p class="meals-intro">
+			Meal planning is included on every trip. Optionally list starter meals below; you can always add or edit them later.
+		</p>
+
 			<div class="meals-list">
 				{#each formData.meals as meal (meal.id)}
 					<div class="meal-card">
@@ -118,7 +108,6 @@
 					Guest contributions can be enabled after trip creation.
 				</p>
 			</div>
-		{/if}
 	</div>
 	
 	<div class="step-actions">
@@ -136,6 +125,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--spacing-xl);
+	}
+
+	.meals-intro {
+		margin: 0;
+		font-size: 0.95rem;
+		color: var(--color-text-light);
+		line-height: 1.6;
 	}
 	
 	.toggle-label {

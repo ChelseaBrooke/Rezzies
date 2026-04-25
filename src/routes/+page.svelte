@@ -44,7 +44,6 @@
 			</div>
 			<div class="main-actions">
 				<a href="/trips/new" class="action-btn primary">Host a Trip</a>
-				<a href="/find-vacation" class="action-btn secondary">Find a Trip</a>
 				<a href="/our-services" class="action-btn secondary">Learn More</a>
 			</div>
 		</div>

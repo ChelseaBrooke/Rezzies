@@ -62,7 +62,7 @@ export interface MealsConfig {
 
 export function getDefaultMealsConfig(): MealsConfig {
 	return {
-		enabled: false,
+		enabled: true,
 		modes: { signups: true, fund: false, informal: false },
 		signupConfig: { slots: [], allowHostPreassign: false, includeLunch: false },
 		fundConfig: {
@@ -122,7 +122,7 @@ export interface ActivitiesConfig {
 
 export function getDefaultActivitiesConfig(): ActivitiesConfig {
 	return {
-		enabled: false,
+		enabled: true,
 		allowGuestSuggestions: true,
 		items: []
 	};
@@ -292,7 +292,7 @@ const defaultDraft: TripDraft = {
 	meals: getDefaultMealsConfig(),
 	activities: getDefaultActivitiesConfig(),
 	costSharingEnabled: false,
-	gamesEnabled: false,
+	gamesEnabled: true,
 	selectedGames: []
 };
 
@@ -394,15 +394,15 @@ export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
 			return 'per-person';
 		})() as TripDraft['pricingModel'],
 		costSharingEnabled: trip.costSharingEnabled ?? false,
-		gamesEnabled: trip.gamesEnabled ?? false,
-		meals: {
-			...getDefaultMealsConfig(),
-			enabled: trip.mealPlan?.enabled ?? false
-		},
-		activities: {
-			...getDefaultActivitiesConfig(),
-			enabled: trip.activitiesEnabled ?? true
-		}
+	gamesEnabled: true,
+	meals: {
+		...getDefaultMealsConfig(),
+		enabled: true
+	},
+	activities: {
+		...getDefaultActivitiesConfig(),
+		enabled: true
+	}
 	};
 }
 
@@ -430,6 +430,7 @@ function createTripDraftStore() {
 								return merged;
 							})()
 						: defaultDraft.meals;
+				const mealsNormalized = { ...meals, enabled: true };
 				// Normalize activities: if old array format, migrate to new shape
 				let activities = defaultDraft.activities;
 				if (parsed.activities != null) {
@@ -452,7 +453,8 @@ function createTripDraftStore() {
 						activities = { ...getDefaultActivitiesConfig(), ...parsed.activities };
 					}
 				}
-				set({ ...defaultDraft, ...parsed, meals, activities });
+				const activitiesNormalized = { ...activities, enabled: true };
+				set({ ...defaultDraft, ...parsed, meals: mealsNormalized, activities: activitiesNormalized });
 			} catch (e) {
 				console.error('Failed to load trip draft from localStorage:', e);
 			}

@@ -12,35 +12,30 @@
 
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
 
-	// Ensure meals config exists and is object (run once on mount / when draft loads)
+	// Ensure meals config exists; meal planning is always on for every trip.
 	$effect(() => {
 		if (!draft.meals || Array.isArray(draft.meals) || !('enabled' in draft.meals)) {
 			draft.meals = { ...getDefaultMealsConfig() };
+			return;
 		}
+		const m = draft.meals as MealsConfig;
+		if (!m.modes) m.modes = { signups: true, fund: false, informal: false };
+		if (!m.expectations)
+			m.expectations = {
+				participationLevel: 'optional',
+				allowGuestsToClaimSlots: true,
+				allowGuestsToContributeInstead: true,
+				allowOptOut: true
+			};
+		if (!m.preferences) m.preferences = { collectIndividualPreferencesLater: true };
+		m.enabled = true;
 	});
 
 	function ensureMeals() {
 		if (!draft.meals || !('enabled' in draft.meals)) {
 			draft.meals = { ...getDefaultMealsConfig() };
 		}
-		autosave();
-	}
-
-	function setEnabled(enabled: boolean) {
-		ensureMeals();
-		const m = draft.meals as MealsConfig;
-		m.enabled = enabled;
-		if (enabled) {
-			if (!m.modes) m.modes = { signups: true, fund: false, informal: false };
-			if (!m.expectations)
-				m.expectations = {
-					participationLevel: 'optional',
-					allowGuestsToClaimSlots: true,
-					allowGuestsToContributeInstead: true,
-					allowOptOut: true
-				};
-			if (!m.preferences) m.preferences = { collectIndividualPreferencesLater: true };
-		}
+		(draft.meals as MealsConfig).enabled = true;
 		autosave();
 	}
 
@@ -152,23 +147,15 @@
 </script>
 
 <div class="step-content meals-step">
-	<!-- Section 1: Enable Meals -->
-	<SectionCard title="Include shared meals" icon="🍽️">
+	<SectionCard title="Shared meals" icon="🍽️">
 		<div class="section-1-body">
-			<label class="toggle-row">
-				<input
-					type="checkbox"
-					checked={(draft.meals as MealsConfig)?.enabled ?? false}
-					onchange={(e) => setEnabled((e.currentTarget as HTMLInputElement).checked)}
-				/>
-				<span class="toggle-title">Include shared meals for this trip?</span>
-			</label>
-			<p class="helper-copy">Set expectations for cooking, chipping in, or planning meals together.</p>
+			<p class="helper-copy">
+				Every trip includes meal planning. Choose how you want to handle meals and set expectations below.
+			</p>
 		</div>
 	</SectionCard>
 
-	{#if (draft.meals as MealsConfig)?.enabled}
-		<!-- Section 2: Choose Meal Setup Style (single select, all options visible) -->
+	<!-- Section 2: Choose Meal Setup Style (single select, all options visible) -->
 		<SectionCard title="How do you want to handle meals?" icon="📋">
 			<div class="section-2-body">
 				<label class="meal-mode-option">
@@ -316,7 +303,6 @@
 			</SectionCard>
 		{/if}
 
-	{/if}
 </div>
 
 <style>

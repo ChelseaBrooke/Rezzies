@@ -70,9 +70,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	const costSharingEnabled = d.costSharingEnabled === true; // explicit opt-in; default false
 	const isPublished = d.isPublished !== false; // default true, pass false to save as draft
 	const splitPlatformFee = d.splitCost === true;
-	const gamesEnabled = d.gamesEnabled === true;
-	const activitiesEnabled = d.activitiesEnabled !== false; // default true; only false when host explicitly disabled
-	const selectedGames = Array.isArray(d.selectedGames) ? (d.selectedGames as string[]) : [];
+	/* Activities, meals, and games are always on for every trip (not host-toggleable). */
+	const gamesEnabled = true;
+	const activitiesEnabled = true;
 	const VALID_GAME_IDS = ['caption-this', 'scavenger-bingo', 'alphabet-hunt', 'daily-trivia'];
 	const GAME_NAMES: Record<string, string> = {
 		'caption-this': 'Caption This',
@@ -239,30 +239,23 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			}
 		}
 
-		// Create MealPlan if meals are enabled in the draft
-		const mealsEnabled = d.mealsEnabled === true;
-		if (mealsEnabled) {
-			await prisma.mealPlan.create({
+		await prisma.mealPlan.create({
+			data: {
+				tripId: trip.id,
+				enabled: true
+			}
+		});
+
+		// All catalog games are available on every trip
+		for (const gameId of VALID_GAME_IDS) {
+			await prisma.tripGame.create({
 				data: {
 					tripId: trip.id,
-					enabled: true
+					gameId,
+					name: GAME_NAMES[gameId] ?? gameId,
+					addedByUserId: user.id
 				}
 			});
-		}
-
-		// Create selected TripGames if games add-on is enabled
-		if (gamesEnabled && selectedGames.length > 0) {
-			for (const gameId of selectedGames) {
-				if (!VALID_GAME_IDS.includes(gameId)) continue;
-				await prisma.tripGame.create({
-					data: {
-						tripId: trip.id,
-						gameId,
-						name: GAME_NAMES[gameId] ?? gameId,
-						addedByUserId: user.id
-					}
-				});
-			}
 		}
 
 		return json({ success: true, tripId: trip.id });

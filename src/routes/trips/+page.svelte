@@ -58,12 +58,16 @@
 							tabindex="0"
 							onkeydown={(e) => e.key === 'Enter' && goto(`/trips/${trip.id}`)}
 						>
-							<div class="trip-card-image-wrap">
-								{#if trip.listingCoverPhoto}
-									<img src={trip.listingCoverPhoto} alt={trip.name} class="trip-image" />
-								{:else}
-									<div class="trip-image-placeholder">🏖️</div>
-								{/if}
+						<div class="trip-card-image-wrap">
+							{#if trip.listingCoverPhoto}
+								<img src={trip.listingCoverPhoto} alt={trip.name} class="trip-image" />
+							{:else}
+								<div class="trip-image-placeholder">🏖️</div>
+							{/if}
+						</div>
+						<div class="trip-content">
+							<div class="trip-content-row">
+								<h3>{trip.name}</h3>
 								<button
 									type="button"
 									class="trip-delete-btn"
@@ -72,7 +76,7 @@
 									onclick={(e) => requestDelete(trip.id, trip.name, e)}
 									onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') requestDelete(trip.id, trip.name, e); }}
 								>
-									<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 										<polyline points="3 6 5 6 21 6"></polyline>
 										<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
 										<line x1="10" y1="11" x2="10" y2="17"></line>
@@ -80,18 +84,16 @@
 									</svg>
 								</button>
 							</div>
-							<div class="trip-content">
-								<h3>{trip.name}</h3>
-								<p class="trip-dates">
-									{trip.checkInDate.toLocaleDateString()} – {trip.checkOutDate.toLocaleDateString()}
-								</p>
-								{#if trip.location}
-									<p class="trip-location">📍 {trip.location}</p>
-								{/if}
-								<span class="badge {trip.isPublished ? 'published' : 'draft'}">
-									{trip.isPublished ? 'Published' : 'Draft'}
-								</span>
-							</div>
+							<p class="trip-dates">
+								{trip.checkInDate.toLocaleDateString()} – {trip.checkOutDate.toLocaleDateString()}
+							</p>
+							{#if trip.location}
+								<p class="trip-location">📍 {trip.location}</p>
+							{/if}
+							<span class="badge {trip.isPublished ? 'published' : 'draft'}">
+								{trip.isPublished ? 'Published' : 'Draft'}
+							</span>
+						</div>
 						</div>
 					{/each}
 				</div>
@@ -259,31 +261,40 @@
 	.trip-card-image-wrap {
 		position: relative;
 	}
-	.trip-delete-form {
-		position: absolute;
-		top: 0.5rem;
-		right: 0.5rem;
-		z-index: 2;
+	.trip-content-row {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.5rem;
+		margin-bottom: 0.35rem;
+	}
+	.trip-content-row h3 {
+		margin: 0;
+		flex: 1;
+		min-width: 0;
 	}
 	.trip-delete-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 2rem;
-		height: 2rem;
+		width: 1.75rem;
+		height: 1.75rem;
 		padding: 0;
-		border: none;
+		border: 1px solid rgba(255, 255, 255, 0.12);
 		border-radius: 6px;
-		background: rgba(0, 0, 0, 0.5);
-		color: white;
+		background: rgba(255, 255, 255, 0.06);
+		color: rgba(255, 255, 255, 0.5);
 		cursor: pointer;
-		transition: background 0.2s;
+		flex-shrink: 0;
+		transition: background 0.2s, color 0.2s, border-color 0.2s;
 	}
 	.trip-delete-btn:hover {
-		background: rgba(220, 38, 38, 0.9);
+		background: rgba(220, 38, 38, 0.15);
+		border-color: rgba(220, 38, 38, 0.4);
+		color: #ef4444;
 	}
-	.trip-delete-btn:focus {
-		outline: 2px solid white;
+	.trip-delete-btn:focus-visible {
+		outline: 2px solid rgba(255, 255, 255, 0.6);
 		outline-offset: 2px;
 	}
 
@@ -310,7 +321,7 @@
 		font-size: 1.125rem;
 		font-weight: 600;
 		color: #fffbf7;
-		margin: 0 0 0.35rem 0;
+		margin: 0;
 	}
 	.trip-dates {
 		font-size: 0.875rem;

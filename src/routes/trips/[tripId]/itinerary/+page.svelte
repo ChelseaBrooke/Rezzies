@@ -28,9 +28,6 @@
 	// ── Server data refs ───────────────────────────────────────────────────
 	const tripDays         = $derived(data.tripDays ?? []);
 	const goingUsers       = $derived(data.goingUsers ?? []);
-	const mealPlanOn       = $derived((data.mealPlan as { enabled: boolean } | null)?.enabled === true);
-	const activitiesEnabled = $derived((data.trip as { activitiesEnabled?: boolean } | null)?.activitiesEnabled ?? true);
-
 	// Set of "date|mealType" keys for existing meal slots (used by placeholders)
 	// data.mealSlots is a flat array from the server
 	const existingMealKeys = $derived.by(() => {
@@ -735,9 +732,7 @@
 						</label>
 					</div>
 			<div class="schedule-header-right">
-					{#if activitiesEnabled}
-						<button class="btn-add-activity" onclick={openAddActivity}>+ Custom Activity</button>
-					{/if}
+					<button class="btn-add-activity" onclick={openAddActivity}>+ Custom Activity</button>
 				</div>
 				</div>
 
@@ -823,8 +818,8 @@
 							</div>
 						{/if}
 
-					<!-- Meal placeholders (only when meal planning is on) -->
-					{#if mealPlanOn && data.canManageMeals}
+					<!-- Meal placeholders (host / co-host) -->
+					{#if data.canManageMeals}
 						{#each [
 							{ mealType: 'breakfast', defaultMin: 9 * 60,  defaultTime: '9:00 AM',  label: '🍳 Breakfast' },
 							{ mealType: 'lunch',     defaultMin: 13 * 60, defaultTime: '1:00 PM',  label: '🥗 Lunch' },
@@ -947,7 +942,6 @@
 
 				<!-- Footer -->
 			<div class="schedule-footer">
-				{#if mealPlanOn}
 				<button
 					class="footer-btn"
 					class:footer-btn-active={filterType === 'meal'}
@@ -956,8 +950,6 @@
 					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v21M3 9h18M3 15h18"/></svg>
 					Meals
 				</button>
-				{/if}
-				{#if activitiesEnabled}
 				<button
 					class="footer-btn"
 					class:footer-btn-active={filterType === 'activity'}
@@ -966,15 +958,6 @@
 					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>
 					Activities
 				</button>
-				{/if}
-				{#if !activitiesEnabled || !mealPlanOn}
-				<p class="itinerary-addon-hint">
-					<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-					Want to plan {!activitiesEnabled && !mealPlanOn ? 'activities or meals' : !activitiesEnabled ? 'activities' : 'meals'}? Turn on
-					{!activitiesEnabled && !mealPlanOn ? 'Activity or Meal Planning' : !activitiesEnabled ? 'Activity Planning' : 'Meal Planning'}
-					in <a href="/trips/{(data.trip as { id: string }).id}/settings" class="itinerary-addon-hint-link">Trip Settings</a>.
-				</p>
-				{/if}
 			</div>
 			</div>
 		</div>
@@ -982,7 +965,7 @@
 </div>
 
 <!-- Add Custom Activity Modal -->
-{#if activitiesEnabled && showAddActivity}
+{#if showAddActivity}
 	<div
 		class="modal-backdrop"
 		role="presentation"
@@ -1053,7 +1036,7 @@
 {/if}
 
 <!-- Add / Edit Meal Modal -->
-{#if mealPlanOn || addMealPrefill?.slotId}
+{#if showAddMeal || addMealPrefill?.slotId}
 	<AddMealModal
 		open={showAddMeal}
 		members={mealModalMembers}

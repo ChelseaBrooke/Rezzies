@@ -31,20 +31,6 @@
 		draft.costSharingEnabled = !draft.costSharingEnabled;
 		autosave();
 	}
-	function toggleMeals() {
-		if (!draft.meals) return;
-		draft.meals.enabled = !draft.meals.enabled;
-		autosave();
-	}
-	function toggleActivities() {
-		if (!draft.activities) return;
-		draft.activities.enabled = !draft.activities.enabled;
-		autosave();
-	}
-	function toggleGames() {
-		draft.gamesEnabled = !draft.gamesEnabled;
-		autosave();
-	}
 	function ensureMealsFundConfig() {
 		if (!draft.meals) return;
 		const d = getDefaultMealsConfig().fundConfig!;
@@ -65,13 +51,6 @@
 		if (mode === 'fund') ensureMealsFundConfig();
 		autosave();
 	}
-	function toggleGame(gameId: string) {
-		const current = draft.selectedGames ?? [];
-		draft.selectedGames = current.includes(gameId)
-			? current.filter((g) => g !== gameId)
-			: [...current, gameId];
-		autosave();
-	}
 	function selectModel(model: TripDraft['pricingModel']) {
 		draft.pricingModel = model;
 		autosave();
@@ -83,12 +62,8 @@
 
 	// ─── Simple card state ───────────────────────────────────────────────────────
 
-	const costEnabled      = $derived(draft.costSharingEnabled);
-	const mealsEnabled     = $derived(draft.meals?.enabled ?? false);
-	const activitiesEnabled = $derived(draft.activities?.enabled ?? false);
-	const gamesEnabled     = $derived(draft.gamesEnabled);
-	const mealMode         = $derived(draft.meals?.modes?.fund ? 'fund' : 'signups');
-	const selectedGames    = $derived(draft.selectedGames ?? []);
+	const costEnabled = $derived(draft.costSharingEnabled);
+	const mealMode    = $derived(draft.meals?.modes?.fund ? 'fund' : 'signups');
 
 	// ─── Pricing calculations (ported from PricingStep) ──────────────────────────
 
@@ -269,7 +244,7 @@
 <div class="addons-screen" class:addons-screen--compact-top={!showHeader}>
 	{#if showHeader}
 		<div class="addons-header">
-			<h2 class="addons-title">Trip Add-Ons<span class="addons-title-divider" aria-hidden="true">|</span><span class="addons-subtitle">Select the features you want for this trip.</span></h2>
+			<h2 class="addons-title">Trip Features<span class="addons-title-divider" aria-hidden="true">|</span><span class="addons-subtitle">Included with every trip — opt in to cost sharing if needed.</span></h2>
 		</div>
 	{/if}
 
@@ -516,128 +491,9 @@
 			</div>
 		</div>
 
-		<!-- ── Activity-planning (left column, below cost) ──── -->
-		<div
-			class="addon-card addon-card--compact"
-			class:addon-card--fullmock-mock-end={!activitiesEnabled}
-			class:active={activitiesEnabled}
-			onclick={toggleActivities}
-			role="button"
-			tabindex="0"
-			onkeydown={(e) => e.key === 'Enter' && toggleActivities()}
-		>
-			{#if !activitiesEnabled}
-				<div class="addon-fullmock-layer addon-fullmock-layer--end" aria-hidden="true">
-					<div class="activity-itin-fade activity-itin-fade--fullmock" aria-hidden="true">
-						<div class="activity-itin-mock activity-itin-mock--fullmock">
-								<div class="itin-mini-grid itin-mini-grid--3day">
-									<div class="itin-mini-corner"></div>
-									<div class="itin-mini-dayhead itin-mini-dayhead--col">
-										<span class="itin-mini-daynum">13</span>
-										<span class="itin-mini-dow">FRI</span>
-									</div>
-									<div class="itin-mini-dayhead itin-mini-dayhead--col">
-										<span class="itin-mini-daynum">14</span>
-										<span class="itin-mini-dow">SAT</span>
-									</div>
-									<div class="itin-mini-dayhead">
-										<span class="itin-mini-daynum">15</span>
-										<span class="itin-mini-dow">SUN</span>
-									</div>
-									<div class="itin-mini-time">9 AM</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--activity">
-											<span class="itin-mini-evt-title">Road trip</span>
-											<div class="itin-mini-evt-row">
-												<span class="itin-mini-evt-time">9:00 AM</span>
-												<span class="itin-mini-evt-pill">✓5</span>
-											</div>
-										</div>
-									</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--meal">
-											<span class="itin-mini-evt-title">Breakfast</span>
-											<span class="itin-mini-evt-time">9:00 AM</span>
-										</div>
-									</div>
-									<div class="itin-mini-cell itin-mini-cell--empty"></div>
-									<div class="itin-mini-time">10 AM</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--activity">
-											<span class="itin-mini-evt-title">Check-in</span>
-											<span class="itin-mini-evt-time">10:00 AM</span>
-										</div>
-									</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--activity">
-											<span class="itin-mini-evt-title">Kayak</span>
-											<div class="itin-mini-evt-row">
-												<span class="itin-mini-evt-time">10:30 AM</span>
-												<span class="itin-mini-evt-pill">✓4</span>
-											</div>
-										</div>
-									</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--activity">
-											<span class="itin-mini-evt-title">Hike</span>
-											<div class="itin-mini-evt-row">
-												<span class="itin-mini-evt-time">10:00 AM</span>
-												<span class="itin-mini-evt-pill">✓6</span>
-											</div>
-										</div>
-									</div>
-									<div class="itin-mini-time">11 AM</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--activity">
-											<span class="itin-mini-evt-title">Explore town</span>
-											<span class="itin-mini-evt-time">11:00 AM</span>
-										</div>
-									</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--activity">
-											<span class="itin-mini-evt-title">Farmers market</span>
-											<span class="itin-mini-evt-time">11:20 AM</span>
-										</div>
-									</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--meal">
-											<span class="itin-mini-evt-title">Brunch</span>
-											<span class="itin-mini-evt-time">11:45 AM</span>
-											<span class="itin-mini-chef">🍳 Sam</span>
-										</div>
-									</div>
-									<div class="itin-mini-time">12 PM</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--activity">
-											<span class="itin-mini-evt-title">Sunset walk</span>
-											<span class="itin-mini-evt-time">2:00 PM</span>
-										</div>
-									</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--activity">
-											<span class="itin-mini-evt-title">Board games</span>
-											<span class="itin-mini-evt-time">2:00 PM</span>
-										</div>
-									</div>
-									<div class="itin-mini-cell">
-										<div class="itin-mini-event itin-mini-event--activity">
-											<span class="itin-mini-evt-title">Pack up</span>
-											<div class="itin-mini-evt-row">
-												<span class="itin-mini-evt-time">2:30 PM</span>
-												<span class="itin-mini-evt-pill">✓3</span>
-											</div>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
-			{/if}
-
-			<div
-				class="addon-header addon-header--split"
-				class:addon-header--over-mock-end={!activitiesEnabled}
-			>
+		<!-- ── Activity-planning (left column, below cost — always included) ──── -->
+		<div class="addon-card addon-card--compact addon-card--always-on active">
+			<div class="addon-header addon-header--split">
 				<div class="addon-title-group">
 					<span class="addon-icon activity-icon">
 						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -646,115 +502,39 @@
 					</span>
 					<span class="addon-title">Activity-planning</span>
 				</div>
-				<label class="addon-toggle" class:checked={activitiesEnabled} onclick={(e) => e.stopPropagation()}>
-					<input
-						type="checkbox"
-						checked={activitiesEnabled}
-						onchange={toggleActivities}
-						aria-label="Enable activity-planning"
-					/>
-					<span class="toggle-track"><span class="toggle-thumb"></span></span>
-				</label>
-				<span class="addon-mock-spacer-end" aria-hidden="true"></span>
+				<span class="addon-always-on-badge">Included</span>
 			</div>
 
-			<div class="addon-body" class:addon-body--over-mock-end={!activitiesEnabled}>
-				{#if !activitiesEnabled}
-					<div class="addon-pane unchecked-pane activity-unchecked-pane addon-unchecked-pane-beside-mock--end">
-						<p class="addon-desc addon-unchecked-desc-beside-mock addon-unchecked-desc-beside-mock--end">
-							Plan and organize what your group will do during the trip. Discover nearby places, build a shared itinerary, and let guests suggest ideas.
-						</p>
-					</div>
-				{:else}
+			<div class="addon-body">
 				<div class="addon-pane checked-pane info-pane">
-					<p class="info-intro">Your guests can now access the full activity toolkit:</p>
-						<ul class="feature-list">
-							<li>
-								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-								Discover nearby activities &amp; restaurants
-							</li>
-							<li>
-								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-								Manually add your own activities
-							</li>
-							<li>
-								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-								Create activity polls for the group
-							</li>
-							<li>
-								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-								Build a shared itinerary with dates &amp; times
-							</li>
-						</ul>
-					</div>
-				{/if}
+					<p class="info-intro">Every trip includes the full activity toolkit:</p>
+					<ul class="feature-list">
+						<li>
+							<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+							Discover nearby activities &amp; restaurants
+						</li>
+						<li>
+							<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+							Manually add your own activities
+						</li>
+						<li>
+							<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+							Create activity polls for the group
+						</li>
+						<li>
+							<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+							Build a shared itinerary with dates &amp; times
+						</li>
+					</ul>
+				</div>
 			</div>
 		</div>
 		</div>
 
 		<div class="addons-column">
-		<!-- ── Meal-planning ────────────────────────────────── -->
-		<div
-			class="addon-card addon-card--compact"
-			class:addon-card--fullmock-mock-start={!mealsEnabled}
-			class:active={mealsEnabled}
-			onclick={toggleMeals}
-			role="button"
-			tabindex="0"
-			onkeydown={(e) => e.key === 'Enter' && toggleMeals()}
-		>
-			{#if !mealsEnabled}
-				<div class="addon-fullmock-layer addon-fullmock-layer--start" aria-hidden="true">
-					<div class="meal-add-modal-fade">
-						<div class="meal-add-modal-mock">
-							<div class="meal-add-modal-mock-header">
-								<span class="meal-add-modal-mock-title">Add Dinner</span>
-								<span class="meal-add-modal-mock-close">×</span>
-							</div>
-							<div class="meal-add-modal-mock-form">
-								<div class="meal-add-modal-mock-form-stack">
-									<div class="meal-add-modal-mock-row2">
-										<div class="meal-add-modal-mock-field">
-											<span class="meal-add-modal-mock-lbl">Date</span>
-											<div class="meal-add-modal-mock-inputish">Sat, Mar 15</div>
-										</div>
-										<div class="meal-add-modal-mock-field">
-											<span class="meal-add-modal-mock-lbl">Time</span>
-											<div class="meal-add-modal-mock-inputish">7:00 PM</div>
-										</div>
-									</div>
-									<span class="meal-add-modal-mock-lbl meal-add-modal-mock-lbl--block">Meal plan</span>
-									<div class="meal-add-modal-mock-options">
-										<div class="meal-add-modal-mock-opt meal-add-modal-mock-opt--selected">
-											👨‍🍳 Chef is cooking
-										</div>
-										<div class="meal-add-modal-mock-opt">📦 Ordering In</div>
-										<div class="meal-add-modal-mock-opt">🍽 Going out to Eat</div>
-										<div class="meal-add-modal-mock-opt">🤷 Fend for yourself</div>
-									</div>
-									<div class="meal-add-modal-mock-field">
-										<span class="meal-add-modal-mock-lbl">Cook</span>
-										<div class="meal-add-modal-mock-inputish">Audrey</div>
-									</div>
-									<p class="meal-add-modal-mock-preview">
-										Will show as: <strong>Dinner by Audrey</strong>
-									</p>
-								</div>
-								<div class="meal-add-modal-mock-actions">
-									<span class="meal-add-modal-mock-btn meal-add-modal-mock-btn--secondary">Cancel</span>
-									<span class="meal-add-modal-mock-btn meal-add-modal-mock-btn--primary">Add meal</span>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
-			{/if}
-
-			<div
-				class="addon-header addon-header--split"
-				class:addon-header--over-mock-start={!mealsEnabled}
-			>
-				<span class="addon-mock-spacer-start" aria-hidden="true"></span>
+		<!-- ── Meal-planning (always included — configure mode below) ──── -->
+		<div class="addon-card addon-card--compact addon-card--always-on active">
+			<div class="addon-header addon-header--split">
 				<div class="addon-title-group">
 					<span class="addon-icon meal-icon">
 						<svg
@@ -768,7 +548,6 @@
 							stroke-linejoin="round"
 							aria-hidden="true"
 						>
-							<!-- Fork + knife (Lucide-style utensils) -->
 							<path d="M3 2v7c0 1.1.9 2 2 2h0c1.1 0 2-.9 2-2V2" />
 							<path d="M7 2v20" />
 							<path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h0" />
@@ -777,29 +556,14 @@
 					</span>
 					<span class="addon-title">Meal-planning</span>
 				</div>
-				<label class="addon-toggle" class:checked={mealsEnabled} onclick={(e) => e.stopPropagation()}>
-					<input
-						type="checkbox"
-						checked={mealsEnabled}
-						onchange={toggleMeals}
-						aria-label="Enable meal-planning"
-					/>
-					<span class="toggle-track"><span class="toggle-thumb"></span></span>
-				</label>
+				<span class="addon-always-on-badge">Included</span>
 			</div>
 
-			<div class="addon-body" class:addon-body--over-mock-start={!mealsEnabled}>
-				{#if !mealsEnabled}
-					<div class="addon-pane unchecked-pane meal-unchecked-pane addon-unchecked-pane-beside-mock--start">
-						<p class="addon-desc addon-unchecked-desc-beside-mock">
-							Coordinate meals and food plans with your group.
-						</p>
-					</div>
-			{:else}
-				<div class="addon-pane checked-pane meal-checked-pane" onclick={(e) => e.stopPropagation()} role="none">
+			<div class="addon-body">
+				<div class="addon-pane checked-pane meal-checked-pane">
 					<div class="config-row meal-config-row">
 						<div class="radio-stack">
-							<label class="radio-option" onclick={(e) => e.stopPropagation()} role="none">
+							<label class="radio-option">
 								<input
 									type="radio"
 									name="mealMode"
@@ -812,11 +576,7 @@
 									<span class="radio-desc">Guests claim breakfast, lunch, or dinner slots</span>
 								</div>
 							</label>
-							<label
-								class="radio-option radio-option--fund-row"
-								onclick={(e) => e.stopPropagation()}
-								role="none"
-							>
+							<label class="radio-option radio-option--fund-row">
 								<input
 									type="radio"
 									name="mealMode"
@@ -829,7 +589,7 @@
 									<span class="radio-desc">Everyone contributes to a collective budget</span>
 								</div>
 								{#if mealMode === 'fund'}
-									<div class="meal-fund-split" onclick={(e) => e.stopPropagation()} role="none">
+									<div class="meal-fund-split">
 										<span class="meal-fund-field-label" id="foodFundTotalSplit-label">Total to split</span>
 										<div class="currency-wrap meal-fund-currency">
 											<span class="currency-sym">$</span>
@@ -859,75 +619,61 @@
 						</div>
 					</div>
 				</div>
-				{/if}
 			</div>
 		</div>
 
-		<!-- ── Games ────────────────────────────────────────── -->
-		<div
-			class="addon-card addon-card--games addon-card--tall"
-			class:addon-card--fullmock-mock-start={!gamesEnabled}
-			class:active={gamesEnabled}
-			onclick={toggleGames}
-			role="button"
-			tabindex="0"
-			onkeydown={(e) => e.key === 'Enter' && toggleGames()}
-		>
-			{#if !gamesEnabled}
-				<div class="addon-fullmock-layer addon-fullmock-layer--start" aria-hidden="true">
-					<div class="games-bingo-fade games-bingo-fade--fullmock" aria-hidden="true">
-						<div class="games-dual-mock-stack">
-							<div class="games-bingo-mock games-bingo-mock--fullmock games-bingo-mock--stack-back">
-								<div class="bingo-board-frame">
-									<div class="bingo-board-inner">
-										<span class="bingo-letter">B</span>
-										<span class="bingo-letter">I</span>
-										<span class="bingo-letter">N</span>
-										<span class="bingo-letter">G</span>
-										<span class="bingo-letter">O</span>
-										{#each SCAVENGER_BINGO_ITEMS as item, idx}
-											<div
-												class="bingo-cell"
-												class:has-photo={GAMES_BINGO_MOCK_PHOTOS.has(idx)}
-											>
-												{#if GAMES_BINGO_MOCK_PHOTOS.has(idx)}
-													<div class="games-bingo-mock-snapshim"></div>
-												{/if}
-												<span class="bingo-item-icon">{item.icon}</span>
-												<span class="bingo-label">{item.label}</span>
-											</div>
-										{/each}
-									</div>
+		<!-- ── Games (always included — all games available to every trip) ──── -->
+		<!-- fullmock-mock-start: position:relative + overflow so the absolute fullmock layer is contained -->
+		<div class="addon-card addon-card--games addon-card--tall addon-card--fullmock-mock-start addon-card--always-on active">
+			<div class="addon-fullmock-layer addon-fullmock-layer--start" aria-hidden="true">
+				<div class="games-bingo-fade games-bingo-fade--fullmock" aria-hidden="true">
+					<div class="games-dual-mock-stack">
+						<div class="games-bingo-mock games-bingo-mock--fullmock games-bingo-mock--stack-back">
+							<div class="bingo-board-frame">
+								<div class="bingo-board-inner">
+									<span class="bingo-letter">B</span>
+									<span class="bingo-letter">I</span>
+									<span class="bingo-letter">N</span>
+									<span class="bingo-letter">G</span>
+									<span class="bingo-letter">O</span>
+									{#each SCAVENGER_BINGO_ITEMS as item, idx}
+										<div
+											class="bingo-cell"
+											class:has-photo={GAMES_BINGO_MOCK_PHOTOS.has(idx)}
+										>
+											{#if GAMES_BINGO_MOCK_PHOTOS.has(idx)}
+												<div class="games-bingo-mock-snapshim"></div>
+											{/if}
+											<span class="bingo-item-icon">{item.icon}</span>
+											<span class="bingo-label">{item.label}</span>
+										</div>
+									{/each}
 								</div>
 							</div>
-							<div class="games-trivia-mock games-trivia-mock--stack-front">
-								<div class="games-trivia-mock-card">
-									<div class="games-trivia-mock-head">
-										<span class="games-trivia-mock-badge">Trip trivia</span>
-										<span class="games-trivia-mock-pts">+50 pts</span>
-									</div>
-									<p class="games-trivia-mock-q">Closest grocery to the cabin?</p>
-									<div class="games-trivia-mock-opts">
-										<span class="games-trivia-mock-opt games-trivia-mock-opt--selected">Mountain Mart</span>
-										<span class="games-trivia-mock-opt">Lakeside Foods</span>
-										<span class="games-trivia-mock-opt">Route 9 Express</span>
-									</div>
-									<p class="games-trivia-mock-foot">Round 3 of 10 · Pinecone crew</p>
+						</div>
+						<div class="games-trivia-mock games-trivia-mock--stack-front">
+							<div class="games-trivia-mock-card">
+								<div class="games-trivia-mock-head">
+									<span class="games-trivia-mock-badge">Trip trivia</span>
+									<span class="games-trivia-mock-pts">+50 pts</span>
 								</div>
+								<p class="games-trivia-mock-q">Closest grocery to the cabin?</p>
+								<div class="games-trivia-mock-opts">
+									<span class="games-trivia-mock-opt games-trivia-mock-opt--selected">Mountain Mart</span>
+									<span class="games-trivia-mock-opt">Lakeside Foods</span>
+									<span class="games-trivia-mock-opt">Route 9 Express</span>
+								</div>
+								<p class="games-trivia-mock-foot">Round 3 of 10 · Pinecone crew</p>
 							</div>
 						</div>
 					</div>
 				</div>
-			{/if}
+			</div>
 
-			<div
-				class="addon-header addon-header--split"
-				class:addon-header--over-mock-start={!gamesEnabled}
-			>
+			<div class="addon-header addon-header--split addon-header--over-mock-start">
 				<span class="addon-mock-spacer-start" aria-hidden="true"></span>
 				<div class="addon-title-group">
 					<span class="addon-icon game-icon">
-						<!-- Same mark as TripNavItem iconName="games" (trip portal sidebar) -->
 						<svg
 							width="18"
 							height="18"
@@ -949,47 +695,25 @@
 					</span>
 					<span class="addon-title">Games</span>
 				</div>
-				<label class="addon-toggle" class:checked={gamesEnabled} onclick={(e) => e.stopPropagation()}>
-					<input
-						type="checkbox"
-						checked={gamesEnabled}
-						onchange={toggleGames}
-						aria-label="Enable games"
-					/>
-					<span class="toggle-track"><span class="toggle-thumb"></span></span>
-				</label>
+				<span class="addon-always-on-badge">Included</span>
 			</div>
 
-			<div class="addon-body" class:addon-body--over-mock-start={!gamesEnabled}>
-				{#if !gamesEnabled}
-					<div class="addon-pane unchecked-pane games-unchecked-pane addon-unchecked-pane-beside-mock--start">
-						<p class="addon-desc addon-unchecked-desc-beside-mock">
-							Add fun, interactive games for your group. Keep everyone entertained before and during the trip.
-						</p>
-					</div>
-				{:else}
-				<div class="addon-pane checked-pane" onclick={(e) => e.stopPropagation()} role="none">
+			<div class="addon-body addon-body--over-mock-start">
+				<div class="addon-pane checked-pane">
 					<div class="config-row">
-							<div class="config-label">Choose your games <span class="optional-tag">optional</span></div>
-							<div class="game-list">
-								{#each GAMES as game}
-									<label class="game-option" onclick={(e) => e.stopPropagation()} role="none">
-										<input
-											type="checkbox"
-											checked={selectedGames.includes(game.id)}
-											onchange={() => toggleGame(game.id)}
-										/>
-										<div class="game-content">
-											<span class="game-name">{game.name}</span>
-											<span class="game-desc">{game.desc}</span>
-										</div>
-									</label>
-								{/each}
-							</div>
-							<p class="config-note">You can also manage games from your trip portal later.</p>
+						<div class="config-label">All games included</div>
+						<div class="game-list">
+							{#each GAMES as game}
+								<div class="game-option game-option--readonly">
+									<div class="game-content">
+										<span class="game-name">{game.name}</span>
+										<span class="game-desc">{game.desc}</span>
+									</div>
+								</div>
+							{/each}
 						</div>
 					</div>
-				{/if}
+				</div>
 			</div>
 		</div>
 		</div>
@@ -1162,9 +886,39 @@
 		user-select: none;
 	}
 
+	/* Full-card mock layers use position:absolute + inset:0 — need a positioned parent */
+	.addon-card:has(> .addon-fullmock-layer) {
+		position: relative;
+	}
+
 	.addon-card:hover {
 		border-color: var(--primary);
 		box-shadow: 0 2px 12px rgba(47, 119, 120, 0.1);
+	}
+
+	/* Always-on cards: not interactive, use default cursor */
+	.addon-card--always-on {
+		cursor: default;
+	}
+	.addon-card--always-on:hover {
+		border-color: transparent;
+		box-shadow: none;
+	}
+
+	/* "Included" badge replaces the toggle on always-on cards */
+	.addon-always-on-badge {
+		display: inline-flex;
+		align-items: center;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		letter-spacing: 0.02em;
+		color: var(--primary);
+		background: rgba(47, 119, 120, 0.1);
+		border: 1px solid rgba(47, 119, 120, 0.2);
+		border-radius: 999px;
+		padding: 0.2rem 0.6rem;
+		white-space: nowrap;
+		flex-shrink: 0;
 	}
 
 	/* Meal-planning (mock start): orange border glow */
@@ -3136,6 +2890,16 @@
 		accent-color: #7850b4;
 		flex-shrink: 0;
 		cursor: pointer;
+	}
+
+	.game-option--readonly {
+		cursor: default;
+		border-color: rgba(120, 80, 180, 0.2);
+		background: rgba(120, 80, 180, 0.03);
+	}
+	.game-option--readonly:hover {
+		border-color: rgba(120, 80, 180, 0.2);
+		background: rgba(120, 80, 180, 0.03);
 	}
 
 	.game-content {

@@ -534,7 +534,7 @@
 
 	/* ── Countdown badge (fixed square; number scales with digit count) ── */
 	.hero-countdown {
-		--countdown-box: 7.125rem;
+		--countdown-box: 8rem;
 		position: absolute;
 		top: 1.25rem;
 		right: 1.25rem;
@@ -564,9 +564,9 @@
 	.hero-countdown-num {
 		/* Shrink glyph size as digit count grows so 1–999 stay inside the square */
 		font-size: clamp(
-			1.35rem,
-			calc(3.35rem / (0.42 + var(--countdown-digits, 2) * 0.52)),
-			3.35rem
+			1.75rem,
+			calc(4rem / (0.4 + var(--countdown-digits, 2) * 0.46)),
+			4rem
 		);
 		font-weight: 800;
 		line-height: 0.95;
@@ -817,9 +817,9 @@
 
 		.hero-countdown-num {
 			font-size: clamp(
-				0.95rem,
-				calc(2.2rem / (0.42 + var(--countdown-digits, 2) * 0.52)),
-				2.2rem
+				1.1rem,
+				calc(2.6rem / (0.4 + var(--countdown-digits, 2) * 0.46)),
+				2.6rem
 			);
 		}
 

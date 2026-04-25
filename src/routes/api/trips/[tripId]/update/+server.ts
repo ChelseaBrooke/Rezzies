@@ -81,9 +81,10 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	const maxGuestsToStore = maxOccupancy != null && maxOccupancy > 0 ? maxOccupancy : null;
 	const partialStayAllowed = d.partialStayAllowed === true;
 	const costSharingEnabled = d.costSharingEnabled === true;
-	const gamesEnabled = d.gamesEnabled === true;
-	const activitiesEnabled = d.activitiesEnabled !== false; // default true
-	const mealsEnabled = d.mealsEnabled === true;
+	/* Activities, meals, and games are always on — ignore client toggles. */
+	const gamesEnabled = true;
+	const activitiesEnabled = true;
+	const mealsEnabled = true;
 
 	if (!name) {
 		return json({ error: 'Trip name is required' }, { status: 400 });

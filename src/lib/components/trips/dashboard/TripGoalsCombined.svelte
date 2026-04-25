@@ -192,8 +192,9 @@
 	.readiness {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
-		height: 100%;
+		gap: 0.65rem;
+		flex: 1;
+		min-height: 0;
 		min-width: 0;
 	}
 
@@ -214,15 +215,15 @@
 		opacity: 0.6;
 	}
 
-	/* ── Gauge section: solid teal, matches chat tab ── */
+	/* ── Gauge section: grows with the card so the chart uses vertical space ── */
 	.rdy-gauge-section {
-		flex: 1;
-		min-height: 0;
+		flex: 1 1 0;
+		min-height: 10.5rem;
 		border-radius: 14px;
 		background: rgb(0, 0, 0, 0.2);
 		display: flex;
 		flex-direction: column;
-		padding: 0.25rem 0.25rem 0.5rem;
+		padding: 0.45rem 0.35rem 0.55rem;
 	}
 
 	/* ── Ring gauge ── */
@@ -235,10 +236,11 @@
 	}
 
 	.rdy-rings {
-		width: 100%;
 		height: 100%;
-		max-width: 200px;
-		max-height: 200px;
+		width: auto;
+		max-height: 100%;
+		max-width: 100%;
+		aspect-ratio: 1;
 		overflow: visible;
 	}
 
@@ -246,15 +248,17 @@
 	.rdy-stats {
 		display: flex;
 		flex-direction: column;
-		gap: 0.15rem;
-		padding-top: 0.4rem;
+		gap: 0.28rem;
+		padding-top: 0.35rem;
+		padding-bottom: 0.15rem;
+		flex-shrink: 0;
 	}
 
 	.rdy-row {
 		display: flex;
 		align-items: center;
 		gap: 0.45rem;
-		padding: 0.28rem 0.25rem;
+		padding: 0.4rem 0.3rem;
 		border-radius: 7px;
 		text-decoration: none;
 		transition: background 0.12s;
@@ -282,7 +286,7 @@
 
 	.rdy-row-bar {
 		flex: 1;
-		height: 3px;
+		height: 4px;
 		background: rgba(29, 77, 78, 0.1);
 		border-radius: 999px;
 		overflow: hidden;

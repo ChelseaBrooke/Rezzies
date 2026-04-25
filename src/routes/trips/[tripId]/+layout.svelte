@@ -40,8 +40,8 @@
 		tripLockedForRecap={tripLockedForRecap}
 		checkInDate={data.trip?.checkInDate ?? null}
 		checkOutDate={data.trip?.checkOutDate ?? null}
-		activitiesEnabled={data.trip?.activitiesEnabled ?? true}
-		gamesEnabled={data.trip?.gamesEnabled ?? true}
+		activitiesEnabled={true}
+		gamesEnabled={true}
 		invitePreviewMode={data.invitePreview === true}
 		inviteToken={data.inviteToken}
 	>

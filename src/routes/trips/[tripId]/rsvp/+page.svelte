@@ -179,7 +179,6 @@
 	const isYes = $derived(rsvpStatus === 'yes');
 	// Add-on feature flags — default true so nothing breaks for existing trips
 	const costSharingOn = $derived(data.trip?.costSharingEnabled ?? true);
-	const mealPlanOn = $derived((data.trip?.mealPlan as { enabled: boolean } | null)?.enabled ?? false);
 
 	const guestEstimateFromServer = $derived(data.guestEstimate ?? null);
 	let liveEstimate = $state<{ lowCents: number; highCents: number; hmin: number; hmax: number } | null>(null);
@@ -441,7 +440,7 @@
 				{/if}
 			</section>
 
-	{#if isYes && mealPlanOn}
+	{#if isYes}
 		<section class="card-section dietary-section">
 			<h2 class="section-title">Meals & dietary</h2>
 			<p class="dietary-intro">

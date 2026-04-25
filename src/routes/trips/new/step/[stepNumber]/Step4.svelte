@@ -53,19 +53,19 @@
 		{
 			key: 'meals',
 			label: 'Meal-planning',
-			enabled: !!(mealsConfig?.enabled),
+			enabled: true,
 			colorClass: 'addon-chip--meals',
 		},
 		{
 			key: 'activities',
 			label: 'Activity-planning',
-			enabled: !!(activitiesConfig?.enabled),
+			enabled: true,
 			colorClass: 'addon-chip--activities',
 		},
 		{
 			key: 'games',
 			label: 'Games',
-			enabled: draft.gamesEnabled,
+			enabled: true,
 			colorClass: 'addon-chip--games',
 		},
 	]);
@@ -90,7 +90,7 @@
 
 	/** Meal-planning modes + optional slot count for the add-on chip */
 	function mealChipSubtitle(mc: MealsConfig | null): string | null {
-		if (!mc?.enabled) return null;
+		if (!mc) return null;
 		const parts: string[] = [];
 		if (mc.modes?.signups) parts.push('Sign-ups');
 		if (mc.modes?.fund) parts.push('Shared food fund');
@@ -109,7 +109,7 @@
 	}
 
 	const mealChipLine = $derived(mealChipSubtitle(mealsConfig));
-	const gamesChipLine = $derived(draft.gamesEnabled ? gamesChipSubtitle(draft.selectedGames) : null);
+	const gamesChipLine = $derived(gamesChipSubtitle(Object.keys(GAME_ID_LABELS)));
 	const costPricingChipLine = $derived(
 		draft.costSharingEnabled && draft.pricingModel
 			? pricingModelLabel[draft.pricingModel] ?? draft.pricingModel

@@ -417,17 +417,30 @@
 		top: 12px;
 		bottom: 12px;
 		width: var(--sidebar-w);
-		background: #fcfcfc;
+		background: transparent;
 		border-radius: 12px;
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
 		padding: 1rem 0;
 		gap: 0;
-		box-shadow: 4px 0 24px rgba(17, 24, 39, 0.06);
 		z-index: 10;
-		overflow: hidden;
+		overflow: visible;
 		transition: width 220ms cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	/* Pseudo-element renders the visual panel (background + shadow + rounded corners)
+	   so the rail's own overflow can stay visible, allowing the avatar dropdown to
+	   appear above the rail boundary without being clipped. */
+	.left-rail::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: #fcfcfc;
+		border-radius: 12px;
+		box-shadow: 4px 0 24px rgba(17, 24, 39, 0.06);
+		pointer-events: none;
+		z-index: -1;
 	}
 
 	/* Logo: fixed left indent that also centers in collapsed width */

@@ -310,20 +310,17 @@
 			Nudge pending
 		</button>
 	{/snippet}
-	{#snippet progressViewDetailButton()}
-		<a href={`/trips/${tripId}/guests`} class="view-detail-btn">View Detail</a>
-	{/snippet}
+	{#snippet activityHeaderSpacer()}{/snippet}
 	<!-- Layout: row1 = reminders | goals | recent, row2 = guests under reminders + goals only -->
 	<div class="dashboard-layout" class:dashboard-layout--no-guests-row={showHostPlanningCard}>
 		<div class="left-column">
 		<div class="sticky-card-wrapper" class:host-mode={isHost}>
 			{#if isHost}
-				<DashboardCard
-						variant="sticky"
-						title="Progress"
-						headerLeft={stickyPinIcon}
-						headerRight={progressViewDetailButton}
-					>
+			<DashboardCard
+					variant="sticky"
+					title="Progress"
+					headerLeft={stickyPinIcon}
+				>
 					<TripGoalsCombined
 						{rsvpCurrent}
 						{rsvpTotal}
@@ -435,10 +432,11 @@
 		</div>
 
 		<div class="recent-cell" style="position:relative;">
-			<DashboardCard
-				title="Recent Activity"
-				headerLeft={activityIcon}
-			>
+		<DashboardCard
+			title="Recent Activity"
+			headerLeft={activityIcon}
+			headerRight={activityHeaderSpacer}
+		>
 				<div class="activity-feed">
 					{#each activityFeed as item (item.type + item.label + item.at.getTime())}
 						<div class="activity-item">

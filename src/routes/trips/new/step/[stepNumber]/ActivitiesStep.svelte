@@ -6,11 +6,12 @@
 
 	let { draft, autosave }: { draft: TripDraft; autosave: () => void } = $props();
 
-	// Normalize activities config
+	// Normalize activities config; activity planning is always on for every trip.
 	$effect(() => {
 		if (!draft.activities || !('enabled' in draft.activities) || !Array.isArray((draft.activities as ActivitiesConfig).items)) {
 			draft.activities = { ...getDefaultActivitiesConfig() };
 		}
+		(draft.activities as ActivitiesConfig).enabled = true;
 	});
 
 	const activities = $derived((draft.activities ?? getDefaultActivitiesConfig()) as ActivitiesConfig);
@@ -66,7 +67,9 @@
 		if (!draft.activities || !('items' in draft.activities)) {
 			draft.activities = { ...getDefaultActivitiesConfig() };
 		}
-		(draft.activities as ActivitiesConfig).items = (draft.activities as ActivitiesConfig).items ?? [];
+		const a = draft.activities as ActivitiesConfig;
+		a.items = a.items ?? [];
+		a.enabled = true;
 	}
 
 	function addManualActivity() {
@@ -230,39 +233,27 @@
 </script>
 
 <div class="step-content activities-step">
-	<!-- Section 1: Enable -->
 	<SectionCard title="Activities" icon="🎯">
 		<div class="section-1-body">
+			<p class="helper-copy">
+				Every trip includes activity planning. Add ideas now or later; guests can help fill the itinerary when you allow
+				suggestions below.
+			</p>
 			<label class="toggle-row">
 				<input
 					type="checkbox"
-					checked={activities.enabled}
+					checked={activities.allowGuestSuggestions}
 					onchange={(e) => {
 						ensureActivities();
-						(draft.activities as ActivitiesConfig).enabled = (e.currentTarget as HTMLInputElement).checked;
+						(draft.activities as ActivitiesConfig).allowGuestSuggestions = (e.currentTarget as HTMLInputElement).checked;
 						autosave();
 					}}
 				/>
-				<span class="toggle-title">Add activities to this trip</span>
+				<span class="toggle-title">Allow guests to suggest activities later</span>
 			</label>
-			{#if activities.enabled}
-				<label class="toggle-row">
-					<input
-						type="checkbox"
-						checked={activities.allowGuestSuggestions}
-						onchange={(e) => {
-							ensureActivities();
-							(draft.activities as ActivitiesConfig).allowGuestSuggestions = (e.currentTarget as HTMLInputElement).checked;
-							autosave();
-						}}
-					/>
-					<span class="toggle-title">Allow guests to suggest activities later</span>
-				</label>
-			{/if}
 		</div>
 	</SectionCard>
 
-	{#if activities.enabled}
 		<!-- Tabs -->
 		<SectionCard title="Add to itinerary" icon="➕">
 			<div class="tabs">
@@ -440,7 +431,6 @@
 				</div>
 			{/if}
 		</SectionCard>
-	{/if}
 </div>
 
 <!-- Edit modal -->
@@ -527,6 +517,12 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
+	}
+	.helper-copy {
+		font-size: 0.875rem;
+		color: var(--muted);
+		margin: 0;
+		line-height: 1.5;
 	}
 	.toggle-row {
 		display: flex;

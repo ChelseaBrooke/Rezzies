@@ -36,9 +36,9 @@
 			maxOccupancy: d.maxOccupancy ?? null,
 			partialStayAllowed: d.partialStayAllowed ?? false,
 			costSharingEnabled: d.costSharingEnabled ?? false,
-			gamesEnabled: d.gamesEnabled ?? false,
-			activitiesEnabled: activitiesConfig?.enabled ?? true,
-			mealsEnabled: mealsConfig?.enabled ?? false,
+			gamesEnabled: true,
+			activitiesEnabled: true,
+			mealsEnabled: true,
 			rooms: (d.rooms ?? []).map((r) => ({
 				name: r.name,
 				photos: Array.isArray(r.photos) ? r.photos : [],

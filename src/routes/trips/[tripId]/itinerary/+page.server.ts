@@ -112,6 +112,16 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 
 	if (!trip) throw error(404, 'Trip not found');
 
+	// Meals / activities / games are always-on: ensure meal plan row exists and is enabled
+	let mealPlan = trip.mealPlan;
+	if (!mealPlan || !mealPlan.enabled) {
+		mealPlan = await prisma.mealPlan.upsert({
+			where: { tripId },
+			create: { tripId, enabled: true, mode: 'slots' },
+			update: { enabled: true }
+		});
+	}
+
 	const yesRsvpUserIdSet = new Set(
 		(trip.rsvps ?? []).filter((r) => r.status === 'yes' && r.userId).map((r) => r.userId as string)
 	);
@@ -281,7 +291,7 @@ export const load: PageServerLoad = async ({ params, cookies, parent }) => {
 		goingUsers,
 		yesRsvpDietarySummaries,
 		canManageMeals,
-		mealPlan: trip.mealPlan ?? null,
+		mealPlan,
 		mealSlots: trip.mealSlots,
 		members: members.filter((m) => m.id),
 		isHost: parentData.isHost ?? false
@@ -356,18 +366,17 @@ export const actions: Actions = {
 
 	// ── Meal slot management ───────────────────────────────────────────────
 
-	setMealPlanEnabled: async ({ request, params, cookies }) => {
+	/** Kept for backwards compatibility; meal planning is always enabled in the product. */
+	setMealPlanEnabled: async ({ params, cookies }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) throw redirect(303, '/login');
 		const tripId = params.tripId;
 		const host = await isTripHost(tripId, user.id);
 		if (!host) return { setMealPlanError: 'Only the host can change meal planning.' };
-		const formData = await request.formData();
-		const enabled = formData.get('enabled') === 'true';
 		await prisma.mealPlan.upsert({
 			where: { tripId },
-			create: { tripId, enabled, mode: 'slots' },
-			update: { enabled }
+			create: { tripId, enabled: true, mode: 'slots' },
+			update: { enabled: true }
 		});
 		return { setMealPlanSuccess: true };
 	},
