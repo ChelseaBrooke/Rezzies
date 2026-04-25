@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 		const { getSessionUser } = await import('$lib/server/session.js');
 		const user = await getSessionUser(cookies);
 		if (user) throw redirect(303, '/trips');
-		// Stale/expired cookie — clear it so the user can log in fresh
+		// Stale/expired cookie, clear it so the user can log in fresh
 		cookies.delete('user_session', { path: '/' });
 	}
 	return {};

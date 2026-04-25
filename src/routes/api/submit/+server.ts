@@ -106,7 +106,7 @@ export const POST: RequestHandler = async (event) => {
 		});
 		await sendHtmlEmail({
 			to: data.email,
-			subject: `You’re booked — ${bed.room.name}`,
+			subject: `You’re booked, ${bed.room.name}`,
 			html: guestHtml,
 			templateKey: TEMPLATE_KEYS.GUEST_CONFIRMATION,
 			tags: [{ name: 'category', value: 'guest-confirmation' }]

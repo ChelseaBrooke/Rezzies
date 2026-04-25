@@ -85,7 +85,7 @@ function mostExpensiveOccupancy(
 		remaining--;
 	}
 
-	// Pass 2: fill additional spots — weight already counted, do NOT add again
+	// Pass 2: fill additional spots, weight already counted, do NOT add again
 	for (let i = 0; i < others.length && remaining > 0; i++) {
 		const extra = others[i].spotCount - usedSpots[i];
 		if (extra > 0) {
@@ -117,7 +117,7 @@ export function perBedOccupancyRangeForUnit(
 
 	const u = units[unitIndex];
 
-	// Edge case: all guests fit on this bed alone — no other beds participate
+	// Edge case: all guests fit on this bed alone, no other beds participate
 	if (k <= u.spotCount) {
 		const bedPrice = totalCost; // only bed in denominator
 		return {

@@ -1,4 +1,4 @@
-/** Logged with each `emailLog` row — not external template IDs (emails are rendered in-app). */
+/** Logged with each `emailLog` row, not external template IDs (emails are rendered in-app). */
 export const TEMPLATE_KEYS = {
 	// --- Existing ---
 	GUEST_CONFIRMATION: 'GUEST_CONFIRMATION',

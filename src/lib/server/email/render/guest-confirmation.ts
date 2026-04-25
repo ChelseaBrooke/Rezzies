@@ -30,7 +30,7 @@ export function renderGuestConfirmationHtml(d: GuestConfirmationEmailData): stri
 	`;
 
 	return renderEmailLayout({
-		preheader: `Booking confirmed — you're all set.`,
+		preheader: `Booking confirmed, you're all set.`,
 		kicker: 'Booking confirmed',
 		heading: "You're booked",
 		body,

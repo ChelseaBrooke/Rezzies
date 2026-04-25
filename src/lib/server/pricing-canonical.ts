@@ -3,7 +3,7 @@
 // See PRICING_MATH.md for formulas.
 //
 // Vocabulary note: this module uses UPPER_SNAKE form for PricingMode ('PER_BED', 'PER_ROOM', …).
-// The DB and REST API layer uses lowercase_underscore ('per_bed', 'per_room', …) — see pricing.ts.
+// The DB and REST API layer uses lowercase_underscore ('per_bed', 'per_room', …), see pricing.ts.
 // calculatePrice() in pricing.ts is the public entry point; it normalises the model string and
 // delegates PER_BED math here via calculateReservationPrice().
 
@@ -183,7 +183,7 @@ const BED_TYPE_CANONICAL_KEYS = [
 /**
  * Normalize bed type for weight lookup: lowercase, spaces -> underscore,
  * strip common suffixes (_bed, _size), then match exact or substring so "Queen Bed" -> "queen", "Bunk" -> "bunk".
- * Distinct from the shared normalizeBedType in $lib/bed-types — this one does extra fuzzy matching for pricing weights.
+ * Distinct from the shared normalizeBedType in $lib/bed-types, this one does extra fuzzy matching for pricing weights.
  */
 function normalizeBedTypeForWeight(bedType: string | null): string {
 	if (!bedType || !bedType.trim()) return 'other';

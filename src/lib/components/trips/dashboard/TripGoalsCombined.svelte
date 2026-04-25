@@ -45,34 +45,34 @@
 		tripInfoTotal > 0 ? Math.min(100, Math.round((tripInfoFilled / tripInfoTotal) * 100)) : 0
 	);
 
-	// Four stat rings — outer to inner, each paired with a theme color
+	// Four stat rings, outer to inner, each paired with a theme color
 	const RING_COLORS = ['#CE5612', '#E8922C', '#2F7778', '#6FB8BA'] as const;
 
 	const allStats = $derived([
 		{
 			label: 'RSVPs',
-			value: rsvpTotal > 0 ? `${rsvpCurrent} / ${rsvpTotal}` : '—',
+			value: rsvpTotal > 0 ? `${rsvpCurrent} / ${rsvpTotal}` : '-',
 			pct: rsvpPct,
 			href: guestsHref,
 			color: RING_COLORS[0]
 		},
 		{
 			label: 'Rooms',
-			value: roomsTotal > 0 ? `${roomsFilled} / ${roomsTotal}` : '—',
+			value: roomsTotal > 0 ? `${roomsFilled} / ${roomsTotal}` : '-',
 			pct: roomsPct,
 			href: roomsHref,
 			color: RING_COLORS[1]
 		},
 		{
 			label: 'Beds',
-			value: bedsTotal > 0 ? `${bedsCurrent} / ${bedsTotal}` : '—',
+			value: bedsTotal > 0 ? `${bedsCurrent} / ${bedsTotal}` : '-',
 			pct: bedsPct,
 			href: roomsHref,
 			color: RING_COLORS[2]
 		},
 		{
 			label: 'Trip info',
-			value: tripInfoTotal > 0 ? `${tripInfoFilled} / ${tripInfoTotal}` : '—',
+			value: tripInfoTotal > 0 ? `${tripInfoFilled} / ${tripInfoTotal}` : '-',
 			pct: tripInfoPct,
 			href: '#trip-info',
 			color: RING_COLORS[3]

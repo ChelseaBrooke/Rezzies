@@ -18,7 +18,7 @@
 	let {
 		title = 'Who\'s winning',
 		players,
-		emptyText = 'No scores yet — play to get on the board!',
+		emptyText = 'No scores yet, play to get on the board!',
 		collapsedOnMobile = false
 	}: Props = $props();
 

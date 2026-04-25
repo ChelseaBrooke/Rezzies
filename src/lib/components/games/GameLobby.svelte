@@ -103,7 +103,7 @@
 			<div class="activity-strip">
 				{#if activityItems.length === 0}
 					<div class="activity-pill activity-pill--empty">
-						No activity yet — be the first to play
+						No activity yet, be the first to play
 					</div>
 				{:else}
 					{#each activityItems.slice(0, 6) as item}

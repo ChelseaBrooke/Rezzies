@@ -213,12 +213,12 @@
 						<span class="tic-time-chip">
 							<span class="tic-time-dot in"></span>
 							<span class="tic-time-dir">In</span>
-							{form.checkInTime?.trim() || '—'}
+							{form.checkInTime?.trim() || '-'}
 						</span>
 						<span class="tic-time-chip">
 							<span class="tic-time-dot out"></span>
 							<span class="tic-time-dir">Out</span>
-							{form.checkOutTime?.trim() || '—'}
+							{form.checkOutTime?.trim() || '-'}
 						</span>
 					</div>
 				</div>
@@ -244,7 +244,7 @@
 							</svg>
 						</a>
 					{:else}
-						<span class="tic-field-value {!form.fullAddress?.trim() ? 'empty' : ''}">{form.fullAddress?.trim() || '—'}</span>
+						<span class="tic-field-value {!form.fullAddress?.trim() ? 'empty' : ''}">{form.fullAddress?.trim() || '-'}</span>
 					{/if}
 				</div>
 
@@ -261,7 +261,7 @@
 						</span>
 						<span class="tic-field-label">Parking</span>
 					</div>
-					<span class="tic-field-value {!form.parkingNotes?.trim() ? 'empty' : ''}">{form.parkingNotes?.trim() || '—'}</span>
+					<span class="tic-field-value {!form.parkingNotes?.trim() ? 'empty' : ''}">{form.parkingNotes?.trim() || '-'}</span>
 				</div>
 
 				<!-- Rules -->
@@ -275,7 +275,7 @@
 						</span>
 						<span class="tic-field-label">Rules</span>
 					</div>
-					<span class="tic-field-value {!form.houseRules?.trim() ? 'empty' : ''}">{form.houseRules?.trim() || '—'}</span>
+					<span class="tic-field-value {!form.houseRules?.trim() ? 'empty' : ''}">{form.houseRules?.trim() || '-'}</span>
 				</div>
 			</div>
 
@@ -393,7 +393,7 @@
 		border-bottom: 1px solid var(--border-soft, rgba(0,0,0,0.06));
 	}
 
-	/* 2-column grid for the 4 info fields — equal row heights so the top two cells match */
+	/* 2-column grid for the 4 info fields, equal row heights so the top two cells match */
 	.tic-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;

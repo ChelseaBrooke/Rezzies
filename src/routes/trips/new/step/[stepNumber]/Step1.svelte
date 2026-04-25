@@ -214,7 +214,7 @@
 		grid-template-columns: 38% 62%;
 		grid-template-rows: minmax(0, 1fr);
 		gap: 1.25rem;
-		/* Don't grow to fill the whole card — keeps panels visibly shorter */
+		/* Don't grow to fill the whole card, keeps panels visibly shorter */
 		flex: 0 1 auto;
 		align-items: stretch;
 		align-self: start;

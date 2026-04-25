@@ -94,6 +94,10 @@
 		tripInfoEdited?: boolean;
 		/** ISO date string for check-in (drives countdown in progress/RSVP cards) */
 		tripCheckInDate?: string;
+		/** Guest RSVP card: whole-room pricing (no bed on assignment). */
+		isPerRoomPricing?: boolean;
+		/** Guest RSVP card: room rows for label fallback when `room.name` is empty. */
+		tripRooms?: Array<{ id: number; name: string; roomType?: string | null }>;
 		/** Host only: cost when all spots fill (incentive to drive RSVPs) */
 	costAtMaxParticipation?: CostAtMaxParticipation | null;
 	/** Whether cost-sharing features are enabled for this trip */
@@ -151,6 +155,8 @@
 		tripInfo = {},
 		tripInfoEdited = false,
 		tripCheckInDate = '',
+		isPerRoomPricing = false,
+		tripRooms = [],
 		costAtMaxParticipation = null,
 	costSharingEnabled = true,
 	expectedPeopleCount = null,
@@ -314,7 +320,7 @@
 	<!-- Layout: row1 = reminders | goals | recent, row2 = guests under reminders + goals only -->
 	<div class="dashboard-layout" class:dashboard-layout--no-guests-row={showHostPlanningCard}>
 		<div class="left-column">
-		<div class="sticky-card-wrapper" class:host-mode={isHost}>
+		<div class="sticky-card-wrapper">
 			{#if isHost}
 			<DashboardCard
 					variant="sticky"
@@ -353,6 +359,8 @@
 						{platformFeePerPerson}
 						{tripCheckInDate}
 						{costSharingEnabled}
+						{isPerRoomPricing}
+						tripRooms={tripRooms}
 					/>
 					</DashboardCard>
 				{/if}
@@ -601,7 +609,7 @@
 		align-items: stretch;
 	}
 
-	/* Host capacity card replaces bottom guests row — single tall row */
+	/* Host capacity card replaces bottom guests row, single tall row */
 	.dashboard-layout--no-guests-row {
 		grid-template-rows: 1fr;
 	}
@@ -742,12 +750,34 @@
 		flex-direction: column;
 	}
 
-	/* ── Shared sticky card shell ── */
+	/* ── Shared sticky card: Progress (host) and Your RSVP (guest), same shell as host Progress ── */
 	.sticky-card-wrapper :global(.dashboard-card.variant-sticky) {
 		flex: 1;
 		width: 100%;
 		overflow: visible;
 		padding: 1rem 1.125rem;
+		background: white;
+		box-shadow: 0 4px 28px rgba(29, 77, 78, 0.12), 0 1px 4px rgba(0, 0, 0, 0.05);
+	}
+
+	.sticky-card-wrapper :global(.card-title) {
+		color: var(--navy, #1d4d4e);
+	}
+	.sticky-card-wrapper :global(.pin-circle) {
+		background: rgba(47, 119, 120, 0.1);
+	}
+	.sticky-card-wrapper :global(.pin-svg) {
+		color: var(--slate, #2f7778);
+		stroke: var(--slate, #2f7778);
+	}
+	.sticky-card-wrapper :global(.view-detail-btn) {
+		color: var(--slate, #2f7778);
+		background: rgba(47, 119, 120, 0.07);
+		border-color: rgba(47, 119, 120, 0.18);
+	}
+	.sticky-card-wrapper :global(.view-detail-btn:hover) {
+		background: rgba(47, 119, 120, 0.13);
+		border-color: rgba(47, 119, 120, 0.3);
 	}
 
 	.sticky-card-wrapper :global(.card-header) {
@@ -768,68 +798,8 @@
 		overflow: visible;
 	}
 
-	/* ── Host progress card: white with dark gauge section inside ── */
-	.sticky-card-wrapper.host-mode :global(.dashboard-card.variant-sticky) {
-		background: white;
-		box-shadow: 0 4px 28px rgba(29, 77, 78, 0.12), 0 1px 4px rgba(0, 0, 0, 0.05);
-	}
-	.sticky-card-wrapper.host-mode :global(.card-title) { color: var(--navy, #1d4d4e); }
-	.sticky-card-wrapper.host-mode :global(.pin-circle) { background: rgba(47, 119, 120, 0.1); }
-	.sticky-card-wrapper.host-mode :global(.pin-svg) { color: var(--slate, #2f7778); stroke: var(--slate, #2f7778); }
-	.sticky-card-wrapper.host-mode :global(.view-detail-btn) {
-		color: var(--slate, #2f7778);
-		background: rgba(47, 119, 120, 0.07);
-		border-color: rgba(47, 119, 120, 0.18);
-	}
-	.sticky-card-wrapper.host-mode :global(.view-detail-btn:hover) {
-		background: rgba(47, 119, 120, 0.13);
-		border-color: rgba(47, 119, 120, 0.3);
-	}
-
 	/* TripGoalsCombined fills the card body */
 	.sticky-card-wrapper :global(.readiness) { flex: 1; }
-
-	/* ── Non-host RSVP card: dark teal ── */
-	.sticky-card-wrapper:not(.host-mode) :global(.dashboard-card.variant-sticky) {
-		background:
-			radial-gradient(ellipse at 20% 0%, rgba(122, 206, 211, 0.18) 0%, transparent 55%),
-			linear-gradient(155deg, #1d4d4e 0%, #2a6263 55%, #1a4041 100%);
-		box-shadow: 0 8px 32px rgba(29, 77, 78, 0.35);
-	}
-	.sticky-card-wrapper:not(.host-mode) :global(.card-title) { color: white; }
-	.sticky-card-wrapper:not(.host-mode) :global(.pin-circle) { background: rgba(255, 255, 255, 0.22); }
-	.sticky-card-wrapper:not(.host-mode) :global(.pin-svg) { color: white; stroke: white; }
-	.sticky-card-wrapper:not(.host-mode) :global(.view-detail-btn) {
-		color: rgba(255, 255, 255, 0.85);
-		background: rgba(255, 255, 255, 0.15);
-		border-color: rgba(255, 255, 255, 0.25);
-	}
-	.sticky-card-wrapper:not(.host-mode) :global(.view-detail-btn:hover) {
-		background: rgba(255, 255, 255, 0.25);
-		border-color: rgba(255, 255, 255, 0.4);
-	}
-
-	/* GuestRsvpSummaryCard — scoped to non-host (dark teal) card */
-	.sticky-card-wrapper:not(.host-mode) :global(.status-banner) { border-color: rgba(255, 255, 255, 0.2); color: white; }
-	.sticky-card-wrapper:not(.host-mode) :global(.status-icon) { color: white; }
-	.sticky-card-wrapper:not(.host-mode) :global(.status-text) { color: white; }
-	.sticky-card-wrapper:not(.host-mode) :global(.status-days) {
-		background: rgba(255, 255, 255, 0.2);
-		border-color: rgba(255, 255, 255, 0.3);
-		color: white;
-	}
-	.sticky-card-wrapper:not(.host-mode) :global(.pending-dot) { background: white; }
-	.sticky-card-wrapper:not(.host-mode) :global(.nudge-text) { color: rgba(255, 255, 255, 0.82); }
-	.sticky-card-wrapper:not(.host-mode) :global(.detail-block) { border-color: rgba(255, 255, 255, 0.18); }
-	.sticky-card-wrapper:not(.host-mode) :global(.detail-label) { color: rgba(255, 255, 255, 0.65); }
-	.sticky-card-wrapper:not(.host-mode) :global(.detail-price) { color: white; }
-	.sticky-card-wrapper:not(.host-mode) :global(.detail-value) { color: white; }
-	.sticky-card-wrapper:not(.host-mode) :global(.detail-note) { color: rgba(255, 255, 255, 0.65); }
-	.sticky-card-wrapper:not(.host-mode) :global(.detail-empty) { color: rgba(255, 255, 255, 0.55); }
-	.sticky-card-wrapper:not(.host-mode) :global(.cta-primary) { background: white; color: var(--warm); }
-	.sticky-card-wrapper:not(.host-mode) :global(.cta-primary:hover) { background: rgba(255, 255, 255, 0.9); }
-	.sticky-card-wrapper:not(.host-mode) :global(.cta-ghost) { color: white; border-color: rgba(255, 255, 255, 0.35); }
-	.sticky-card-wrapper:not(.host-mode) :global(.cta-ghost:hover) { background: rgba(255, 255, 255, 0.12); }
 
 	@media (max-width: 1024px) {
 		.dashboard-wrapper {

@@ -29,7 +29,7 @@ export function renderNewRsvpHostHtml(d: NewRsvpHostEmailData): string {
 	`;
 
 	return renderEmailLayout({
-		preheader: `${d.guestName} is in — ${spotsLine}.`,
+		preheader: `${d.guestName} is in, ${spotsLine}.`,
 		kicker: 'New RSVP',
 		heading: `${guestName} is in`,
 		subheading: spotsLine,

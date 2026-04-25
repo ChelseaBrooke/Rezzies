@@ -10,7 +10,7 @@ export interface EmailLayoutOptions {
 	heading: string;
 	/** Optional subline beneath the heading. Already-escaped HTML is accepted. */
 	subheading?: string;
-	/** Main body content — escaped HTML (paragraphs, tables, etc.). */
+	/** Main body content, escaped HTML (paragraphs, tables, etc.). */
 	body: string;
 	/** CTA button URL. If omitted, no button is rendered. */
 	ctaUrl?: string;

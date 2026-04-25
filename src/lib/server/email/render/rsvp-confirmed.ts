@@ -20,12 +20,12 @@ export function renderRsvpConfirmedHtml(d: RsvpConfirmedEmailData): string {
 	if (d.bedSummary) rows.push(metaRow('Bed', escapeHtml(d.bedSummary)));
 
 	const body = `
-		<p class="lead">Hi ${guestName}, you're confirmed — can't wait to see you there.</p>
+		<p class="lead">Hi ${guestName}, you're confirmed, can't wait to see you there.</p>
 		${metaTable(rows.join(''))}
 	`;
 
 	return renderEmailLayout({
-		preheader: `You're going to "${d.tripName}" — your RSVP is confirmed.`,
+		preheader: `You're going to "${d.tripName}", your RSVP is confirmed.`,
 		kicker: 'RSVP confirmed',
 		heading: "You're going",
 		subheading: escapeHtml(tripName),

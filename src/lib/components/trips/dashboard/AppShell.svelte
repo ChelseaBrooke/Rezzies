@@ -25,7 +25,7 @@
 		/** Trip dates for dashboard mode pill (Planning/Vacation/Recap) */
 		checkInDate?: Date | string | null;
 		checkOutDate?: Date | string | null;
-		/** Add-on flags — when false the corresponding nav item is hidden */
+		/** Add-on flags, when false the corresponding nav item is hidden */
 		activitiesEnabled?: boolean;
 		gamesEnabled?: boolean;
 		isHost?: boolean;
@@ -447,7 +447,7 @@
 	}
 
 	/* Logo: fixed left indent that also centers in collapsed width */
-	/* collapsed: (72 - 48) / 2 = 12px — margin-left:12px is already perfect */
+	/* collapsed: (72 - 48) / 2 = 12px, margin-left:12px is already perfect */
 	.logo-button {
 		width: 48px;
 		height: 48px;
@@ -844,9 +844,9 @@
 
 	/*
 	 * Desktop: .trip-sticky-header uses display: contents, and .top-actions is position:absolute,
-	 * so it does not reserve space — page content was scrolling underneath messages / notifications.
+	 * so it does not reserve space, page content was scrolling underneath messages / notifications.
 	 * Reserve a band equal to the floating action row (top offset + 44px controls + breathing room).
-	 * Token: --trip-dash-hero-offset (theme.css) — same band used for “mode pill → hero top” on
+	 * Token: --trip-dash-hero-offset (theme.css), same band used for “mode pill → hero top” on
 	 * planning, vacation, and recap; dashboard heroes must not add duplicate top padding.
 	 */
 	@media (min-width: 641px) {

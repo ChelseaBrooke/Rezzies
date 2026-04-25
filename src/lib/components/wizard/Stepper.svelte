@@ -146,7 +146,7 @@
 		color: var(--text);
 	}
 
-	/* Theme display font (same as global h1/h2 — Fraunces in app.css) */
+	/* Theme display font (same as global h1/h2, Fraunces in app.css) */
 	.stepper-inline-label {
 		font-family: 'Fraunces', Georgia, serif;
 		font-size: 1.625rem;

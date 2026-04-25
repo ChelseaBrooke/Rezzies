@@ -513,7 +513,7 @@
 		overrides[ds.eventId] = { ...overrides[ds.eventId], date: newDate, time: newTime };
 		moveError = null;
 
-		// Persist — roll back the optimistic update on failure
+		// Persist, roll back the optimistic update on failure
 		const fd = new FormData();
 		fd.set('date', newDate);
 		fd.set('time', newTime);
@@ -529,12 +529,12 @@
 			if (!res.ok) {
 				const { [ds.eventId]: _removed, ...rest } = overrides;
 				overrides = rest;
-				moveError = 'Could not move event — please try again.';
+				moveError = 'Could not move event, please try again.';
 			}
 		} catch {
 			const { [ds.eventId]: _removed, ...rest } = overrides;
 			overrides = rest;
-			moveError = 'Could not move event — please try again.';
+			moveError = 'Could not move event, please try again.';
 		}
 		await invalidateAll();
 	}
@@ -714,9 +714,9 @@
 						</h2>
 						{#if (data.trip?.checkInTime ?? '').trim() || (data.trip?.checkOutTime ?? '').trim()}
 							<p class="schedule-check-times">
-								<span class="schedule-check-in">Check-in {(data.trip?.checkInTime ?? '').trim() || '—'}</span>
+								<span class="schedule-check-in">Check-in {(data.trip?.checkInTime ?? '').trim() || '-'}</span>
 								<span class="schedule-check-sep"> · </span>
-								<span class="schedule-check-out">Check-out {(data.trip?.checkOutTime ?? '').trim() || '—'}</span>
+								<span class="schedule-check-out">Check-out {(data.trip?.checkOutTime ?? '').trim() || '-'}</span>
 							</p>
 						{/if}
 						<label class="skip-toggle">

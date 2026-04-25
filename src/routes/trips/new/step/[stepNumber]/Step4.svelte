@@ -391,7 +391,7 @@
 
 <style>
 	/* ════════════════════════════════════════════════════════════════
-	 * Step 3 (Review) — Divvi hype-and-confirm redesign
+	 * Step 3 (Review), Divvi hype-and-confirm redesign
 	 * ════════════════════════════════════════════════════════════════ */
 
 	.rev-page {

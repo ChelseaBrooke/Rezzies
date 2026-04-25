@@ -6,11 +6,11 @@
  * Status lifecycle for a guest:
  *   (no row / not_responded)
  *     → waitlisted       (trip fills up; RSVP row created/updated)
- *     → yes              (spot opens and guest RSVPs yes first — first come, first served)
+ *     → yes              (spot opens and guest RSVPs yes first, first come, first served)
  *     → no               (trip starts and waitlist is dissolved, or guest explicitly declines)
  *
  * When a spot opens, ALL waitlisted guests are notified simultaneously.
- * Spots go to whoever RSVPs yes first — no claim windows, no promotion queue.
+ * Spots go to whoever RSVPs yes first, no claim windows, no promotion queue.
  */
 
 import { prisma } from './prisma.js';
@@ -91,7 +91,7 @@ export async function checkAndHandleCapacity(tripId: string): Promise<void> {
 	const yesCount = await getYesCount(tripId);
 	if (yesCount < trip.maxCapacity) return; // Still room
 
-	// Trip is full — find all non-host members without a confirmed answer
+	// Trip is full, find all non-host members without a confirmed answer
 	const allMembers = await prisma.tripMember.findMany({
 		where: { tripId, role: { not: 'host' }, inviteStatus: 'approved' },
 		select: { userId: true, createdAt: true }
@@ -164,7 +164,7 @@ export async function checkAndHandleCapacity(tripId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Core: Handle spot opening — notify all waitlisted guests (first come, first served)
+// Core: Handle spot opening, notify all waitlisted guests (first come, first served)
 // ---------------------------------------------------------------------------
 
 /**
@@ -193,7 +193,7 @@ export async function handleSpotOpened(tripId: string): Promise<void> {
 	});
 	if (waitlisted.length === 0) return;
 
-	// Notify everyone simultaneously — first to RSVP yes wins
+	// Notify everyone simultaneously, first to RSVP yes wins
 	for (const entry of waitlisted) {
 		const user = await prisma.user.findUnique({
 			where: { id: entry.userId },
@@ -206,7 +206,7 @@ export async function handleSpotOpened(tripId: string): Promise<void> {
 			tripId,
 			type: 'waitlist_spot_opened',
 			title: openSpots === 1 ? 'A spot just opened!' : `${openSpots} spots just opened!`,
-			message: `${openSpots === 1 ? 'A spot' : `${openSpots} spots`} just opened on "${trip.name}". It's first come, first served — go RSVP now!`
+			message: `${openSpots === 1 ? 'A spot' : `${openSpots} spots`} just opened on "${trip.name}". It's first come, first served, go RSVP now!`
 		}).catch(console.error);
 
 		if (user.email) {
@@ -217,7 +217,7 @@ export async function handleSpotOpened(tripId: string): Promise<void> {
 			});
 			await sendHtmlEmail({
 				to: user.email,
-				subject: `${openSpots === 1 ? 'A spot opened' : `${openSpots} spots opened`} on "${trip.name}" — first come, first served`,
+				subject: `${openSpots === 1 ? 'A spot opened' : `${openSpots} spots opened`} on "${trip.name}", first come, first served`,
 				html,
 				templateKey: TEMPLATE_KEYS.SPOT_OPENED
 			}).catch(console.error);

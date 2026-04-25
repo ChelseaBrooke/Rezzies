@@ -54,9 +54,9 @@
 		myAssignments = [],
 		announcements = [],
 		userRsvp = null,
-		/** Trip rooms list — used to label your stay when assignment.room is missing but roomId is set */
+		/** Trip rooms list, used to label your stay when assignment.room is missing but roomId is set */
 		stayRoomLookup = [],
-		/** Resolved on the trip dashboard load (guest) — avoids client/prop sync issues */
+		/** Resolved on the trip dashboard load (guest), avoids client/prop sync issues */
 		serverStayRoomLabel = null as string | null
 	}: {
 		tripId: string;
@@ -191,7 +191,7 @@
 	const displayName = $derived(currentUserName?.trim() || 'there');
 
 	function formatTime12(t: string | null | undefined): string {
-		if (!t) return '—';
+		if (!t) return '-';
 		const m24 = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
 		if (m24) {
 			let h = +m24[1];
@@ -474,7 +474,7 @@
 						<span class="v-hero-avatar v-hero-avatar--more" style="z-index: 14">+{yesRsvps.length - 14}</span>
 					{/if}
 				{:else}
-					<span class="v-hero-avatar v-hero-avatar--placeholder" title="RSVP yes to show up here">—</span>
+					<span class="v-hero-avatar v-hero-avatar--placeholder" title="RSVP yes to show up here">-</span>
 				{/if}
 			</div>
 		</div>
@@ -491,7 +491,7 @@
 	<!-- 2 ── MAIN: left grid + right assistant -->
 	<div class="v-main">
 		<div class="v-grid">
-			<!-- My Stay — full width -->
+			<!-- My Stay, full width -->
 			<section class="v-tile v-suite-stay v-tile--full" aria-labelledby="v-stay-title">
 				<div class="v-suite-stay-compact">
 					<figure class="v-suite-stay-thumb">
@@ -524,13 +524,13 @@
 								<div class="v-suite-stay-chip">
 									<span class="v-suite-stay-chip-k">Check-in</span>
 									<span class="v-suite-stay-chip-v" class:v-suite-stay-chip-v--empty={!stayCheckInValue}
-										>{stayCheckInValue || '—'}</span
+										>{stayCheckInValue || '-'}</span
 									>
 								</div>
 								<div class="v-suite-stay-chip">
 									<span class="v-suite-stay-chip-k">Check-out</span>
 									<span class="v-suite-stay-chip-v" class:v-suite-stay-chip-v--empty={!stayCheckOutValue}
-										>{stayCheckOutValue || '—'}</span
+										>{stayCheckOutValue || '-'}</span
 									>
 								</div>
 							</div>
@@ -653,7 +653,7 @@
 					<p class="v-greet-date">{todayFormatted}</p>
 					<p class="v-greet-weather">
 						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-						<span>—</span>
+						<span>-</span>
 					</p>
 				</header>
 
@@ -749,15 +749,15 @@
 				<div class="v-suite-house-grid">
 					<div class="v-suite-kv">
 						<span class="v-suite-k">Check-in</span>
-						<span class="v-suite-v" class:v-suite-v--empty={!houseCheckInDisplay}>{houseCheckInDisplay || '—'}</span>
+						<span class="v-suite-v" class:v-suite-v--empty={!houseCheckInDisplay}>{houseCheckInDisplay || '-'}</span>
 					</div>
 					<div class="v-suite-kv">
 						<span class="v-suite-k">Check-out</span>
-						<span class="v-suite-v" class:v-suite-v--empty={!houseCheckOutDisplay}>{houseCheckOutDisplay || '—'}</span>
+						<span class="v-suite-v" class:v-suite-v--empty={!houseCheckOutDisplay}>{houseCheckOutDisplay || '-'}</span>
 					</div>
 					<div class="v-suite-kv v-suite-span2">
 						<span class="v-suite-k">Parking</span>
-						<span class="v-suite-v" class:v-suite-v--empty={!houseParkingDisplay}>{houseParkingDisplay || '—'}</span>
+						<span class="v-suite-v" class:v-suite-v--empty={!houseParkingDisplay}>{houseParkingDisplay || '-'}</span>
 					</div>
 					<div class="v-suite-kv v-suite-span2 v-suite-kv--wifi">
 						<span class="v-suite-k">Wi-Fi</span>
@@ -765,13 +765,13 @@
 							<p class="v-suite-wifi-line">
 								<span class="v-suite-wifi-label">Network</span>
 								<span class="v-suite-v" class:v-suite-v--empty={!(wifiName ?? '').trim()}
-									>{(wifiName ?? '').trim() || '—'}</span
+									>{(wifiName ?? '').trim() || '-'}</span
 								>
 							</p>
 							<p class="v-suite-wifi-line">
 								<span class="v-suite-wifi-label">Password</span>
 								<span class="v-suite-v" class:v-suite-v--empty={!(wifiPassword ?? '').trim()}
-									>{(wifiPassword ?? '').trim() || '—'}</span
+									>{(wifiPassword ?? '').trim() || '-'}</span
 								>
 							</p>
 						</div>
@@ -785,7 +785,7 @@
 								<span class="v-suite-v">{houseAddressDisplay}</span>
 							{/if}
 						{:else}
-							<span class="v-suite-v v-suite-v--empty">—</span>
+							<span class="v-suite-v v-suite-v--empty">-</span>
 						{/if}
 					</div>
 				</div>
@@ -825,7 +825,7 @@
 		--v-lift-hover: 0 6px 24px rgba(0,0,0,0.10);
 		/*
 		 * Match planning dash: top of `.v-hero` photo = only AppShell
-		 * `--trip-dash-hero-offset` on `.main-content-inner` — do not stack extra padding here.
+		 * `--trip-dash-hero-offset` on `.main-content-inner`, do not stack extra padding here.
 		 */
 		padding-top: 0;
 		position: relative;
@@ -1794,7 +1794,7 @@
 	.v-assistant {
 		position: fixed; top: 0; right: 0; bottom: 0;
 		width: var(--v-right);
-		/* background: shared with .v above — same gradient + fixed attachment */
+		/* background: shared with .v above, same gradient + fixed attachment */
 		border-left: 1px solid rgba(227,206,170,0.55);
 		box-shadow: -5px 0 28px rgba(0,0,0,0.05);
 		overflow-y: auto;

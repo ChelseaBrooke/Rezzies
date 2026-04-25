@@ -185,7 +185,7 @@
 		}
 	});
 
-	// Update polling interval when isOpen changes (client only — SSR would otherwise call fetch)
+	// Update polling interval when isOpen changes (client only, SSR would otherwise call fetch)
 	$effect(() => {
 		if (!browser) return;
 		if (pollInterval) {

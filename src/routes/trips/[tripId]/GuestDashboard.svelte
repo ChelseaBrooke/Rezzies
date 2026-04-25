@@ -90,6 +90,15 @@
 	const hostName = $derived(hostMember?.user?.name ?? hostMember?.user?.email ?? 'Host');
 	const hostedByLine = $derived(formatHostedByLine(trip?.members ?? []));
 
+	const isPerRoomPricing = $derived((trip?.pricingModel ?? '').toLowerCase() === 'per_room');
+	const tripRoomsForRsvpCard = $derived(
+		(rooms ?? []).map((r: { id: number; name?: string | null; roomType?: string | null }) => ({
+			id: r.id,
+			name: r.name ?? '',
+			roomType: r.roomType ?? null
+		}))
+	);
+
 	const myAssignments = $derived.by(() => {
 		if (!user) return [];
 		const g = data.guestRoomAssignments;
@@ -119,7 +128,7 @@
 			? formatTripDateRange(trip.checkInDate, trip.checkOutDate)
 			: trip?.checkInDate
 				? new Date(trip.checkInDate).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
-				: '—'
+				: '-'
 	);
 
 	function initials(name: string | null | undefined): string {
@@ -344,6 +353,8 @@
 				}}
 				tripCheckInDate={trip?.checkInDate ? String(trip.checkInDate) : ''}
 				costSharingEnabled={trip.costSharingEnabled ?? false}
+				isPerRoomPricing={isPerRoomPricing}
+				tripRooms={tripRoomsForRsvpCard}
 				recentActivities={activities.map((a) => ({ title: a.title, createdAt: String(a.createdAt) }))}
 				recentMealSlots={mealSlots.map((m) => ({
 					mealType: m.mealType,

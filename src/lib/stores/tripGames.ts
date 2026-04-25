@@ -174,6 +174,14 @@ export interface TriviaQuestion {
 	options: TriviaOption[];
 }
 
+/** Enough text + options to publish or hand off to guests. */
+export function isTriviaQuestionComplete(q: TriviaQuestion): boolean {
+	if (!q.question.trim()) return false;
+	const filled = q.options.filter((o) => o.text.trim() !== '');
+	if (filled.length < 2) return false;
+	return filled.some((o) => o.correct);
+}
+
 const TRIVIA_QUESTIONS_KEY = (tripId: string, tripGameId: string) =>
 	`trip-games-trivia-${tripId}-${tripGameId}`;
 const TRIVIA_ANSWER_KEY = (tripId: string, tripGameId: string, userId: string) =>
@@ -185,6 +193,12 @@ const TRIVIA_PUBLISHED_KEY = (tripId: string, tripGameId: string) =>
 
 export function getTriviaQuestions(tripId: string, tripGameId: string): TriviaQuestion[] {
 	return loadFromStorage<TriviaQuestion[]>(TRIVIA_QUESTIONS_KEY(tripId, tripGameId), []);
+}
+
+/** Replace the whole quiz (e.g. host publish). No-op if submissions already exist. */
+export function setTriviaQuestions(tripId: string, tripGameId: string, list: TriviaQuestion[]): void {
+	if (getTriviaGameHasSubmissions(tripId, tripGameId)) return;
+	saveToStorage(TRIVIA_QUESTIONS_KEY(tripId, tripGameId), list);
 }
 
 export function addTriviaQuestion(
@@ -200,10 +214,28 @@ export function addTriviaQuestion(
 		: payload.options.map((o, i) => ({ ...o, correct: i === 0 }));
 	const newQ: TriviaQuestion = {
 		id: crypto.randomUUID(),
-		question: payload.question.trim(),
+		question: payload.question,
 		options: options.filter((o) => o.text.trim() !== '')
 	};
-	if (newQ.options.length < 2) return newQ;
+	if (newQ.options.length < 2) return null;
+	questions.push(newQ);
+	saveToStorage(TRIVIA_QUESTIONS_KEY(tripId, tripGameId), questions);
+	return newQ;
+}
+
+/** New blank card (host authoring). Options stay as empty slots until the host fills them. */
+export function addEmptyTriviaQuestion(tripId: string, tripGameId: string): TriviaQuestion | null {
+	if (getTriviaGameHasSubmissions(tripId, tripGameId)) return null;
+	const questions = getTriviaQuestions(tripId, tripGameId);
+	const newQ: TriviaQuestion = {
+		id: crypto.randomUUID(),
+		question: '',
+		options: [
+			{ text: '', correct: true },
+			{ text: '', correct: false },
+			{ text: '', correct: false },
+		],
+	};
 	questions.push(newQ);
 	saveToStorage(TRIVIA_QUESTIONS_KEY(tripId, tripGameId), questions);
 	return newQ;
@@ -220,6 +252,15 @@ export function reorderTriviaQuestions(
 	const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as TriviaQuestion[];
 	if (reordered.length !== questions.length) return;
 	saveToStorage(TRIVIA_QUESTIONS_KEY(tripId, tripGameId), reordered);
+}
+
+export function deleteTriviaQuestion(tripId: string, tripGameId: string, questionId: string): boolean {
+	if (getTriviaGameHasSubmissions(tripId, tripGameId)) return false;
+	const questions = getTriviaQuestions(tripId, tripGameId);
+	const next = questions.filter((q) => q.id !== questionId);
+	if (next.length === questions.length) return false;
+	saveToStorage(TRIVIA_QUESTIONS_KEY(tripId, tripGameId), next);
+	return true;
 }
 
 export function getTriviaGameHasSubmissions(tripId: string, tripGameId: string): boolean {
@@ -287,15 +328,15 @@ export function updateTriviaQuestion(
 	const idx = questions.findIndex((q) => q.id === questionId);
 	if (idx < 0) return false;
 	const hasCorrect = payload.options.some((o) => o.correct);
-	const options = hasCorrect
-		? payload.options
-		: payload.options.map((o, i) => ({ ...o, correct: i === 0 }));
+	let options = hasCorrect
+		? payload.options.map((o) => ({ text: o.text, correct: o.correct }))
+		: payload.options.map((o, i) => ({ text: o.text, correct: i === 0 }));
+	while (options.length < 2) options = [...options, { text: '', correct: false }];
 	questions[idx] = {
 		id: questionId,
-		question: payload.question.trim(),
-		options: options.filter((o) => o.text.trim() !== '')
+		question: payload.question,
+		options,
 	};
-	if (questions[idx].options.length < 2) return false;
 	saveToStorage(TRIVIA_QUESTIONS_KEY(tripId, tripGameId), questions);
 	return true;
 }

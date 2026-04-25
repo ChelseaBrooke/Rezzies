@@ -16,6 +16,8 @@ import {
 	CAPTION_MAX_LENGTH
 } from '$lib/server/caption-this.js';
 
+const VALID_CATALOG_GAME_IDS = ['scavenger-bingo', 'caption-this', 'alphabet-hunt', 'daily-trivia'] as const;
+
 export const load: PageServerLoad = async ({ parent, url, params }) => {
 	const parentData = await parent();
 	const trip = parentData.trip;
@@ -44,6 +46,15 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 		addedByUserId: g.addedByUserId,
 		addedAt: g.createdAt.toISOString()
 	}));
+
+	/* ?game= must match a catalog id and a row on this trip (published trips seed all games). */
+	if (
+		gameParam &&
+		(!VALID_CATALOG_GAME_IDS.includes(gameParam as (typeof VALID_CATALOG_GAME_IDS)[number]) ||
+			!tripGames.some((g) => g.gameId === gameParam))
+	) {
+		throw redirect(303, `/trips/${tripId}/games`);
+	}
 
 	// Caption This: load round + leaderboard + past rounds for inline game viewer
 	let captionThis = {
@@ -153,27 +164,22 @@ export const actions: Actions = {
 		if (!(await isTripMember(tripId, user.id))) return fail(403, { error: 'Unauthorized' });
 		const formData = await request.formData();
 		const roundId = formData.get('roundId') as string | null;
-		const activeTab = (formData.get('activeTab') as string | null)?.trim() || null;
 		if (!roundId) return fail(400, { error: 'Missing roundId' });
 		const result = await endRoundNowCaptionThis(roundId, user.id, tripId);
 		if (!result.ok) return fail(400, { error: result.error });
-		if (activeTab) throw redirect(303, `/trips/${tripId}/games?tab=${encodeURIComponent(activeTab)}`);
-		return { success: true };
+		throw redirect(303, `/trips/${tripId}/games?game=caption-this`);
 	},
-	startNextRound: async ({ request, params, cookies }) => {
+	startNextRound: async ({ params, cookies }) => {
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(403, { error: 'Unauthorized' });
 		const tripId = params.tripId;
 		if (!(await isTripMember(tripId, user.id))) return fail(403, { error: 'Unauthorized' });
-		const formData = await request.formData();
-		const activeTab = (formData.get('activeTab') as string | null)?.trim() || null;
 		const trip = await prisma.trip.findUnique({
 			where: { id: tripId },
 			select: { timezone: true }
 		});
 		await getOrCreateRound(tripId, trip?.timezone ?? 'UTC');
-		if (activeTab) throw redirect(303, `/trips/${tripId}/games?tab=${encodeURIComponent(activeTab)}`);
-		return { success: true };
+		throw redirect(303, `/trips/${tripId}/games?game=caption-this`);
 	},
 
 	addTripGame: async ({ request, params, cookies }) => {
@@ -185,8 +191,8 @@ export const actions: Actions = {
 		const gameId = (formData.get('gameId') as string | null)?.trim();
 		const name = (formData.get('name') as string | null)?.trim();
 		if (!gameId || !name) return fail(400, { error: 'Missing gameId or name' });
-		const validGameIds = ['scavenger-bingo', 'caption-this', 'alphabet-hunt', 'daily-trivia'];
-		if (!validGameIds.includes(gameId)) return fail(400, { error: 'Invalid game' });
+		if (!VALID_CATALOG_GAME_IDS.includes(gameId as (typeof VALID_CATALOG_GAME_IDS)[number]))
+			return fail(400, { error: 'Invalid game' });
 		const existing = await prisma.tripGame.findUnique({
 			where: { tripId_gameId: { tripId, gameId } }
 		});
@@ -194,7 +200,7 @@ export const actions: Actions = {
 		const newGame = await prisma.tripGame.create({
 			data: { tripId, gameId, name, addedByUserId: user.id }
 		});
-		throw redirect(303, `/trips/${tripId}/games?tab=${encodeURIComponent(newGame.id)}`);
+		throw redirect(303, `/trips/${tripId}/games?game=${encodeURIComponent(gameId)}`);
 	},
 
 	removeTripGame: async ({ request, params, cookies }) => {

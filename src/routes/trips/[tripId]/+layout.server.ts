@@ -151,7 +151,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 		};
 	}
 
-	/** Unauthenticated (or not yet on trip) claim flow — skip membership gate */
+	/** Unauthenticated (or not yet on trip) claim flow, skip membership gate */
 	const isPublicHouseholdJoin = url.pathname.includes('/join/household/');
 	if (isPublicHouseholdJoin) {
 		const sUser = await getSessionUser(cookies);

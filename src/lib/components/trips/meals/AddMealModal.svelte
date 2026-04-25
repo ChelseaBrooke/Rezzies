@@ -15,7 +15,7 @@
 		open: boolean;
 		members: MealGuest[];
 		tripDays: { value: string; label: string }[];
-		/** Confirmed (RSVP yes) guests with account dietary info — for meal planning */
+		/** Confirmed (RSVP yes) guests with account dietary info, for meal planning */
 		yesRsvpDietarySummaries?: DietarySummary[];
 		prefill?: {
 			slotId?: string;

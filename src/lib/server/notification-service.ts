@@ -6,15 +6,15 @@
  * don't need try/catch around every notification call.
  *
  * Wiring map (where each function is called from):
- *   sendRsvpConfirmedToGuest     — rsvp/+page.server.ts → updateRsvp (yes path)
- *   sendNewRsvpToHost            — rsvp/+page.server.ts → updateRsvp (yes path)
- *   sendRsvpUpdatedToGuest       — rsvp/+page.server.ts → updateRsvp (no/edit path)
- *   sendTripFillingUpToHost      — rsvp/+page.server.ts → updateRsvp (yes path, after capacity check)
- *   sendGuestJoinedEmail         — trips/[tripId]/join/+page.server.ts
- *   sendRemovedFromTripEmail     — guests/+page.server.ts → removeGuest
- *   sendTripCanceledEmails       — trips/+page.server.ts → deleteTrip
- *   sendWelcomeCoHostEmail       — (future: role-update endpoint)
- *   sendBedRemovedEmails         — bed-claims.ts → releaseBedClaimsAndNotify
+ *   sendRsvpConfirmedToGuest    , rsvp/+page.server.ts → updateRsvp (yes path)
+ *   sendNewRsvpToHost           , rsvp/+page.server.ts → updateRsvp (yes path)
+ *   sendRsvpUpdatedToGuest      , rsvp/+page.server.ts → updateRsvp (no/edit path)
+ *   sendTripFillingUpToHost     , rsvp/+page.server.ts → updateRsvp (yes path, after capacity check)
+ *   sendGuestJoinedEmail        , trips/[tripId]/join/+page.server.ts
+ *   sendRemovedFromTripEmail    , guests/+page.server.ts → removeGuest
+ *   sendTripCanceledEmails      , trips/+page.server.ts → deleteTrip
+ *   sendWelcomeCoHostEmail      , (future: role-update endpoint)
+ *   sendBedRemovedEmails        , bed-claims.ts → releaseBedClaimsAndNotify
  */
 
 import { prisma } from './prisma.js';
@@ -314,7 +314,7 @@ export async function sendRemovedFromTripEmail(
 
 /**
  * Notify all approved members (except host) that a trip was canceled.
- * Fetches member list internally — call BEFORE deleting the trip.
+ * Fetches member list internally, call BEFORE deleting the trip.
  */
 export async function sendTripCanceledEmails(tripId: string): Promise<void> {
 	try {
@@ -382,7 +382,7 @@ export async function sendWelcomeCoHostEmail(
 
 /**
  * Send bed-removed emails to all affected users.
- * `affectedUsers` is [{userId, email?, name?}] — caller provides what they already fetched.
+ * `affectedUsers` is [{userId, email?, name?}], caller provides what they already fetched.
  */
 export async function sendBedRemovedEmails(
 	tripId: string,
@@ -452,7 +452,7 @@ export async function sendCostShareReapprovalToGuest(p: CostShareReapprovalEmail
 			reminder: p.reminder
 		});
 
-		const baseSubject = `Your cost share for "${p.tripName}" has increased — action needed`;
+		const baseSubject = `Your cost share for "${p.tripName}" has increased, action needed`;
 		const subject = p.reminder ? `Reminder: ${baseSubject}` : baseSubject;
 
 		await sendHtmlEmail({

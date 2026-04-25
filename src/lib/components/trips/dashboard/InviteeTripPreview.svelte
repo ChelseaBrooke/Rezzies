@@ -57,7 +57,7 @@
 						day: 'numeric',
 						year: 'numeric'
 					})
-				: '—'
+				: '-'
 	);
 
 	const cityLine = $derived((trip.locationCity ?? trip.location ?? '').trim());
@@ -152,7 +152,7 @@
 	<section class="inv-panel" aria-labelledby="inv-preview-h">
 		<h2 id="inv-preview-h" class="inv-panel-title">Invitation preview</h2>
 		<p class="inv-panel-lead">
-			You’ve been invited to this trip. RSVP after you sign in — more details unlock once you’re going.
+			You’ve been invited to this trip. RSVP after you sign in, more details unlock once you’re going.
 		</p>
 
 		<div class="inv-going">
@@ -198,14 +198,14 @@
 				</div>
 			{:else}
 				<p class="inv-rsvp-copy">
-					<strong>Going</strong> — sign in, join the trip, then pick your room and bed on the RSVP page.
+					<strong>Going</strong>, sign in, join the trip, then pick your room and bed on the RSVP page.
 				</p>
 				<p class="inv-rsvp-copy inv-rsvp-muted">
-					<strong>Can’t make it</strong> — tell the host now (no account needed). You can always sign in later to
+					<strong>Can’t make it</strong>, tell the host now (no account needed). You can always sign in later to
 					update.
 				</p>
 				<div class="inv-rsvp-actions">
-					<a href={joinWithInvite} class="inv-btn inv-btn--primary">I’m going — sign in</a>
+					<a href={joinWithInvite} class="inv-btn inv-btn--primary">I’m going, sign in</a>
 					<a href={signupWithInvite} class="inv-btn inv-btn--ghost">Create account</a>
 					<button
 						type="button"

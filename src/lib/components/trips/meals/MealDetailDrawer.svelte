@@ -196,7 +196,7 @@
 									{#if a.dietaryNote || a.guest?.allergies || a.guest?.dietaryRestrictions}
 										<li>
 											<strong>{a.guest?.name ?? 'Guest'}</strong>:
-											{a.dietaryNote || [a.guest?.allergies, a.guest?.dietaryRestrictions].filter(Boolean).join('; ') || '—'}
+											{a.dietaryNote || [a.guest?.allergies, a.guest?.dietaryRestrictions].filter(Boolean).join('; ') || '-'}
 										</li>
 									{/if}
 								{/each}

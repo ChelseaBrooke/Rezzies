@@ -46,7 +46,7 @@ async function init(isHost: boolean) {
 				return merged;
 			});
 		}
-	} catch { /* offline — localStorage cache is fine */ }
+	} catch { /* offline, localStorage cache is fine */ }
 }
 
 function dismiss(key: string) {

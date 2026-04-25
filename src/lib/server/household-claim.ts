@@ -46,7 +46,7 @@ async function flagDuplicateNameForHostReview(params: {
 				select: { userId: true }
 			});
 			if (host) {
-				// TODO: notify host — duplicate name review
+				// TODO: notify host, duplicate name review
 				await prisma.notification
 					.create({
 						data: {

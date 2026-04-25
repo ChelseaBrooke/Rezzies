@@ -46,7 +46,7 @@
 	}: {
 		tripId: string;
 		isHost?: boolean;
-		/** e.g. "Hosted by Alex" — same line as planning hero */
+		/** e.g. "Hosted by Alex", same line as planning hero */
 		hostedByLine?: string | null;
 		trip?: {
 			name?: string | null;
@@ -449,7 +449,7 @@
 						<span class="r-trophy-stat">{activityWinners[0].count} activit{activityWinners[0].count === 1 ? 'y' : 'ies'}</span>
 					{:else}
 						<span class="r-trophy-avatar r-trophy-avatar--empty" aria-hidden="true">?</span>
-						<span class="r-trophy-name r-trophy-name--empty">—</span>
+						<span class="r-trophy-name r-trophy-name--empty">-</span>
 						<span class="r-trophy-stat">No data yet</span>
 					{/if}
 				</div>
@@ -474,7 +474,7 @@
 						<span class="r-trophy-stat">{chefWinners[0].count} meal{chefWinners[0].count === 1 ? '' : 's'} cooked</span>
 					{:else}
 						<span class="r-trophy-avatar r-trophy-avatar--empty" aria-hidden="true">?</span>
-						<span class="r-trophy-name r-trophy-name--empty">—</span>
+						<span class="r-trophy-name r-trophy-name--empty">-</span>
 						<span class="r-trophy-stat">No data yet</span>
 					{/if}
 				</div>
@@ -484,7 +484,7 @@
 					<span class="r-trophy-medal">🎮</span>
 					<span class="r-trophy-cat">Game Champion</span>
 					<span class="r-trophy-avatar r-trophy-avatar--empty" aria-hidden="true">?</span>
-					<span class="r-trophy-name r-trophy-name--empty">—</span>
+					<span class="r-trophy-name r-trophy-name--empty">-</span>
 					<a href="/trips/{tripId}/games" class="r-trophy-link">View game results →</a>
 				</div>
 
@@ -493,7 +493,7 @@
 					<span class="r-trophy-medal">📸</span>
 					<span class="r-trophy-cat">Photographer</span>
 					<span class="r-trophy-avatar r-trophy-avatar--empty" aria-hidden="true">?</span>
-					<span class="r-trophy-name r-trophy-name--empty">—</span>
+					<span class="r-trophy-name r-trophy-name--empty">-</span>
 					<a href="/trips/{tripId}/files" class="r-trophy-link">View gallery</a>
 				</div>
 			</div>

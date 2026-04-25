@@ -55,7 +55,7 @@
 	}
 	let noNotes = $state('');
 
-	/** Full trip stay only — no partial dates on RSVP */
+	/** Full trip stay only, no partial dates on RSVP */
 	const fullStayArrival = $derived(
 		data.trip?.checkInDate != null ? tripDateKey(data.trip.checkInDate as Date | string) : ''
 	);
@@ -160,7 +160,7 @@
 	// Waitlist derived state
 	const isWaitlisted = $derived(data.isWaitlisted ?? false);
 	const waitlistPosition = $derived(data.waitlistPosition ?? null);
-	// True when the guest is waitlisted but spots are currently open (FCFS — go RSVP now)
+	// True when the guest is waitlisted but spots are currently open (FCFS, go RSVP now)
 	const waitlistSpotsOpen = $derived(
 		isWaitlisted &&
 		data.maxCapacity != null &&
@@ -178,7 +178,7 @@
 		noNotes = data.currentRsvp?.status === 'no' ? (data.currentRsvp?.notes ?? '') : '';
 	});
 	const isYes = $derived(rsvpStatus === 'yes');
-	// Add-on feature flags — default true so nothing breaks for existing trips
+	// Add-on feature flags, default true so nothing breaks for existing trips
 	const costSharingOn = $derived(data.trip?.costSharingEnabled ?? false);
 
 	const guestEstimateFromServer = $derived(data.guestEstimate ?? null);
@@ -346,7 +346,7 @@
 								? `${data.maxCapacity - (data.yesCount ?? 0)} spot${data.maxCapacity - (data.yesCount ?? 0) === 1 ? '' : 's'} just opened!`
 								: 'Spots just opened!'}
 						</p>
-						<p class="waitlist-banner-sub">It's first come, first served — RSVP yes below to claim your spot now.</p>
+						<p class="waitlist-banner-sub">It's first come, first served, RSVP yes below to claim your spot now.</p>
 					</div>
 				</div>
 			{:else}
@@ -355,7 +355,7 @@
 					<div class="waitlist-banner-body">
 						<p class="waitlist-banner-title">You're on the waitlist</p>
 						{#if waitlistPosition != null}
-							<p class="waitlist-banner-sub">Position <strong>#{waitlistPosition}</strong> — we'll email and notify you the moment a spot opens.</p>
+							<p class="waitlist-banner-sub">Position <strong>#{waitlistPosition}</strong>, we'll email and notify you the moment a spot opens.</p>
 						{:else}
 							<p class="waitlist-banner-sub">We'll email and notify you the moment a spot opens.</p>
 						{/if}
@@ -500,7 +500,7 @@
 								<span>Room capacity: <strong>{selectedRoomCapacity}</strong></span>
 							{/if}
 							{#if spotsShortfall > 0}
-								<span class="spots-warn">Your party needs more capacity than this room allows—pick another room or reduce adults.</span>
+								<span class="spots-warn">Your party needs more capacity than this room allows-pick another room or reduce adults.</span>
 							{/if}
 						</div>
 						<form bind:this={claimRoomsFormEl} method="POST" action="?/claimRooms" use:enhance>
@@ -522,7 +522,7 @@
 												<div
 													class="hotel-room-photo-placeholder hotel-room-photo-placeholder--{rtpSlug}"
 													role="img"
-													aria-label="{rtpLabel} — {room.name}, no photo"
+													aria-label="{rtpLabel}, {room.name}, no photo"
 												>
 													<div class="room-placeholder-grid" aria-hidden="true"></div>
 													<div class="room-placeholder-inner">
@@ -590,7 +590,7 @@
 												<div
 													class="hotel-room-photo-placeholder hotel-room-photo-placeholder--{rtpSlug}"
 													role="img"
-													aria-label="{rtpLabel} — {room.name}, no photo"
+													aria-label="{rtpLabel}, {room.name}, no photo"
 												>
 													<div class="room-placeholder-grid" aria-hidden="true"></div>
 													<div class="room-placeholder-inner">
@@ -1236,9 +1236,23 @@
 	.commitment-checkbox.form-group { margin-bottom: 0; }
 	.commitment-label { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; cursor: pointer; font-weight: normal; }
 	.commitment-line-one {
-		display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 0.45rem; width: fit-content;
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: 0.45rem;
+		width: 100%;
+		max-width: 100%;
+		box-sizing: border-box;
 	}
-	.commitment-line-one > span { white-space: nowrap; font-size: 0.9rem; }
+	.commitment-line-one > span {
+		flex: 1 1 12rem;
+		min-width: 0;
+		white-space: normal;
+		font-size: 0.9rem;
+		line-height: 1.45;
+		text-align: left;
+	}
 	.commitment-label .commitment-checkbox-input {
 		flex-shrink: 0; margin: 0; vertical-align: middle;
 		width: 1rem; height: 1rem; min-width: 1rem; min-height: 1rem;

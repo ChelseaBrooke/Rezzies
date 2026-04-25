@@ -9,7 +9,7 @@ export type SpotOpenedEmailData = {
 
 /**
  * Email sent to ALL waitlisted guests when spots open on a trip.
- * It's first come, first served — whoever RSVPs yes first gets in.
+ * It's first come, first served, whoever RSVPs yes first gets in.
  */
 export function renderSpotOpenedHtml(d: SpotOpenedEmailData): string {
 	const guestName = escapeHtml(d.guestName);
@@ -20,7 +20,7 @@ export function renderSpotOpenedHtml(d: SpotOpenedEmailData): string {
 	const body = `
 		<p class="lead">Hi ${guestName},</p>
 		<p class="lead">
-			Good news — ${count === 1 ? 'a spot has' : `${count} spots have`} just opened up on
+			Good news, ${count === 1 ? 'a spot has' : `${count} spots have`} just opened up on
 			<strong>${tripName}</strong>. This is first come, first served, so head over and
 			RSVP yes now if you want in.
 		</p>
@@ -33,7 +33,7 @@ export function renderSpotOpenedHtml(d: SpotOpenedEmailData): string {
 	);
 
 	return renderEmailLayout({
-		preheader: `${count} ${spotWord} opened on "${d.tripName}" — RSVP now before they fill.`,
+		preheader: `${count} ${spotWord} opened on "${d.tripName}", RSVP now before they fill.`,
 		kicker: 'Waitlist update',
 		heading: count === 1 ? 'A spot just opened!' : `${count} spots just opened!`,
 		subheading: tripName,

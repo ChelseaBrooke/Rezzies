@@ -1,16 +1,14 @@
 <script lang="ts">
 	import {
 		getTriviaQuestions,
-		addTriviaQuestion,
-		updateTriviaQuestion,
-		reorderTriviaQuestions,
+		setTriviaQuestions,
 		getTriviaGameHasSubmissions,
 		getTriviaGamePublished,
 		setTriviaGamePublished,
 		submitAllTriviaAnswers,
 		getTriviaAnswersForUser,
+		isTriviaQuestionComplete,
 		type TriviaQuestion,
-		type TriviaOption,
 	} from '$lib/stores/tripGames.js';
 	import GameLeaderboard from './GameLeaderboard.svelte';
 	import type { LeaderboardPlayer } from './GameLeaderboard.svelte';
@@ -31,82 +29,91 @@
 	let published = $state(false);
 	let canEdit   = $state(false);
 
-	// Host: question form
-	let showAddForm    = $state(false);
-	let addForm = $state({ question: '', options: ['', '', ''], correctIndex: 0 });
-	let editStates = $state<Record<string, { question: string; options: string[]; correctIndex: number }>>({});
-	let draggedIndex   = $state<number | null>(null);
+	let draggedIndex = $state<number | null>(null);
+
+	/** While authoring before publish, questions live only in memory until Publish writes storage. */
+	let draftSessionKey = $state('');
 
 	// Guest: pending answers (before submit)
 	let pending = $state<Record<string, number>>({});
 	let submitted = $state(false);
 
-	// Mobile: add-form bottom sheet
-	let showAddSheet = $state(false);
-
-	function refresh() {
-		questions  = getTriviaQuestions(tripId, tripGameId);
-		answers    = getTriviaAnswersForUser(tripId, tripGameId, userId);
-		published  = getTriviaGamePublished(tripId, tripGameId);
-		canEdit    = !getTriviaGameHasSubmissions(tripId, tripGameId);
-
-		// Populate edit states for any new questions
-		const next = { ...editStates };
-		let changed = false;
-		for (const q of questions) {
-			if (!(q.id in next)) {
-				const texts = q.options.map((o) => o.text);
-				next[q.id] = {
-					question: q.question,
-					options: texts.length >= 2 ? texts : [...texts, '', ''].slice(0, 2),
-					correctIndex: Math.max(0, q.options.findIndex((o) => o.correct)),
-				};
-				changed = true;
-			}
-		}
-		if (changed) editStates = next;
+	function emptyQuestion(): TriviaQuestion {
+		return {
+			id: crypto.randomUUID(),
+			question: '',
+			options: [
+				{ text: '', correct: true },
+				{ text: '', correct: false },
+				{ text: '', correct: false },
+			],
+		};
 	}
 
-	$effect(() => {
-		if (typeof window !== 'undefined') refresh();
+	function cloneQuestion(q: TriviaQuestion): TriviaQuestion {
+		return {
+			id: q.id,
+			question: q.question,
+			options: q.options.map((o) => ({ text: o.text, correct: o.correct })),
+		};
+	}
+
+	const isHostDraftAuthoring = $derived(isHostOfGame && canEdit && !published);
+
+	function refresh() {
+		answers = getTriviaAnswersForUser(tripId, tripGameId, userId);
+		published = getTriviaGamePublished(tripId, tripGameId);
+		canEdit = !getTriviaGameHasSubmissions(tripId, tripGameId);
+
+		const sessionKey = `${tripId}:${tripGameId}`;
+
+		if (isHostOfGame && canEdit && !published) {
+			if (draftSessionKey !== sessionKey) {
+				draftSessionKey = sessionKey;
+				const fromStore = getTriviaQuestions(tripId, tripGameId);
+				questions = fromStore.length > 0 ? fromStore.map(cloneQuestion) : [emptyQuestion()];
+			}
+		} else {
+			draftSessionKey = '';
+			questions = getTriviaQuestions(tripId, tripGameId);
+		}
+	}
+
+	$effect.pre(() => {
+		tripId;
+		tripGameId;
+		userId;
+		isHostOfGame;
+		published;
+		refresh();
 	});
 
 	// ── Host actions ──────────────────────────────────────────────────────────
-	function submitAdd() {
-		const opts: TriviaOption[] = addForm.options
-			.map((text, i) => ({ text: text.trim(), correct: i === addForm.correctIndex }))
-			.filter((o) => o.text !== '');
-		if (!addForm.question.trim() || opts.length < 2) return;
-		addTriviaQuestion(tripId, tripGameId, { question: addForm.question.trim(), options: opts });
-		addForm = { question: '', options: ['', '', ''], correctIndex: 0 };
-		showAddForm = false;
-		showAddSheet = false;
-		refresh();
-	}
-
-	function saveEdit(qId: string) {
-		const form = editStates[qId];
-		if (!form) return;
-		const opts: TriviaOption[] = form.options
-			.map((text, i) => ({ text: text.trim(), correct: i === form.correctIndex }))
-			.filter((o) => o.text !== '');
-		if (!form.question.trim() || opts.length < 2) return;
-		updateTriviaQuestion(tripId, tripGameId, qId, { question: form.question.trim(), options: opts });
-		refresh();
+	function addNewQuestion() {
+		if (!isHostDraftAuthoring) return;
+		questions = [...questions, emptyQuestion()];
 	}
 
 	function moveQuestion(fromIdx: number, toIdx: number) {
-		if (!canEdit || fromIdx === toIdx) return;
-		const ids = questions.map((q) => q.id);
-		const [removed] = ids.splice(fromIdx, 1);
-		ids.splice(toIdx, 0, removed);
-		reorderTriviaQuestions(tripId, tripGameId, ids);
-		refresh();
+		if (!isHostDraftAuthoring || fromIdx === toIdx) return;
+		const next = questions.map(cloneQuestion);
+		const [removed] = next.splice(fromIdx, 1);
+		next.splice(toIdx, 0, removed);
+		questions = next;
+	}
+
+	function removeQuestion(qId: string) {
+		if (!isHostDraftAuthoring) return;
+		const next = questions.filter((q) => q.id !== qId);
+		questions = next.length > 0 ? next : [emptyQuestion()];
 	}
 
 	function publishGame() {
-		if (!isHostOfGame || !canEdit || questions.length === 0) return;
+		if (!isHostOfGame || !canEdit || questions.length === 0 || published) return;
+		if (!questions.every(isTriviaQuestionComplete)) return;
+		setTriviaQuestions(tripId, tripGameId, questions.map(cloneQuestion));
 		setTriviaGamePublished(tripId, tripGameId);
+		draftSessionKey = '';
 		refresh();
 	}
 
@@ -144,77 +151,106 @@
 
 	const score = $derived(Object.values(answers).filter((a) => a.correct).length);
 	const hasAnswered = $derived(Object.keys(answers).length > 0);
+
+	const allQuestionsComplete = $derived(questions.every(isTriviaQuestionComplete));
 </script>
 
 <div class="trivia-wrap">
 	{#if isHostOfGame}
 		<!-- ── Host view ──────────────────────────────────────────────── -->
 		<div class="trivia-host">
+			<div class="trivia-hero" aria-hidden="false">
+				<div class="trivia-hero-deco" aria-hidden="true"></div>
+				<p class="trivia-hero-kicker">Crew game</p>
+				<h2 class="trivia-hero-title">Daily Trivia</h2>
+				<p class="trivia-hero-lede">
+					Each line is its own question card. Edit freely, nothing is stored until you <strong>Publish quiz</strong> (then guests can play). Use <strong>Add new question</strong> for another row. Drag ⠿ or ↑ ↓ to reorder; ✕ removes. Finish every card before publishing. Guests answer once; first try counts.
+				</p>
+			</div>
+
 			<div class="trivia-host-header">
-				<span class="game-master-badge">Game Master ✦</span>
+				<span class="game-master-badge">You’re the host ✦</span>
 				{#if published}
-					<span class="trivia-published-pill">Published · guests can play</span>
+					<span class="trivia-published-pill">Live · guests can play</span>
+				{:else if questions.length > 0}
+					<span class="trivia-draft-pill">{questions.length} question{questions.length === 1 ? '' : 's'} · not published yet</span>
 				{/if}
 			</div>
 
 			<div class="trivia-host-body">
 				<!-- Question list -->
 				<div class="trivia-q-list">
-					{#if questions.length === 0}
-						<div class="trivia-empty">
-							<p>No questions yet. Add your first one below.</p>
-						</div>
-					{:else}
-						{#each questions as q, i}
-							{@const isEditing = !!editStates[q.id]}
-							{@const form = editStates[q.id]}
+					{#if isHostDraftAuthoring && questions.length > 1}
+						<p class="trivia-reorder-hint">Reorder: drag the ⠿ handle, or tap ↑ ↓.</p>
+					{/if}
+					{#if questions.length > 0}
+						{#each questions as q, i (q.id)}
 							<div
 								class="trivia-q-row"
 								class:trivia-q-row--dragging={draggedIndex === i}
-								draggable={canEdit}
+								class:trivia-q-row--editable={isHostDraftAuthoring}
+								draggable={isHostDraftAuthoring}
 								role="listitem"
 								ondragstart={(e) => onDragStart(e, i)}
 								ondragover={onDragOver}
 								ondrop={(e) => onDrop(e, i)}
 								ondragend={onDragEnd}
 							>
-								{#if canEdit}
+								{#if isHostDraftAuthoring}
+									<button
+										type="button"
+										class="trivia-q-delete"
+										draggable="false"
+										aria-label="Delete question"
+										onclick={(e) => {
+											e.stopPropagation();
+											removeQuestion(q.id);
+										}}
+									>×</button>
+								{/if}
+								<span class="trivia-q-index" aria-label="Question {i + 1}">{i + 1}</span>
+								{#if isHostDraftAuthoring}
 									<span class="trivia-drag-handle" aria-hidden="true">⠿</span>
+								{:else}
+									<span class="trivia-q-lead-spacer" aria-hidden="true"></span>
 								{/if}
 								<div class="trivia-q-content">
-									{#if isEditing && canEdit && form}
-										<!-- Inline edit -->
+									{#if isHostDraftAuthoring}
 										<textarea
 											class="trivia-q-input"
-											rows="2"
-											bind:value={form.question}
+											rows="4"
+											bind:value={q.question}
 											placeholder="Question text"
 										></textarea>
 										<div class="trivia-opts-edit">
-											{#each form.options as _, j}
+											{#each q.options as opt, j (q.id + '-' + j)}
 												<label class="trivia-opt-row">
 													<input
 														type="radio"
 														name="correct-{q.id}"
-														checked={form.correctIndex === j}
-														onchange={() => { form.correctIndex = j; }}
+														checked={opt.correct}
+														onchange={() => {
+															q.options = q.options.map((o, k) => ({ ...o, correct: k === j }));
+														}}
 													/>
 													<input
 														type="text"
 														class="trivia-opt-input"
 														placeholder="Option {j + 1}"
-														bind:value={form.options[j]}
+														bind:value={q.options[j].text}
 													/>
-													{#if form.options.length > 2}
+													{#if q.options.length > 2}
 														<button
 															type="button"
 															class="trivia-opt-remove"
 															aria-label="Remove option"
 															onclick={() => {
-																form.options = form.options.filter((_, idx) => idx !== j);
-																if (form.correctIndex >= form.options.length)
-																	form.correctIndex = Math.max(0, form.options.length - 1);
-																else if (j < form.correctIndex) form.correctIndex -= 1;
+																const next = q.options.filter((_, idx) => idx !== j);
+																let opts = next;
+																if (!opts.some((o) => o.correct)) {
+																	opts = opts.map((o, k) => ({ ...o, correct: k === 0 }));
+																}
+																q.options = opts;
 															}}
 														>×</button>
 													{/if}
@@ -225,22 +261,27 @@
 											<button
 												type="button"
 												class="trivia-btn trivia-btn-ghost"
-												onclick={() => { form.options = [...form.options, '']; }}
+												onclick={() => {
+													q.options = [...q.options, { text: '', correct: false }];
+												}}
 											>+ Option</button>
-											<button type="button" class="trivia-btn trivia-btn-save" onclick={() => saveEdit(q.id)}>Save</button>
 										</div>
 									{:else}
-										<p class="trivia-q-text">{q.question}</p>
+										{#if q.question.trim()}
+											<p class="trivia-q-text">{q.question}</p>
+										{:else}
+											<p class="trivia-q-text trivia-q-text--placeholder">Question text</p>
+										{/if}
 										<div class="trivia-q-meta">
 											<span class="trivia-q-opts-count">{q.options.length} options</span>
 											<span class="trivia-q-correct">
-												✓ {q.options.find((o) => o.correct)?.text ?? '—'}
+												✓ {(q.options.find((o) => o.correct)?.text ?? '').trim() || '-'}
 											</span>
 										</div>
 									{/if}
 								</div>
 								<!-- Mobile up/down (touch-friendly reorder) -->
-								{#if canEdit}
+								{#if isHostDraftAuthoring}
 									<div class="trivia-reorder-btns">
 										<button
 											type="button"
@@ -257,104 +298,66 @@
 											aria-label="Move question down"
 										>↓</button>
 									</div>
+								{:else}
+									<span class="trivia-reorder-spacer" aria-hidden="true"></span>
 								{/if}
 							</div>
 						{/each}
 					{/if}
 
-					{#if canEdit}
-						<button
-							type="button"
-							class="trivia-add-btn"
-							onclick={() => { showAddForm = true; showAddSheet = true; }}
-						>
-							+ Add question
+					{#if isHostDraftAuthoring}
+						<button type="button" class="trivia-add-btn" onclick={addNewQuestion}>
+							<span class="trivia-add-btn-icon" aria-hidden="true">＋</span>
+							Add new question
 						</button>
 					{/if}
 				</div>
 
-				<!-- Publish -->
-				{#if canEdit && questions.length > 0 && !published}
+				{#if isHostDraftAuthoring && questions.length > 0}
 					<div class="trivia-publish-row">
-						<p class="trivia-publish-warn">Publishing locks the questions. Guests will be able to answer.</p>
-						<button type="button" class="trivia-btn trivia-btn-publish" onclick={publishGame}>
-							Publish →
+						{#if !allQuestionsComplete}
+							<p class="trivia-publish-warn">
+								Finish every question (prompt + two or more answers, one marked correct) before publishing.
+							</p>
+						{:else}
+							<p class="trivia-publish-warn">Publishing locks the questions. Guests will be able to answer.</p>
+						{/if}
+						<button
+							type="button"
+							class="trivia-btn trivia-btn-publish"
+							disabled={!allQuestionsComplete}
+							onclick={publishGame}
+						>
+							Publish quiz →
 						</button>
 					</div>
 				{/if}
 
 				{#if published}
 					<div class="trivia-host-stats">
-						<!-- TODO: wire to API — show per-question guest answer progress -->
-						<p class="trivia-hint">Game is live. Guests can answer now.</p>
+						<p class="trivia-hint">You’re live. Guests use the same Daily Trivia card, remind them to submit once they’ve picked every answer.</p>
+						<GameLeaderboard title="Who’s playing" {players} emptyText="Scores show after guests submit." />
 					</div>
 				{/if}
 			</div>
-
-			<!-- Add-question bottom sheet (mobile) / inline (desktop) -->
-			{#if showAddForm}
-				<div class="sheet-backdrop" role="presentation" onclick={() => { showAddForm = false; showAddSheet = false; }}></div>
-				<div class="add-sheet" role="dialog" aria-modal="true" aria-label="Add question">
-					<div class="add-sheet-handle" aria-hidden="true"></div>
-					<h3 class="add-sheet-title">Add a question</h3>
-					<label class="trivia-label">Question</label>
-					<textarea
-						class="trivia-q-input"
-						rows="2"
-						placeholder="e.g. What's our host's middle name?"
-						bind:value={addForm.question}
-					></textarea>
-					<label class="trivia-label">Answer choices <span class="trivia-label-hint">(mark the correct one)</span></label>
-					<div class="trivia-opts-edit">
-						{#each addForm.options as _, i}
-							<label class="trivia-opt-row">
-								<input
-									type="radio"
-									name="add-correct"
-									checked={addForm.correctIndex === i}
-									onchange={() => { addForm.correctIndex = i; }}
-								/>
-								<input
-									type="text"
-									class="trivia-opt-input"
-									placeholder="Option {i + 1}"
-									bind:value={addForm.options[i]}
-								/>
-								{#if addForm.options.length > 2}
-									<button
-										type="button"
-										class="trivia-opt-remove"
-										aria-label="Remove option"
-										onclick={() => {
-											addForm.options = addForm.options.filter((_, idx) => idx !== i);
-											if (addForm.correctIndex >= addForm.options.length)
-												addForm.correctIndex = Math.max(0, addForm.options.length - 1);
-											else if (i < addForm.correctIndex) addForm.correctIndex -= 1;
-										}}
-									>×</button>
-								{/if}
-							</label>
-						{/each}
-					</div>
-					<button
-						type="button"
-						class="trivia-btn trivia-btn-ghost"
-						onclick={() => { addForm.options = [...addForm.options, '']; }}
-					>+ Add option</button>
-					<div class="add-sheet-footer">
-						<button type="button" class="trivia-btn trivia-btn-publish" onclick={submitAdd}>
-							Save question
-						</button>
-					</div>
-				</div>
-			{/if}
 		</div>
 
 	{:else}
 		<!-- ── Guest view ─────────────────────────────────────────────── -->
+		<div class="trivia-guest">
+			<div class="trivia-hero trivia-hero--guest">
+				<div class="trivia-hero-deco" aria-hidden="true"></div>
+				<p class="trivia-hero-kicker">Crew game</p>
+				<h2 class="trivia-hero-title">Daily Trivia</h2>
+				<p class="trivia-hero-lede">
+					How well do you know this trip? One pass through every question, choose carefully before you submit.
+				</p>
+			</div>
 		{#if !published}
 			<div class="trivia-holding">
-				<p class="trivia-holding-text">The game master is still setting up questions. Check back soon!</p>
+				<span class="trivia-holding-emoji" aria-hidden="true">🧠</span>
+				<p class="trivia-holding-title">Questions are on the way</p>
+				<p class="trivia-holding-text">Your host is still writing the set. Grab a snack and check back in a bit.</p>
 			</div>
 		{:else if hasAnswered}
 			<!-- Results -->
@@ -367,17 +370,24 @@
 					{score === questions.length ? 'Perfect score! 🎉' : score > questions.length / 2 ? 'Nice work!' : 'Better luck next time!'}
 				</p>
 				<div class="trivia-breakdown">
-					{#each questions as q}
+					{#each questions as q, i}
 						{@const ans = answers[q.id]}
 						{@const correct = ans?.correct}
 						{@const chosen = ans !== undefined ? q.options[ans.answerIndex]?.text : null}
 						{@const rightOption = q.options.find((o) => o.correct)?.text}
-						<div class="trivia-breakdown-card" class:trivia-breakdown-card--correct={correct} class:trivia-breakdown-card--wrong={!correct && ans !== undefined}>
-							<p class="tbc-q">{q.question}</p>
-							<p class="tbc-answer tbc-answer--correct">✓ {rightOption}</p>
-							{#if !correct && chosen}
-								<p class="tbc-answer tbc-answer--wrong">✗ You said: {chosen}</p>
-							{/if}
+						<div
+							class="trivia-breakdown-card"
+							class:trivia-breakdown-card--correct={correct}
+							class:trivia-breakdown-card--wrong={!correct && ans !== undefined}
+						>
+							<span class="trivia-q-index" aria-hidden="true">{i + 1}</span>
+							<div class="trivia-breakdown-card-main">
+								<p class="tbc-q">{q.question}</p>
+								<p class="tbc-answer tbc-answer--correct">✓ {rightOption}</p>
+								{#if !correct && chosen}
+									<p class="tbc-answer tbc-answer--wrong">✗ You said: {chosen}</p>
+								{/if}
+							</div>
 						</div>
 					{/each}
 				</div>
@@ -389,7 +399,8 @@
 				<div class="trivia-questions-list">
 					{#each questions as q, i}
 						<div class="trivia-question-card">
-							<p class="tq-num">Question {i + 1} of {questions.length}</p>
+							<span class="trivia-q-index" aria-label="Question {i + 1}">{i + 1}</span>
+							<div class="trivia-question-card-main">
 							<p class="tq-text">{q.question}</p>
 							<div class="tq-options">
 								{#each q.options as opt, j}
@@ -402,6 +413,7 @@
 										{opt.text}
 									</button>
 								{/each}
+							</div>
 							</div>
 						</div>
 					{/each}
@@ -422,13 +434,84 @@
 				</div>
 			</div>
 		{/if}
+		</div>
 	{/if}
 </div>
 
 <style>
 	.trivia-wrap {
-		max-width: 640px;
+		max-width: 720px;
 		min-width: 0;
+		margin: 0 auto;
+		padding: 1.25rem 1rem 2rem;
+		border-radius: 20px;
+		border: 1px solid rgba(47, 119, 120, 0.12);
+		background:
+			radial-gradient(120% 80% at 100% 0%, rgba(206, 86, 18, 0.08) 0%, transparent 55%),
+			radial-gradient(90% 60% at 0% 20%, rgba(122, 206, 211, 0.12) 0%, transparent 50%),
+			linear-gradient(165deg, #fffefb 0%, #f8faf9 45%, #f1f5f4 100%);
+		box-shadow: 0 10px 40px rgba(29, 77, 78, 0.06);
+	}
+
+	.trivia-hero {
+		position: relative;
+		overflow: hidden;
+		border-radius: 16px;
+		padding: 1.35rem 1.25rem 1.5rem;
+		margin-bottom: 1.25rem;
+		background: linear-gradient(125deg, #1d4d4e 0%, #2f7778 42%, #256a6b 100%);
+		color: #fff;
+		box-shadow: 0 8px 28px rgba(29, 77, 78, 0.25);
+	}
+
+	.trivia-hero--guest {
+		margin-bottom: 1.5rem;
+	}
+
+	.trivia-hero-deco {
+		position: absolute;
+		inset: 0;
+		background:
+			radial-gradient(circle at 88% 12%, rgba(247, 170, 41, 0.35) 0%, transparent 38%),
+			radial-gradient(circle at 8% 80%, rgba(122, 206, 211, 0.25) 0%, transparent 35%);
+		pointer-events: none;
+	}
+
+	.trivia-hero-kicker {
+		position: relative;
+		margin: 0 0 0.35rem;
+		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: rgba(255, 255, 255, 0.72);
+	}
+
+	.trivia-hero-title {
+		position: relative;
+		margin: 0 0 0.5rem;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: clamp(1.5rem, 4vw, 1.875rem);
+		font-weight: 800;
+		letter-spacing: -0.03em;
+		line-height: 1.15;
+		text-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+	}
+
+	.trivia-hero-lede {
+		position: relative;
+		margin: 0;
+		max-width: 36rem;
+		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		font-size: 0.9rem;
+		line-height: 1.55;
+		color: rgba(255, 255, 255, 0.88);
+	}
+
+	.trivia-guest {
+		display: flex;
+		flex-direction: column;
 	}
 
 	/* ── Game master badge ── */
@@ -451,6 +534,18 @@
 		padding: 3px 10px;
 		background: rgba(29,158,117,0.1);
 		color: #1D9E75;
+		border-radius: 999px;
+		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		font-size: 0.75rem;
+		font-weight: 600;
+	}
+
+	.trivia-draft-pill {
+		display: inline-flex;
+		align-items: center;
+		padding: 3px 10px;
+		background: rgba(206, 86, 18, 0.12);
+		color: #b45309;
 		border-radius: 999px;
 		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 		font-size: 0.75rem;
@@ -485,19 +580,40 @@
 		gap: 0.5rem;
 	}
 
-	.trivia-empty {
-		padding: 1.25rem;
-		background: #f8fafc;
-		border-radius: 12px;
-		text-align: center;
+	.trivia-reorder-hint {
+		margin: 0 0 0.25rem;
+		padding: 0 0.125rem;
 		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-		font-size: 0.875rem;
+		font-size: 0.78rem;
 		color: #64748b;
+		line-height: 1.4;
 	}
 
-	.trivia-empty p { margin: 0; }
+	.trivia-q-index {
+		flex-shrink: 0;
+		width: 2rem;
+		height: 2rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1rem;
+		font-weight: 800;
+		color: #1d4d4e;
+		background: rgba(47, 119, 120, 0.1);
+		border-radius: 10px;
+		line-height: 1;
+		margin-top: 2px;
+	}
+
+	.trivia-q-lead-spacer {
+		width: 1rem;
+		flex-shrink: 0;
+		pointer-events: none;
+	}
 
 	.trivia-q-row {
+		position: relative;
 		display: flex;
 		align-items: flex-start;
 		gap: 0.5rem;
@@ -510,6 +626,43 @@
 		transition: border-color 0.12s, box-shadow 0.12s;
 	}
 
+	.trivia-q-row--editable {
+		padding-right: 0.75rem;
+	}
+
+	/* Keep ↑ ↓ below the ✕ so both stay usable */
+	.trivia-q-row--editable .trivia-reorder-btns {
+		margin-top: 2.125rem;
+		align-self: flex-end;
+	}
+
+	.trivia-q-delete {
+		position: absolute;
+		top: 0.5rem;
+		right: 0.5rem;
+		z-index: 2;
+		width: 2rem;
+		height: 2rem;
+		padding: 0;
+		border: none;
+		border-radius: 8px;
+		background: #f1f5f9;
+		color: #64748b;
+		font-size: 1.25rem;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-family: system-ui, sans-serif;
+		transition: background 0.12s, color 0.12s;
+	}
+
+	.trivia-q-delete:hover {
+		background: #fee2e2;
+		color: #b91c1c;
+	}
+
 	.trivia-q-row--dragging {
 		opacity: 0.55;
 		cursor: grabbing;
@@ -517,6 +670,13 @@
 
 	.trivia-q-row:not([draggable='true']) {
 		cursor: default;
+	}
+
+	.trivia-reorder-spacer {
+		width: 28px;
+		flex-shrink: 0;
+		pointer-events: none;
+		align-self: stretch;
 	}
 
 	.trivia-drag-handle {
@@ -540,9 +700,13 @@
 		font-size: 0.9375rem;
 		color: #1d4d4e;
 		margin: 0;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	.trivia-q-text--placeholder {
+		color: #94a3b8;
+		font-style: italic;
 	}
 
 	.trivia-q-meta {
@@ -659,8 +823,13 @@
 
 	.trivia-edit-actions {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.5rem;
 		margin-top: 0.25rem;
+	}
+
+	.trivia-q-row-actions {
+		margin-top: 0.375rem;
 	}
 
 	/* ── Buttons ── */
@@ -690,16 +859,6 @@
 		color: #1d4d4e;
 	}
 
-	.trivia-btn-save {
-		background: #2f7778;
-		border-color: #2f7778;
-		color: white;
-	}
-
-	.trivia-btn-save:hover {
-		background: #1d6566;
-	}
-
 	.trivia-btn-publish {
 		background: #2f7778;
 		border-color: #2f7778;
@@ -709,28 +868,54 @@
 		font-size: 1rem;
 	}
 
-	.trivia-btn-publish:hover {
+	.trivia-btn-publish:hover:not(:disabled) {
 		background: #1d6566;
 	}
 
-	/* ── Add button ── */
+	.trivia-btn-publish:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+
+	/* ── Dashed “Add new question” strip ── */
 	.trivia-add-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
 		width: 100%;
-		height: 48px;
-		border: 1.5px dashed #cbd5e1;
-		background: white;
-		border-radius: 12px;
+		min-height: 48px;
+		padding: 0.625rem 1rem;
+		border: 1.5px dashed #94a3b8;
+		background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+		border-radius: 14px;
 		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 		font-size: 0.9375rem;
 		font-weight: 600;
-		color: #2f7778;
+		color: #1d4d4e;
 		cursor: pointer;
-		transition: border-color 0.12s, background 0.12s;
+		transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+		box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
 	}
 
 	.trivia-add-btn:hover {
 		border-color: #2f7778;
-		background: rgba(47,119,120,0.04);
+		background: rgba(47, 119, 120, 0.06);
+		box-shadow: 0 0 0 1px rgba(47, 119, 120, 0.08);
+	}
+
+	.trivia-add-btn-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		border-radius: 10px;
+		background: rgba(47, 119, 120, 0.14);
+		color: #1d4d4e;
+		font-size: 1.05rem;
+		line-height: 1;
+		font-weight: 700;
 	}
 
 	/* ── Publish row ── */
@@ -751,73 +936,6 @@
 		margin: 0;
 	}
 
-	/* ── Add sheet (bottom sheet / modal) ── */
-	.sheet-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0,0,0,0.4);
-		z-index: 200;
-	}
-
-	.add-sheet {
-		position: fixed;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		z-index: 201;
-		background: white;
-		border-radius: 16px 16px 0 0;
-		box-shadow: 0 -4px 24px rgba(0,0,0,0.08);
-		padding: 0 16px 32px;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		max-height: 90vh;
-		overflow-y: auto;
-		animation: sheet-up 0.2s ease-out;
-	}
-
-	@keyframes sheet-up {
-		from { transform: translateY(100%); }
-		to   { transform: translateY(0); }
-	}
-
-	.add-sheet-handle {
-		width: 32px;
-		height: 4px;
-		background: #d1d5db;
-		border-radius: 999px;
-		margin: 10px auto 2px;
-		flex-shrink: 0;
-	}
-
-	.add-sheet-title {
-		font-family: 'Fraunces', Georgia, serif;
-		font-size: 1.125rem;
-		font-weight: 700;
-		color: #1d4d4e;
-		margin: 0;
-	}
-
-	.add-sheet-footer {
-		position: sticky;
-		bottom: 0;
-		padding-top: 0.75rem;
-		background: white;
-	}
-
-	.trivia-label {
-		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: #1d4d4e;
-	}
-
-	.trivia-label-hint {
-		font-weight: 400;
-		color: #64748b;
-	}
-
 	.trivia-hint {
 		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 		font-size: 0.8125rem;
@@ -827,10 +945,29 @@
 
 	/* ── Guest: holding ── */
 	.trivia-holding {
-		background: #f8fafc;
-		border-radius: 14px;
-		padding: 2rem 1.5rem;
+		background: linear-gradient(165deg, #fff 0%, #f1f5f9 100%);
+		border: 1.5px solid #e2e8f0;
+		border-radius: 16px;
+		padding: 2rem 1.5rem 2.25rem;
 		text-align: center;
+		box-shadow: 0 4px 20px rgba(29, 77, 78, 0.05);
+	}
+
+	.trivia-holding-emoji {
+		display: block;
+		font-size: 2.25rem;
+		line-height: 1;
+		margin-bottom: 0.75rem;
+		filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.08));
+	}
+
+	.trivia-holding-title {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: #1d4d4e;
+		margin: 0 0 0.5rem;
+		letter-spacing: -0.02em;
 	}
 
 	.trivia-holding-text {
@@ -838,6 +975,10 @@
 		font-size: 0.9375rem;
 		color: #64748b;
 		margin: 0;
+		line-height: 1.55;
+		max-width: 22rem;
+		margin-left: auto;
+		margin-right: auto;
 	}
 
 	/* ── Guest: answer questions ── */
@@ -850,32 +991,31 @@
 	.trivia-questions-list {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.5rem;
 	}
 
 	.trivia-question-card {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
 		background: white;
 		border: 1.5px solid #e2e8f0;
-		border-radius: 14px;
-		padding: 1.125rem 1.25rem;
+		border-radius: 12px;
+		padding: 0.875rem 1rem;
+		min-width: 0;
+	}
+
+	.trivia-question-card-main {
+		flex: 1;
+		min-width: 0;
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
 	}
 
-	.tq-num {
-		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-		font-size: 0.75rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.07em;
-		color: #94a3b8;
-		margin: 0;
-	}
-
 	.tq-text {
-		font-family: 'Fraunces', Georgia, serif;
-		font-size: 1.0625rem;
+		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		font-size: 0.9375rem;
 		font-weight: 600;
 		color: #1d4d4e;
 		margin: 0;
@@ -973,10 +1113,13 @@
 		align-items: baseline;
 		gap: 0.25rem;
 		justify-content: center;
-		padding: 1.5rem;
-		background: white;
+		padding: 1.5rem 1.25rem;
+		background:
+			radial-gradient(80% 100% at 50% 0%, rgba(122, 206, 211, 0.15) 0%, transparent 55%),
+			linear-gradient(180deg, #fff 0%, #f8fafc 100%);
 		border: 1.5px solid #e2e8f0;
 		border-radius: 16px;
+		box-shadow: 0 6px 24px rgba(29, 77, 78, 0.06);
 	}
 
 	.trivia-score-num {
@@ -1015,6 +1158,15 @@
 		border-radius: 12px;
 		padding: 0.875rem 1rem;
 		display: flex;
+		flex-direction: row;
+		align-items: flex-start;
+		gap: 0.5rem;
+	}
+
+	.trivia-breakdown-card-main {
+		flex: 1;
+		min-width: 0;
+		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
 	}
@@ -1047,34 +1199,13 @@
 	.tbc-answer--wrong   { color: #ef4444; }
 
 	.trivia-host-stats {
-		padding: 0.75rem 1rem;
-		background: #f8fafc;
-		border-radius: 10px;
+		padding: 1rem 1.125rem;
+		background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+		border: 1px solid #e2e8f0;
+		border-radius: 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
 	}
 
-	/* ── Desktop: add sheet becomes a dialog ── */
-	@media (min-width: 640px) {
-		.add-sheet {
-			position: fixed;
-			bottom: auto;
-			left: 50%;
-			top: 50%;
-			transform: translate(-50%, -50%);
-			right: auto;
-			width: 440px;
-			border-radius: 16px;
-			max-height: 80vh;
-			animation: sheet-scale 0.18s ease-out;
-		}
-
-		@keyframes sheet-scale {
-			from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
-			to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-		}
-
-		/* On desktop, hide up/down arrows — drag handles are sufficient */
-		.trivia-reorder-btns {
-			display: none;
-		}
-	}
 </style>

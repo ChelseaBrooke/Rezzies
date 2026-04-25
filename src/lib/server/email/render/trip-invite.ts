@@ -12,7 +12,7 @@ export type TripInviteEmailData = {
 };
 
 /**
- * Divvi trip invite — rendered through the shared coastal email layout.
+ * Divvi trip invite, rendered through the shared coastal email layout.
  */
 export function renderTripInviteHtml(d: TripInviteEmailData): string {
 	const hostName = escapeHtml(d.hostName);

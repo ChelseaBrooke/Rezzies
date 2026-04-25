@@ -228,8 +228,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 			type: 'member',
 			userId: uid,
 			role: member.role,
-			name: member.user?.name ?? '—',
-			email: member.user?.email ?? '—',
+			name: member.user?.name ?? '-',
+			email: member.user?.email ?? '-',
 			avatarUrl: member.user?.avatarUrl,
 			rsvpStatus: status,
 			rsvpUpdatedAt: rsvp?.updatedAt ? rsvp.updatedAt.toISOString() : null,
@@ -265,14 +265,14 @@ export const load: PageServerLoad = async ({ parent }) => {
 
 	const removedRows: RemovedRow[] = removedMembers.map((m) => ({
 		userId: m.user?.id ?? '',
-		name: m.user?.name ?? '—',
-		email: m.user?.email ?? '—',
+		name: m.user?.name ?? '-',
+		email: m.user?.email ?? '-',
 		role: m.role
 	}));
 
 	for (const inv of invites) {
 		unrespondedCount++;
-		const email = inv.recipientEmail ?? inv.recipientPhone ?? '—';
+		const email = inv.recipientEmail ?? inv.recipientPhone ?? '-';
 		const name = inv.recipient?.name ?? email;
 		guestRows.push({
 			type: 'invite',
@@ -335,8 +335,8 @@ export const load: PageServerLoad = async ({ parent }) => {
 		waitlistCount = waitlisted.length;
 		waitlistEntries = waitlisted.map((w) => ({
 			userId: w.userId,
-			name: w.user?.name ?? '—',
-			email: w.user?.email ?? '—',
+			name: w.user?.name ?? '-',
+			email: w.user?.email ?? '-',
 			avatarUrl: w.user?.avatarUrl ?? null,
 			waitlistPosition: w.waitlistPosition,
 			waitlistJoinedAt: w.waitlistJoinedAt?.toISOString() ?? null,

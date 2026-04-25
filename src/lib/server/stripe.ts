@@ -19,7 +19,7 @@ function stripePublishableKey(): string | undefined {
 
 /**
  * Ensures secret + publishable keys are the same mode (test vs live).
- * Mismatched account pairs (two different pk_test from two accounts) are not detectable here —
+ * Mismatched account pairs (two different pk_test from two accounts) are not detectable here -
  * copy both keys from the same place: Stripe Dashboard → Developers → API keys.
  */
 function assertPublishableKeyMatchesSecretMode(): void {
@@ -44,7 +44,7 @@ function assertPublishableKeyMatchesSecretMode(): void {
 	}
 	if (secretTest !== pubTest || secretLive !== pubLive) {
 		throw new Error(
-			'Stripe key mismatch: use sk_test_ with pk_test_, or sk_live_ with pk_live_ — both from the same Stripe account (Developers → API keys).'
+			'Stripe key mismatch: use sk_test_ with pk_test_, or sk_live_ with pk_live_, both from the same Stripe account (Developers → API keys).'
 		);
 	}
 }

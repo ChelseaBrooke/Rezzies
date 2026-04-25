@@ -32,11 +32,9 @@
 		leaderboard: LeaderboardRow[];
 		pastRounds?: PastRoundSummary[];
 		currentUserId: string | null;
-		tripTimezone: string;
 		captionMaxLength: number;
 		eligibleCaptionCount: number;
 		form?: unknown;
-		activeTabId?: string | null;
 	};
 
 	let {
@@ -46,8 +44,7 @@
 		currentUserId = null,
 		captionMaxLength = 120,
 		eligibleCaptionCount = 0,
-		form,
-		activeTabId = null
+		form
 	}: Props = $props();
 
 	// ── Derived state ─────────────────────────────────────────────────────────
@@ -160,7 +157,6 @@
 	>
 		<input type="hidden" name="roundId" value={roundId} />
 		<input type="hidden" name="photoUrl" value={uploadPendingUrl ?? ''} />
-		{#if activeTabId}<input type="hidden" name="activeTab" value={activeTabId} />{/if}
 	</form>
 	<input type="file" accept="image/*" capture="environment" class="ct-hidden-input" aria-hidden="true" tabindex="-1" bind:this={photoCameraInputRef} onchange={handlePhotoFile} />
 	<input type="file" accept="image/*" class="ct-hidden-input" aria-hidden="true" tabindex="-1" bind:this={photoFileInputRef} onchange={handlePhotoFile} />
@@ -259,7 +255,7 @@
 			{:else if submittedCaption}
 				<div class="ct-submitted-confirm">
 					<span class="ct-submitted-icon" aria-hidden="true">✓</span>
-					<p>Your caption is in — voting starts when everyone's ready.</p>
+					<p>Your caption is in, voting starts when everyone's ready.</p>
 					{#if myCaption}
 						<p class="ct-submitted-preview">"{myCaption.text}"</p>
 					{/if}
@@ -280,7 +276,6 @@
 					}}
 				>
 					<input type="hidden" name="roundId" value={roundId} />
-					{#if activeTabId}<input type="hidden" name="activeTab" value={activeTabId} />{/if}
 					<div class="ct-textarea-wrap">
 						<textarea
 							name="text"
@@ -335,7 +330,6 @@
 							>
 								<input type="hidden" name="roundId" value={roundId} />
 								<input type="hidden" name="captionId" value={c.id} />
-								{#if activeTabId}<input type="hidden" name="activeTab" value={activeTabId} />{/if}
 								<button type="submit" class="ct-caption-card ct-caption-card--voteable">
 									<span class="ct-caption-card-text">"{c.text}"</span>
 									<span class="ct-vote-btn-label">Vote</span>
@@ -395,7 +389,6 @@
 						{#if endRoundConfirm}
 							<span class="ct-end-confirm">
 								<form method="POST" action="?/startNextRound">
-									{#if activeTabId}<input type="hidden" name="activeTab" value={activeTabId} />{/if}
 									<button type="submit" class="ct-btn-primary ct-btn-start-next" disabled={startingNext} onclick={() => { startingNext = true; }}>
 										{startingNext ? 'Starting…' : 'Start next round'}
 									</button>
@@ -423,7 +416,6 @@
 						End round now?
 						<form method="POST" action="?/endRoundNow" class="ct-inline-form" use:enhance>
 							<input type="hidden" name="roundId" value={roundId} />
-							{#if activeTabId}<input type="hidden" name="activeTab" value={activeTabId} />{/if}
 							<button type="submit" class="ct-btn-danger">Yes, end it</button>
 						</form>
 						<button type="button" class="ct-btn-ghost" onclick={() => (endRoundConfirm = false)}>Cancel</button>

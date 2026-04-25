@@ -17,7 +17,7 @@ export function renderWaitlistAddedHtml(d: WaitlistAddedEmailData): string {
 	const body = `
 		<p class="lead">Hi ${guestName},</p>
 		<p class="lead">
-			Great news — you're still in the running for <strong>${tripName}</strong>!
+			Great news, you're still in the running for <strong>${tripName}</strong>!
 			The trip is currently full, so we've placed you on the waitlist.
 			If a spot opens up, we'll notify you right away.
 		</p>
@@ -35,7 +35,7 @@ export function renderWaitlistAddedHtml(d: WaitlistAddedEmailData): string {
 		subheading: tripName,
 		body,
 		callout,
-		finePrint: 'Spots are offered on a first-come, first-served basis. When a spot opens you\'ll receive a new email — keep an eye on your inbox.',
+		finePrint: 'Spots are offered on a first-come, first-served basis. When a spot opens you\'ll receive a new email, keep an eye on your inbox.',
 		footerNote: `You received this because you were invited to "${d.tripName}" on Divvi.`
 	});
 }

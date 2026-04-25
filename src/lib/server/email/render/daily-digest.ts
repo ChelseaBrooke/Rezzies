@@ -24,7 +24,7 @@ export function renderDailyDigestHtml(d: DailyDigestEmailData): string {
 							`<tr><td>• ${escapeHtml(e)}</td></tr>`
 					)
 					.join('')
-			: `<tr><td>No events scheduled for today — enjoy some free time.</td></tr>`;
+			: `<tr><td>No events scheduled for today, enjoy some free time.</td></tr>`;
 
 	const digestClass = d.events.length > 0 ? 'digest' : 'digest digest--muted';
 	const body = `
@@ -35,7 +35,7 @@ export function renderDailyDigestHtml(d: DailyDigestEmailData): string {
 	`;
 
 	return renderEmailLayout({
-		preheader: `Today's plan for "${d.tripName}" — ${d.dateLabel}.`,
+		preheader: `Today's plan for "${d.tripName}", ${d.dateLabel}.`,
 		kicker: "Today's plan",
 		heading: dateLabel,
 		subheading: tripName,

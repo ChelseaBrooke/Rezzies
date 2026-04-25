@@ -81,7 +81,7 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	const maxGuestsToStore = maxOccupancy != null && maxOccupancy > 0 ? maxOccupancy : null;
 	const partialStayAllowed = d.partialStayAllowed === true;
 	const costSharingEnabled = d.costSharingEnabled === true;
-	/* Activities, meals, and games are always on — ignore client toggles. */
+	/* Activities, meals, and games are always on, ignore client toggles. */
 	const gamesEnabled = true;
 	const activitiesEnabled = true;
 	const mealsEnabled = true;

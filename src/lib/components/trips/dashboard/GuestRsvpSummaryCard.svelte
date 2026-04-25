@@ -1,8 +1,16 @@
 <script lang="ts">
+	import { roomTypeDisplayLabel } from '$lib/room-type-display.js';
+
 	interface Assignment {
 		room?: { id: number; name: string | null; photoUrls?: string[] } | null;
 		bed?: { id: string; bedType: string | null } | null;
 		partySize?: number;
+	}
+
+	interface TripRoomLookup {
+		id: number;
+		name: string;
+		roomType?: string | null;
 	}
 
 	interface Props {
@@ -13,6 +21,10 @@
 		platformFeePerPerson?: number;
 		tripCheckInDate?: string;
 		costSharingEnabled?: boolean;
+		/** Whole-room pricing: assignments have no bed row; match RSVP completion rules. */
+		isPerRoomPricing?: boolean;
+		/** Fallback room label when `room.name` is empty (same as RSVP page). */
+		tripRooms?: TripRoomLookup[];
 	}
 
 	let {
@@ -22,7 +34,9 @@
 		userReservationPrice,
 		platformFeePerPerson = 0,
 		tripCheckInDate = '',
-		costSharingEnabled = true
+		costSharingEnabled = true,
+		isPerRoomPricing = false,
+		tripRooms = []
 	}: Props = $props();
 
 	const rsvpEditHref = $derived(`/trips/${tripId}/rsvp`);
@@ -37,7 +51,17 @@
 	const hasDeclined = $derived(userRsvp?.status === 'no');
 
 	const primaryAssignment = $derived(myAssignments[0] ?? null);
-	const roomName = $derived(primaryAssignment?.room?.name?.trim() || null);
+	const primaryRoomId = $derived(primaryAssignment?.room?.id ?? null);
+	const roomName = $derived.by(() => {
+		const fromJoin = primaryAssignment?.room?.name?.trim();
+		if (fromJoin) return fromJoin;
+		if (primaryRoomId != null && tripRooms.length > 0) {
+			const row = tripRooms.find((r) => r.id === primaryRoomId);
+			if (row?.name?.trim()) return row.name.trim();
+			if (row) return roomTypeDisplayLabel(row);
+		}
+		return null;
+	});
 	const bedLabel = $derived(primaryAssignment?.bed?.bedType?.trim() || null);
 	const roomPhotoUrl = $derived(
 		myAssignments.find((a) => a.room?.photoUrls && a.room.photoUrls.length > 0)?.room?.photoUrls?.[0] ??
@@ -46,9 +70,10 @@
 
 	const hasRoom = $derived(Boolean(roomName));
 	const hasBed = $derived(Boolean(bedLabel));
+	const placementComplete = $derived(hasBed || isPerRoomPricing);
 
-	/** Confirmed RSVP = going + room + bed (product rule: no “confirmed” without both). */
-	const rsvpFullyComplete = $derived(hasAccepted && hasRoom && hasBed);
+	/** Confirmed: going + room + (bed or whole-room booking). */
+	const rsvpFullyComplete = $derived(hasAccepted && hasRoom && placementComplete);
 
 	const daysUntil = $derived.by(() => {
 		if (!tripCheckInDate) return null;
@@ -65,35 +90,56 @@
 		return peopleCount === 1 ? '1 guest' : `${peopleCount} guests`;
 	});
 
-	/** Going but data missing room/bed — surface as incomplete, not “confirmed”. */
-	const acceptedNeedsRoomBed = $derived(hasAccepted && (!hasRoom || !hasBed));
+	const acceptedNeedsPlacement = $derived(hasAccepted && (!hasRoom || !placementComplete));
 
 	const statusHeadline = $derived.by(() => {
 		if (hasDeclined) return 'You’ve declined this trip';
 		if (rsvpFullyComplete) return 'RSVP confirmed';
-		if (acceptedNeedsRoomBed) return 'Room and bed selection required';
+		if (acceptedNeedsPlacement)
+			return isPerRoomPricing ? 'Room selection required' : 'Room and bed selection required';
 		return 'Finish your RSVP';
 	});
 
 	const statusSubline = $derived.by(() => {
 		if (hasDeclined) return 'You can update your RSVP any time before the trip.';
 		if (rsvpFullyComplete) return 'You’re going';
-		if (acceptedNeedsRoomBed)
-			return 'Choose your room and bed to complete your RSVP.';
-		return 'Let your host know you’re joining, then pick your room and bed.';
+		if (acceptedNeedsPlacement)
+			return isPerRoomPricing
+				? 'Choose one whole room for your party to complete your RSVP.'
+				: 'Choose your room and bed to complete your RSVP.';
+		return isPerRoomPricing
+			? 'Let your host know you’re joining, then pick a whole room for your party.'
+			: 'Let your host know you’re joining, then pick your room and bed.';
 	});
 
 	const roomDisplay = $derived(hasRoom ? roomName! : 'Not selected');
-	const bedDisplay = $derived(hasBed ? bedLabel! : 'Not selected');
+	const bedDisplay = $derived.by(() => {
+		if (hasBed) return bedLabel!;
+		if (isPerRoomPricing && hasRoom) return 'Whole room';
+		return 'Not selected';
+	});
 
-	const incompletePrimaryLabel = $derived(hasAccepted ? 'Choose room & bed' : 'Complete RSVP');
+	const incompletePrimaryLabel = $derived(
+		hasAccepted ? (isPerRoomPricing ? 'Choose your room' : 'Choose room & bed') : 'Complete RSVP'
+	);
+
+	const incompleteFootnote = $derived(
+		isPerRoomPricing
+			? 'Choose a whole room for your party to finish your RSVP. It only takes a minute.'
+			: 'Choose your room and bed to finish your RSVP. It only takes a minute.'
+	);
+
+	const completeFootnote = $derived(
+		isPerRoomPricing
+			? 'Your room is reserved. You’re all set for this trip.'
+			: 'Your room and bed are reserved. You’re all set for this trip.'
+	);
 </script>
 
 <!-- Premium guest RSVP panel (planning dashboard sticky card). -->
 <div class="grsvp">
 	<header class="grsvp-header">
 		<div class="grsvp-header-text">
-			<h2 class="grsvp-title">Your RSVP</h2>
 			<p class="grsvp-statusline">{statusHeadline}</p>
 			<p class="grsvp-subline">{statusSubline}</p>
 		</div>
@@ -147,7 +193,7 @@
 				{:else if rsvpFullyComplete}
 					<p class="grsvp-res-party">
 						<span class="grsvp-res-bed-k">Party size</span>
-						<span class="grsvp-res-bed-v">—</span>
+						<span class="grsvp-res-bed-v">-</span>
 					</p>
 				{:else}
 					<p class="grsvp-res-party">
@@ -161,7 +207,7 @@
 		<!-- Compact detail chips -->
 		<div class="grsvp-chips" aria-label="RSVP details">
 			<span class="grsvp-chip">
-				<span class="grsvp-chip-k">Party</span>{partyLine ?? (rsvpFullyComplete ? '—' : 'Add when you RSVP')}
+				<span class="grsvp-chip-k">Party</span>{partyLine ?? (rsvpFullyComplete ? '-' : 'Add when you RSVP')}
 			</span>
 			<span class="grsvp-chip"><span class="grsvp-chip-k">Room</span>{roomDisplay}</span>
 			<span class="grsvp-chip"><span class="grsvp-chip-k">Bed</span>{bedDisplay}</span>
@@ -187,11 +233,11 @@
 		<!-- Next step / reassurance -->
 		{#if rsvpFullyComplete}
 			<div class="grsvp-footnote grsvp-footnote--ok" role="status">
-				Your room and bed are reserved. You’re all set for this trip.
+				{completeFootnote}
 			</div>
 		{:else}
 			<div class="grsvp-footnote" role="status">
-				Choose your room and bed to finish your RSVP — it only takes a minute.
+				{incompleteFootnote}
 			</div>
 		{/if}
 
@@ -207,13 +253,15 @@
 </div>
 
 <style>
+	/* Light panel to match host Progress card (Fraunces + Plus Jakarta, navy / slate) */
 	.grsvp {
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
 		min-width: 0;
 		flex: 1;
-		color: rgba(255, 255, 255, 0.94);
+		color: var(--navy, #1d4d4e);
+		font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 	}
 
 	.grsvp-header {
@@ -223,21 +271,12 @@
 		align-items: start;
 		gap: 0.35rem 0.5rem;
 		padding-bottom: 0.65rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+		border-bottom: 1px solid rgba(29, 77, 78, 0.12);
 	}
 
 	.grsvp-header-text {
 		grid-column: 1;
 		min-width: 0;
-	}
-
-	.grsvp-title {
-		margin: 0 0 0.2rem;
-		font-size: 0.6875rem;
-		font-weight: 700;
-		letter-spacing: 0.11em;
-		text-transform: uppercase;
-		color: rgba(255, 255, 255, 0.55);
 	}
 
 	.grsvp-statusline {
@@ -247,14 +286,14 @@
 		font-weight: 650;
 		line-height: 1.25;
 		letter-spacing: -0.02em;
-		color: #fff;
+		color: var(--navy, #1d4d4e);
 	}
 
 	.grsvp-subline {
 		margin: 0.35rem 0 0;
 		font-size: 0.8125rem;
 		line-height: 1.45;
-		color: rgba(255, 255, 255, 0.78);
+		color: #64748b;
 		font-weight: 450;
 	}
 
@@ -264,9 +303,9 @@
 		align-self: start;
 		font-size: 0.625rem;
 		font-weight: 600;
-		color: rgba(255, 255, 255, 0.95);
-		background: rgba(255, 255, 255, 0.16);
-		border: 1px solid rgba(255, 255, 255, 0.28);
+		color: var(--slate, #2f7778);
+		background: rgba(47, 119, 120, 0.1);
+		border: 1px solid rgba(47, 119, 120, 0.2);
 		padding: 0.2rem 0.5rem;
 		border-radius: 999px;
 		white-space: nowrap;
@@ -283,9 +322,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: rgba(255, 255, 255, 0.14);
-		border: 1px solid rgba(255, 255, 255, 0.22);
-		color: rgba(186, 240, 220, 0.95);
+		background: rgba(21, 128, 61, 0.1);
+		border: 1px solid rgba(21, 128, 61, 0.22);
+		color: #15803d;
 	}
 
 	.grsvp-confirm-icon svg {
@@ -293,17 +332,15 @@
 		height: 15px;
 	}
 
-	/* Inset reservation module */
 	.grsvp-reservation {
 		display: grid;
 		grid-template-columns: 4.25rem 1fr;
 		gap: 0.75rem;
 		align-items: center;
 		padding: 0.65rem 0.7rem;
-		border-radius: 12px;
-		background: rgba(0, 0, 0, 0.12);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 14px;
+		background: rgba(0, 0, 0, 0.04);
+		border: 1px solid rgba(29, 77, 78, 0.1);
 	}
 
 	.grsvp-res-thumb {
@@ -312,8 +349,8 @@
 		border-radius: 10px;
 		overflow: hidden;
 		flex-shrink: 0;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid rgba(255, 255, 255, 0.12);
+		background: #f1f5f9;
+		border: 1px solid rgba(29, 77, 78, 0.1);
 	}
 
 	.grsvp-res-img {
@@ -329,12 +366,12 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: rgba(255, 255, 255, 0.45);
-		background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+		color: #94a3b8;
+		background: linear-gradient(145deg, #f8fafc, #eef2f7);
 	}
 
 	.grsvp-res-placeholder--dim {
-		color: rgba(255, 255, 255, 0.35);
+		color: #cbd5e1;
 	}
 
 	.grsvp-res-body {
@@ -350,7 +387,7 @@
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
-		color: rgba(255, 255, 255, 0.5);
+		color: rgba(47, 119, 120, 0.65);
 	}
 
 	.grsvp-res-room {
@@ -358,7 +395,7 @@
 		font-size: 0.9375rem;
 		font-weight: 650;
 		line-height: 1.25;
-		color: #fff;
+		color: var(--navy, #1d4d4e);
 	}
 
 	.grsvp-res-bed,
@@ -378,12 +415,12 @@
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
-		color: rgba(255, 255, 255, 0.48);
+		color: #94a3b8;
 		margin-right: 0.15rem;
 	}
 
 	.grsvp-res-bed-v {
-		color: rgba(255, 255, 255, 0.92);
+		color: #334155;
 		font-weight: 500;
 	}
 
@@ -401,16 +438,16 @@
 		border-radius: 999px;
 		font-size: 0.75rem;
 		font-weight: 600;
-		color: rgba(255, 255, 255, 0.92);
-		background: rgba(255, 255, 255, 0.08);
-		border: 1px solid rgba(255, 255, 255, 0.12);
+		color: #334155;
+		background: #f8fafc;
+		border: 1px solid #e2e8f0;
 	}
 
 	.grsvp-estimate {
 		margin: 0;
 		font-size: 0.75rem;
 		line-height: 1.45;
-		color: rgba(255, 255, 255, 0.72);
+		color: #64748b;
 	}
 
 	.grsvp-estimate-k {
@@ -419,14 +456,14 @@
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.07em;
-		color: rgba(255, 255, 255, 0.45);
+		color: rgba(47, 119, 120, 0.65);
 		margin-bottom: 0.1rem;
 	}
 
 	.grsvp-estimate-v {
 		font-size: 1rem;
 		font-weight: 700;
-		color: #fff;
+		color: var(--navy, #1d4d4e);
 		margin-right: 0.35rem;
 	}
 
@@ -434,41 +471,41 @@
 		display: block;
 		margin-top: 0.15rem;
 		font-size: 0.6875rem;
-		color: rgba(255, 255, 255, 0.58);
+		color: #94a3b8;
 	}
 
 	.grsvp-footnote {
 		font-size: 0.8125rem;
 		line-height: 1.45;
-		color: rgba(255, 255, 255, 0.78);
+		color: #475569;
 		padding: 0.5rem 0.65rem;
 		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: #f8fafc;
+		border: 1px solid #e2e8f0;
 	}
 
 	.grsvp-footnote--ok {
-		color: rgba(230, 250, 245, 0.92);
-		background: rgba(122, 206, 211, 0.1);
-		border-color: rgba(122, 206, 211, 0.22);
+		color: #166534;
+		background: rgba(34, 197, 94, 0.08);
+		border-color: rgba(34, 197, 94, 0.25);
 	}
 
 	.grsvp-panel {
 		padding: 0.65rem 0.75rem;
 		border-radius: 12px;
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		background: rgba(0, 0, 0, 0.1);
+		border: 1px solid #e2e8f0;
+		background: #f8fafc;
 	}
 
 	.grsvp-panel--muted {
-		background: rgba(0, 0, 0, 0.08);
+		background: #f1f5f9;
 	}
 
 	.grsvp-panel-copy {
 		margin: 0;
 		font-size: 0.8125rem;
 		line-height: 1.45;
-		color: rgba(255, 255, 255, 0.75);
+		color: #64748b;
 	}
 
 	.grsvp-actions {
@@ -483,19 +520,18 @@
 		align-self: center;
 		font-size: 0.8125rem;
 		font-weight: 600;
-		color: rgba(255, 255, 255, 0.82);
+		color: var(--slate, #2f7778);
 		text-decoration: none;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+		border-bottom: 1px solid rgba(47, 119, 120, 0.35);
 		padding-bottom: 1px;
 		transition: color 0.15s ease, border-color 0.15s ease;
 	}
 
 	.grsvp-secondary-link:hover {
-		color: #fff;
-		border-color: rgba(255, 255, 255, 0.5);
+		color: var(--navy, #1d4d4e);
+		border-color: rgba(29, 77, 78, 0.55);
 	}
 
-	/* CTAs — class names kept for TripDashboardGrid :global(...) overrides on teal card */
 	.cta-btn {
 		display: inline-flex;
 		align-items: center;
@@ -529,13 +565,13 @@
 	}
 
 	.cta-ghost {
-		background: rgba(255, 255, 255, 0.08);
-		color: rgba(255, 255, 255, 0.95);
-		border: 1px solid rgba(255, 255, 255, 0.28);
+		background: rgba(47, 119, 120, 0.07);
+		color: var(--slate, #2f7778);
+		border: 1px solid rgba(47, 119, 120, 0.22);
 	}
 
 	.cta-ghost:hover {
-		background: rgba(255, 255, 255, 0.14);
-		border-color: rgba(255, 255, 255, 0.4);
+		background: rgba(47, 119, 120, 0.12);
+		border-color: rgba(47, 119, 120, 0.35);
 	}
 </style>

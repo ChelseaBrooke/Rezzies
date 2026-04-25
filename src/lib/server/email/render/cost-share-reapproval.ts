@@ -29,7 +29,7 @@ export function renderCostShareReapprovalGuestHtml(d: CostShareReapprovalEmailDa
 	const range = `${formatMoney(d.originalLowCents)} – ${formatMoney(d.originalHighCents)}`;
 	const newShare = formatMoney(d.newShareCents);
 	const reminderLine = d.reminder
-		? '<p class="lead lead--tight"><strong>This is a reminder — your deadline is tomorrow.</strong></p>'
+		? '<p class="lead lead--tight"><strong>This is a reminder, your deadline is tomorrow.</strong></p>'
 		: '';
 
 	const body = `

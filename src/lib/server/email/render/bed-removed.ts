@@ -17,7 +17,7 @@ export function renderBedRemovedHtml(d: BedRemovedEmailData): string {
 	`;
 
 	return renderEmailLayout({
-		preheader: `Action needed — a bed on "${d.tripName}" was removed. Please choose a new one.`,
+		preheader: `Action needed, a bed on "${d.tripName}" was removed. Please choose a new one.`,
 		kicker: 'Action needed',
 		heading: 'Your bed was removed',
 		subheading: tripName,

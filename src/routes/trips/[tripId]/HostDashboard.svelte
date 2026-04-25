@@ -127,7 +127,7 @@
 			? formatTripDateRange(trip.checkInDate, trip.checkOutDate)
 			: trip?.checkInDate
 				? new Date(trip.checkInDate).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
-				: '—'
+				: '-'
 	);
 
 	function initials(name: string | null | undefined): string {

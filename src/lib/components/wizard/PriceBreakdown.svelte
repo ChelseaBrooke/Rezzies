@@ -178,7 +178,7 @@
 		{:else}
 			<div class="breakdown-item">
 				<span class="item-label">Add rooms/beds to see pricing breakdown</span>
-				<span class="item-value">—</span>
+				<span class="item-value">-</span>
 			</div>
 		{/if}
 		

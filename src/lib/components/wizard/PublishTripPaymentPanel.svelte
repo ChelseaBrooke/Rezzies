@@ -247,7 +247,7 @@
 				<p class="sales-eyebrow">Almost there</p>
 				<h1 class="sales-title">Your group trip, finally under control.</h1>
 				<p class="sales-lead">
-					One link to share. Everyone RSVPs, picks a room, votes on the itinerary, and pays their share — all in one place. You stay in charge from the first invite to the last night.
+					One link to share. Everyone RSVPs, picks a room, votes on the itinerary, and pays their share, all in one place. You stay in charge from the first invite to the last night.
 				</p>
 			</header>
 
@@ -297,14 +297,14 @@
 					<span class="perk-icon">💸</span>
 					<div>
 						<p class="perk-title">Fair cost splitting</p>
-						<p class="perk-body">Room costs, shared fees, add-ons — everyone sees exactly what they owe and why.</p>
+						<p class="perk-body">Room costs, shared fees, add-ons, everyone sees exactly what they owe and why.</p>
 					</div>
 				</div>
 			</div>
 
 			<div class="social-proof">
 				<p class="social-proof-text">"Finally, a way to organize a group trip that doesn't end in a group chat meltdown."</p>
-				<p class="social-proof-attr">— A relieved trip host</p>
+				<p class="social-proof-attr">- A relieved trip host</p>
 			</div>
 		</div>
 

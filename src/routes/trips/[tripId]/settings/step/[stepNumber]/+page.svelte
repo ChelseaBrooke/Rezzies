@@ -57,7 +57,7 @@
 	let draft = $state<TripDraft>(tripToDraft(data.trip));
 
 	function autosave() {
-		// No-op for edit mode — save only on explicit Save actions
+		// No-op for edit mode, save only on explicit Save actions
 	}
 
 	function nextStep() {

@@ -116,13 +116,13 @@
 	const insightText = $derived.by((): string => {
 		if (!hasPricingHero || currentCpp == null || expectedCpp == null || fullCpp == null || !data) return '';
 		if (acceptedRsvpCount === 0) {
-			return 'Invite guests to split the trip—every confirmation lowers what each person pays.';
+			return 'Invite guests to split the trip-every confirmation lowers what each person pays.';
 		}
 		const toExpected = Math.max(0, currentCpp - expectedCpp);
 		const toFull = Math.max(0, currentCpp - fullCpp);
 		const gapToExpected = expectedHeadcount - acceptedRsvpCount;
 		if (gapToExpected > 0 && toExpected >= 1) {
-			return `Invite ${gapToExpected} more ${gapToExpected === 1 ? 'guest' : 'guests'} to reach your expected headcount—about ${fmtMoney(toExpected)} less per person vs. today.`;
+			return `Invite ${gapToExpected} more ${gapToExpected === 1 ? 'guest' : 'guests'} to reach your expected headcount-about ${fmtMoney(toExpected)} less per person vs. today.`;
 		}
 		if (acceptedRsvpCount < maxHeadcount && toFull >= 1) {
 			return `Full capacity (${maxHeadcount} guests) lowers cost by about ${fmtMoney(toFull)} per person compared to now.`;
@@ -130,7 +130,7 @@
 		if (acceptedRsvpCount < expectedHeadcount && toExpected > 0) {
 			return `Reach your expected headcount to lower cost by about ${fmtMoney(toExpected)} per person.`;
 		}
-		return 'Great momentum—more confirmations keep the per-person share low.';
+		return 'Great momentum-more confirmations keep the per-person share low.';
 	});
 
 	const setupProgressPct = $derived.by(() => {
@@ -456,7 +456,7 @@
 		border-color: rgba(47, 119, 120, 0.35);
 	}
 
-	/* —— State A: hero band —— */
+	/* -- State A: hero band -- */
 	.cg-hero-band {
 		display: grid;
 		grid-template-columns: 1fr auto 1fr auto 1fr;
@@ -538,7 +538,7 @@
 		margin: 0.25rem 0;
 	}
 
-	/* —— Visualization —— */
+	/* -- Visualization -- */
 	.cg-viz {
 		display: flex;
 		flex-direction: column;
@@ -629,7 +629,7 @@
 		padding: 0 0.25rem;
 	}
 
-	/* —— Insight —— */
+	/* -- Insight -- */
 	.cg-insight {
 		padding: 0.65rem 0.85rem;
 		border-radius: var(--radius-lg, 10px);
@@ -644,7 +644,7 @@
 		line-height: 1.4;
 	}
 
-	/* —— State B fallback —— */
+	/* -- State B fallback -- */
 	.cg-fallback {
 		display: flex;
 		flex-direction: column;
@@ -660,7 +660,7 @@
 		text-align: center;
 	}
 
-	/* Cost-sharing off: copy left, CTAs right — shorter vertically */
+	/* Cost-sharing off: copy left, CTAs right, shorter vertically */
 	.cg-fallback--split {
 		flex-direction: row;
 		align-items: center;
@@ -856,7 +856,7 @@
 		transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
-	/* —— Guest strip —— */
+	/* -- Guest strip -- */
 	.cg-guest-strip {
 		display: flex;
 		flex-direction: row;

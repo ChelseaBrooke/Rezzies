@@ -1,6 +1,6 @@
 // Pricing calculation logic for Divvi
 //
-// Vocabulary note — three representations of "pricing model" exist in this codebase:
+// Vocabulary note, three representations of "pricing model" exist in this codebase:
 //   DB / API form    (this file):             'per_room' | 'per_bed' | 'per_person' | 'per_person_per_night'
 //   Internal/canonical form (pricing-canonical.ts): 'PER_ROOM' | 'PER_BED' | 'PER_PERSON' | 'PER_PERSON_PER_NIGHT'
 //   UI form (PricingStep.svelte):             'per-room' | 'per-bed' | 'per-person'

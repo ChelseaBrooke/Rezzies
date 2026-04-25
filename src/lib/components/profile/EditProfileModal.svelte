@@ -211,7 +211,7 @@
 					<div class="form-group">
 						<label for="edit-travel-style">Travel style</label>
 						<select id="edit-travel-style" bind:value={form.travelStyle}>
-							<option value="">—</option>
+							<option value="">-</option>
 							{#each TRAVEL_STYLE_OPTIONS as opt}
 								<option value={opt}>{opt}</option>
 							{/each}

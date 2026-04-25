@@ -144,7 +144,7 @@
 							class:bingo-cell--filled={hasPhoto}
 							class:bingo-cell--pop={isPopped}
 							role="gridcell"
-							aria-label="{item.label}{hasPhoto ? ' — filled' : ' — tap to add photo'}"
+							aria-label="{item.label}{hasPhoto ? ', filled' : ', tap to add photo'}"
 							onclick={() => openPicker(idx)}
 						>
 							{#if hasPhoto}
@@ -182,7 +182,7 @@
 			{/if}
 		</div>
 
-		<!-- Leaderboard (placeholder — TODO: wire to real multi-user progress) -->
+		<!-- Leaderboard (placeholder, TODO: wire to real multi-user progress) -->
 		<GameLeaderboard
 			title="Who's winning"
 			{players}

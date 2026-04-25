@@ -116,7 +116,7 @@
 					class:alpha-cell--flip={isFlipping}
 					onclick={() => { if (current) openPicker(); }}
 					disabled={!current}
-					aria-label="{letter}{done ? ' — complete' : current ? ' — your current letter' : ' — upcoming'}"
+					aria-label="{letter}{done ? ', complete' : current ? ', your current letter' : ', upcoming'}"
 					aria-current={current ? 'true' : undefined}
 				>
 					{#if done && photos[i]}
@@ -182,7 +182,7 @@
 			<ul class="htp-list">
 				<li>Find real-world things for each letter in order, A → Z.</li>
 				<li>Take a photo or tap "mark done" to advance to the next letter.</li>
-				<li>Spelling counts — the thing must genuinely start with that letter.</li>
+				<li>Spelling counts, the thing must genuinely start with that letter.</li>
 				<li>Whoever gets furthest through the alphabet by trip end wins. All 26 is a full run!</li>
 			</ul>
 		</details>

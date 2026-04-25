@@ -54,7 +54,7 @@
 			return;
 		}
 		try {
-			await navigator.share({ title: 'Join our trip', text: "You're invited — open this link to join.", url: link });
+			await navigator.share({ title: 'Join our trip', text: "You're invited, open this link to join.", url: link });
 		} catch {
 			// user cancel or error
 		}

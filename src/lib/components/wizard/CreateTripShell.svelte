@@ -24,7 +24,7 @@
 		stepperInlineLabel,
 		steps: stepsProp,
 		hideStepperBack = false,
-		/** Hide wizard TopBar (emoji bell/profile) — e.g. trip editor publish */
+		/** Hide wizard TopBar (emoji bell/profile), e.g. trip editor publish */
 		hideTopBar = false,
 		/** Hide step circles; keep only back link when applicable */
 		hideStepIndicators = false
@@ -39,7 +39,7 @@
 		/** When set, replaces the back button with an inline label inside the stepper row */
 		stepperInlineLabel?: string;
 		steps?: Step[];
-		/** When true, stepper header hides Back (e.g. trips/new — footer has Back). */
+		/** When true, stepper header hides Back (e.g. trips/new, footer has Back). */
 		hideStepperBack?: boolean;
 		hideTopBar?: boolean;
 		hideStepIndicators?: boolean;

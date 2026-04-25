@@ -499,7 +499,7 @@
 	/* ════════════════════════════════════
 	   FULL HERO (Planning)
 	   On trip dashboard: first pixel of cover photo sits `--trip-dash-hero-offset` below the top
-	   of `.main-content-inner` (floating mode pill + messages row). margin-top stays 0 — do not
+	   of `.main-content-inner` (floating mode pill + messages row). margin-top stays 0, do not
 	   duplicate that offset here; vacation/recap dashboard roots follow the same rule.
 	   ════════════════════════════════════ */
 	.trip-hero {
@@ -798,7 +798,7 @@
 		color: white;
 	}
 
-	/* ShareButton uses .sh-btn — match .action-btn (My RSVP / Edit trip); chain .quick-actions for specificity over ShareButton.svelte */
+	/* ShareButton uses .sh-btn, match .action-btn (My RSVP / Edit trip); chain .quick-actions for specificity over ShareButton.svelte */
 	.hero-center-actions :global(.quick-actions .sh-btn) {
 		color: white;
 		background: rgba(255, 255, 255, 0.2);

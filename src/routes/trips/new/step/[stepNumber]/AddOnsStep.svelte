@@ -11,7 +11,7 @@
 	let {
 		draft = $bindable(),
 		autosave,
-		/** When false, hide the page title row (e.g. edit trip — stepper already shows the step name). */
+		/** When false, hide the page title row (e.g. edit trip, stepper already shows the step name). */
 	showHeader = true,
 	/** Keep legacy add-on cards in code but hidden by default. */
 	showLegacyAddOns = false
@@ -113,7 +113,7 @@
 	const rooms      = $derived(draft.rooms ?? []);
 	const totalRooms = $derived(rooms.length);
 
-	// Per-person (flat split — min vs max headcount)
+	// Per-person (flat split, min vs max headcount)
 	const ppExpected = $derived(expected > 0 ? total / expected : 0);
 	const ppMax = $derived(maxG > 0 ? total / maxG : 0);
 
@@ -150,7 +150,7 @@
 		const sim = Math.min(expected, totalSpots);
 		const rangeMap = computePerBedRangeByBedId(total, sim, units);
 
-		// Full-capacity table: deterministic — 1 guest per bed, all beds selected
+		// Full-capacity table: deterministic, 1 guest per bed, all beds selected
 		const totalWeight = units.reduce((s, u) => s + u.weight, 0);
 		const fixedPriceById = new Map<string, number>(
 			units.map((u) => [u.bedId, totalWeight > 0 ? total * (u.weight / totalWeight) : 0])
@@ -560,7 +560,7 @@
 														</div>
 													</div>
 												{:else}
-													—
+													-
 												{/if}
 											</td>
 										</tr>
@@ -574,7 +574,7 @@
 													<span class="pt-amount">${roundUsd(perRoomShare)} per room</span>
 													<p class="pt-cost-sub">Trip total ÷ {totalRooms} room{totalRooms === 1 ? '' : 's'} (whole-room RSVP)</p>
 												{:else}
-													—
+													-
 												{/if}
 											</td>
 										</tr>
@@ -641,7 +641,7 @@
 		{/if}
 
 		{#if showLegacyAddOns}
-		<!-- ── Activity-planning (left column, below cost — always included) ──── -->
+		<!-- ── Activity-planning (left column, below cost, always included) ──── -->
 		<div class="addon-card addon-card--compact addon-card--always-on active">
 			<div class="addon-header addon-header--split">
 				<div class="addon-title-group">
@@ -684,7 +684,7 @@
 
 		{#if showLegacyAddOns}
 		<div class="addons-column">
-		<!-- ── Meal-planning (always included — configure mode below) ──── -->
+		<!-- ── Meal-planning (always included, configure mode below) ──── -->
 		<div class="addon-card addon-card--compact addon-card--always-on active">
 			<div class="addon-header addon-header--split">
 				<div class="addon-title-group">
@@ -774,7 +774,7 @@
 			</div>
 		</div>
 
-		<!-- ── Games (always included — all games available to every trip) ──── -->
+		<!-- ── Games (always included, all games available to every trip) ──── -->
 		<!-- fullmock-mock-start: position:relative + overflow so the absolute fullmock layer is contained -->
 		<div class="addon-card addon-card--games addon-card--tall addon-card--fullmock-mock-start addon-card--always-on active">
 			<div class="addon-fullmock-layer addon-fullmock-layer--start" aria-hidden="true">
@@ -1201,7 +1201,7 @@
 		user-select: none;
 	}
 
-	/* Full-card mock layers use position:absolute + inset:0 — need a positioned parent */
+	/* Full-card mock layers use position:absolute + inset:0, need a positioned parent */
 	.addon-card:has(> .addon-fullmock-layer) {
 		position: relative;
 	}
@@ -1493,7 +1493,7 @@
 	}
 
 	.cost-icon { background: rgba(47, 119, 120, 0.12); color: var(--primary); }
-	/* Orange glyph on soft orange tile — matches food / meal-planning */
+	/* Orange glyph on soft orange tile, matches food / meal-planning */
 	.meal-icon {
 		background: rgba(249, 115, 22, 0.14);
 		color: #ea580c;
@@ -1829,7 +1829,7 @@
 		box-shadow: none;
 		border: none;
 		overflow: hidden;
-		/* Stronger than other mocks — reads like a solid receipt */
+		/* Stronger than other mocks, reads like a solid receipt */
 		opacity: 0.98;
 		filter: saturate(0.82);
 		line-height: normal;
@@ -3355,7 +3355,7 @@
 		gap: 0.35rem;
 		flex: 1;
 		min-height: 0;
-		/* Space below cost-sharing toggle / pane top — new trip + trip settings both use this component */
+		/* Space below cost-sharing toggle / pane top, new trip + trip settings both use this component */
 		margin-top: 0.875rem;
 	}
 
@@ -3905,7 +3905,7 @@
 	}
 
 	/* ════════════════════════════════════════════════════════════════
-	 * Cost Sharing — Divvi differentiator redesign
+	 * Cost Sharing, Divvi differentiator redesign
 	 * Hero + receipt visual + branded pricing model picker + value props
 	 * ════════════════════════════════════════════════════════════════ */
 

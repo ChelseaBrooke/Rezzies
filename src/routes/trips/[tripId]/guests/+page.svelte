@@ -279,16 +279,16 @@
 
 	function stateLabel(row: GuestRow): string {
 		const s = row.memberTripState;
-		if (!s) return row.type === 'invite' ? 'Pending' : '—';
+		if (!s) return row.type === 'invite' ? 'Pending' : '-';
 		if (s === 'invited') return 'Invited';
 		if (s === 'accepted') return 'Accepted';
 		if (s === 'rsvp_yes') return 'Going';
 		if (s === 'rsvp_no') return 'Not going';
-		return '—';
+		return '-';
 	}
 
 	function initials(name: string, email: string): string {
-		if (name && name !== '—') {
+		if (name && name !== '-') {
 			const parts = name.trim().split(/\s+/);
 			return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
 		}
@@ -515,14 +515,14 @@
 				[
 					`"${(r.name || '').replace(/"/g, '""')}"`,
 					`"${(r.email || '').replace(/"/g, '""')}"`,
-					r.rsvpStatus ?? '—',
+					r.rsvpStatus ?? '-',
 					r.partySize,
-					r.roomName ?? '—',
-					r.bedType ?? '—',
-					r.arrivalDate ?? '—',
-					r.departureDate ?? '—',
-					r.dietaryRestrictions ?? '—',
-					r.allergies ?? '—'
+					r.roomName ?? '-',
+					r.bedType ?? '-',
+					r.arrivalDate ?? '-',
+					r.departureDate ?? '-',
+					r.dietaryRestrictions ?? '-',
+					r.allergies ?? '-'
 				].join(',')
 			)
 		];
@@ -542,7 +542,7 @@
 	<header class="gp-page-head">
 		<div class="gp-page-head__main">
 			<h1 class="gp-title">Guests</h1>
-			<p class="gp-page-head__lede">Invites and RSVPs by guest list entry — each row is a household or pending invite.</p>
+			<p class="gp-page-head__lede">Invites and RSVPs by guest list entry, each row is a household or pending invite.</p>
 		</div>
 		{#if data.trip?.rsvpByDate}
 			<div class="gp-page-head__meta">
@@ -684,7 +684,7 @@
 					<span class="gp-waitlist-cap">Cap: {data.maxCapacity}</span>
 				{/if}
 			</div>
-			<p class="gp-waitlist-hint">All waitlisted guests are notified simultaneously when a spot opens — first come, first served.</p>
+			<p class="gp-waitlist-hint">All waitlisted guests are notified simultaneously when a spot opens. First come, first served.</p>
 			<div class="gp-waitlist-list" role="list">
 				{#each waitlistEntries as entry, i (entry.userId)}
 					<div class="gp-waitlist-row" role="listitem">
@@ -894,7 +894,7 @@
 												</span>
 												<div class="gp-guest-info">
 													<span class="gp-guest-name">{row.name}</span>
-													{#if row.email && row.email !== '—'}<span class="gp-guest-email">{row.email}</span>{/if}
+													{#if row.email && row.email !== '-'}<span class="gp-guest-email">{row.email}</span>{/if}
 												</div>
 											</button>
 										</ProfileTooltip>
@@ -903,7 +903,7 @@
 											<span class="gp-avatar">{initials(row.name, row.email)}</span>
 											<div class="gp-guest-info">
 												<span class="gp-guest-name">{row.name}</span>
-												{#if row.email && row.email !== '—'}<span class="gp-guest-email">{row.email}</span>{/if}
+												{#if row.email && row.email !== '-'}<span class="gp-guest-email">{row.email}</span>{/if}
 											</div>
 										</div>
 									{/if}
@@ -928,7 +928,7 @@
 								</td>
 								<!-- Party size -->
 								<td class="gp-td gp-td--center">
-									{row.partySize > 0 ? row.partySize : '—'}
+									{row.partySize > 0 ? row.partySize : '-'}
 								</td>
 								<!-- Room/bed -->
 								<td class="gp-td">
@@ -937,7 +937,7 @@
 									{:else if row.type === 'member'}
 										<span class="gp-room-unassigned" title="No room or bed assigned">Unassigned</span>
 									{:else}
-										<span class="gp-muted">—</span>
+										<span class="gp-muted">-</span>
 									{/if}
 								</td>
 								<!-- Amount + Payment status -->
@@ -961,9 +961,9 @@
 											{/if}
 										</div>
 									{:else if row.type === 'member' && row.userId}
-										<span class="gp-payment-badge gp-payment-badge--none">—</span>
+										<span class="gp-payment-badge gp-payment-badge--none">-</span>
 									{:else}
-										<span class="gp-muted">—</span>
+										<span class="gp-muted">-</span>
 									{/if}
 								</td>
 								<!-- Price approved -->
@@ -984,7 +984,7 @@
 											</span>
 										{/if}
 									{:else}
-										<span class="gp-muted">—</span>
+										<span class="gp-muted">-</span>
 									{/if}
 								</td>
 								<!-- Paid (redundant with Amount cell; keep for column header) -->
@@ -1000,13 +1000,13 @@
 											</span>
 										{/if}
 									{:else}
-										<span class="gp-muted">—</span>
+										<span class="gp-muted">-</span>
 									{/if}
 								</td>
 								<!-- Partial stay dates -->
 								{#if data.trip?.allowPartialStays}
-									<td class="gp-td">{row.arrivalDate ?? '—'}</td>
-									<td class="gp-td">{row.departureDate ?? '—'}</td>
+									<td class="gp-td">{row.arrivalDate ?? '-'}</td>
+									<td class="gp-td">{row.departureDate ?? '-'}</td>
 								{/if}
 								<!-- Actions -->
 								{#if data.canManageGuests}
@@ -1098,7 +1098,7 @@
 									<td class="gp-td">{r.name}</td>
 									<td class="gp-td">{r.email}</td>
 									<td class="gp-td">{r.roomName}</td>
-									<td class="gp-td">{r.bedType ? r.bedType.toUpperCase() : '—'}</td>
+									<td class="gp-td">{r.bedType ? r.bedType.toUpperCase() : '-'}</td>
 									<td class="gp-td">{formatDate(r.checkInDate)}</td>
 									<td class="gp-td">{formatDate(r.checkOutDate)}</td>
 									<td class="gp-td">{r.nights}</td>
@@ -1576,7 +1576,9 @@
 		white-space: nowrap;
 		color: var(--muted, #94a3b8);
 	}
-	.gp-hc-meta { margin-top: 0.45rem; }
+	.gp-hc-meta {
+		margin-top: 0.65rem;
+	}
 	.gp-hc-pill {
 		display: inline-flex;
 		align-items: center;

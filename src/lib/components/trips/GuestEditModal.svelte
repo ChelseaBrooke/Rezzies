@@ -95,11 +95,11 @@
 			? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(
 					row.toPayTotal
 				)
-			: '—'
+			: '-'
 	);
 	const reApprovalDeadlineLabel = $derived.by(() => {
 		const raw = row?.reApprovalDeadlineAt;
-		if (!raw) return '—';
+		if (!raw) return '-';
 		const d = new Date(raw);
 		return d.toLocaleString('en-US', {
 			weekday: 'short',

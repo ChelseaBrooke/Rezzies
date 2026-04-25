@@ -23,12 +23,12 @@ export function renderTripFillingUpHtml(d: TripFillingUpEmailData): string {
 	];
 
 	const body = `
-		<p class="lead">Hi ${hostName}, <strong>${tripName}</strong> is ${d.thresholdPercent}% full — spots are going quickly.</p>
+		<p class="lead">Hi ${hostName}, <strong>${tripName}</strong> is ${d.thresholdPercent}% full, spots are going quickly.</p>
 		${metaTable(rows.join(''))}
 	`;
 
 	return renderEmailLayout({
-		preheader: `${d.yesCount} of ${d.maxCapacity} spots taken — "${d.tripName}" is filling up.`,
+		preheader: `${d.yesCount} of ${d.maxCapacity} spots taken, "${d.tripName}" is filling up.`,
 		kicker: 'Trip update',
 		heading: `${tripName} is filling up`,
 		subheading: `${d.yesCount} / ${d.maxCapacity} spots filled`,

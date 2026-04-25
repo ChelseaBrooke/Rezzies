@@ -339,7 +339,7 @@ export const actions: Actions = {
 		await checkAndSetReconfirmRequired(tripId);
 		// Check if the trip just became full and enqueue not-responded guests
 		await checkAndHandleCapacity(tripId).catch(console.error);
-		// Transactional emails (fire-and-forget — errors are logged internally)
+		// Transactional emails (fire-and-forget, errors are logged internally)
 		sendRsvpConfirmedToGuest(tripId, user.id);
 		sendNewRsvpToHost(tripId, user.id);
 		sendTripFillingUpToHost(tripId);

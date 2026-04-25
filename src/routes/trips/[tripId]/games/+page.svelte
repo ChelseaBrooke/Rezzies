@@ -63,11 +63,6 @@
 	const currentUserName = $derived(data.user?.name ?? null);
 	const currentUserInitials = $derived(initials(currentUserName));
 
-	// For Daily Trivia: is the current user the one who "added" (hosts) this game?
-	const isTriviaHost = $derived(
-		!!(activeGame && activeGame.gameId === 'daily-trivia' && activeGame.addedByUserId === userId)
-	);
-
 	// ── Game config map ───────────────────────────────────────────────────────
 	type GameColor = 'teal' | 'coral' | 'purple' | 'amber';
 	const GAME_CONFIG: Record<string, { color: GameColor; icon: string; name: string }> = {
@@ -81,7 +76,7 @@
 		activeGameId ? (GAME_CONFIG[activeGameId] ?? GAME_CONFIG['scavenger-bingo']) : null
 	);
 
-	// ── Activity strip: placeholder — TODO wire to real activity/event API ────
+	// ── Activity strip: placeholder, TODO wire to real activity/event API ────
 	// Currently returns an empty array; swap in real data when endpoint is ready.
 	const activityItems: Array<{ initials: string; name: string; action: string }> = [];
 </script>
@@ -111,11 +106,9 @@
 					leaderboard={data.captionThis?.leaderboard ?? []}
 					pastRounds={data.captionThis?.pastRounds ?? []}
 					currentUserId={data.captionThis?.currentUserId ?? null}
-					tripTimezone={data.captionThis?.tripTimezone ?? 'UTC'}
 					captionMaxLength={data.captionThis?.captionMaxLength ?? 120}
 					eligibleCaptionCount={data.captionThis?.eligibleCaptionCount ?? 0}
 					{form}
-					activeTabId={activeGame.id}
 				/>
 
 			{:else if activeGameId === 'alphabet-hunt'}
@@ -133,7 +126,7 @@
 					{tripId}
 					tripGameId={activeGame.id}
 					{userId}
-					isHostOfGame={isTriviaHost}
+					isHostOfGame={Boolean(data.isHost || data.isCoHost)}
 					{players}
 				/>
 			{/if}

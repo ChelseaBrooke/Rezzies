@@ -386,7 +386,7 @@
 					{@const hours = activityDetailSnapshot.hours_on_date as { open?: string; close?: string }}
 					<div class="activity-detail-row">
 						<span class="activity-detail-label">Hours</span>
-						<span>{hours.open ?? '—'} – {hours.close ?? '—'}</span>
+						<span>{hours.open ?? '-'} – {hours.close ?? '-'}</span>
 					</div>
 				{/if}
 				{#if activityDetailSnapshot.phone}

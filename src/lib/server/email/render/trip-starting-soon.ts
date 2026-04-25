@@ -29,7 +29,7 @@ export function renderTripStartingSoonHtml(d: TripStartingSoonEmailData): string
 	`;
 
 	return renderEmailLayout({
-		preheader: `"${d.tripName}" starts in ${daysLabel} — check the itinerary.`,
+		preheader: `"${d.tripName}" starts in ${daysLabel}, check the itinerary.`,
 		kicker: 'Coming up',
 		heading: `${tripName} starts soon`,
 		subheading: `${daysLabel} to go`,

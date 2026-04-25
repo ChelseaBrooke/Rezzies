@@ -145,7 +145,7 @@
 
 			<div class="crm-actions">
 				<button type="button" class="crm-btn crm-btn--primary crm-btn--block" disabled={busy} onclick={onApprove}>
-					{busy ? 'Saving…' : `I'm in — I'll pay ${formatCents(block.currentShareCents)}`}
+					{busy ? 'Saving…' : `I'm in at ${formatCents(block.currentShareCents)}`}
 				</button>
 				<button
 					type="button"

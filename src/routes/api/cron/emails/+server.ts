@@ -2,7 +2,7 @@
  * Cron endpoint: /api/cron/emails
  *
  * Runs all time-based transactional email jobs in one sweep.
- * Every job is idempotent — already-sent emails are skipped via EmailLog.
+ * Every job is idempotent, already-sent emails are skipped via EmailLog.
  *
  * Protect with CRON_SECRET (same secret as /api/cron/waitlist).
  * Add to vercel.json:

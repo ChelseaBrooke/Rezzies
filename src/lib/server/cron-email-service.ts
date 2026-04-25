@@ -2,16 +2,16 @@
  * Cron Email Service
  *
  * Functions called by scheduled jobs for time-based transactional emails.
- * Each function is idempotent — it checks EmailLog before sending so re-runs
+ * Each function is idempotent, it checks EmailLog before sending so re-runs
  * (e.g. if the cron fires twice) do not produce duplicate emails.
  *
  * Schedule (all times in EST / America/New_York):
- *   sendInvitationReminders     — daily at 10 AM
- *   sendTripStartingSoonEmails  — daily at 10 AM (7 days and 3 days before check-in)
- *   sendDayOfTripEmails         — daily at 7 AM (on check-in day)
- *   sendDailyDigestEmails       — daily at 7 AM (each trip day after day 1)
- *   sendTripRecapEmails         — daily at 7 AM (day after check-out)
- *   sendFeedbackRequestEmails   — daily at 7 AM (7 days after check-out)
+ *   sendInvitationReminders    , daily at 10 AM
+ *   sendTripStartingSoonEmails , daily at 10 AM (7 days and 3 days before check-in)
+ *   sendDayOfTripEmails        , daily at 7 AM (on check-in day)
+ *   sendDailyDigestEmails      , daily at 7 AM (each trip day after day 1)
+ *   sendTripRecapEmails        , daily at 7 AM (day after check-out)
+ *   sendFeedbackRequestEmails  , daily at 7 AM (7 days after check-out)
  */
 
 import { prisma } from './prisma.js';
@@ -258,7 +258,7 @@ export async function sendDayOfTripEmails(): Promise<{ sent: number; skipped: nu
 
 			await sendHtmlEmail({
 				to: member.user.email,
-				subject: `Today's the day — "${trip.name}" starts now`,
+				subject: `Today's the day, "${trip.name}" starts now`,
 				html,
 				templateKey: TEMPLATE_KEYS.DAY_OF_TRIP,
 				tags: [{ name: 'category', value: 'trip-day' }]
@@ -451,7 +451,7 @@ export async function sendCostReapprovalReminderEmails(): Promise<{ sent: number
 }
 
 /**
- * Guests still pending after reApprovalDeadline — notify hosts (email + in-app).
+ * Guests still pending after reApprovalDeadline, notify hosts (email + in-app).
  * TODO: Implement query, send COST_SHARE_REAPPROVAL_HOST_OVERDUE, dedupe, and native push.
  */
 export async function sendCostReapprovalOverdueHostEmails(): Promise<{ sent: number; skipped: number }> {
