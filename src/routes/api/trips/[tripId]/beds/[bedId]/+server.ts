@@ -4,6 +4,8 @@ import { getSessionUser } from '$lib/server/session.js';
 import { isTripHost } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 import { releaseBedClaimsAndNotify } from '$lib/server/bed-claims.js';
+import { effectiveSleepSlots } from '$lib/bed-spot-validation.js';
+import { isPerBedPricingModel } from '$lib/server/per-bed-pricing-validate.js';
 
 export const PATCH: RequestHandler = async ({ request, cookies, params }) => {
 	const user = await getSessionUser(cookies);
@@ -46,6 +48,31 @@ export const DELETE: RequestHandler = async ({ cookies, params }) => {
 		include: { room: true }
 	});
 	if (!bed || bed.room.tripId !== tripId) return json({ error: 'Bed not found' }, { status: 404 });
+
+	const trip = await prisma.trip.findUnique({
+		where: { id: tripId },
+		select: { pricingModel: true, maxGuests: true }
+	});
+	const otherBeds = await prisma.bed.findMany({
+		where: { room: { tripId }, id: { not: bedId } },
+		select: { id: true, bedType: true, capacitySlots: true, capacity: true }
+	});
+	const spotsAfter = otherBeds.reduce((s, b) => s + effectiveSleepSlots(b), 0);
+	const cap = trip?.maxGuests ?? null;
+	if (
+		trip &&
+		isPerBedPricingModel(trip.pricingModel ?? '') &&
+		cap != null &&
+		cap >= 1 &&
+		spotsAfter < cap
+	) {
+		return json(
+			{
+				error: `Removing this bed would leave ${spotsAfter} bed-spot(s), below your max capacity of ${cap}. Add another spot or lower max capacity first.`
+			},
+			{ status: 400 }
+		);
+	}
 
 	await releaseBedClaimsAndNotify(bedId);
 	await prisma.bed.delete({ where: { id: bedId } });

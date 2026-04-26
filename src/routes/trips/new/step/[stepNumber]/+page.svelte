@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { tripDraft } from '$lib/stores/tripDraft.js';
+	import { isPerBedPricingSpotShortfall } from '$lib/trip/per-bed-pricing-guard.js';
 	import Step1 from './Step1.svelte';
 	import AddOnsStep from './AddOnsStep.svelte';
 	import Step4 from './Step4.svelte';
@@ -75,6 +76,7 @@
 	}
 	
 	const canProceed = $derived(checkCanProceed());
+	const pricingStepBlocked = $derived(stepNumber() === 2 && isPerBedPricingSpotShortfall(draft));
 	
 	$effect(() => {
 		const step = stepNumber();
@@ -201,7 +203,7 @@
 				type="button"
 				class="btn-next"
 				onclick={handleNextStep}
-				disabled={!canProceed}
+				disabled={!canProceed || pricingStepBlocked}
 			>
 				Next
 			</button>

@@ -9,6 +9,10 @@ import {
 import { isStripeConfigured, verifyPublishPaymentIntent } from '$lib/server/stripe.js';
 import { capacityFieldsForNewBed } from '$lib/bed-spot-validation.js';
 import { normalizeRoomTypeFromWizard } from '$lib/room-type-display.js';
+import {
+	validatePerBedPricingAgainstHeadcountCeiling,
+	perBedInsufficientMessage
+} from '$lib/server/per-bed-pricing-validate.js';
 
 /** Map draft pricingModel to Prisma enum-style string */
 function mapPricingModel(
@@ -156,6 +160,38 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	/** Only persist a trip-level max when the host entered one; otherwise null (capacity from beds elsewhere). */
 	const maxGuestsToStore =
 		maxOccupancy != null && maxOccupancy > 0 ? maxOccupancy : null;
+
+	const spotCheckPublish = await validatePerBedPricingAgainstHeadcountCeiling({
+		tripId: 'pending',
+		pricingModel,
+		maxGuests: maxGuestsToStore,
+		roomsPayload: rooms as Array<{ beds?: Array<{ bedType?: string; count?: unknown }> }>,
+		usePayloadSpotsOnly: true
+	});
+	if (!spotCheckPublish.ok) {
+		if (spotCheckPublish.kind === 'no_rooms') {
+			return json(
+				{
+					error: "You haven't added any rooms or beds yet. Add your sleeping arrangements before enabling per-bed pricing.",
+					errorCode: 'insufficient_bed_spots',
+					totalBedSpots: 0,
+					maxGuests: spotCheckPublish.maxGuests,
+					shortfall: spotCheckPublish.shortfall
+				},
+				{ status: 400 }
+			);
+		}
+		return json(
+			{
+				error: perBedInsufficientMessage(spotCheckPublish.spots, spotCheckPublish.maxGuests),
+				errorCode: 'insufficient_bed_spots',
+				totalBedSpots: spotCheckPublish.spots,
+				maxGuests: spotCheckPublish.maxGuests,
+				shortfall: spotCheckPublish.shortfall
+			},
+			{ status: 400 }
+		);
+	}
 
 	try {
 		const trip = await prisma.trip.create({

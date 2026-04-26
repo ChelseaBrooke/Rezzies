@@ -144,10 +144,15 @@
 		if (!room) return 0;
 		return roomCapacityForRoom(room);
 	});
+	const perBedPickerRelaxed = $derived(
+		Boolean(data.isPerBedPricing) &&
+			Boolean(data.perBedGuestPickerHolding) &&
+			!isPerRoomPricing
+	);
 	const canSubmit = $derived(
 		isPerRoomPricing
 			? selectedRoomId != null && partySize <= selectedRoomCapacity
-			: spotsSelected >= partySize
+			: perBedPickerRelaxed || spotsSelected >= partySize
 	);
 	const spotsShortfall = $derived(
 		isPerRoomPricing
@@ -182,8 +187,18 @@
 	const costSharingOn = $derived(data.trip?.costSharingEnabled ?? false);
 
 	const guestEstimateFromServer = $derived(data.guestEstimate ?? null);
-	let liveEstimate = $state<{ lowCents: number; highCents: number; hmin: number; hmax: number } | null>(null);
+	let liveEstimate = $state<{
+		lowCents: number;
+		highCents: number;
+		hmin: number;
+		hmax: number;
+		displayCents?: number;
+	} | null>(null);
 	const guestEstimate = $derived(liveEstimate ?? guestEstimateFromServer);
+
+	const estimateHasSpread = $derived(
+		guestEstimate != null && guestEstimate.lowCents !== guestEstimate.highCents
+	);
 
 	$effect(() => {
 		if (!browser) return;
@@ -568,6 +583,35 @@
 								<p class="helper-text">Select a room for your party.</p>
 							{/if}
 						</form>
+					{:else if data.perBedGuestPickerHolding}
+						<div class="per-bed-holding-card hotel-room-card">
+							<div class="hotel-room-body">
+								{#if (data.freeSleepSpotsForGuestPicker ?? 0) === 0}
+									<p class="per-bed-holding-lead">All beds are currently assigned.</p>
+									<p class="per-bed-holding-copy">
+										{data.hostFirstName} is aware. Reach out to them directly if you need to sort out sleeping arrangements.
+									</p>
+								{:else}
+									<p class="per-bed-holding-lead">
+										No beds are available to pick right now that fit your party ({partySize} guest{partySize === 1 ? '' : 's'}).
+									</p>
+									<p class="per-bed-holding-copy">
+										You can complete your RSVP and {data.hostFirstName} will sort out your sleeping arrangement.
+									</p>
+								{/if}
+								{#if data.hostMessagingUserId}
+									<p class="per-bed-holding-chat-wrap">
+										<a href="/messages?with={data.hostMessagingUserId}" class="per-bed-holding-chat">
+											→ Message {data.hostFirstName}
+										</a>
+									</p>
+								{/if}
+								<form method="POST" action="?/claimBeds" use:enhance class="per-bed-holding-form">
+									<input type="hidden" name="partySize" value={adultsCount} />
+									<button type="submit" class="btn btn-secondary">Continue without selecting a bed</button>
+								</form>
+							</div>
+						</div>
 					{:else}
 						<div class="spots-counter">
 							<span>Spots needed: <strong>{partySize}</strong></span>
@@ -645,7 +689,7 @@
 							{/if}
 						</form>
 					{/if}
-					{#if costSharingOn && tripNights > 0 && data.roomPricing && tripTotalCost > 0}
+					{#if costSharingOn && tripNights > 0 && data.roomPricing && tripTotalCost > 0 && !data.perBedGuestPickerHolding}
 						<p class="trip-total-line">
 							<strong>Total Trip Cost:</strong> {formatDollars(tripTotalCost)}
 							<span class="trip-total-note">
@@ -664,23 +708,39 @@
 										<p class="estimate-range">
 											<strong>
 												Your estimated share:{' '}
-												{guestEstimate.displayCents != null
-													? formatCents(guestEstimate.displayCents)
-													: formatRange(guestEstimate.lowCents, guestEstimate.highCents)}
+												{#if estimateHasSpread}
+													{formatRange(guestEstimate.lowCents, guestEstimate.highCents)}
+												{:else if guestEstimate.displayCents != null}
+													{formatCents(guestEstimate.displayCents)}
+												{:else}
+													{formatCents(guestEstimate.lowCents)}
+												{/if}
 											</strong>
 										</p>
-										<p class="estimate-secondary estimate-secondary--muted">Based on current and expected guest count.</p>
+										<p class="estimate-secondary estimate-secondary--muted">
+											{#if estimateHasSpread}
+												{#if guestEstimate.displayCents != null}
+													About {formatCents(guestEstimate.displayCents)} with who has RSVPed so far (inside the range above).
+												{:else}
+													Range uses this trip’s low turnout ({guestEstimate.hmin} guests) through capacity ({guestEstimate.hmax} guests), plus how people may spread across beds.
+												{/if}
+											{:else if guestEstimate.displayCents != null}
+												With who has RSVPed so far. Modeled min/max headcount landed on the same price for this bunk (see note below).
+											{:else}
+												Based on current trip settings and your bunk selection.
+											{/if}
+										</p>
 										<p class="estimate-secondary">
 											{#if data.isPerRoomPricing}
 												Each room pays an equal share of the trip total; your dates prorate that amount.
-											{:else if guestEstimate.displayCents != null}
-												{#if guestEstimate.lowCents === guestEstimate.highCents}
-													{formatRange(guestEstimate.lowCents, guestEstimate.highCents)} for your selection at the modeled headcount range (no low–high spread).
-												{:else}
-													Range {formatRange(guestEstimate.lowCents, guestEstimate.highCents)} depending on final headcount.
-												{/if}
+											{:else if estimateHasSpread}
+												The trip total is split across beds (privacy and bed weights). We model <strong>{guestEstimate.hmin}</strong> guests as a
+												planning low and <strong>{guestEstimate.hmax}</strong> as the capacity ceiling. Usually <strong>more people who actually come
+												means a lower share for you</strong> (toward the bottom of the range); <strong>fewer people can mean a higher share</strong>
+												(toward the top). Final invoices follow who attends and how beds fill in.
 											{:else}
-												Least if {guestEstimate.hmax} people attend (max headcount, capacity limit); most if {guestEstimate.hmin} attend (min headcount, realistic low). Final amount depends on the number of guests.
+												With current trip settings, the modeled min and max headcount both point to the same dollar amount for this bunk (unusual).
+												Final invoices still follow who attends. The host can also change the trip total or lodging before billing.
 											{/if}
 										</p>
 									</div>
@@ -688,7 +748,11 @@
 										<label class="commitment-label">
 											<span class="commitment-line-one">
 												<input type="checkbox" bind:checked={costCommitmentChecked} name="costRangeAcknowledged" value="true" form="yes-confirm-form" class="commitment-checkbox-input" />
-												<span>I understand my share may fall anywhere in this range and agree to pay accordingly.</span>
+												{#if estimateHasSpread}
+													<span>I understand my share may fall anywhere in this range and agree to pay accordingly.</span>
+												{:else}
+													<span>I understand this estimate and agree to pay my share of trip costs.</span>
+												{/if}
 											</span>
 										</label>
 									</div>
@@ -1332,6 +1396,33 @@
 
 	/* ── Room section ────────────────────────────────────────────── */
 	.room-section { border-top: 1px solid #f0ece7; }
+	.per-bed-holding-card {
+		max-width: 32rem;
+		margin-bottom: 0.5rem;
+	}
+	.per-bed-holding-lead {
+		font-weight: 600;
+		margin: 0 0 0.5rem;
+		font-size: 0.95rem;
+	}
+	.per-bed-holding-copy {
+		margin: 0 0 0.65rem;
+		font-size: 0.875rem;
+		line-height: 1.5;
+		color: #44403c;
+	}
+	.per-bed-holding-chat-wrap {
+		margin: 0 0 0.75rem;
+	}
+	.per-bed-holding-chat {
+		font-weight: 600;
+		color: #0d9488;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.per-bed-holding-form {
+		margin-top: 0.25rem;
+	}
 	.room-section-footer { margin-top: 1rem; }
 	.room-pricing-intro { font-size: 0.85rem; }
 

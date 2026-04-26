@@ -318,6 +318,7 @@
 				{userRsvp}
 				{myAssignment}
 				userReservationPrice={data.userReservationPrice ?? null}
+				guestEstimate={data.guestDashboardEstimate ?? null}
 				platformFeePerPerson={trip.platformFeePerPerson ?? 0}
 				{myAssignments}
 				{myDueTotal}

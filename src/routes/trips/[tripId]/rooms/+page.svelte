@@ -4,6 +4,8 @@
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import { normalizeBedType, BED_TYPE_LABELS } from '$lib/bed-types.js';
+	import { effectiveSleepSlots } from '$lib/bed-spot-validation.js';
+	import PerBedHeadcountSpotWarning from '$lib/components/trips/PerBedHeadcountSpotWarning.svelte';
 	import kingBedIconUrl from '$lib/assets/images/beds/king.svg.svg?url';
 	import queenBedIconUrl from '$lib/assets/images/beds/queen.svg.svg?url';
 	import twinBedIconUrl from '$lib/assets/images/beds/twin.svg.svg?url';
@@ -122,6 +124,24 @@
 		roomAssignments.some((a) => a.userId === currentUserId)
 	);
 
+	const totalEffectiveBedSpots = $derived.by(() => {
+		let n = 0;
+		for (const room of rooms) {
+			for (const bed of room.beds ?? []) {
+				n += effectiveSleepSlots(bed);
+			}
+		}
+		return n;
+	});
+
+	const showPerBedHeadcountWarning = $derived(
+		isHost &&
+			(data.trip?.pricingModel ?? '').toLowerCase() === 'per_bed' &&
+			data.trip?.maxGuests != null &&
+			data.trip.maxGuests >= 1 &&
+			totalEffectiveBedSpots < data.trip.maxGuests
+	);
+
 	function canRequestToJoin(slot: { user: { id: string } | null }): boolean {
 		if (!currentUserId) return false;
 		return slot.user != null && slot.user.id !== currentUserId;
@@ -168,6 +188,14 @@
 		{/if}
 		<p class="page-subtitle">See who's in each room and bed. Open spots? Claim a bed or request to share.</p>
 	</div>
+
+	{#if showPerBedHeadcountWarning && data.trip?.maxGuests != null}
+		<PerBedHeadcountSpotWarning
+			totalSpots={totalEffectiveBedSpots}
+			maxHeadcount={data.trip.maxGuests}
+			roomsSettingsHref="/trips/{tripId}/settings/step/1"
+		/>
+	{/if}
 
 	{#if rooms.length === 0}
 		<div class="empty-state">

@@ -6,6 +6,9 @@
 	import AddOnsStep from '../../../../new/step/[stepNumber]/AddOnsStep.svelte';
 	import Step4 from '../../../../new/step/[stepNumber]/Step4.svelte';
 	import type { PageData } from './$types';
+	import PerBedHeadcountSpotWarning from '$lib/components/trips/PerBedHeadcountSpotWarning.svelte';
+	import { isPerBedPricingSpotShortfall } from '$lib/trip/per-bed-pricing-guard.js';
+	import { totalSleepSpotsFromWizardRooms } from '$lib/bed-spot-validation.js';
 
 	let { data }: { data: PageData } = $props();
 
@@ -92,6 +95,15 @@
 	}
 
 	const canProceed = $derived(checkCanProceed());
+
+	const pricingStepBlocked = $derived(stepNumber === 2 && isPerBedPricingSpotShortfall(draft));
+	const perBedWizardSpotCount = $derived(totalSleepSpotsFromWizardRooms(draft.rooms ?? []));
+	const showPerBedHeadcountBanner = $derived(
+		stepNumber === 2 &&
+			(draft.pricingModel ?? '').toLowerCase() === 'per-bed' &&
+			Number(draft.maxOccupancy) >= 1 &&
+			perBedWizardSpotCount < Number(draft.maxOccupancy)
+	);
 
 	$effect(() => {
 		if (stepNumber === 1 && !canProceed) {
@@ -231,7 +243,7 @@
 						type="button"
 						class="btn-save-exit"
 						onclick={handleSave}
-						disabled={isSaving || !canProceed}
+						disabled={isSaving || !canProceed || pricingStepBlocked}
 					>
 						{isSaving ? 'Saving…' : 'Save & exit'}
 					</button>
@@ -239,7 +251,7 @@
 						type="button"
 						class="btn-next"
 						onclick={handleNextStep}
-						disabled={!canProceed}
+						disabled={!canProceed || pricingStepBlocked}
 					>
 						Next
 					</button>

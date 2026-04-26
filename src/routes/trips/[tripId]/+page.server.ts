@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { prisma } from '$lib/server/prisma.js';
 import { calculatePrice } from '$lib/server/pricing.js';
+import { computeGuestEstimateRange } from '$lib/server/guest-estimate.js';
 import { roomTypeDisplayLabel } from '$lib/room-type-display.js';
 
 const assignmentInclude = {
@@ -80,6 +81,19 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 		}
 	}
 
+	// Same headcount-modeled range as RSVP cost commitment (per-bed etc.); live single price alone misses low–high.
+	let guestDashboardEstimate: Awaited<ReturnType<typeof computeGuestEstimateRange>> | null = null;
+	if (!isHost && userRsvp?.status === 'yes') {
+		try {
+			guestDashboardEstimate = await computeGuestEstimateRange(tripId, user.id);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Unknown error';
+			if (message !== 'Guest has not selected a bed yet') {
+				console.warn('[trip dashboard] computeGuestEstimateRange failed:', message);
+			}
+		}
+	}
+
 	return {
 		...parentData,
 		userRsvp,
@@ -87,6 +101,7 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 		roomAssignments,
 		guestRoomAssignments,
 		vacationStayRoomLabel,
-		userReservationPrice
+		userReservationPrice,
+		guestDashboardEstimate
 	};
 };

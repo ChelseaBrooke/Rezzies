@@ -8,6 +8,7 @@
 // delegates PER_BED math here via calculateReservationPrice().
 
 import { prisma } from './prisma.js';
+import { effectiveSleepSlots, type BedLike } from '$lib/bed-spot-validation.js';
 import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from './trip-room-order.js';
 import {
 	perBedLowHighForUnit,
@@ -230,9 +231,13 @@ export function getRoomEffectivePrivacy(beds: { length: number } | unknown[]): n
 	return getEffectivePrivacyFactor(n);
 }
 
-/** Spot count for a bed (PRICING_MATH: capacity in people). */
-export function getSpotCount(bed: { capacitySlots?: number | null; capacity?: number | null }): number {
-	return bed.capacitySlots ?? bed.capacity ?? 1;
+/** Spot count for a bed (PRICING_MATH: capacity in people). Uses bed-type defaults when DB still has 1/1 for bunks, queens, etc. */
+export function getSpotCount(bed: {
+	capacitySlots?: number | null;
+	capacity?: number | null;
+	bedType?: string | null;
+}): number {
+	return effectiveSleepSlots(bed as BedLike);
 }
 
 /** Spot weight = bedTypeWeight × effectiveRoomPrivacy (PRICING_MATH). */
@@ -257,7 +262,12 @@ export function buildPerBedInventoryUnits(
 	trip: {
 		rooms: Array<{
 			id: number;
-			beds: Array<{ id: string; bedType: string; capacitySlots?: number | null; capacity?: number | null }>;
+			beds: Array<{
+				id: string;
+				bedType: string;
+				capacitySlots?: number | null;
+				capacity?: number | null;
+			}>;
 		}>;
 	},
 	bedWeights: BedWeights
@@ -449,7 +459,7 @@ export async function computeRoomPricing(
 			const occMax = Math.max(
 				1,
 				room.maxOccupancy ??
-					room.beds.reduce((s, bed) => s + (bed.capacitySlots ?? bed.capacity ?? 1), 0)
+					room.beds.reduce((s, bed) => s + getSpotCount(bed), 0)
 			);
 			const slotPriceFullStay = share / occMax;
 			return {
@@ -484,7 +494,7 @@ export async function computeRoomPricing(
 
 		for (const bed of room.beds) {
 			const w = getBedWeight(bedWeights, bed.bedType);
-			const slots = bed.capacitySlots || bed.capacity || 1;
+			const slots = getSpotCount(bed);
 			bedWeightSum += w * slots;
 			occMax += slots;
 		}
@@ -652,7 +662,7 @@ export async function getCostAtMaxParticipation(tripId: string): Promise<CostAtM
 	if (!trip || trip.rooms.length === 0) return null;
 
 	const totalSlots = trip.rooms.reduce(
-		(s, r) => s + r.beds.reduce((b, bed) => b + (bed.capacitySlots ?? bed.capacity ?? 1), 0),
+		(s, r) => s + r.beds.reduce((b, bed) => b + getSpotCount(bed), 0),
 		0
 	);
 	const maxHeadcount = Math.max(1, trip.maxGuests ?? totalSlots);
@@ -1054,7 +1064,10 @@ export function perBedSelectionRangeForTripBedIds(
 ): { low: number; high: number } {
 	const units = buildPerBedInventoryUnits(trip, bedWeights);
 	if (units.length === 0 || bedIds.length === 0) return { low: 0, high: 0 };
-	const simCount = Math.min(Math.max(1, expectedGuestCount), units.length);
+	// Must cap by total sleeping spots, not number of beds — otherwise 12 vs 20 guests can clamp to the same
+	// "bed count" and collapse the whole headcount range (e.g. many bunks with 2 spots each).
+	const totalSpots = units.reduce((s, u) => s + u.spotCount, 0);
+	const simCount = Math.min(Math.max(1, expectedGuestCount), Math.max(1, totalSpots));
 	const rangeByBedId = computePerBedRangeByBedId(totalCost, simCount, units);
 	const f = totalTripNights > 0 ? stayNights / totalTripNights : 1;
 	let low = 0;

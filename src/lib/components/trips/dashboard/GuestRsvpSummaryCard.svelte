@@ -13,6 +13,15 @@
 		roomType?: string | null;
 	}
 
+	/** Serialized from server (`computeGuestEstimateRange`); matches RSVP cost-commitment math. */
+	interface GuestEstimateDisplay {
+		lowCents: number;
+		highCents: number;
+		displayCents?: number;
+		hmin: number;
+		hmax: number;
+	}
+
 	interface Props {
 		tripId: string;
 		userRsvp?: { status?: string; adultsCount?: number; kidsCount?: number } | null;
@@ -25,6 +34,8 @@
 		isPerRoomPricing?: boolean;
 		/** Fallback room label when `room.name` is empty (same as RSVP page). */
 		tripRooms?: TripRoomLookup[];
+		/** When present and low≠high, show dollar range like the RSVP page (not only live single price). */
+		guestEstimate?: GuestEstimateDisplay | null;
 	}
 
 	let {
@@ -36,7 +47,8 @@
 		tripCheckInDate = '',
 		costSharingEnabled = true,
 		isPerRoomPricing = false,
-		tripRooms = []
+		tripRooms = [],
+		guestEstimate = null
 	}: Props = $props();
 
 	const rsvpEditHref = $derived(`/trips/${tripId}/rsvp`);
@@ -45,6 +57,26 @@
 	const totalGuestPrice = $derived(
 		userReservationPrice != null ? userReservationPrice + platformFeePerPerson : null
 	);
+
+	function totalWithFeeFromTripCents(cents: number): number {
+		return Math.round((cents / 100 + platformFeePerPerson) * 100) / 100;
+	}
+
+	const hasEstimateRange = $derived(
+		Boolean(
+			guestEstimate &&
+				Number.isFinite(guestEstimate.lowCents) &&
+				Number.isFinite(guestEstimate.highCents) &&
+				guestEstimate.lowCents !== guestEstimate.highCents
+		)
+	);
+
+	const estimateRangeLabel = $derived.by(() => {
+		if (!guestEstimate || !hasEstimateRange) return null;
+		const lo = totalWithFeeFromTripCents(guestEstimate.lowCents);
+		const hi = totalWithFeeFromTripCents(guestEstimate.highCents);
+		return `$${lo.toFixed(2)} – $${hi.toFixed(2)}`;
+	});
 
 	const peopleCount = $derived((userRsvp?.adultsCount ?? 0) + (userRsvp?.kidsCount ?? 0));
 	const hasAccepted = $derived(userRsvp?.status === 'yes');
@@ -215,9 +247,21 @@
 
 		{#if costSharingEnabled && totalGuestPrice != null && rsvpFullyComplete}
 			<p class="grsvp-estimate">
-				<span class="grsvp-estimate-k">Current estimate</span>
-				<span class="grsvp-estimate-v">${totalGuestPrice.toFixed(2)}</span>
-				{#if platformFeePerPerson > 0}
+				<span class="grsvp-estimate-k">{hasEstimateRange ? 'Estimated share (range)' : 'Current estimate'}</span>
+				<span class="grsvp-estimate-v">
+					{#if hasEstimateRange && estimateRangeLabel}
+						{estimateRangeLabel}
+					{:else}
+						${totalGuestPrice.toFixed(2)}
+					{/if}
+				</span>
+				{#if hasEstimateRange && guestEstimate}
+					<span class="grsvp-estimate-note">
+						About ${totalGuestPrice.toFixed(2)} with today's RSVPs (trip share plus any Divvi fee). More guests
+						toward capacity ({guestEstimate.hmax}) usually lowers your share; fewer toward the planning low
+						({guestEstimate.hmin}) can raise it.
+					</span>
+				{:else if platformFeePerPerson > 0}
 					<span class="grsvp-estimate-note">
 						Includes ${platformFeePerPerson.toFixed(2)} Divvi fee
 						{#if userReservationPrice != null}

@@ -98,6 +98,14 @@
 		isPerRoomPricing?: boolean;
 		/** Guest RSVP card: room rows for label fallback when `room.name` is empty. */
 		tripRooms?: Array<{ id: number; name: string; roomType?: string | null }>;
+		/** Guest RSVP card: modeled low–high trip share (same source as RSVP cost commitment). */
+		guestEstimate?: {
+			lowCents: number;
+			highCents: number;
+			displayCents?: number;
+			hmin: number;
+			hmax: number;
+		} | null;
 		/** Host only: cost when all spots fill (incentive to drive RSVPs) */
 	costAtMaxParticipation?: CostAtMaxParticipation | null;
 	/** Whether cost-sharing features are enabled for this trip */
@@ -157,6 +165,7 @@
 		tripCheckInDate = '',
 		isPerRoomPricing = false,
 		tripRooms = [],
+		guestEstimate = null,
 		costAtMaxParticipation = null,
 	costSharingEnabled = true,
 	expectedPeopleCount = null,
@@ -361,6 +370,7 @@
 						{costSharingEnabled}
 						{isPerRoomPricing}
 						tripRooms={tripRooms}
+						{guestEstimate}
 					/>
 					</DashboardCard>
 				{/if}

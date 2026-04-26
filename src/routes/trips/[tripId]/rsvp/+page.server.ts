@@ -4,7 +4,13 @@ import { getSessionUser } from '$lib/server/session.js';
 import { isTripMember } from '$lib/server/trip-access.js';
 import { prisma } from '$lib/server/prisma.js';
 import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
-import { totalSpotsForBeds, hasEnoughSpots, isPrismaUniqueConflict } from '$lib/bed-spot-validation.js';
+import {
+	totalSpotsForBeds,
+	hasEnoughSpots,
+	isPrismaUniqueConflict,
+	effectiveSleepSlots
+} from '$lib/bed-spot-validation.js';
+import { firstNameFromUserName } from '$lib/server/household-claim.js';
 import {
 	computeGuestEstimateRange,
 	computeGuestEstimateWithOverrides,
@@ -41,10 +47,15 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		where: { id: tripId },
 		include: {
 			mealPlan: true,
+			members: {
+				where: { role: 'host', inviteStatus: 'approved' },
+				take: 1,
+				include: { user: { select: { id: true, name: true } } }
+			},
 			rooms: {
 				orderBy: TRIP_ROOMS_ORDER_BY,
 				include: {
-					beds: { where: { isAvailable: true }, orderBy: ROOM_BEDS_ORDER_BY },
+					beds: { orderBy: ROOM_BEDS_ORDER_BY },
 					roomAssignments: true
 				}
 			},
@@ -97,6 +108,26 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	);
 	const selectedActivities = trip.activities.filter((a) => a.participants.length > 0);
 
+	const isPerBedPricingLoad = (trip.pricingModel ?? '').toLowerCase() === 'per_bed';
+	const allBedsForTrip = trip.rooms.flatMap((r) => r.beds ?? []);
+	let freeSleepSpotsForGuestPicker = 0;
+	for (const bed of allBedsForTrip) {
+		if (bed.isAvailable === false) continue;
+		if (claimedBedIdsByOther.has(bed.id)) continue;
+		freeSleepSpotsForGuestPicker += effectiveSleepSlots(bed);
+	}
+	const partySizeForBedPicker = Math.max(1, currentRsvp?.adultsCount ?? 1);
+	const hasHostAssignedBeds = myAssignmentIds.size > 0;
+	const perBedGuestPickerHolding =
+		isPerBedPricingLoad &&
+		!isPerRoomPricing &&
+		!hasHostAssignedBeds &&
+		freeSleepSpotsForGuestPicker < partySizeForBedPicker;
+	const hostMember = trip.members[0];
+	const hostMessagingUserId = hostMember?.user?.id ?? null;
+	const hostFirstName =
+		firstNameFromUserName(hostMember?.user?.name ?? null) || 'the host';
+
 	// Cost commitment: estimate range only when already YES (per-bed may be null until a bed is picked)
 	let guestEstimate: Awaited<ReturnType<typeof computeGuestEstimateRange>> | null = null;
 	let guestEstimateError: string | null = null;
@@ -106,9 +137,7 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Unknown error';
 			guestEstimateError = message;
-			if (message !== 'Guest has not selected a bed yet') {
-				console.warn('[RSVP] computeGuestEstimateRange failed:', message);
-			}
+			console.warn('[RSVP] computeGuestEstimateRange failed:', message);
 		}
 	}
 	const reconfirmPolicy = parseReconfirmPolicy(null);
@@ -152,6 +181,11 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 		currentRsvp,
 		currentProfile,
 		isPerRoomPricing,
+		isPerBedPricing: isPerBedPricingLoad,
+		freeSleepSpotsForGuestPicker,
+		perBedGuestPickerHolding,
+		hostMessagingUserId,
+		hostFirstName,
 		myClaimedBedIds: Array.from(myAssignmentIds),
 		claimedBedIdsByOther: Array.from(claimedBedIdsByOther),
 		myClaimedRoomIds,
@@ -343,6 +377,18 @@ export const actions: Actions = {
 		sendRsvpConfirmedToGuest(tripId, user.id);
 		sendNewRsvpToHost(tripId, user.id);
 		sendTripFillingUpToHost(tripId);
+		const tripModel = await prisma.trip.findUnique({
+			where: { id: tripId },
+			select: { pricingModel: true }
+		});
+		if ((tripModel?.pricingModel ?? '').toLowerCase() === 'per_bed') {
+			const bedAssignCount = await prisma.roomAssignment.count({
+				where: { tripId, userId: user.id, bedId: { not: null } }
+			});
+			if (bedAssignCount === 0) {
+				// TODO: notify host — guest completed RSVP Yes without a bed assignment (e.g. no open spots for their party).
+			}
+		}
 		return { success: true };
 	}
 
@@ -584,7 +630,10 @@ export const actions: Actions = {
 			include: {
 				rooms: {
 					orderBy: TRIP_ROOMS_ORDER_BY,
-					include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } }
+					include: {
+						beds: { orderBy: ROOM_BEDS_ORDER_BY },
+						roomAssignments: true
+					}
 				}
 			}
 		});
@@ -593,6 +642,41 @@ export const actions: Actions = {
 			return fail(400, {
 				claimBedsError: 'This trip prices by whole room. Select a room above instead of individual beds.'
 			});
+		}
+
+		const allAssignmentsForClaim = trip.rooms.flatMap((r) => r.roomAssignments);
+		const claimedBedIdsByOtherForClaim = new Set(
+			allAssignmentsForClaim
+				.filter((a) => a.userId !== user.id && a.bedId)
+				.map((a) => a.bedId as string)
+		);
+		let freeSleepSpotsForClaim = 0;
+		for (const b of trip.rooms.flatMap((r) => r.beds)) {
+			if (b.isAvailable === false) continue;
+			if (claimedBedIdsByOtherForClaim.has(b.id)) continue;
+			freeSleepSpotsForClaim += effectiveSleepSlots(b);
+		}
+		const allowEmptyBedSelection =
+			(trip.pricingModel ?? '').toLowerCase() === 'per_bed' && freeSleepSpotsForClaim < partySize;
+
+		if (bedIds.length === 0) {
+			if (!allowEmptyBedSelection) {
+				return fail(400, { claimBedsError: 'Select at least one bed.' });
+			}
+			try {
+				await prisma.$transaction(async (tx) => {
+					await tx.roomAssignment.deleteMany({ where: { tripId, userId: user.id } });
+				});
+			} catch (e: unknown) {
+				if (isPrismaUniqueConflict(e)) {
+					return fail(409, { bedClaimConflict: true, claimBedsError: 'That bed was just claimed. Pick another.' });
+				}
+				throw e;
+			}
+			const { createInvoiceForUser } = await import('$lib/server/invoice-calculator.js');
+			await createInvoiceForUser(tripId, user.id).catch(() => {});
+			await checkAndSetReconfirmRequired(tripId);
+			return { claimBedsSuccess: true };
 		}
 
 		const allBeds = trip.rooms.flatMap((r) => r.beds);

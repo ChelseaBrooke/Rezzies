@@ -23,12 +23,56 @@ export function sleepSlotsDefaultForBedType(bedType: string | null | undefined):
 		t === 'cal_king' ||
 		t === 'bunk' ||
 		t === 'full' ||
+		t === 'sofa' ||
 		t === 'sofa_bed' ||
 		t === 'futon'
 	) {
 		return 2;
 	}
 	return 1;
+}
+
+/** Wizard / API payload room list: sum (count × default slots per bed type) for each bed line. */
+export function totalSleepSpotsFromWizardRooms(
+	rooms: Array<{ beds?: Array<{ bedType?: string; count?: unknown }> }> | null | undefined
+): number {
+	if (!rooms?.length) return 0;
+	let n = 0;
+	for (const room of rooms) {
+		for (const bed of room.beds ?? []) {
+			const countRaw = bed.count;
+			const c =
+				typeof countRaw === 'number' && Number.isFinite(countRaw) && countRaw > 0
+					? Math.floor(countRaw)
+					: typeof countRaw === 'string' && countRaw.trim() !== ''
+						? Math.max(1, parseInt(countRaw, 10) || 1)
+						: 1;
+			const slots = sleepSlotsDefaultForBedType(bed.bedType);
+			n += c * slots;
+		}
+	}
+	return n;
+}
+
+/** Sum effective sleep spots for persisted bed rows (same rule as RSVP). */
+export function sumEffectiveSleepSpotsForBedRows(
+	beds: Array<{
+		id?: string;
+		bedType?: string | null;
+		capacitySlots?: number | null;
+		capacity?: number | null;
+	}>
+): number {
+	let n = 0;
+	for (const b of beds) {
+		n += effectiveSleepSlots({
+			id: b.id ?? '',
+			bedType: b.bedType,
+			capacitySlots: b.capacitySlots,
+			capacity: b.capacity
+		});
+	}
+	return n;
 }
 
 /**

@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
 	totalSpotsForBeds,
 	hasEnoughSpots,
-	isPrismaUniqueConflict
+	isPrismaUniqueConflict,
+	totalSleepSpotsFromWizardRooms
 } from './bed-spot-validation.js';
 
 describe('totalSpotsForBeds', () => {
@@ -41,6 +42,24 @@ describe('totalSpotsForBeds', () => {
 	it('returns 0 for empty bedIds', () => {
 		const map = new Map([['b1', { id: 'b1', capacitySlots: 2 }]]);
 		expect(totalSpotsForBeds(map, [])).toBe(0);
+	});
+});
+
+describe('totalSleepSpotsFromWizardRooms', () => {
+	it('sums count × default slots per bed type', () => {
+		const rooms = [
+			{
+				beds: [
+					{ bedType: 'queen', count: 1 },
+					{ bedType: 'twin', count: 2 }
+				]
+			}
+		];
+		expect(totalSleepSpotsFromWizardRooms(rooms)).toBe(2 + 2);
+	});
+
+	it('treats sofa as 2 slots (matches publish defaults)', () => {
+		expect(totalSleepSpotsFromWizardRooms([{ beds: [{ bedType: 'sofa', count: 1 }] }])).toBe(2);
 	});
 });
 

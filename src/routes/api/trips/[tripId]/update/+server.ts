@@ -7,6 +7,10 @@ import { prisma } from '$lib/server/prisma.js';
 import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
 import { capacityFieldsForNewBed } from '$lib/bed-spot-validation.js';
 import { normalizeRoomTypeFromWizard } from '$lib/room-type-display.js';
+import {
+	validatePerBedPricingAgainstHeadcountCeiling,
+	perBedInsufficientMessage
+} from '$lib/server/per-bed-pricing-validate.js';
 
 function mapPricingModel(
 	model: string
@@ -125,6 +129,64 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	}
 	if (maxOccupancy == null || maxOccupancy < 1) {
 		return json({ error: 'Maximum headcount (capacity limit) is required' }, { status: 400 });
+	}
+
+	const existingTripForPerBedCheck = await prisma.trip.findUnique({
+		where: { id: tripId },
+		include: {
+			rooms: {
+				orderBy: TRIP_ROOMS_ORDER_BY,
+				include: {
+					beds: {
+						orderBy: ROOM_BEDS_ORDER_BY,
+						select: { id: true, bedType: true }
+					}
+				}
+			}
+		}
+	});
+	const existingRoomSignaturePre = (existingTripForPerBedCheck?.rooms ?? [])
+		.map((r) => `${r.name}:${r.beds.map((b) => b.bedType).sort().join(',')}`)
+		.sort()
+		.join('|');
+	const incomingRoomSignaturePre = rooms
+		.map(
+			(r: { name?: string; beds?: Array<{ bedType?: string }> }) =>
+				`${r.name ?? ''}:${(r.beds ?? []).map((b: { bedType?: string }) => b.bedType ?? 'other').sort().join(',')}`
+		)
+		.sort()
+		.join('|');
+	const structureWillChangePre = existingRoomSignaturePre !== incomingRoomSignaturePre;
+	const spotCheck = await validatePerBedPricingAgainstHeadcountCeiling({
+		tripId,
+		pricingModel,
+		maxGuests: maxGuestsToStore,
+		roomsPayload: rooms as Array<{ beds?: Array<{ bedType?: string; count?: unknown }> }>,
+		usePayloadSpotsOnly: structureWillChangePre
+	});
+	if (!spotCheck.ok) {
+		if (spotCheck.kind === 'no_rooms') {
+			return json(
+				{
+					error: "You haven't added any rooms or beds yet. Add your sleeping arrangements before enabling per-bed pricing.",
+					errorCode: 'insufficient_bed_spots',
+					totalBedSpots: 0,
+					maxGuests: spotCheck.maxGuests,
+					shortfall: spotCheck.shortfall
+				},
+				{ status: 400 }
+			);
+		}
+		return json(
+			{
+				error: perBedInsufficientMessage(spotCheck.spots, spotCheck.maxGuests),
+				errorCode: 'insufficient_bed_spots',
+				totalBedSpots: spotCheck.spots,
+				maxGuests: spotCheck.maxGuests,
+				shortfall: spotCheck.shortfall
+			},
+			{ status: 400 }
+		);
 	}
 
 	try {

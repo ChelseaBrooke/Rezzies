@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TripDraft } from '$lib/stores/tripDraft.js';
 	import { getDefaultMealsConfig, effectiveMaxForDraft } from '$lib/stores/tripDraft.js';
+	import { perBedSpotShortfallDetails } from '$lib/trip/per-bed-pricing-guard.js';
 	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
 	import { SCAVENGER_BINGO_ITEMS } from '$lib/games/scavengerBingoItems.js';
 	import divviLogo from '$lib/assets/images/divvi logo.png';
@@ -14,12 +15,15 @@
 		/** When false, hide the page title row (e.g. edit trip, stepper already shows the step name). */
 	showHeader = true,
 	/** Keep legacy add-on cards in code but hidden by default. */
-	showLegacyAddOns = false
+	showLegacyAddOns = false,
+	/** Host link for “add beds” (e.g. `/trips/{id}/rooms` or `/trips/new/step/1`). */
+	roomsListingsHref = null as string | null | undefined
 	}: {
 		draft: TripDraft;
 		autosave: () => void;
 		showHeader?: boolean;
 		showLegacyAddOns?: boolean;
+		roomsListingsHref?: string | null;
 	} = $props();
 
 	let bedBreakdownModalOpen = $state(false);
@@ -112,6 +116,8 @@
 	const total      = $derived(parseFloat(String(draft.totalTripCost)) || 0);
 	const rooms      = $derived(draft.rooms ?? []);
 	const totalRooms = $derived(rooms.length);
+
+	const perBedSpotShortfall = $derived(perBedSpotShortfallDetails(draft));
 
 	// Per-person (flat split, min vs max headcount)
 	const ppExpected = $derived(expected > 0 ? total / expected : 0);
@@ -452,6 +458,23 @@
 										</div>
 									</td>
 								</tr>
+								{#if perBedSpotShortfall}
+									<tr class="pt-row pt-row--per-bed-warn" aria-live="polite">
+										<td colspan="3" class="pt-per-bed-warn-cell">
+											<p class="pt-per-bed-warn-text">
+												<strong>⚠️</strong> You have {perBedSpotShortfall.spots} bed-spot{perBedSpotShortfall.spots === 1 ? '' : 's'}
+												defined but a max capacity of {perBedSpotShortfall.cap}. Every guest needs a bed to pick. Add{' '}
+												{perBedSpotShortfall.shortfall} more spot{perBedSpotShortfall.shortfall === 1 ? '' : 's'} before enabling
+												per-bed pricing.
+											</p>
+											{#if roomsListingsHref}
+												<p class="pt-per-bed-warn-link-wrap">
+													<a href={roomsListingsHref} class="pt-per-bed-warn-link">→ Go to Rooms & Beds</a>
+												</p>
+											{/if}
+										</td>
+									</tr>
+								{/if}
 							</tbody>
 						</table>
 					</div>
@@ -599,6 +622,23 @@
 												</div>
 											</td>
 										</tr>
+										{#if perBedSpotShortfall}
+											<tr class="pt-row pt-row--per-bed-warn" aria-live="polite">
+												<td colspan="3" class="pt-per-bed-warn-cell">
+													<p class="pt-per-bed-warn-text">
+														<strong>⚠️</strong> You have {perBedSpotShortfall.spots} bed-spot{perBedSpotShortfall.spots === 1 ? '' : 's'}
+														defined but a max capacity of {perBedSpotShortfall.cap}. Every guest needs a bed to pick. Add{' '}
+														{perBedSpotShortfall.shortfall} more spot{perBedSpotShortfall.shortfall === 1 ? '' : 's'} before enabling
+														per-bed pricing.
+													</p>
+													{#if roomsListingsHref}
+														<p class="pt-per-bed-warn-link-wrap">
+															<a href={roomsListingsHref} class="pt-per-bed-warn-link">→ Go to Rooms & Beds</a>
+														</p>
+													{/if}
+												</td>
+											</tr>
+										{/if}
 									</tbody>
 								</table>
 							</div>
@@ -3436,6 +3476,38 @@
 	.pt-row:hover { background: rgba(30,58,138,0.04); }
 
 	.pt-row.pt-selected { background: rgba(30,58,138,0.07); }
+
+	.pt-row--per-bed-warn {
+		cursor: default;
+	}
+	.pt-row--per-bed-warn:hover {
+		background: transparent;
+	}
+	.pt-per-bed-warn-cell {
+		padding-top: 0.35rem !important;
+		padding-bottom: 0.85rem !important;
+		border-top: none;
+	}
+	.pt-per-bed-warn-text {
+		margin: 0;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: #422006;
+		line-height: 1.45;
+	}
+	.pt-per-bed-warn-link-wrap {
+		margin: 0.4rem 0 0;
+	}
+	.pt-per-bed-warn-link {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: #0d9488;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+	.pt-per-bed-warn-link:hover {
+		color: #0f766e;
+	}
 
 	.pt-radio {
 		vertical-align: middle;
