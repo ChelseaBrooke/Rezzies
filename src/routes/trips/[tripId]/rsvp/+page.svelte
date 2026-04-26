@@ -730,19 +730,16 @@
 												Based on current trip settings and your bunk selection.
 											{/if}
 										</p>
-										<p class="estimate-secondary">
-											{#if data.isPerRoomPricing}
+										{#if data.isPerRoomPricing}
+											<p class="estimate-secondary">
 												Each room pays an equal share of the trip total; your dates prorate that amount.
-											{:else if estimateHasSpread}
-												The trip total is split across beds (privacy and bed weights). We model <strong>{guestEstimate.hmin}</strong> guests as a
-												planning low and <strong>{guestEstimate.hmax}</strong> as the capacity ceiling. Usually <strong>more people who actually come
-												means a lower share for you</strong> (toward the bottom of the range); <strong>fewer people can mean a higher share</strong>
-												(toward the top). Final invoices follow who attends and how beds fill in.
-											{:else}
+											</p>
+										{:else if !estimateHasSpread}
+											<p class="estimate-secondary">
 												With current trip settings, the modeled min and max headcount both point to the same dollar amount for this bunk (unusual).
 												Final invoices still follow who attends. The host can also change the trip total or lodging before billing.
-											{/if}
-										</p>
+											</p>
+										{/if}
 									</div>
 									<div class="form-group commitment-checkbox">
 										<label class="commitment-label">
