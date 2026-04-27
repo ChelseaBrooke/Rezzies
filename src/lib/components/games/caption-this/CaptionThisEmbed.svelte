@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { enhance } from '$app/forms';
+	import { page } from '$app/stores';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 
 	type PastRoundSummary = {
@@ -47,6 +48,18 @@
 		form
 	}: Props = $props();
 
+	/**
+	 * SvelteKit named actions use `?/actionName` in the query, which *replaces* the entire search string
+	 * if written as a bare `?/submitPhoto`. We must re-append the current `?game=` and any other params
+	 * (e.g. on `/trips/.../games?game=caption-this`) or the post lands on `/games` and the user loses
+	 * the inline game view. See: https://github.com/sveltejs/kit/issues/7137
+	 */
+	const formAction = $derived.by(() => {
+		const rest = $page.url.searchParams.toString();
+		return (name: 'submitPhoto' | 'submitCaption' | 'submitVote' | 'removePhoto' | 'startNextRound' | 'endRoundNow') =>
+			rest ? `?/${name}&${rest}` : `?/${name}`;
+	});
+
 	// ── Derived state ─────────────────────────────────────────────────────────
 	const phase = $derived(round?.phase ?? null);
 	const roundId = $derived(round?.id ?? '');
@@ -66,6 +79,14 @@
 		myVoteCaptionId == null
 	);
 
+	const voteCount = $derived(round?.votes?.length ?? 0);
+	const canRemovePhoto = $derived(
+		isPhotoSubmitter &&
+			(phase === 'CAPTION_SUBMISSION' || phase === 'VOTING') &&
+			voteCount === 0 &&
+			(photoUrl ?? null) != null
+	);
+
 	const sortedCaptions = $derived(
 		[...captions].sort((a, b) => (b.voteCount ?? 0) - (a.voteCount ?? 0))
 	);
@@ -79,7 +100,8 @@
 	// ── UI state ──────────────────────────────────────────────────────────────
 	let captionText   = $state('');
 	let captionSubmitting = $state(false);
-	let endRoundConfirm = $state(false);
+	/** "End round early" (caption / voting) — separate from starting the next round so state does not cross flows */
+	let endRoundEarlyConfirm = $state(false);
 	let startingNext  = $state(false);
 	let selectedPastId = $state<string | null>(null);
 	let uploadPendingUrl = $state<string | null>(null);
@@ -124,6 +146,12 @@
 		return () => clearInterval(t);
 	});
 
+	$effect(() => {
+		if (phase !== 'CAPTION_SUBMISSION' && phase !== 'VOTING') {
+			endRoundEarlyConfirm = false;
+		}
+	});
+
 	// ── Photo upload helpers ──────────────────────────────────────────────────
 	function handlePhotoFile(e: Event) {
 		const input = e.target as HTMLInputElement;
@@ -150,7 +178,7 @@
 	<!-- Hidden photo upload form -->
 	<form
 		method="POST"
-		action="?/submitPhoto"
+		action={formAction('submitPhoto')}
 		bind:this={photoFormRef}
 		onsubmit={() => { uploading = false; uploadPendingUrl = null; }}
 		class="ct-hidden-form"
@@ -158,8 +186,17 @@
 		<input type="hidden" name="roundId" value={roundId} />
 		<input type="hidden" name="photoUrl" value={uploadPendingUrl ?? ''} />
 	</form>
-	<input type="file" accept="image/*" capture="environment" class="ct-hidden-input" aria-hidden="true" tabindex="-1" bind:this={photoCameraInputRef} onchange={handlePhotoFile} />
-	<input type="file" accept="image/*" class="ct-hidden-input" aria-hidden="true" tabindex="-1" bind:this={photoFileInputRef} onchange={handlePhotoFile} />
+	<input
+		type="file"
+		accept="image/*"
+		capture="environment"
+		class="ct-hidden-input"
+		aria-hidden="true"
+		tabindex="-1"
+		bind:this={photoCameraInputRef}
+		onchange={handlePhotoFile}
+	/>
+	<!-- gallery input also bound inside upload label in waiting state; ref set there -->
 
 	{#if actionError}
 		<div class="ct-error-toast" role="alert">{actionError}</div>
@@ -212,58 +249,171 @@
 		</div>
 
 	{:else}
+		<!-- ── Hero (phase vibes) ── -->
+		{@const phaseKey = isWaitingForPhoto
+			? 'waiting'
+			: isCaptionPhase
+				? 'captions'
+				: isVotingPhase
+					? 'voting'
+					: isResultsPhase
+						? 'results'
+						: 'idle'}
+		<header class="ct-hero" data-phase={phaseKey}>
+			<div class="ct-hero__burst" aria-hidden="true"></div>
+			<div class="ct-hero__inner">
+				<p class="ct-hero__eyebrow">Caption This</p>
+				<h2 class="ct-hero__title">
+					{#if phaseKey === 'waiting'}
+						Set the scene
+					{:else if phaseKey === 'captions'}
+						Roast the photo in one line
+					{:else if phaseKey === 'voting'}
+						Pick the line that slayed
+					{:else if phaseKey === 'results'}
+						We have a winner
+					{:else}
+						Let’s play
+					{/if}
+				</h2>
+				<p class="ct-hero__sub">
+					{#if phaseKey === 'waiting' && currentUserId}
+						Upload a picture to get going—anyone in the trip can. Everyone will caption it anonymously, then the group votes.
+					{:else if phaseKey === 'waiting'}
+						Sign in to play. The group is waiting for someone to start by posting a picture.
+					{:else if phaseKey === 'captions' && !isPhotoSubmitter}
+						No names, no stress—just the funniest line you can write.
+					{:else if phaseKey === 'captions'}
+						You’re on camera duty this round. Everyone else is writing.
+					{:else if phaseKey === 'voting'}
+						One vote. Make it count. (You can’t vote for your own line.)
+					{:else if phaseKey === 'results'}
+						Bragging rights, sealed. Ready for another round?
+					{:else}
+						Group captions, secret ballots, one champion.
+					{/if}
+				</p>
+			</div>
+		</header>
+
 		<!-- ── Current round ── -->
 
 		<!-- SUB-STATE A: Waiting for photo -->
 		{#if isWaitingForPhoto}
-			{#if isPhotoSubmitter}
+			{#if currentUserId}
 				<div class="ct-section">
-					<p class="ct-section-label">It's your turn to post a photo</p>
-					<div class="ct-upload-zone" role="group">
-						<span class="ct-upload-icon" aria-hidden="true">📷</span>
-						<p class="ct-upload-heading">Post a photo to start the round</p>
-						<div class="ct-upload-btns">
-							<button type="button" class="ct-upload-btn ct-upload-btn--primary" disabled={uploading} onclick={() => photoCameraInputRef?.click()}>
-								{uploading ? 'Uploading…' : '📷 Take a photo'}
+					<p class="ct-section-label"><span class="ct-section-pill">Round opener</span></p>
+					<div class="ct-upload-outer">
+						<!-- Entire zone is a label; tap anywhere to open image picker (same as "From library") -->
+						<label
+							class="ct-upload-zone"
+							class:ct-upload-zone--loading={uploading}
+							aria-busy={uploading}
+						>
+							<input
+								type="file"
+								accept="image/*"
+								class="ct-upload-file-overlay"
+								bind:this={photoFileInputRef}
+								onchange={handlePhotoFile}
+								disabled={uploading}
+								aria-label="Add a picture to start the round. Tap or click anywhere in this area."
+							/>
+							<div class="ct-upload-overlay-stack">
+								<div class="ct-upload-sparkles" aria-hidden="true">
+									<span>✨</span><span>💬</span><span>🎬</span>
+								</div>
+								<span class="ct-upload-icon" aria-hidden="true">📷</span>
+								<p class="ct-upload-heading">Drop the photo that starts the chaos</p>
+								<p class="ct-upload-lede">
+									Tap or click this whole box to add a picture—then the group will caption it blind. Anyone in the trip can be
+									first.
+								</p>
+							</div>
+						</label>
+						<div class="ct-upload-btns" role="group" aria-label="Or pick a source">
+							<button
+								type="button"
+								class="ct-upload-btn ct-upload-btn--primary"
+								disabled={uploading}
+								onclick={() => photoCameraInputRef?.click()}
+							>
+								{uploading ? 'Uploading…' : 'Take a photo'}
 							</button>
-							<button type="button" class="ct-upload-btn ct-upload-btn--ghost" disabled={uploading} onclick={() => photoFileInputRef?.click()}>
-								🖼 Choose from gallery
+							<button
+								type="button"
+								class="ct-upload-btn ct-upload-btn--ghost"
+								disabled={uploading}
+								onclick={() => photoFileInputRef?.click()}
+							>
+								From library
 							</button>
 						</div>
 					</div>
 				</div>
 			{:else}
 				<div class="ct-holding-card">
-					<span class="ct-holding-icon" aria-hidden="true">⏳</span>
-					<p class="ct-holding-text">Waiting for someone to post a photo to start the round…</p>
+					<div class="ct-holding-illus" aria-hidden="true">🎞️</div>
+					<p class="ct-holding-kicker">Sign in to play</p>
+					<p class="ct-holding-text">Caption This is for trip guests. Sign in, then you or someone else can post a picture to start a round.</p>
 				</div>
 			{/if}
 
 		<!-- SUB-STATE B: Caption submission -->
 		{:else if isCaptionPhase}
 			{#if photoUrl}
-				<div class="ct-photo-block">
-					<img class="ct-round-photo" src={photoUrl} alt="Round photo" />
+				<div class="ct-photo-theatre">
+					<div class="ct-photo-polaroid">
+						<div class="ct-photo-block">
+							<img class="ct-round-photo" src={photoUrl} alt="Round photo" />
+						</div>
+						<span class="ct-photo-tape ct-photo-tape--left" aria-hidden="true"></span>
+						<span class="ct-photo-tape ct-photo-tape--right" aria-hidden="true"></span>
+					</div>
 				</div>
+				{#if canRemovePhoto}
+					<div class="ct-remove-photo-wrap">
+						<form
+							method="POST"
+							action={formAction('removePhoto')}
+							class="ct-inline-form"
+							use:enhance={() => async ({ result, update }) => {
+								await update();
+								if (result.type === 'success' || result.type === 'redirect') await invalidateAll();
+							}}
+						>
+							<input type="hidden" name="roundId" value={roundId} />
+							<button type="submit" class="ct-btn-ghost ct-remove-photo-btn" title="Clears the photo and all captions. Not available after anyone votes.">
+								Remove photo
+							</button>
+						</form>
+						<p class="ct-remove-hint">You can take this back until the first vote. This resets the round.</p>
+					</div>
+				{/if}
 			{/if}
 
 			{#if isPhotoSubmitter}
 				<div class="ct-poster-waiting">
-					<p class="ct-poster-waiting-text">You posted this photo. Waiting for everyone to submit captions…</p>
-					<span class="ct-captions-count">{captions.length} caption{captions.length !== 1 ? 's' : ''} in so far</span>
+					<div class="ct-poster-waiting-ico" aria-hidden="true">🍿</div>
+					<div class="ct-poster-waiting-body">
+						<p class="ct-poster-waiting-text">You’re the photog this round. Grab popcorn while the crew writes.</p>
+						<span class="ct-captions-count">{captions.length} caption{captions.length !== 1 ? 's' : ''} in so far</span>
+					</div>
 				</div>
 			{:else if submittedCaption}
 				<div class="ct-submitted-confirm">
+					<div class="ct-submitted-burst" aria-hidden="true">✨</div>
 					<span class="ct-submitted-icon" aria-hidden="true">✓</span>
-					<p>Your caption is in, voting starts when everyone's ready.</p>
+					<p class="ct-submitted-hed">You’re in the mix</p>
+					<p class="ct-submitted-sub">When everyone’s done, the vote opens. No peeking.</p>
 					{#if myCaption}
-						<p class="ct-submitted-preview">"{myCaption.text}"</p>
+						<blockquote class="ct-submitted-preview">“{myCaption.text}”</blockquote>
 					{/if}
 				</div>
 			{:else}
 				<form
 					method="POST"
-					action="?/submitCaption"
+					action={formAction('submitCaption')}
 					class="ct-caption-form"
 					use:enhance={() => async ({ result, update }) => {
 						captionSubmitting = true;
@@ -276,26 +426,29 @@
 					}}
 				>
 					<input type="hidden" name="roundId" value={roundId} />
-					<div class="ct-textarea-wrap">
-						<textarea
-							name="text"
-							class="ct-caption-input"
-							placeholder="Write your caption…"
-							maxlength={captionMaxLength}
-							rows="2"
-							bind:value={captionText}
-							disabled={captionSubmitting}
-						></textarea>
-						<span class="ct-char-count" class:ct-char-count--warn={captionText.length > captionMaxLength * 0.85}>
-							{captionText.length} / {captionMaxLength}
-						</span>
+					<p class="ct-caption-form-label"><span class="ct-section-pill">Your line</span></p>
+					<div class="ct-bubble-wrap">
+						<div class="ct-textarea-wrap">
+							<textarea
+								name="text"
+								class="ct-caption-input"
+								placeholder="The punchline, the roast, the chaos…"
+								maxlength={captionMaxLength}
+								rows="3"
+								bind:value={captionText}
+								disabled={captionSubmitting}
+							></textarea>
+							<span class="ct-char-count" class:ct-char-count--warn={captionText.length > captionMaxLength * 0.85}>
+								{captionText.length} / {captionMaxLength}
+							</span>
+						</div>
 					</div>
 					<button
 						type="submit"
 						class="ct-submit-btn"
 						disabled={!captionText.trim() || captionSubmitting}
 					>
-						{captionSubmitting ? 'Submitting…' : 'Submit caption →'}
+						{captionSubmitting ? 'Sending…' : 'Lock it in — submit caption'}
 					</button>
 				</form>
 			{/if}
@@ -303,17 +456,53 @@
 		<!-- SUB-STATE C: Voting -->
 		{:else if isVotingPhase}
 			{#if photoUrl}
-				<div class="ct-photo-block">
-					<img class="ct-round-photo" src={photoUrl} alt="Round photo" />
+				<div class="ct-photo-theatre">
+					<div class="ct-photo-polaroid">
+						<div class="ct-photo-block">
+							<img class="ct-round-photo" src={photoUrl} alt="Round photo" />
+						</div>
+						<span class="ct-photo-tape ct-photo-tape--left" aria-hidden="true"></span>
+						<span class="ct-photo-tape ct-photo-tape--right" aria-hidden="true"></span>
+					</div>
 				</div>
+				{#if canRemovePhoto}
+					<div class="ct-remove-photo-wrap">
+						<form
+							method="POST"
+							action={formAction('removePhoto')}
+							class="ct-inline-form"
+							use:enhance={() => async ({ result, update }) => {
+								await update();
+								if (result.type === 'success' || result.type === 'redirect') await invalidateAll();
+							}}
+						>
+							<input type="hidden" name="roundId" value={roundId} />
+							<button type="submit" class="ct-btn-ghost ct-remove-photo-btn" title="Clears the photo and all captions. Not available after anyone votes.">
+								Remove photo
+							</button>
+						</form>
+						<p class="ct-remove-hint">You can take this back until the first vote. This resets the round.</p>
+					</div>
+				{/if}
 			{/if}
 
 			<div class="ct-voting-section">
-				<p class="ct-section-label">
-					{#if myVoteCaptionId}Your vote is in!{:else}Vote for the funniest caption{/if}
+				<p class="ct-vote-hed">
+					{#if myVoteCaptionId}
+						<span class="ct-section-pill ct-section-pill--done">Ballot in</span>
+					{:else}
+						<span class="ct-section-pill">The ballot</span>
+					{/if}
+				</p>
+				<p class="ct-vote-deck">
+					{#if myVoteCaptionId}
+						Your vote is locked. Watch the room decide.
+					{:else}
+						Tap the line that made you actually laugh.
+					{/if}
 				</p>
 				<div class="ct-caption-cards">
-					{#each sortedCaptions as c}
+					{#each sortedCaptions as c, i}
 						{@const isMyCaption = c.id === myCaptionId}
 						{@const isVoted = myVoteCaptionId === c.id}
 						{@const canVoteThis = canVote && !isMyCaption}
@@ -321,7 +510,7 @@
 						{#if canVoteThis}
 							<form
 								method="POST"
-								action="?/submitVote"
+								action={formAction('submitVote')}
 								class="ct-vote-form"
 								use:enhance={() => async ({ result, update }) => {
 									await update();
@@ -330,25 +519,32 @@
 							>
 								<input type="hidden" name="roundId" value={roundId} />
 								<input type="hidden" name="captionId" value={c.id} />
-								<button type="submit" class="ct-caption-card ct-caption-card--voteable">
-									<span class="ct-caption-card-text">"{c.text}"</span>
-									<span class="ct-vote-btn-label">Vote</span>
+								<button type="submit" class="ct-caption-card ct-caption-card--voteable" style="--i:{i};">
+									<span class="ct-card-num" aria-hidden="true">#{i + 1}</span>
+									<span class="ct-caption-card-text">“{c.text}”</span>
+									<span class="ct-vote-btn-label">This one →</span>
 								</button>
 							</form>
 						{:else}
-							<div class="ct-caption-card" class:ct-caption-card--voted={isVoted} class:ct-caption-card--mine={isMyCaption && !isVoted}>
-								<span class="ct-caption-card-text">"{c.text}"</span>
+							<div
+								class="ct-caption-card"
+								class:ct-caption-card--voted={isVoted}
+								class:ct-caption-card--mine={isMyCaption && !isVoted}
+								style="--i:{i};"
+							>
+								<span class="ct-card-num" aria-hidden="true">#{i + 1}</span>
+								<span class="ct-caption-card-text">“{c.text}”</span>
 								{#if isVoted}
-									<span class="ct-voted-label">Your vote ✓</span>
+									<span class="ct-voted-label">Your pick ✓</span>
 								{:else if isMyCaption}
-									<span class="ct-mine-label">Yours</span>
+									<span class="ct-mine-label">Yours (no self-votes)</span>
 								{/if}
 							</div>
 						{/if}
 					{/each}
 
 					{#if captions.length === 0}
-						<p class="ct-no-captions">No captions submitted yet.</p>
+						<p class="ct-no-captions">No captions yet. Reality is stranger than fiction.</p>
 					{/if}
 				</div>
 			</div>
@@ -356,8 +552,14 @@
 		<!-- RESULTS -->
 		{:else if isResultsPhase}
 			{#if photoUrl}
-				<div class="ct-photo-block">
-					<img class="ct-round-photo" src={photoUrl} alt="Round photo" />
+				<div class="ct-photo-theatre">
+					<div class="ct-photo-polaroid">
+						<div class="ct-photo-block">
+							<img class="ct-round-photo" src={photoUrl} alt="Round photo" />
+						</div>
+						<span class="ct-photo-tape ct-photo-tape--left" aria-hidden="true"></span>
+						<span class="ct-photo-tape ct-photo-tape--right" aria-hidden="true"></span>
+					</div>
 				</div>
 			{/if}
 
@@ -365,17 +567,18 @@
 				{#if winners.length > 0}
 					{#each winners as w}
 						<div class="ct-winner-card">
-							<span class="ct-winner-badge">🏆 Funniest caption</span>
-							<p class="ct-winner-text">"{w.text}"</p>
+							<div class="ct-winner-shine" aria-hidden="true"></div>
+							<span class="ct-winner-badge">Funniest line</span>
+							<p class="ct-winner-text">“{w.text}”</p>
 							<span class="ct-winner-votes">{w.voteCount} vote{(w.voteCount ?? 0) !== 1 ? 's' : ''}</span>
 						</div>
 					{/each}
 				{:else}
-					<div class="ct-no-winners">No captions this round.</div>
+					<div class="ct-no-winners">No captions this round. Crickets.</div>
 				{/if}
 
 				<div class="ct-vote-dist">
-					<p class="ct-section-label">All captions</p>
+					<p class="ct-vote-dist-label"><span class="ct-section-pill">Scoreboard</span></p>
 					{#each sortedCaptions as c}
 						<div class="ct-dist-row" class:ct-dist-row--winner={winners.some((w) => w.id === c.id)}>
 							<span class="ct-dist-text">"{c.text}"</span>
@@ -386,20 +589,25 @@
 
 				{#if isPhotoSubmitter}
 					<div class="ct-next-row">
-						{#if endRoundConfirm}
-							<span class="ct-end-confirm">
-								<form method="POST" action="?/startNextRound">
-									<button type="submit" class="ct-btn-primary ct-btn-start-next" disabled={startingNext} onclick={() => { startingNext = true; }}>
-										{startingNext ? 'Starting…' : 'Start next round'}
-									</button>
-								</form>
-								<button type="button" class="ct-btn-ghost" onclick={() => (endRoundConfirm = false)}>Cancel</button>
-							</span>
-						{:else}
-							<button type="button" class="ct-btn-primary ct-btn-start-next" onclick={() => (endRoundConfirm = true)}>
-								Start next round →
+						<form
+							method="POST"
+							action={formAction('startNextRound')}
+							class="ct-start-next-form"
+							use:enhance={() => {
+								return async ({ update }) => {
+									startingNext = true;
+									try {
+										await update();
+									} finally {
+										startingNext = false;
+									}
+								};
+							}}
+						>
+							<button type="submit" class="ct-btn-primary ct-btn-start-next" disabled={startingNext}>
+								{startingNext ? 'Starting…' : 'Start next round'}
 							</button>
-						{/if}
+						</form>
 					</div>
 				{:else}
 					<p class="ct-waiting-next">The photo poster will start the next round.</p>
@@ -411,17 +619,17 @@
 
 		{#if (isCaptionPhase || isVotingPhase) && isPhotoSubmitter}
 			<div class="ct-end-early">
-				{#if endRoundConfirm}
+				{#if endRoundEarlyConfirm}
 					<span class="ct-end-confirm">
 						End round now?
-						<form method="POST" action="?/endRoundNow" class="ct-inline-form" use:enhance>
+						<form method="POST" action={formAction('endRoundNow')} class="ct-inline-form" use:enhance>
 							<input type="hidden" name="roundId" value={roundId} />
 							<button type="submit" class="ct-btn-danger">Yes, end it</button>
 						</form>
-						<button type="button" class="ct-btn-ghost" onclick={() => (endRoundConfirm = false)}>Cancel</button>
+						<button type="button" class="ct-btn-ghost" onclick={() => (endRoundEarlyConfirm = false)}>Cancel</button>
 					</span>
 				{:else}
-					<button type="button" class="ct-btn-ghost ct-end-btn" onclick={() => (endRoundConfirm = true)}>
+					<button type="button" class="ct-btn-ghost ct-end-btn" onclick={() => (endRoundEarlyConfirm = true)}>
 						End round early
 					</button>
 				{/if}
@@ -484,12 +692,136 @@
 
 <style>
 	.ct-wrap {
-		max-width: 680px;
+		--ct-coral: #ce5612;
+		--ct-coral-dim: rgba(206, 86, 18, 0.12);
+		--ct-teal: #2f7778;
+		--ct-ink: #1d4d4e;
+		max-width: 720px;
 		width: 100%;
+		margin-left: auto;
+		margin-right: auto;
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
+		gap: 1.35rem;
 		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		position: relative;
+		padding: 0.5rem 0 0;
+	}
+
+	/* ── Hero band ── */
+	.ct-hero {
+		position: relative;
+		border-radius: 18px;
+		padding: 1.15rem 1.25rem 1.3rem;
+		background: linear-gradient(135deg, #fff6ef 0%, #fff 42%, #f0faf9 100%);
+		border: 1px solid rgba(206, 86, 18, 0.2);
+		box-shadow: 0 8px 32px -12px rgba(29, 77, 78, 0.18);
+		overflow: hidden;
+	}
+	.ct-hero__burst {
+		position: absolute;
+		inset: -40%;
+		background: radial-gradient(circle at 30% 20%, rgba(255, 180, 100, 0.35) 0%, transparent 45%),
+			radial-gradient(circle at 80% 60%, rgba(122, 206, 211, 0.22) 0%, transparent 40%);
+		pointer-events: none;
+	}
+	.ct-hero__inner {
+		position: relative;
+		z-index: 1;
+		text-align: center;
+	}
+	.ct-hero__eyebrow {
+		font-size: 0.68rem;
+		font-weight: 800;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--ct-coral);
+		margin: 0 0 0.35rem;
+	}
+	.ct-hero__title {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: clamp(1.35rem, 4.5vw, 1.7rem);
+		font-weight: 700;
+		color: var(--ct-ink);
+		letter-spacing: -0.03em;
+		line-height: 1.15;
+		margin: 0 0 0.45rem;
+	}
+	.ct-hero__sub {
+		margin: 0 auto;
+		font-size: 0.9rem;
+		line-height: 1.5;
+		color: #475569;
+		max-width: 38rem;
+	}
+	[data-phase='voting'] .ct-hero {
+		border-color: rgba(47, 119, 120, 0.25);
+		background: linear-gradient(135deg, #f0fdfa 0%, #fff 50%, #fff7ed 100%);
+	}
+	[data-phase='results'] .ct-hero {
+		background: linear-gradient(135deg, #fffbeb 0%, #fff 55%, #fef3c7 100%);
+		border-color: rgba(192, 136, 32, 0.35);
+	}
+
+	/* ── Section pills (replace flat labels) ── */
+	.ct-section-pill {
+		display: inline-block;
+		padding: 0.22rem 0.65rem;
+		border-radius: 999px;
+		font-size: 0.65rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: #b45309;
+		background: linear-gradient(180deg, #fff7ed, #ffedd5);
+		border: 1px solid rgba(206, 86, 18, 0.28);
+	}
+	.ct-section-pill--done {
+		color: #15803d;
+		background: linear-gradient(180deg, #ecfdf5, #d1fae5);
+		border-color: rgba(21, 128, 61, 0.3);
+	}
+	.ct-caption-form-label {
+		margin: 0 0 0.4rem;
+	}
+
+	/* ── Photo theatre (polaroid) ── */
+	.ct-photo-theatre {
+		display: flex;
+		justify-content: center;
+		perspective: 800px;
+	}
+	.ct-photo-polaroid {
+		position: relative;
+		padding: 0.65rem 0.75rem 1.4rem;
+		background: linear-gradient(180deg, #fefefe 0%, #f1f0eb 100%);
+		border-radius: 3px;
+		box-shadow:
+			0 1px 0 rgba(0, 0, 0, 0.06),
+			0 10px 28px -8px rgba(0, 0, 0, 0.2);
+		transform: rotate(-1.2deg);
+		max-width: 100%;
+	}
+	.ct-photo-tape {
+		position: absolute;
+		width: 3.25rem;
+		height: 0.9rem;
+		background: linear-gradient(90deg, rgba(255, 255, 200, 0.85), rgba(255, 248, 200, 0.65));
+		opacity: 0.9;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+		top: -0.2rem;
+	}
+	.ct-photo-tape--left {
+		left: 12%;
+		transform: rotate(-8deg);
+	}
+	.ct-photo-tape--right {
+		right: 10%;
+		transform: rotate(6deg);
+	}
+	.ct-photo-theatre .ct-photo-block {
+		border-radius: 2px;
+		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
 	}
 
 	/* ── Hidden form infrastructure ── */
@@ -519,55 +851,137 @@
 		color: #dc2626;
 	}
 
-	/* ── Section label ── */
+	/* ── Section label (legacy + pill container) ── */
 	.ct-section-label {
-		font-size: 0.75rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: #94a3b8;
-		margin: 0 0 0.625rem;
+		margin: 0 0 0.75rem;
+		text-align: center;
 	}
 
-	/* ── Photo block ── */
+	/* ── Photo block (inside polaroid) ── */
 	.ct-photo-block {
-		border-radius: 14px;
+		border-radius: 2px;
 		overflow: hidden;
 		line-height: 0;
 	}
 	.ct-round-photo {
 		width: 100%;
-		height: clamp(220px, 38vw, 340px);
+		max-height: 52vh;
+		height: clamp(220px, 40vw, 360px);
 		object-fit: cover;
 		display: block;
 	}
 
 	/* ── Upload zone (Sub-state A, poster) ── */
-	.ct-section { display: flex; flex-direction: column; }
+	.ct-section {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		width: 100%;
+	}
 
-	.ct-upload-zone {
-		border: 2px dashed #cbd5e1;
-		border-radius: 16px;
-		padding: 2.5rem 1.5rem;
+	.ct-upload-outer {
+		width: 100%;
+		max-width: 26rem;
+		margin-left: auto;
+		margin-right: auto;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 0.75rem;
+	}
+
+	.ct-upload-zone {
+		--ct-upload-pad: 2.5rem 1.5rem 2.25rem;
+		display: block;
+		position: relative;
+		border: 2px dashed rgba(206, 86, 18, 0.45);
+		border-radius: 18px;
+		padding: var(--ct-upload-pad);
+		width: 100%;
+		box-sizing: border-box;
+		background: linear-gradient(165deg, #fff7ed 0%, #fff 38%, #f0fdfa 100%);
+		box-shadow: 0 10px 36px -20px rgba(206, 86, 18, 0.35);
+		overflow: hidden;
+		cursor: pointer;
+		transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+	}
+	.ct-upload-file-overlay {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		margin: 0;
+		padding: 0;
+		opacity: 0.001;
+		font-size: 0;
+		cursor: pointer;
+		z-index: 2;
+	}
+	.ct-upload-overlay-stack {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
 		text-align: center;
-		background: #f8fafc;
-		transition: border-color 0.15s, background 0.15s;
+		pointer-events: none;
 	}
-
+	.ct-upload-zone--loading,
+	.ct-upload-zone--loading .ct-upload-file-overlay {
+		cursor: wait;
+	}
+	.ct-upload-zone--loading {
+		pointer-events: none;
+		opacity: 0.72;
+	}
+	.ct-upload-zone:has(.ct-upload-file-overlay:disabled) {
+		cursor: not-allowed;
+	}
+	.ct-upload-zone::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(circle at 15% 30%, rgba(255, 200, 120, 0.2) 0%, transparent 45%);
+		pointer-events: none;
+		z-index: 0;
+	}
+	@media (hover: hover) and (pointer: fine) {
+		.ct-upload-zone:has(.ct-upload-file-overlay:not(:disabled):hover) {
+			border-color: var(--ct-coral);
+			transform: translateY(-2px);
+			box-shadow: 0 16px 44px -18px rgba(47, 119, 120, 0.35);
+		}
+	}
+	.ct-upload-zone:has(.ct-upload-file-overlay:focus-visible) {
+		outline: 2px solid #2f7778;
+		outline-offset: 2px;
+	}
+	.ct-upload-sparkles {
+		display: flex;
+		gap: 0.75rem;
+		font-size: 1.15rem;
+		opacity: 0.85;
+		margin-bottom: 0.15rem;
+	}
 	.ct-upload-icon {
-		font-size: 2.5rem;
+		font-size: 2.75rem;
+		filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.12));
 	}
-
 	.ct-upload-heading {
 		font-family: 'Fraunces', Georgia, serif;
-		font-size: 1.0625rem;
+		font-size: 1.2rem;
 		font-weight: 700;
 		color: #1d4d4e;
 		margin: 0;
+		position: relative;
+	}
+	.ct-upload-lede {
+		margin: 0 0 0.35rem;
+		font-size: 0.875rem;
+		line-height: 1.45;
+		color: #64748b;
+		max-width: 22rem;
 	}
 
 	.ct-upload-btns {
@@ -621,41 +1035,85 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.75rem;
-		padding: 2.5rem 1.5rem;
-		background: #f8fafc;
-		border-radius: 14px;
-		border: 1.5px solid #e2e8f0;
+		gap: 0.4rem;
+		padding: 2.25rem 1.5rem 2.5rem;
+		background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+		border-radius: 16px;
+		border: 1.5px dashed rgba(47, 119, 120, 0.3);
 		text-align: center;
+		position: relative;
+		overflow: hidden;
 	}
-
-	.ct-holding-icon {
-		font-size: 2rem;
+	.ct-holding-card::after {
+		content: '';
+		position: absolute;
+		width: 120px;
+		height: 120px;
+		background: repeating-linear-gradient(
+			-12deg,
+			transparent,
+			transparent 6px,
+			rgba(47, 119, 120, 0.04) 6px,
+			rgba(47, 119, 120, 0.04) 7px
+		);
+		right: -20px;
+		top: -20px;
+		border-radius: 50%;
+		pointer-events: none;
 	}
-
+	.ct-holding-illus {
+		font-size: 2.5rem;
+		line-height: 1;
+		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+	}
+	.ct-holding-kicker {
+		margin: 0.25rem 0 0;
+		font-size: 0.72rem;
+		font-weight: 800;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: #2f7778;
+	}
 	.ct-holding-text {
-		font-size: 0.9375rem;
-		color: #64748b;
+		font-size: 0.95rem;
+		color: #475569;
 		margin: 0;
+		max-width: 22rem;
+		line-height: 1.45;
+		position: relative;
+		z-index: 1;
 	}
 
 	/* ── Poster waiting (Sub-state B, is poster) ── */
 	.ct-poster-waiting {
-		background: rgba(47,119,120,0.06);
-		border: 1px solid rgba(47,119,120,0.18);
-		border-radius: 12px;
-		padding: 1rem 1.25rem;
+		background: linear-gradient(90deg, rgba(47, 119, 120, 0.1) 0%, rgba(47, 119, 120, 0.04) 100%);
+		border: 1px solid rgba(47, 119, 120, 0.2);
+		border-radius: 14px;
+		padding: 1rem 1.15rem;
+		display: flex;
+		align-items: center;
+		gap: 0.9rem;
+		flex-wrap: wrap;
+	}
+	.ct-poster-waiting-ico {
+		font-size: 1.75rem;
+		line-height: 1;
+		flex-shrink: 0;
+	}
+	.ct-poster-waiting-body {
+		flex: 1;
+		min-width: 0;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.75rem;
 		flex-wrap: wrap;
 	}
-
 	.ct-poster-waiting-text {
-		font-size: 0.9375rem;
+		font-size: 0.9rem;
 		color: #1d4d4e;
 		margin: 0;
+		line-height: 1.4;
 	}
 
 	.ct-captions-count {
@@ -667,60 +1125,107 @@
 
 	/* ── Submitted confirm (Sub-state B, after submit) ── */
 	.ct-submitted-confirm {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 1.25rem;
-		background: rgba(29,158,117,0.06);
-		border: 1px solid rgba(29,158,117,0.25);
-		border-radius: 12px;
+		gap: 0.35rem;
+		padding: 1.4rem 1.25rem 1.5rem;
+		background: linear-gradient(145deg, #ecfdf5 0%, #d1fae5 50%, #fff 100%);
+		border: 1.5px solid rgba(16, 185, 129, 0.35);
+		border-radius: 16px;
 		text-align: center;
-		font-size: 0.9375rem;
 		color: #1d4d4e;
+		box-shadow: 0 6px 24px -12px rgba(16, 185, 129, 0.35);
 	}
-
-	.ct-submitted-icon {
-		font-size: 1.5rem;
-		color: #1D9E75;
+	.ct-submitted-burst {
+		position: absolute;
+		top: 0.5rem;
+		right: 0.75rem;
+		font-size: 1.25rem;
+		opacity: 0.85;
 	}
-
-	.ct-submitted-confirm p {
-		margin: 0;
+	.ct-submitted-confirm .ct-submitted-icon {
+		font-size: 1.35rem;
+		color: #059669;
+		background: #fff;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 	}
-
-	.ct-submitted-preview {
+	.ct-submitted-hed {
+		margin: 0.25rem 0 0;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.15rem;
+		font-weight: 700;
+	}
+	.ct-submitted-sub {
+		margin: 0 0 0.25rem;
+		font-size: 0.85rem;
 		color: #64748b;
+		line-height: 1.4;
+	}
+	.ct-submitted-preview {
+		margin: 0.35rem 0 0;
+		color: #0f766e;
 		font-style: italic;
+		font-size: 0.95rem;
+		font-weight: 500;
+		padding: 0.5rem 0.75rem;
+		background: rgba(255, 255, 255, 0.6);
+		border-radius: 10px;
+		border: 1px solid rgba(16, 185, 129, 0.2);
 	}
 
 	/* ── Caption form (Sub-state B, not submitted) ── */
 	.ct-caption-form {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.85rem;
 	}
-
+	.ct-bubble-wrap {
+		position: relative;
+	}
+	.ct-bubble-wrap::before {
+		content: '“';
+		position: absolute;
+		left: 0.5rem;
+		top: 0.35rem;
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 2.5rem;
+		font-weight: 700;
+		color: rgba(206, 86, 18, 0.2);
+		line-height: 1;
+		pointer-events: none;
+	}
 	.ct-textarea-wrap {
 		position: relative;
 	}
 
 	.ct-caption-input {
 		width: 100%;
-		border: 1.5px solid #e2e8f0;
-		border-radius: 12px;
-		padding: 0.875rem 1rem 2rem;
+		border: 2px solid #e2e8f0;
+		border-radius: 16px;
+		border-top-left-radius: 6px;
+		padding: 0.9rem 1rem 1.9rem 1.75rem;
 		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-		font-size: 0.9375rem;
+		font-size: 1rem;
+		line-height: 1.45;
 		color: #1d4d4e;
 		resize: none;
-		transition: border-color 0.12s;
+		transition: border-color 0.12s, box-shadow 0.12s;
 		box-sizing: border-box;
+		background: linear-gradient(180deg, #fffefb 0%, #fff 100%);
 	}
 
 	.ct-caption-input:focus {
 		outline: none;
-		border-color: #CE5612;
+		border-color: var(--ct-coral);
+		box-shadow: 0 0 0 3px var(--ct-coral-dim);
 	}
 
 	.ct-char-count {
@@ -768,41 +1273,75 @@
 		display: flex;
 		flex-direction: column;
 	}
+	.ct-vote-hed {
+		margin: 0 0 0.35rem;
+	}
+	.ct-vote-deck {
+		margin: 0 0 0.9rem;
+		font-size: 0.9rem;
+		line-height: 1.45;
+		color: #64748b;
+	}
 
 	.ct-caption-cards {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.65rem;
 	}
 
 	.ct-vote-form {
 		display: contents;
 	}
-
+	.ct-card-num {
+		flex-shrink: 0;
+		font-size: 0.65rem;
+		font-weight: 800;
+		letter-spacing: 0.06em;
+		color: #94a3b8;
+		min-width: 1.5rem;
+	}
 	.ct-caption-card {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		padding: 0.875rem 1rem;
-		border-radius: 12px;
+		gap: 0.6rem;
+		padding: 0.95rem 1rem 0.95rem 0.85rem;
+		border-radius: 14px;
 		border: 1.5px solid #e2e8f0;
-		background: white;
+		background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
 		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-		font-size: 0.9375rem;
+		font-size: 0.95rem;
 		color: #1d4d4e;
 		text-align: left;
-		min-height: 56px;
-		transition: border-color 0.12s, background 0.12s;
+		min-height: 60px;
+		transition:
+			border-color 0.15s,
+			background 0.15s,
+			transform 0.15s,
+			box-shadow 0.15s;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+		animation: ct-card-in 0.45s ease backwards;
+		animation-delay: calc(var(--i, 0) * 0.05s);
+	}
+	@keyframes ct-card-in {
+		from {
+			opacity: 0;
+			transform: translateX(-8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateX(0);
+		}
 	}
 
 	.ct-caption-card--voteable {
 		cursor: pointer;
 		width: 100%;
 	}
-
 	.ct-caption-card--voteable:hover {
-		border-color: #CE5612;
-		background: rgba(206,86,18,0.04);
+		border-color: var(--ct-coral);
+		background: linear-gradient(135deg, #fffdfb 0%, #fff5eb 100%);
+		transform: translateX(2px) scale(1.01);
+		box-shadow: 0 6px 20px -6px rgba(206, 86, 18, 0.35);
 	}
 
 	.ct-caption-card--voted {
@@ -822,13 +1361,17 @@
 
 	.ct-vote-btn-label {
 		flex-shrink: 0;
-		font-size: 0.8125rem;
-		font-weight: 700;
-		color: #CE5612;
-		border: 1.5px solid #CE5612;
-		border-radius: 7px;
-		padding: 3px 10px;
+		font-size: 0.7rem;
+		font-weight: 800;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: #fff;
+		background: linear-gradient(180deg, #ea6a2a, var(--ct-coral));
+		border: none;
+		border-radius: 8px;
+		padding: 0.45rem 0.65rem;
 		white-space: nowrap;
+		box-shadow: 0 2px 6px rgba(206, 86, 18, 0.4);
 	}
 
 	.ct-voted-label {
@@ -856,31 +1399,53 @@
 	.ct-results {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 1.1rem;
 	}
 
 	.ct-winner-card {
-		background: white;
-		border: 2px solid rgba(192,136,32,0.4);
-		border-radius: 14px;
-		padding: 1.125rem 1.25rem;
+		position: relative;
+		border: 2px solid rgba(192, 136, 32, 0.45);
+		border-radius: 16px;
+		padding: 1.3rem 1.35rem 1.2rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.375rem;
-		background: rgba(192,136,32,0.05);
+		gap: 0.4rem;
+		background: linear-gradient(160deg, #fffbeb 0%, #fff 45%, #fef3c7 100%);
+		overflow: hidden;
+		box-shadow: 0 8px 28px -10px rgba(192, 136, 32, 0.45);
+	}
+	.ct-winner-shine {
+		position: absolute;
+		inset: -20% -30%;
+		background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.5) 50%, transparent 60%);
+		transform: translateX(-100%);
+		animation: ct-shine 1.1s ease-out 0.2s forwards;
+		pointer-events: none;
+	}
+	@keyframes ct-shine {
+		to {
+			transform: translateX(100%);
+		}
 	}
 
 	.ct-winner-badge {
-		font-size: 0.75rem;
-		font-weight: 700;
+		position: relative;
+		z-index: 1;
+		font-size: 0.7rem;
+		font-weight: 800;
 		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: #a87818;
+		letter-spacing: 0.1em;
+		color: #b45309;
+		widows: 1;
 	}
-
+	.ct-winner-badge::before {
+		content: '👑 ';
+	}
 	.ct-winner-text {
+		position: relative;
+		z-index: 1;
 		font-family: 'Fraunces', Georgia, serif;
-		font-size: 1.125rem;
+		font-size: 1.25rem;
 		font-weight: 700;
 		color: #1d4d4e;
 		margin: 0;
@@ -904,7 +1469,10 @@
 	.ct-vote-dist {
 		display: flex;
 		flex-direction: column;
-		gap: 0.35rem;
+		gap: 0.45rem;
+	}
+	.ct-vote-dist-label {
+		margin: 0.25rem 0 0.1rem;
 	}
 
 	.ct-dist-row {
@@ -964,6 +1532,22 @@
 
 	.ct-inline-form {
 		display: inline;
+	}
+
+	.ct-remove-photo-wrap {
+		margin-top: 0.75rem;
+		text-align: center;
+	}
+
+	.ct-remove-photo-btn {
+		font-size: 0.8125rem;
+	}
+
+	.ct-remove-hint {
+		margin: 0.35rem 0 0 0;
+		font-size: 0.75rem;
+		color: #94a3b8;
+		line-height: 1.35;
 	}
 
 	.ct-waiting-next {
@@ -1034,22 +1618,29 @@
 
 	/* ── Leaderboard ── */
 	.ct-leaderboard {
-		background: white;
-		border: 1px solid #e2e8f0;
-		border-radius: 14px;
-		padding: 1rem 1.125rem;
+		background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+		border: 1px solid rgba(47, 119, 120, 0.2);
+		border-radius: 16px;
+		padding: 1.1rem 1.2rem 1.2rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.55rem;
+		box-shadow: 0 4px 20px -8px rgba(29, 77, 78, 0.15);
 	}
-
 	.ct-lb-title {
 		font-family: 'Fraunces', Georgia, serif;
-		font-size: 1rem;
+		font-size: 1.1rem;
 		font-weight: 700;
 		color: #1d4d4e;
 		margin: 0;
 		letter-spacing: -0.01em;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.ct-lb-title::after {
+		content: '🥇';
+		font-size: 0.9rem;
 	}
 
 	.ct-lb-rows {
@@ -1387,15 +1978,24 @@
 		.ct-caption-card {
 			min-height: 56px;
 		}
+		.ct-hero {
+			margin: 0 -4px;
+			border-radius: 14px;
+		}
+		.ct-photo-theatre {
+			margin: 0 -12px;
+		}
+		.ct-photo-polaroid {
+			transform: rotate(-0.5deg);
+		}
 
 		.ct-round-photo {
 			height: 220px;
 			border-radius: 0;
 		}
 
-		.ct-photo-block {
+		.ct-photo-theatre .ct-photo-block {
 			border-radius: 0;
-			margin: 0 -16px;
 		}
 
 		.ct-past-photo {

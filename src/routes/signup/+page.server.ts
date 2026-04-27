@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { createUser } from '$lib/server/user-auth.js';
 import { createSession } from '$lib/server/session.js';
+import { AUTH_RATE, isRateLimited } from '$lib/server/rate-limit.js';
 import { linkPendingInvitesForUser } from '$lib/server/invite-service.js';
 import {
 	HOUSEHOLD_CLAIM_COOKIE,
@@ -16,9 +17,6 @@ const signupSchema = z.object({
 	password: z.string().min(8, 'Password must be at least 8 characters'),
 	name: z.string().optional(),
 	travelStyle: z.union([z.enum(TRAVEL_STYLE_OPTIONS), z.literal('')]).optional()
-}).refine((data) => data.password.length >= 8, {
-	message: 'Password must be at least 8 characters',
-	path: ['password']
 });
 
 export const load: PageServerLoad = async ({ cookies }) => {
@@ -33,7 +31,15 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies, url }) => {
+	default: async ({ request, cookies, url, getClientAddress }) => {
+		const clientIp = getClientAddress();
+		const rl = isRateLimited(`signup:${clientIp}`, AUTH_RATE.max, AUTH_RATE.windowMs);
+		if (rl.limited) {
+			return fail(429, {
+				error: `Too many sign-up attempts. Try again in about ${rl.retryAfterSec} seconds.`
+			});
+		}
+
 		const formData = await request.formData();
 		const email = formData.get('email');
 		const password = formData.get('password');

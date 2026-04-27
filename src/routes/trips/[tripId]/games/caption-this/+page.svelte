@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 	import LeaderboardPanel from '$lib/components/games/caption-this/LeaderboardPanel.svelte';
 	import PhotoSubmitBox from '$lib/components/games/caption-this/PhotoSubmitBox.svelte';
@@ -26,6 +27,13 @@
 	const dayKey = $derived(round?.dayKey ?? '');
 	const isPhotoSubmitter = $derived(
 		currentUserId != null && photoSubmitterUserId === currentUserId
+	);
+	const voteCount = $derived(round?.votes?.length ?? 0);
+	const canRemovePhoto = $derived(
+		isPhotoSubmitter &&
+			(phase === 'CAPTION_SUBMISSION' || phase === 'VOTING') &&
+			voteCount === 0 &&
+			(photoUrl ?? null) != null
 	);
 
 	const anonymousCaptions = $derived(
@@ -57,7 +65,7 @@
 
 	let countdownMs = $state(0);
 	let collapsedLeaderboard = $state(false);
-	let endRoundConfirm = $state(false);
+	let endRoundEarlyConfirm = $state(false);
 
 	$effect(() => {
 		if (phase === 'RESULTS' || !dayKey || !tripTimezone) {
@@ -77,6 +85,12 @@
 		if (phase !== 'RESULTS') return;
 		const t = setInterval(() => invalidateAll(), 5000);
 		return () => clearInterval(t);
+	});
+
+	$effect(() => {
+		if (phase !== 'CAPTION_SUBMISSION' && phase !== 'VOTING') {
+			endRoundEarlyConfirm = false;
+		}
 	});
 
 	const countdownLabel = $derived(
@@ -133,6 +147,25 @@
 							roundId={roundId}
 							disabled={phase !== 'WAITING_FOR_PHOTO'}
 						/>
+						{#if canRemovePhoto}
+							<div class="remove-photo">
+								<form
+									method="POST"
+									action="?/removePhoto"
+									class="remove-photo-form"
+									use:enhance={() => async ({ result, update }) => {
+										await update();
+										if (result.type === 'success' || result.type === 'redirect') await invalidateAll();
+									}}
+								>
+									<input type="hidden" name="roundId" value={roundId} />
+									<button type="submit" class="remove-photo-btn" title="Clears the photo and all captions. Not available after anyone votes.">
+										Remove photo
+									</button>
+								</form>
+								<p class="remove-photo-hint">You can take this back until the first vote. This resets the round.</p>
+							</div>
+						{/if}
 					</div>
 
 					{#if phase === 'CAPTION_SUBMISSION'}
@@ -171,17 +204,17 @@
 
 					{#if (phase === 'CAPTION_SUBMISSION' || phase === 'VOTING') && isPhotoSubmitter}
 						<div class="end-round-wrap">
-							{#if endRoundConfirm}
+							{#if endRoundEarlyConfirm}
 								<span class="end-round-confirm">
 									End round now?
 									<form method="POST" action="?/endRoundNow" class="inline-form">
 										<input type="hidden" name="roundId" value={roundId} />
 										<button type="submit" class="btn-danger">Yes, end round</button>
 									</form>
-									<button type="button" class="btn-ghost" onclick={() => (endRoundConfirm = false)}>Cancel</button>
+									<button type="button" class="btn-ghost" onclick={() => (endRoundEarlyConfirm = false)}>Cancel</button>
 								</span>
 							{:else}
-								<button type="button" class="btn-ghost end-round-btn" onclick={() => (endRoundConfirm = true)}>
+								<button type="button" class="btn-ghost end-round-btn" onclick={() => (endRoundEarlyConfirm = true)}>
 									End round now
 								</button>
 							{/if}
@@ -277,6 +310,32 @@
 	}
 	.photo-section {
 		width: 100%;
+	}
+	.remove-photo {
+		margin-top: 0.75rem;
+		text-align: center;
+	}
+	.remove-photo-form {
+		display: inline;
+	}
+	.remove-photo-btn {
+		background: none;
+		border: none;
+		font: inherit;
+		cursor: pointer;
+		color: var(--muted, #666);
+		text-decoration: underline;
+		font-size: 0.8125rem;
+		padding: 0.25rem 0.5rem;
+	}
+	.remove-photo-btn:hover {
+		color: var(--error, #c00);
+	}
+	.remove-photo-hint {
+		margin: 0.35rem 0 0 0;
+		font-size: 0.75rem;
+		color: var(--muted, #999);
+		line-height: 1.35;
 	}
 	.section {
 		margin-top: 0.5rem;

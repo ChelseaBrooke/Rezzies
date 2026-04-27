@@ -3,6 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { verifyUser } from '$lib/server/user-auth.js';
 import { createSession } from '$lib/server/session.js';
 import { backfillTripMembershipsForUser } from '$lib/server/trip-access.js';
+import { AUTH_RATE, isRateLimited } from '$lib/server/rate-limit.js';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -23,7 +24,15 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
-	login: async ({ request, cookies, url }) => {
+	login: async ({ request, cookies, url, getClientAddress }) => {
+		const clientIp = getClientAddress();
+		const rl = isRateLimited(`login:${clientIp}`, AUTH_RATE.max, AUTH_RATE.windowMs);
+		if (rl.limited) {
+			return fail(429, {
+				error: `Too many sign-in attempts. Try again in about ${rl.retryAfterSec} seconds.`
+			});
+		}
+
 		const formData = await request.formData();
 		const email = formData.get('email');
 		const password = formData.get('password');

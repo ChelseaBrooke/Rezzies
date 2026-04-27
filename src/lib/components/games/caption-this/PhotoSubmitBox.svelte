@@ -14,11 +14,6 @@
 	let error = $state<string | null>(null);
 	let pendingDataUrl = $state<string | null>(null);
 
-	function triggerUpload() {
-		if (disabled || uploading) return;
-		inputEl?.click();
-	}
-
 	function handleFile(e: Event) {
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0];
@@ -57,15 +52,6 @@
 	{/if}
 </form>
 
-<input
-	type="file"
-	accept="image/*"
-	class="hidden"
-	aria-hidden="true"
-	bind:this={inputEl}
-	onchange={handleFile}
-/>
-
 {#if photoUrl}
 	<div class="polaroid">
 		<div class="polaroid-inner">
@@ -73,19 +59,28 @@
 		</div>
 	</div>
 {:else}
-	<button
-		type="button"
+	<!-- Full card is the hit target: invisible file input covers the label surface -->
+	<label
 		class="empty-state"
-		class:disabled
-		class:uploading
-		onclick={triggerUpload}
-		disabled={disabled || uploading}
+		class:state-disabled={disabled}
+		class:state-uploading={uploading}
 	>
-		<span class="empty-state-icon" aria-hidden="true">📷</span>
-		<span class="empty-state-text">
-			{uploading ? 'Uploading…' : 'Click to submit the first photo'}
+		<input
+			type="file"
+			accept="image/*"
+			class="empty-file-overlay"
+			bind:this={inputEl}
+			onchange={handleFile}
+			disabled={disabled || uploading}
+			aria-label="Add a picture to start the round"
+		/>
+		<span class="empty-state-content">
+			<span class="empty-state-icon" aria-hidden="true">📷</span>
+			<span class="empty-state-text">
+				{uploading ? 'Uploading…' : 'Click or tap anywhere in this area to add a picture'}
+			</span>
 		</span>
-	</button>
+	</label>
 {/if}
 {#if error}
 	<p class="error">{error}</p>
@@ -98,13 +93,6 @@
 		height: 0;
 		opacity: 0;
 		pointer-events: none;
-		overflow: hidden;
-	}
-	.hidden {
-		position: absolute;
-		width: 0.1px;
-		height: 0.1px;
-		opacity: 0;
 		overflow: hidden;
 	}
 	.polaroid {
@@ -131,30 +119,59 @@
 		vertical-align: middle;
 	}
 	.empty-state {
+		--_pad: 2rem;
+		display: block;
+		position: relative;
+		box-sizing: border-box;
+		min-height: 200px;
+		width: 100%;
+		padding: var(--_pad);
+		background: var(--surface2, #f5f5f5);
+		border: 2px dashed var(--border, #ccc);
+		border-radius: 12px;
+		cursor: pointer;
+		transition: border-color 0.2s, background 0.2s, opacity 0.2s;
+		font: inherit;
+		color: var(--text, #1a1a1a);
+	}
+	.empty-file-overlay {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		margin: 0;
+		opacity: 0.001;
+		cursor: pointer;
+		z-index: 2;
+	}
+	.empty-state-content {
+		position: relative;
+		z-index: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		gap: 0.75rem;
-		min-height: 200px;
-		width: 100%;
-		padding: 2rem;
-		background: var(--surface2, #f5f5f5);
-		border: 2px dashed var(--border, #ccc);
-		border-radius: 12px;
-		cursor: pointer;
-		transition: border-color 0.2s, background 0.2s;
-		font: inherit;
-		color: var(--text, #1a1a1a);
+		text-align: center;
+		pointer-events: none;
+		min-height: calc(200px - 2 * var(--_pad));
 	}
-	.empty-state:hover:not(:disabled):not(.uploading) {
+	.empty-state:not(:has(.empty-file-overlay:disabled)):hover,
+	.empty-state:has(.empty-file-overlay:hover:not(:disabled)) {
 		border-color: var(--primary, #e85d04);
 		background: rgba(232, 93, 4, 0.06);
 	}
-	.empty-state.disabled,
-	.empty-state:disabled {
+	.empty-state:has(.empty-file-overlay:disabled) {
 		cursor: not-allowed;
+	}
+	.state-disabled,
+	.state-uploading,
+	.empty-state:has(.empty-file-overlay:disabled) {
 		opacity: 0.7;
+	}
+	.state-disabled .empty-file-overlay,
+	.state-uploading .empty-file-overlay {
+		cursor: not-allowed;
 	}
 	.empty-state-icon {
 		font-size: 2.5rem;

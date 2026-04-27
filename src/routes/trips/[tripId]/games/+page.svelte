@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { deserialize } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import type { GameId } from '$lib/stores/tripGames.js';
@@ -29,8 +30,35 @@
 	);
 
 	// ── Navigation ────────────────────────────────────────────────────────────
-	function navigateToGame(gameId: string) {
-		goto(`/trips/${tripId}/games?game=${encodeURIComponent(gameId)}`, { replaceState: false });
+	/**
+	 * Server load redirects away from ?game= if that game is not in tripGames.
+	 * If the trip does not have this game yet, add it (same as “add to trip”) then open it.
+	 */
+	async function navigateToGame(gameId: string) {
+		if (!tripId) return;
+		const hasGame = tripGames.some((g) => g.gameId === gameId);
+		if (hasGame) {
+			await goto(`/trips/${tripId}/games?game=${encodeURIComponent(gameId)}`, { replaceState: false });
+			return;
+		}
+		const def = GAME_DEFS.find((g) => g.id === gameId);
+		if (!def) return;
+		const fd = new FormData();
+		fd.set('gameId', gameId);
+		fd.set('name', def.name);
+		const res = await fetch('?/addTripGame', { method: 'POST', body: fd });
+		const result = deserialize(await res.text());
+		if (result.type === 'redirect') {
+			await goto(result.location, { replaceState: false });
+			return;
+		}
+		// e.g. “already added” race — try opening anyway
+		if (result.type === 'failure' && result.data && typeof result.data === 'object') {
+			const err = (result.data as { error?: string }).error ?? '';
+			if (err.toLowerCase().includes('already')) {
+				await goto(`/trips/${tripId}/games?game=${encodeURIComponent(gameId)}`, { replaceState: false });
+			}
+		}
 	}
 
 	function backToLobby() {

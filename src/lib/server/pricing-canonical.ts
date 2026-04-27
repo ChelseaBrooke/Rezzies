@@ -1,6 +1,6 @@
 // Canonical Pricing Model for Divvi
 // Per-bed and per-room pricing use bed-type weights and room privacy factors.
-// See PRICING_MATH.md for formulas.
+// See PRICING.md for formulas.
 //
 // Vocabulary note: this module uses UPPER_SNAKE form for PricingMode ('PER_BED', 'PER_ROOM', …).
 // The DB and REST API layer uses lowercase_underscore ('per_bed', 'per_room', …), see pricing.ts.
@@ -9,6 +9,7 @@
 
 import { prisma } from './prisma.js';
 import { effectiveSleepSlots, type BedLike } from '$lib/bed-spot-validation.js';
+import { favorableHeadcountForClosingRange } from './closing-range.js';
 import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from './trip-room-order.js';
 import {
 	perBedLowHighForUnit,
@@ -214,7 +215,7 @@ export const PRIVACY_FACTOR_PRIVATE = 1.25;
 
 /**
  * Effective privacy factor from number of beds in the room (evolving factor).
- * Fewer beds → more private → higher factor. See PRICING_MATH.md.
+ * Fewer beds → more private → higher factor. See PRICING.md.
  * 1 bed → 1.25, 2 beds → 1.125, 3+ beds → 1.0.
  */
 export function getEffectivePrivacyFactor(bedCount: number): number {
@@ -231,7 +232,7 @@ export function getRoomEffectivePrivacy(beds: { length: number } | unknown[]): n
 	return getEffectivePrivacyFactor(n);
 }
 
-/** Spot count for a bed (PRICING_MATH: capacity in people). Uses bed-type defaults when DB still has 1/1 for bunks, queens, etc. */
+/** Spot count for a bed (PRICING.md: capacity in people). Uses bed-type defaults when DB still has 1/1 for bunks, queens, etc. */
 export function getSpotCount(bed: {
 	capacitySlots?: number | null;
 	capacity?: number | null;
@@ -240,7 +241,7 @@ export function getSpotCount(bed: {
 	return effectiveSleepSlots(bed as BedLike);
 }
 
-/** Spot weight = bedTypeWeight × effectiveRoomPrivacy (PRICING_MATH). */
+/** Spot weight = bedTypeWeight × effectiveRoomPrivacy (PRICING.md). */
 export function getSpotWeight(
 	bed: { bedType: string },
 	roomBeds: { length: number } | unknown[],
@@ -423,7 +424,7 @@ export function parseBedWeights(weightsJson: string | null): BedWeights {
 
 /**
  * Compute canonical pricing for all rooms in a trip.
- * Uses bed-type weights and room privacy factors. See PRICING_MATH.md.
+ * Uses bed-type weights and room privacy factors. See PRICING.md.
  */
 export async function computeRoomPricing(
 	tripId: string
@@ -785,9 +786,8 @@ export async function computeCommittedFundsFromYesRsvps(tripId: string): Promise
 						);
 					}
 				} else if (pricingModel === 'per_person') {
-					const totalCapacity =
-						trip.expectedPeopleCount ??
-						(trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 2), 0) || 1);
+					// PRICING.md: equal-split live = totalCost ÷ sum(room.maxOccupancy)
+					const totalCapacity = trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 0), 0) || 1;
 					price = (trip.totalCost / totalCapacity) * slots * stayFactor;
 				} else if (pricingModel === 'per_person_per_night') {
 					const totalCapacity =
@@ -801,11 +801,8 @@ export async function computeCommittedFundsFromYesRsvps(tripId: string): Promise
 				total += price;
 			}
 		} else if (firstRoomId && pricingModel !== 'per_bed') {
-			// Yes RSVP but no room assignment (e.g. PER_PERSON before room pick):
-			// count as 1 person at the average per-person rate.
-			const totalCapacity =
-				trip.expectedPeopleCount ??
-				(trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 2), 0) || 1);
+			// Yes RSVP but no room assignment: count as 1 at equal-split (PRICING.md totalSlots).
+			const totalCapacity = trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 0), 0) || 1;
 			total += trip.totalCost / totalCapacity;
 		}
 	}
@@ -815,7 +812,7 @@ export async function computeCommittedFundsFromYesRsvps(tripId: string): Promise
 
 /**
  * Calculate price for a reservation using privacy-aware per-bed or per-room formula.
- * See PRICING_MATH.md.
+ * See PRICING.md.
  */
 export async function calculateReservationPrice(
 	params: ReservationPriceParams
@@ -939,7 +936,7 @@ export async function calculateReservationPrice(
 		};
 	}
 
-	// PER_PERSON_PER_NIGHT: equal split by capacity and nights
+	// PER_PERSON_PER_NIGHT: @deprecated in MVP (PRICING.md) — equal split by capacity and nights
 	if (pricingModel === 'per_person_per_night') {
 		const totalCapacity = trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 0), 0) || 1;
 		const pricePerPersonPerNight = trip.totalCost / totalNights / totalCapacity;
@@ -1004,10 +1001,11 @@ export async function getPricingPreview(
 
 	switch (mode) {
 		case 'PER_PERSON': {
-			const expectedPeople = trip.expectedPeopleCount || pricing.totalSlots;
+			// PRICING.md: live = totalCost ÷ sum(room.maxOccupancy)
+			const totalCap = trip.rooms.reduce((s, r) => s + (r.maxOccupancy ?? 0), 0) || 1;
 			return {
 				mode,
-				perPersonFullStay: Math.round((trip.totalCost / expectedPeople) * 100) / 100
+				perPersonFullStay: Math.round((trip.totalCost / totalCap) * 100) / 100
 			};
 		}
 
@@ -1023,8 +1021,12 @@ export async function getPricingPreview(
 		case 'PER_BED': {
 			const weights = parseBedWeights(trip.bedWeights);
 			const units = buildPerBedInventoryUnits(trip, weights);
-			const { minExpectedGuests } = getPerBedRangeGuestCounts(trip);
-			const simCount = Math.min(Math.max(1, minExpectedGuests), Math.max(1, units.length));
+			const totalSpots = units.reduce((s, u) => s + u.spotCount, 0);
+			// PRICING.md: sim at host max (maxCapacity); cap by total sleep spots
+			const simCount = Math.min(
+				Math.max(1, favorableHeadcountForClosingRange(trip)),
+				Math.max(1, totalSpots)
+			);
 			const rangeByBedId = computePerBedRangeByBedId(trip.totalCost, simCount, units);
 			const byType = aggregatePerBedTypeRanges(units, rangeByBedId);
 			const perBed = Object.entries(byType).map(([bedType, r]) => {

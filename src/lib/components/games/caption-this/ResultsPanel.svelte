@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+
 	type CaptionWithVotes = { id: string; text: string; voteCount?: number };
 	type Props = {
 		captions: CaptionWithVotes[];
@@ -43,12 +45,26 @@
 		</ul>
 	</div>
 	{#if isPhotoSubmitter}
-		<form method="POST" action="?/startNextRound" class="next-round-form">
+		<form
+			method="POST"
+			action="?/startNextRound"
+			class="next-round-form"
+			use:enhance={() => {
+				return async ({ update }) => {
+					startingNext = true;
+					try {
+						await update();
+					} finally {
+						startingNext = false;
+					}
+				};
+			}}
+		>
 			{#if activeTabId}
 				<input type="hidden" name="activeTab" value={activeTabId} />
 			{/if}
 			<button type="submit" class="next-round-btn" disabled={startingNext}>
-				{startingNext ? 'Starting…' : 'Next round'}
+				{startingNext ? 'Starting…' : 'Start next round'}
 			</button>
 		</form>
 	{:else}

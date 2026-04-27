@@ -65,17 +65,47 @@
 		}
 	}
 
-	async function handleNotificationClick(notification: Notification) {
-		if (notification.relatedTripId) {
-			await markRead(notification.id, notification.relatedTripId);
-			open = false;
-			goto(`/trips/${notification.relatedTripId}`);
-			return;
-		}
+	function tripPath(tripId: string, sub: string) {
+		return sub ? `/trips/${tripId}/${sub}` : `/trips/${tripId}`;
+	}
+
+	async function handleNotificationClick(
+		notification: Notification,
+		e: MouseEvent
+	) {
+		e.stopPropagation();
+
 		if (notification.type === 'friend_request' && notification.relatedEntityId) {
 			await markRead(notification.id);
 			open = false;
 			openProfileCard(notification.relatedEntityId);
+			return;
+		}
+
+		if (notification.relatedTripId) {
+			const tid = notification.relatedTripId;
+			await markRead(notification.id, tid);
+			open = false;
+
+			// Message copy often says "approve" — take people to the screen where that action exists.
+			if (notification.type === 'bed_share_request') {
+				const q = notification.relatedEntityId
+					? `?bedId=${encodeURIComponent(notification.relatedEntityId)}`
+					: '';
+				goto(`/trips/${tid}/rooms${q}`);
+				return;
+			}
+			if (notification.type === 'household_duplicate_review') {
+				goto(tripPath(tid, 'guests'));
+				return;
+			}
+			if (notification.type === 'cost_share_guest_approved') {
+				goto(tripPath(tid, 'guests'));
+				return;
+			}
+			// cost_share_reapproval, rsvp_nudge, room_assigned, waitlist_*, invite_received, etc.
+			goto(tripPath(tid, ''));
+			return;
 		}
 	}
 
@@ -144,7 +174,7 @@
 							<button
 								type="button"
 								class="tray-item {notification.read ? 'read' : 'unread'}"
-								onclick={() => handleNotificationClick(notification)}
+								onclick={(e) => handleNotificationClick(notification, e)}
 							>
 								<div class="tray-item-content">
 									<h3>{notification.title}</h3>

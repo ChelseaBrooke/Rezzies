@@ -1436,6 +1436,8 @@
 		}
 		.gp-summary-grid--split .gp-hc-card .gp-hc-meta {
 			margin-top: auto;
+			/* extra air above the pill; margin-top:auto alone hugged the bar on short cards */
+			padding-top: 1.75rem;
 		}
 	}
 
@@ -1537,7 +1539,10 @@
 	.gp-ov-chip--active .gp-ov-chip__n { color: #fff; }
 	.gp-ov-chip__txt { font-weight: 600; color: var(--text, #1e293b); }
 	.gp-ov-chip--active .gp-ov-chip__txt { color: #fff; }
-	.gp-hc-bar { width: 100%; }
+	.gp-hc-bar {
+		width: 100%;
+		margin-bottom: 0.0rem;
+	}
 	.gp-hc-bar__track {
 		position: relative;
 		height: 11px;
@@ -1577,7 +1582,7 @@
 		color: var(--muted, #94a3b8);
 	}
 	.gp-hc-meta {
-		margin-top: 0.65rem;
+		margin-top: 2.0rem;
 	}
 	.gp-hc-pill {
 		display: inline-flex;

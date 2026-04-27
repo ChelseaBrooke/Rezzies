@@ -50,12 +50,14 @@ export type RoundWithDetails = {
 	votes: { voterUserId: string; captionId: string }[];
 };
 
-/** Get the active round (phase !== RESULTS) for the trip, or the latest RESULTS round for display. */
+/**
+ * Latest round for the trip (by `createdAt`), any phase. Vote counts on captions are set when phase is RESULTS.
+ * (Name is historical; it is not “first non-RESULTS” — that would need a different query.)
+ */
 export async function getActiveRound(
 	tripId: string,
 	tripTimezone: string
 ): Promise<RoundWithDetails | null> {
-	const dayKey = getDayKey(tripTimezone);
 	const round = await prisma.captionThisRound.findFirst({
 		where: { tripId },
 		orderBy: { createdAt: 'desc' },
@@ -79,7 +81,10 @@ export async function getActiveRound(
 	return r as RoundWithDetails;
 }
 
-/** Get or create current round. Returns round in WAITING_FOR_PHOTO or existing active round. */
+/**
+ * If the latest round is not finished (not RESULTS), return it (idempotent: safe for double “start next”
+ * after the first request already created a new WAITING round). Otherwise create a new WAITING_FOR_PHOTO round.
+ */
 export async function getOrCreateRound(
 	tripId: string,
 	tripTimezone: string
@@ -123,6 +128,41 @@ export async function submitPhoto(
 			phase: 'CAPTION_SUBMISSION'
 		}
 	});
+	return { ok: true };
+}
+
+/**
+ * Uploader can clear the photo and reset to WAITING_FOR_PHOTO while no votes exist
+ * (caption phase, or voting phase before anyone has voted).
+ */
+export async function removePhoto(
+	roundId: string,
+	userId: string,
+	tripId: string
+): Promise<{ ok: boolean; error?: string }> {
+	const round = await prisma.captionThisRound.findUnique({
+		where: { id: roundId },
+		select: { id: true, tripId: true, phase: true, photoSubmitterUserId: true, photoUrl: true }
+	});
+	if (!round || round.tripId !== tripId) return { ok: false, error: 'Round not found' };
+	if (round.photoSubmitterUserId !== userId) return { ok: false, error: 'Only the uploader can remove the photo' };
+	if (!round.photoUrl) return { ok: false, error: 'No photo to remove' };
+	if (round.phase !== 'CAPTION_SUBMISSION' && round.phase !== 'VOTING') {
+		return { ok: false, error: 'Cannot remove the photo in this phase' };
+	}
+	const nVotes = await prisma.captionThisVote.count({ where: { roundId } });
+	if (nVotes > 0) return { ok: false, error: 'Cannot remove after the first vote' };
+	await prisma.$transaction([
+		prisma.captionThisCaption.deleteMany({ where: { roundId } }),
+		prisma.captionThisRound.update({
+			where: { id: roundId },
+			data: {
+				photoUrl: null,
+				photoSubmitterUserId: null,
+				phase: 'WAITING_FOR_PHOTO'
+			}
+		})
+	]);
 	return { ok: true };
 }
 

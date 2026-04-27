@@ -31,7 +31,21 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 
 	const isSelf = sessionUser?.id === userId;
 	const profileVisibility = user.profileVisibility ?? 'public';
-	if (!isSelf && profileVisibility === 'private') {
+
+	/** So friend-request recipients can open Accept/Decline even if the sender’s profile is private. */
+	const hasPendingFriendRequestToViewer =
+		sessionUser?.id &&
+		!isSelf &&
+		(await prisma.friendRequest.findFirst({
+			where: {
+				fromUserId: userId,
+				toUserId: sessionUser.id,
+				status: 'pending'
+			},
+			select: { id: true }
+		}));
+
+	if (!isSelf && profileVisibility === 'private' && !hasPendingFriendRequestToViewer) {
 		return json({ error: 'User not found' }, { status: 404 });
 	}
 
@@ -67,7 +81,8 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 		}
 	}
 	const canViewFullProfile = isSelf || profileVisibility === 'public' || (profileVisibility === 'trip_only' && sharedTrips.length > 0);
-	if (!isSelf && !canViewFullProfile) {
+	/** Skip trip_only “limited” stub when a friend request is pending so we can load status + action buttons. */
+	if (!isSelf && !canViewFullProfile && !hasPendingFriendRequestToViewer) {
 		return json({
 			displayName: user.name || 'Traveler',
 			avatarUrl: user.avatarUrl,
@@ -107,19 +122,22 @@ export const GET: RequestHandler = async ({ params, cookies }) => {
 		}
 	}
 
+	const showTravelAndStats = isSelf || canViewFullProfile;
+
 	return json({
 		displayName: user.name || 'Traveler',
 		avatarUrl: user.avatarUrl,
-		travelStyle: user.travelStyle,
-		homeCity: user.homeCity,
-		memberSince: user.createdAt.getFullYear(),
+		travelStyle: showTravelAndStats ? user.travelStyle : null,
+		homeCity: showTravelAndStats ? user.homeCity : null,
+		memberSince: showTravelAndStats ? user.createdAt.getFullYear() : null,
 		isSelf,
-		tripsHosted,
-		tripsJoined,
-		sharedTrips,
+		tripsHosted: showTravelAndStats ? tripsHosted : 0,
+		tripsJoined: showTravelAndStats ? tripsJoined : 0,
+		sharedTrips: showTravelAndStats ? sharedTrips : [],
 		friendshipStatus,
 		pendingRequestFromUserId,
-		friends,
-		limitedView: false
+		friends: showTravelAndStats ? friends : [],
+		/** Name + avatar only when private; friend Accept/Decline still shown in UI. */
+		limitedView: !canViewFullProfile
 	});
 };

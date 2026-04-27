@@ -1,10 +1,11 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { prisma } from '$lib/server/prisma.js';
 import {
 	getActiveRound,
 	getOrCreateRound,
 	submitPhoto as submitPhotoGame,
+	removePhoto as removePhotoGame,
 	submitCaption as submitCaptionGame,
 	submitVote as submitVoteGame,
 	endRoundNow,
@@ -59,6 +60,18 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	removePhoto: async ({ request, params, parent }) => {
+		const { user, trip } = await parent();
+		const tripId = params.tripId;
+		if (!user || !trip || trip.id !== tripId) return fail(403, { error: 'Unauthorized' });
+		const formData = await request.formData();
+		const roundId = formData.get('roundId') as string | null;
+		if (!roundId) return fail(400, { error: 'Missing roundId' });
+		const result = await removePhotoGame(roundId, user.id, tripId);
+		if (!result.ok) return fail(400, { error: result.error });
+		return { success: true };
+	},
+
 	submitCaption: async ({ request, params, parent }) => {
 		const { user, trip } = await parent();
 		const tripId = params.tripId;
@@ -102,6 +115,7 @@ export const actions: Actions = {
 		const tripId = params.tripId;
 		if (!user || !trip || trip.id !== tripId) return fail(403, { error: 'Unauthorized' });
 		await getOrCreateRound(tripId, trip.timezone ?? 'UTC');
-		return { success: true };
+		// Full navigation keeps client state in sync and matches the games/ embed behavior.
+		throw redirect(303, `/trips/${tripId}/games/caption-this`);
 	}
 };

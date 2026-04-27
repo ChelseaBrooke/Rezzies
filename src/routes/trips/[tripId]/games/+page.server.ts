@@ -8,6 +8,7 @@ import {
 	getOrCreateRound,
 	getPastRounds,
 	submitPhoto as submitPhotoCaptionThis,
+	removePhoto as removePhotoCaptionThis,
 	submitCaption as submitCaptionCaptionThis,
 	submitVote as submitVoteCaptionThis,
 	endRoundNow as endRoundNowCaptionThis,
@@ -128,6 +129,18 @@ export const actions: Actions = {
 		const photoUrl = formData.get('photoUrl') as string | null;
 		if (!roundId || !photoUrl) return fail(400, { error: 'Missing roundId or photo' });
 		const result = await submitPhotoCaptionThis(roundId, user.id, photoUrl, tripId);
+		if (!result.ok) return fail(400, { error: result.error });
+		return { success: true };
+	},
+	removePhoto: async ({ request, params, cookies }) => {
+		const user = await getSessionUser(cookies);
+		if (!user) return fail(403, { error: 'Unauthorized' });
+		const tripId = params.tripId;
+		if (!(await isTripMember(tripId, user.id))) return fail(403, { error: 'Unauthorized' });
+		const formData = await request.formData();
+		const roundId = formData.get('roundId') as string | null;
+		if (!roundId) return fail(400, { error: 'Missing roundId' });
+		const result = await removePhotoCaptionThis(roundId, user.id, tripId);
 		if (!result.ok) return fail(400, { error: result.error });
 		return { success: true };
 	},

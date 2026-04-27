@@ -221,7 +221,15 @@
 							{/if}
 						</div>
 						<h2 id="profile-card-name" class="profile-card-name">{profile.displayName}</h2>
-						<p class="profile-card-limited">This profile is only visible to people they've been on a trip with.</p>
+						{#if profile.friendshipStatus === 'pending_received' && profile.pendingRequestFromUserId}
+							<p class="profile-card-limited">Wants to connect on Divvi.</p>
+							<div class="profile-card-actions profile-card-actions--row">
+								<button type="button" class="btn btn-primary" onclick={acceptRequest}>Accept</button>
+								<button type="button" class="btn btn-ghost" onclick={declineRequest}>Decline</button>
+							</div>
+						{:else}
+							<p class="profile-card-limited">This profile is only visible to people they've been on a trip with.</p>
+						{/if}
 					{:else}
 					<div class="profile-card-avatar-wrap">
 						{#if profile.avatarUrl}

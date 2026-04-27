@@ -94,8 +94,11 @@
 	{#if !compact}
 		<!-- Page header -->
 		<header class="lobby-header">
+			<p class="lobby-eyebrow">Game library</p>
 			<h1 class="lobby-title">Games</h1>
-			<p class="lobby-sub">Play together, wherever you are. Bragging rights await.</p>
+			<p class="lobby-sub">
+				Your trip's game library - pick a game to play. Bragging rights await.
+			</p>
 		</header>
 
 		<!-- Activity strip -->
@@ -126,12 +129,53 @@
 				onclick={() => onNavigate(card.id)}
 				aria-label="Play {card.name}"
 			>
-				<!-- Illustration zone -->
 				<div class="card-art" style="background: {card.color};">
-					<!-- CSS pattern circles -->
-					<span class="card-art-circle card-art-circle--1" style="background: {card.colorPattern};" aria-hidden="true"></span>
-					<span class="card-art-circle card-art-circle--2" style="background: {card.colorPattern};" aria-hidden="true"></span>
-					<span class="card-art-circle card-art-circle--3" style="background: {card.colorPattern};" aria-hidden="true"></span>
+					<div class="card-art-marks" aria-hidden="true">
+						{#if card.id === 'scavenger-bingo'}
+							<svg class="card-art-svg card-art-svg--a" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="12" cy="11" r="3" /><path d="M3 9h4l1-2h6l1 2h4" /></svg
+							>
+							<svg class="card-art-svg card-art-svg--b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" /><circle cx="12" cy="9" r="2" /></svg
+							>
+							<svg class="card-art-svg card-art-svg--c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg
+							>
+						{:else if card.id === 'caption-this'}
+							<svg class="card-art-svg card-art-svg--a" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg
+							>
+							<svg class="card-art-svg card-art-svg--b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg
+							>
+							<svg class="card-art-svg card-art-svg--c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" stroke-linejoin="round" /></svg
+							>
+						{:else if card.id === 'alphabet-hunt'}
+							<svg class="card-art-svg card-art-svg--a" viewBox="0 0 24 24" fill="currentColor" stroke="none"
+								><text x="3" y="19" font-size="15" font-family="Georgia,serif" font-weight="700">A</text></svg
+							>
+							<svg class="card-art-svg card-art-svg--b" viewBox="0 0 24 24" fill="currentColor" stroke="none"
+								><text x="8" y="20" font-size="13" font-family="Georgia,serif" font-weight="700">→</text></svg
+							>
+							<svg class="card-art-svg card-art-svg--c" viewBox="0 0 24 24" fill="currentColor" stroke="none"
+								><text x="2" y="20" font-size="15" font-family="Georgia,serif" font-weight="700">Z</text></svg
+							>
+							<svg class="card-art-svg card-art-svg--d" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg
+							>
+						{:else if card.id === 'daily-trivia'}
+							<svg class="card-art-svg card-art-svg--a" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg
+							>
+							<svg class="card-art-svg card-art-svg--b" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2z" /></svg
+							>
+							<svg class="card-art-svg card-art-svg--c" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+								><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg
+							>
+						{/if}
+					</div>
 					<span class="card-art-emoji" aria-hidden="true">{card.icon}</span>
 				</div>
 
@@ -162,6 +206,16 @@
 	/* ── Header ── */
 	.lobby-header {
 		padding-top: 1.5rem;
+	}
+
+	.lobby-eyebrow {
+		font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+		font-size: 0.7rem;
+		font-weight: 800;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: #2f7778;
+		margin: 0 0 0.35rem;
 	}
 
 	.lobby-title {
@@ -272,7 +326,7 @@
 	/* Illustration zone */
 	.card-art {
 		position: relative;
-		height: 120px;
+		height: 158px;
 		overflow: hidden;
 		display: flex;
 		align-items: center;
@@ -280,56 +334,59 @@
 		flex-shrink: 0;
 	}
 	.lobby--compact .card-art {
-		height: 70px;
+		height: 88px;
 	}
 	.lobby--compact .card-art-emoji {
 		font-size: 1.85rem;
 	}
-	.lobby--compact .card-art-circle--1 {
+	.lobby--compact .card-art-svg--a { width: 64px; height: 64px; top: -6px; left: -4px; opacity: 0.3; }
+	.lobby--compact .card-art-svg--b { width: 48px; height: 48px; bottom: 2px; right: 0; opacity: 0.28; }
+	.lobby--compact .card-art-svg--c { width: 40px; height: 40px; top: 6px; right: 20%; opacity: 0.22; }
+	.lobby--compact .card-art-svg--d { width: 36px; height: 36px; bottom: 8px; left: 8px; opacity: 0.25; }
+
+	.card-art-marks {
+		position: absolute;
+		inset: 0;
+		color: rgba(255, 255, 255, 0.34);
+		pointer-events: none;
+		overflow: hidden;
+	}
+
+	.card-art-svg {
+		position: absolute;
+		display: block;
+		opacity: 0.36;
+	}
+
+	.card-art-svg--a {
+		width: 130px;
+		height: 130px;
+		top: -24px;
+		left: -20px;
+		transform: rotate(-8deg);
+	}
+	.card-art-svg--b {
+		width: 100px;
+		height: 100px;
+		bottom: -16px;
+		right: -12px;
+		transform: rotate(12deg);
+		opacity: 0.3;
+	}
+	.card-art-svg--c {
 		width: 72px;
 		height: 72px;
-		top: -24px;
-		left: -16px;
+		top: 12px;
+		right: 18%;
+		opacity: 0.22;
 	}
-	.lobby--compact .card-art-circle--2 {
-		width: 48px;
-		height: 48px;
-		bottom: -12px;
-		right: -6px;
-	}
-	.lobby--compact .card-art-circle--3 {
-		width: 32px;
-		height: 32px;
-		top: 6px;
-		right: 18px;
-	}
-
-	.card-art-circle {
-		position: absolute;
-		border-radius: 50%;
-		opacity: 0.45;
-	}
-
-	.card-art-circle--1 {
-		width: 120px;
-		height: 120px;
-		top: -40px;
-		left: -30px;
-	}
-
-	.card-art-circle--2 {
-		width: 80px;
-		height: 80px;
-		bottom: -20px;
-		right: -10px;
-	}
-
-	.card-art-circle--3 {
-		width: 50px;
-		height: 50px;
-		top: 10px;
-		right: 30px;
-		opacity: 0.25;
+	.card-art-svg--d {
+		width: 64px;
+		height: 64px;
+		bottom: 4px;
+		left: 12px;
+		opacity: 0.28;
+		transform: rotate(-6deg);
 	}
 
 	.card-art-emoji {
@@ -344,7 +401,8 @@
 		display: flex;
 		align-items: flex-start;
 		gap: 0.5rem;
-		padding: 0.875rem 1rem;
+		padding: 1rem 1.05rem 1.1rem;
+		min-height: 5.5rem;
 		flex: 1;
 	}
 
@@ -428,15 +486,15 @@
 		}
 
 		.card-art {
-			height: 100px;
+			height: 132px;
 		}
 
 		.card-art-emoji {
 			font-size: 2.25rem;
 		}
 
-		.card-art-circle--1 { width: 90px; height: 90px; }
-		.card-art-circle--2 { width: 64px; height: 64px; }
+		.card-art-svg--a { width: 100px; height: 100px; }
+		.card-art-svg--b { width: 80px; height: 80px; }
 
 		.card-body {
 			align-items: center;

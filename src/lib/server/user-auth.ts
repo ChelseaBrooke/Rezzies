@@ -1,14 +1,23 @@
-import bcrypt from 'bcryptjs';
 import { prisma } from './prisma.js';
 import { hashPassword, verifyPassword } from './auth.js';
+
+/** Fixed bcrypt hash for the string "x" (cost 10) — used so "unknown user" still runs a compare. */
+const DUMMY_PASSWORD_HASH =
+	'$2a$10$zC0iQ.Adh1uH2ESH3r.8teNaCH5NF9qAq0ufH7SFrs3jItxNxBMia';
+
+export function normalizeEmail(email: string): string {
+	return email.trim().toLowerCase();
+}
 
 export async function createUser(
 	email: string,
 	password: string,
 	opts?: { name?: string; travelStyle?: string | null }
 ): Promise<{ id: string; email: string; name: string | null }> {
-	const existingUser = await prisma.user.findUnique({
-		where: { email }
+	const emailNorm = normalizeEmail(email);
+
+	const existingUser = await prisma.user.findFirst({
+		where: { email: { equals: emailNorm, mode: 'insensitive' } }
 	});
 
 	if (existingUser) {
@@ -21,7 +30,7 @@ export async function createUser(
 
 	const user = await prisma.user.create({
 		data: {
-			email,
+			email: emailNorm,
 			passwordHash,
 			name,
 			travelStyle
@@ -37,16 +46,15 @@ export async function createUser(
 }
 
 export async function verifyUser(email: string, password: string): Promise<{ id: string; email: string; name: string | null } | null> {
-	const user = await prisma.user.findUnique({
-		where: { email }
+	const emailNorm = normalizeEmail(email);
+	const user = await prisma.user.findFirst({
+		where: { email: { equals: emailNorm, mode: 'insensitive' } }
 	});
 
-	if (!user) {
-		return null;
-	}
-
-	const isValid = await verifyPassword(password, user.passwordHash);
-	if (!isValid) {
+	// Always run bcrypt.compare so timing does not reveal whether the email exists.
+	const hash = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
+	const isValid = await verifyPassword(password, hash);
+	if (!user || !isValid) {
 		return null;
 	}
 
@@ -70,8 +78,9 @@ export async function getUserById(userId: string) {
 }
 
 export async function getUserByEmail(email: string) {
-	return prisma.user.findUnique({
-		where: { email },
+	const emailNorm = normalizeEmail(email);
+	return prisma.user.findFirst({
+		where: { email: { equals: emailNorm, mode: 'insensitive' } },
 		select: {
 			id: true,
 			email: true,
