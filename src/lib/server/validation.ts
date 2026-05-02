@@ -21,11 +21,6 @@ export type GuestSubmissionInput = z.infer<typeof guestSubmissionSchema>;
 export const tripCreationSchema = z.object({
 	name: z.string().min(1, 'Trip name is required').max(200),
 	description: z.string().max(1000).optional(),
-	listingUrl: z.preprocess(
-		(val) => (val === '' || val === null ? undefined : val),
-		z.string().url('Invalid URL').optional()
-	),
-	listingTitle: z.string().optional(),
 	listingCoverPhoto: z.string().optional(),
 	checkInDate: z.coerce.date(),
 	checkOutDate: z.coerce.date(),

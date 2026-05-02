@@ -15,7 +15,7 @@ model Trip {
   id                String   @id @default(uuid())
   name              String
   description       String?
-  listingUrl        String? // Airbnb/VRBO URL
+  listingUrl        String? // Legacy; app no longer sets this
   listingTitle      String?
   listingCoverPhoto String?
   checkInDate       DateTime

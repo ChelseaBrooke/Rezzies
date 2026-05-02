@@ -73,7 +73,12 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	const totalTripCostStr = typeof d.totalTripCost === 'string' ? d.totalTripCost : String(d.totalTripCost ?? '');
 	const rooms = Array.isArray(d.rooms) ? d.rooms : [];
 	const description = typeof d.description === 'string' ? d.description : null;
-	const listingUrl = typeof d.listingUrl === 'string' ? d.listingUrl : null;
+	const listingUrl =
+		'listingUrl' in d
+			? typeof d.listingUrl === 'string'
+				? d.listingUrl.trim() || null
+				: null
+			: undefined;
 	const propertyAddress = typeof d.propertyAddress === 'string' ? d.propertyAddress.trim() || null : null;
 	const fullAddressPayload = typeof d.fullAddress === 'string' ? d.fullAddress.trim() || null : null;
 	const locationCityPayload = typeof d.locationCity === 'string' ? d.locationCity.trim() || null : null;
@@ -196,7 +201,7 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 			data: {
 				name,
 				description: description || null,
-				listingUrl,
+				...(listingUrl !== undefined ? { listingUrl } : {}),
 				listingCoverPhoto: coverPhoto || null,
 				checkInDate,
 				checkOutDate,

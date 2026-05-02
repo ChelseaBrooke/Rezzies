@@ -82,4 +82,18 @@
 	--transition-fast: 150ms ease;
 	--transition-base: 200ms ease;
 	--transition-slow: 300ms ease;
+
+	/* Editorial display scale — used by marketing pages (/our-services) where the
+	 * page sits on a light "paper" surface inside MarketingShell's dark canvas.
+	 * Three Fraunces sizes: hero display, section opener, CTA closer.
+	 */
+	--display-xl: clamp(2.75rem, 6vw, 5rem);    /* hero headline */
+	--display-lg: clamp(2rem, 4vw, 3rem);       /* section titles */
+	--display-md: clamp(1.5rem, 2.5vw, 2rem);   /* CTA headline */
+
+	/* Warm off-white "magazine page" surface for editorial marketing layouts.
+	 * Paired with --shadow-paper so a light page floats on the dark MarketingShell bg.
+	 */
+	--surface-paper: #fbf9f6;
+	--shadow-paper: 0 30px 80px -30px rgba(10, 18, 22, 0.45);
 }

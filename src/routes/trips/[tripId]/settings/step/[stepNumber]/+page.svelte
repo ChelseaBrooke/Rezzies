@@ -24,7 +24,6 @@
 		return {
 			name: d.name,
 			description: d.description ?? '',
-			listingUrl: d.listingUrl ?? '',
 			propertyAddress: address,
 			fullAddress: address,
 			locationCity: (d.locationCity ?? '').trim() || undefined,

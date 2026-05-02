@@ -129,13 +129,11 @@ export function getDefaultActivitiesConfig(): ActivitiesConfig {
 }
 
 export interface TripDraft {
-	// Step 1: Basics & Source
+	// Step 1: Basics
 	name: string;
 	description: string;
 	visibility: 'private' | 'invite-only';
-	sourceType: 'airbnb' | 'vrbo' | 'manual';
-	listingUrl: string;
-	
+
 	// Step 2: Location, Dates & Media
 	destinationCity: string;
 	destinationState: string;
@@ -236,8 +234,6 @@ const defaultDraft: TripDraft = {
 	name: '',
 	description: '',
 	visibility: 'invite-only',
-	sourceType: 'manual',
-	listingUrl: '',
 	destinationCity: '',
 	destinationState: '',
 	destinationCountry: '',
@@ -301,7 +297,6 @@ export interface TripForDraft {
 	id: string;
 	name: string;
 	description?: string | null;
-	listingUrl?: string | null;
 	listingCoverPhoto?: string | null;
 	checkInDate: Date | string;
 	checkOutDate: Date | string;
@@ -369,7 +364,6 @@ export function tripToDraft(trip: TripForDraft | null | undefined): TripDraft {
 		...defaultDraft,
 		name: trip.name ?? '',
 		description: trip.description ?? '',
-		listingUrl: trip.listingUrl ?? '',
 		coverPhoto: trip.listingCoverPhoto ?? '',
 		galleryPhotos: trip.listingCoverPhoto ? [trip.listingCoverPhoto] : [],
 		destinationCity: (trip.fullAddress ?? trip.location) ?? '',

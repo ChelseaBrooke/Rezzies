@@ -13,7 +13,7 @@ A consumer-friendly web application that allows trip organizers to fairly split 
 
 ## Features
 
-- **Trip Management**: Create and manage multiple trips with Airbnb/VRBO integration
+- **Trip Management**: Create and manage multiple trips from a guided wizard
 - **Flexible Pricing Models**: Support for per-room, per-bed, per-person, and per-person-per-night pricing
 - **Room & Bed Setup**: Easy interface for hosts to configure room inventory
 - **Invite Code Access**: Secure trip access via unique invite codes

@@ -61,7 +61,6 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		typeof d.totalTripCost === 'string' ? d.totalTripCost : String(d.totalTripCost ?? '0');
 	const rooms = Array.isArray(d.rooms) ? d.rooms : [];
 	const description = typeof d.description === 'string' ? d.description : null;
-	const listingUrl = typeof d.listingUrl === 'string' ? d.listingUrl : null;
 	const propertyAddress = typeof d.propertyAddress === 'string' ? d.propertyAddress : null;
 	const locationCity = typeof d.locationCity === 'string' ? d.locationCity.trim() || null : null;
 	const coverPhoto = typeof d.coverPhoto === 'string' ? d.coverPhoto : null;
@@ -198,7 +197,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			data: {
 				name,
 				description: description || null,
-				listingUrl,
+				listingUrl: null,
 				listingTitle: null,
 				listingCoverPhoto: coverPhoto || null,
 				checkInDate,
