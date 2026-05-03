@@ -57,7 +57,8 @@
 		/** Trip rooms list, used to label your stay when assignment.room is missing but roomId is set */
 		stayRoomLookup = [],
 		/** Resolved on the trip dashboard load (guest), avoids client/prop sync issues */
-		serverStayRoomLabel = null as string | null
+		serverStayRoomLabel = null as string | null,
+		gamesUiEnabled = false
 	}: {
 		tripId: string;
 		isHost?: boolean;
@@ -92,6 +93,7 @@
 		userRsvp?: { adultsCount?: number; kidsCount?: number } | null;
 		stayRoomLookup?: StayRoomRow[];
 		serverStayRoomLabel?: string | null;
+		gamesUiEnabled?: boolean;
 	} = $props();
 
 	function stayRoomLabelFromAssignment(a: RoomAssignment | null | undefined): string | null {
@@ -560,25 +562,27 @@
 						</div>
 					</header>
 					<div class="v-quick-tiles">
-						<a href="/trips/{tripId}/games" class="v-quick-tile v-quick-tile--games">
-							<span class="v-quick-tile__icon" aria-hidden="true">
-								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-									<rect x="2" y="6" width="20" height="12" rx="4" />
-									<line x1="7" y1="12" x2="10" y2="12" />
-									<line x1="8.5" y1="10.5" x2="8.5" y2="13.5" />
-									<circle cx="16" cy="12" r="0.9" fill="currentColor" stroke="none" />
-									<circle cx="19" cy="12" r="0.9" fill="currentColor" stroke="none" />
-								</svg>
-							</span>
-							<span class="v-quick-tile__body">
-								<span class="v-quick-tile__kicker">Play</span>
-								<span class="v-quick-tile__name">Group games</span>
-								<span class="v-quick-tile__sub">Scoreboards, prompts &amp; laughs</span>
-							</span>
-							<span class="v-quick-tile__arrow" aria-hidden="true">
-								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg>
-							</span>
-						</a>
+						{#if gamesUiEnabled}
+							<a href="/trips/{tripId}/games" class="v-quick-tile v-quick-tile--games">
+								<span class="v-quick-tile__icon" aria-hidden="true">
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+										<rect x="2" y="6" width="20" height="12" rx="4" />
+										<line x1="7" y1="12" x2="10" y2="12" />
+										<line x1="8.5" y1="10.5" x2="8.5" y2="13.5" />
+										<circle cx="16" cy="12" r="0.9" fill="currentColor" stroke="none" />
+										<circle cx="19" cy="12" r="0.9" fill="currentColor" stroke="none" />
+									</svg>
+								</span>
+								<span class="v-quick-tile__body">
+									<span class="v-quick-tile__kicker">Play</span>
+									<span class="v-quick-tile__name">Group games</span>
+									<span class="v-quick-tile__sub">Scoreboards, prompts &amp; laughs</span>
+								</span>
+								<span class="v-quick-tile__arrow" aria-hidden="true">
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+								</span>
+							</a>
+						{/if}
 						<a href="/trips/{tripId}/files" class="v-quick-tile v-quick-tile--gallery">
 							<span class="v-quick-tile__icon" aria-hidden="true">
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

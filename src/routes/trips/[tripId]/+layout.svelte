@@ -44,7 +44,7 @@
 		checkInDate={data.trip?.checkInDate ?? null}
 		checkOutDate={data.trip?.checkOutDate ?? null}
 		activitiesEnabled={true}
-		gamesEnabled={true}
+		gamesEnabled={data.gamesUiEnabled ?? false}
 		invitePreviewMode={data.invitePreview === true}
 		inviteToken={data.inviteToken}
 	>

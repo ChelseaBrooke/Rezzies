@@ -28,9 +28,20 @@
 		previewHostName: string;
 		goingMembers: GoingMember[];
 		counts: { meals: number; activities: number; games: number };
+		/** Mirrors trip layout `gamesUiEnabled` (see `src/lib/config/features.ts`). */
+		gamesUiEnabled?: boolean;
 	}
 
-	let { tripId, inviteToken, inviteStatus, trip, previewHostName, goingMembers, counts }: Props = $props();
+	let {
+		tripId,
+		inviteToken,
+		inviteStatus,
+		trip,
+		previewHostName,
+		goingMembers,
+		counts,
+		gamesUiEnabled = false
+	}: Props = $props();
 
 	const quickActions = getContext<{ onInvite: () => void; showToast: (msg: string) => void }>('tripQuickActions');
 
@@ -143,7 +154,7 @@
 			selectedMode="planning"
 			itineraryHref=""
 			gamesHref=""
-			gamesCount={counts.games}
+			gamesCount={gamesUiEnabled ? counts.games : 0}
 			{hostedByLine}
 			hideQuickActions={true}
 		/>
@@ -182,7 +193,13 @@
 		<div class="inv-locked" aria-hidden="false">
 			<div class="inv-locked-inner">
 				<span class="inv-lock-icon" aria-hidden="true">🔒</span>
-				<p class="inv-locked-title">Itinerary, rooms, polls, games &amp; chat stay private until you join</p>
+				<p class="inv-locked-title">
+					{#if gamesUiEnabled}
+						Itinerary, rooms, polls, games &amp; chat stay private until you join
+					{:else}
+						Itinerary, rooms, polls &amp; chat stay private until you join
+					{/if}
+				</p>
 				<p class="inv-locked-copy">
 					We keep collaboration details for confirmed guests. Sign in and join to see everything.
 				</p>

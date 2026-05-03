@@ -15,6 +15,7 @@
 
 	let { data }: { data: PageData } = $props();
 
+	const gamesUiEnabled = $derived(data.gamesUiEnabled ?? false);
 	const quickActions = getContext<{ onInvite: () => void; showToast: (msg: string) => void }>('tripQuickActions');
 
 	const trip = $derived(data.trip);
@@ -209,10 +210,12 @@
 			previewHostName={data.previewHostName}
 			goingMembers={trip.members ?? []}
 			counts={data.previewCounts}
+			{gamesUiEnabled}
 		/>
 	{:else if dashboardMode === 'vacation'}
 		<VacationModeView
 			tripId={trip.id}
+			{gamesUiEnabled}
 			isHost={false}
 			hostName={hostName}
 			trip={{
@@ -250,6 +253,7 @@
 		{:else if dashboardMode === 'recap'}
 		<RecapModeView
 			tripId={trip.id}
+			{gamesUiEnabled}
 			isHost={false}
 			{hostedByLine}
 			trip={{
@@ -297,8 +301,8 @@
 			{mealSlots}
 			selectedMode={dashboardMode}
 			itineraryHref={trip ? `/trips/${trip.id}/itinerary` : ''}
-			gamesHref={trip ? `/trips/${trip.id}/games` : ''}
-			gamesCount={data.tripGames?.length ?? 0}
+			gamesHref={gamesUiEnabled && trip ? `/trips/${trip.id}/games` : ''}
+			gamesCount={gamesUiEnabled ? (data.tripGames?.length ?? 0) : 0}
 			{hostedByLine}
 			canHostShare={data.canHostShare ?? false}
 			householdShare={data.householdShare ?? null}
@@ -362,7 +366,7 @@
 					title: m.title ?? null,
 					createdAt: String(m.createdAt)
 				}))}
-				recentGames={data.tripGames ?? []}
+				recentGames={gamesUiEnabled ? (data.tripGames ?? []) : []}
 				recentPolls={data.recentPolls ?? []}
 			/>
 		{/if}

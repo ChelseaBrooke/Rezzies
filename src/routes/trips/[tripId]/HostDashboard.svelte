@@ -14,6 +14,7 @@
 
 	let { data }: { data: PageData } = $props();
 
+	const gamesUiEnabled = $derived(data.gamesUiEnabled ?? false);
 	const trip = $derived(data.trip);
 	const modeFromDate = $derived.by((): DashboardMode => {
 		const checkIn = trip?.checkInDate ? new Date(trip.checkInDate) : null;
@@ -222,6 +223,7 @@
 	{#if dashboardMode === 'vacation'}
 		<VacationModeView
 			tripId={trip.id}
+			{gamesUiEnabled}
 			isHost={true}
 			hostName={hostName}
 			trip={{
@@ -258,6 +260,7 @@
 		{:else if dashboardMode === 'recap'}
 		<RecapModeView
 			tripId={trip.id}
+			{gamesUiEnabled}
 			isHost={true}
 			{hostedByLine}
 			trip={{
@@ -304,8 +307,8 @@
 			{mealSlots}
 			selectedMode={dashboardMode}
 			itineraryHref={trip ? `/trips/${trip.id}/itinerary` : ''}
-			gamesHref={trip ? `/trips/${trip.id}/games` : ''}
-			gamesCount={data.tripGames?.length ?? 0}
+			gamesHref={gamesUiEnabled && trip ? `/trips/${trip.id}/games` : ''}
+			gamesCount={gamesUiEnabled ? (data.tripGames?.length ?? 0) : 0}
 			{hostedByLine}
 			canHostShare={data.canHostShare ?? false}
 			householdShare={data.householdShare ?? null}
@@ -368,7 +371,7 @@
 					title: m.title ?? null,
 					createdAt: String(m.createdAt)
 				}))}
-				recentGames={data.tripGames ?? []}
+				recentGames={gamesUiEnabled ? (data.tripGames ?? []) : []}
 				recentPolls={data.recentPolls ?? []}
 			/>
 		{/if}

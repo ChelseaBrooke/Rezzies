@@ -6,6 +6,7 @@
 	import TripSwitcher from './TripSwitcher.svelte';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import type { TripForSidebar } from '$lib/trips/types.js';
+	import { FEATURE_TRIP_GAMES } from '$lib/config/features.js';
 
 	let {
 		trip,
@@ -62,15 +63,19 @@
 		}))
 	);
 
-	const mobileTabs = [
-		{ href: `/trips/${tripId}`, label: 'Dashboard', icon: '📊' },
-		{ href: `/trips/${tripId}/guests`, label: 'Guests', icon: '👥' },
-		{ href: `/trips/${tripId}/rooms`, label: 'Rooms', icon: '🛏️' },
-		{ href: `/trips/${tripId}/itinerary`, label: 'Itinerary', icon: '📋' },
-		{ href: `/trips/${tripId}/polls`, label: 'Polls', icon: '🗳️' },
-		{ href: `/trips/${tripId}/games`, label: 'Games', icon: '🎲' },
-		{ href: `/trips/${tripId}/files`, label: 'Files', icon: '📁' }
-	];
+	const mobileTabs = $derived.by(() => {
+		const id = tripId;
+		const all = [
+			{ href: `/trips/${id}`, label: 'Dashboard', icon: '📊' },
+			{ href: `/trips/${id}/guests`, label: 'Guests', icon: '👥' },
+			{ href: `/trips/${id}/rooms`, label: 'Rooms', icon: '🛏️' },
+			{ href: `/trips/${id}/itinerary`, label: 'Itinerary', icon: '📋' },
+			{ href: `/trips/${id}/polls`, label: 'Polls', icon: '🗳️' },
+			{ href: `/trips/${id}/games`, label: 'Games', icon: '🎲' },
+			{ href: `/trips/${id}/files`, label: 'Files', icon: '📁' }
+		];
+		return FEATURE_TRIP_GAMES ? all : all.filter((t) => !t.href.endsWith('/games'));
+	});
 
 	function isActive(href: string) {
 		if (href === `/trips/${tripId}`) return currentPath === href;

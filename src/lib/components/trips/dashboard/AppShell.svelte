@@ -46,7 +46,7 @@
 		checkInDate = null,
 		checkOutDate = null,
 		activitiesEnabled = true,
-		gamesEnabled = true,
+		gamesEnabled = false,
 		isHost = false,
 		invitePreviewMode = false,
 		inviteToken = null

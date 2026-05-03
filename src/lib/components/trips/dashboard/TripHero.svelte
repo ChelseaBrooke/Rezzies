@@ -79,7 +79,10 @@
 
 	const mealsCount = $derived(mealSlots.length);
 	const activitiesCount = $derived(activities.length);
-	const showMealsActivitiesGames = $derived(mealsCount > 0 || activitiesCount > 0 || gamesCount > 0);
+	const showGamesInHero = $derived(gamesCount > 0 || (gamesHref ?? '').length > 0);
+	const showMealsActivitiesGames = $derived(
+		mealsCount > 0 || activitiesCount > 0 || showGamesInHero
+	);
 
 	const destinationLabel = $derived((trip.locationCity ?? trip.fullAddress ?? trip.location)?.trim() ?? '');
 	const isCompact = $derived(selectedMode === 'vacation' || selectedMode === 'recap');
@@ -123,11 +126,13 @@
 						{:else}
 							<span class="hero-count-text">{activitiesCount} activities</span>
 						{/if}
-						<span class="hero-count-sep">|</span>
-						{#if gamesHref}
-							<a href={gamesHref} class="hero-count-link">{gamesCount} games</a>
-						{:else}
-							<span class="hero-count-text">{gamesCount} games</span>
+						{#if showGamesInHero}
+							<span class="hero-count-sep">|</span>
+							{#if gamesHref}
+								<a href={gamesHref} class="hero-count-link">{gamesCount} games</a>
+							{:else}
+								<span class="hero-count-text">{gamesCount} games</span>
+							{/if}
 						{/if}
 					</div>
 				{/if}
@@ -221,11 +226,13 @@
 						{:else}
 							<span class="hero-count-text">{activitiesCount} activities</span>
 						{/if}
-						<span class="hero-count-sep">|</span>
-						{#if gamesHref}
-							<a href={gamesHref} class="hero-count-link">{gamesCount} games</a>
-						{:else}
-							<span class="hero-count-text">{gamesCount} games</span>
+						{#if showGamesInHero}
+							<span class="hero-count-sep">|</span>
+							{#if gamesHref}
+								<a href={gamesHref} class="hero-count-link">{gamesCount} games</a>
+							{:else}
+								<span class="hero-count-text">{gamesCount} games</span>
+							{/if}
 						{/if}
 					</div>
 				{/if}

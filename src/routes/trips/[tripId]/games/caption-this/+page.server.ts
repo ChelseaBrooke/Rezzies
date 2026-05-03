@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { prisma } from '$lib/server/prisma.js';
+import { ensureTripGamesEnabled } from '$lib/server/trip-games-guard.js';
 import {
 	getActiveRound,
 	getOrCreateRound,
@@ -15,6 +16,7 @@ import {
 } from '$lib/server/caption-this.js';
 
 export const load: PageServerLoad = async ({ parent, params }) => {
+	ensureTripGamesEnabled(params.tripId);
 	const { trip, user } = await parent();
 	const tripId = params.tripId;
 	if (!trip || !user || trip.id !== tripId) {
@@ -48,6 +50,7 @@ export const load: PageServerLoad = async ({ parent, params }) => {
 
 export const actions: Actions = {
 	submitPhoto: async ({ request, params, parent }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const { user, trip } = await parent();
 		const tripId = params.tripId;
 		if (!user || !trip || trip.id !== tripId) return fail(403, { error: 'Unauthorized' });
@@ -61,6 +64,7 @@ export const actions: Actions = {
 	},
 
 	removePhoto: async ({ request, params, parent }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const { user, trip } = await parent();
 		const tripId = params.tripId;
 		if (!user || !trip || trip.id !== tripId) return fail(403, { error: 'Unauthorized' });
@@ -73,6 +77,7 @@ export const actions: Actions = {
 	},
 
 	submitCaption: async ({ request, params, parent }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const { user, trip } = await parent();
 		const tripId = params.tripId;
 		if (!user || !trip || trip.id !== tripId) return fail(403, { error: 'Unauthorized' });
@@ -86,6 +91,7 @@ export const actions: Actions = {
 	},
 
 	submitVote: async ({ request, params, parent }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const { user, trip } = await parent();
 		const tripId = params.tripId;
 		if (!user || !trip || trip.id !== tripId) return fail(403, { error: 'Unauthorized' });
@@ -99,6 +105,7 @@ export const actions: Actions = {
 	},
 
 	endRoundNow: async ({ request, params, parent }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const { user, trip } = await parent();
 		const tripId = params.tripId;
 		if (!user || !trip || trip.id !== tripId) return fail(403, { error: 'Unauthorized' });
@@ -111,6 +118,7 @@ export const actions: Actions = {
 	},
 
 	startNextRound: async ({ params, parent }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const { user, trip } = await parent();
 		const tripId = params.tripId;
 		if (!user || !trip || trip.id !== tripId) return fail(403, { error: 'Unauthorized' });

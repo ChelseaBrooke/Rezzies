@@ -42,7 +42,8 @@
 		totalCost = 0,
 		costSharingEnabled = true,
 		rsvps = [],
-		tripGalleryFiles = []
+		tripGalleryFiles = [],
+		gamesUiEnabled = false
 	}: {
 		tripId: string;
 		isHost?: boolean;
@@ -65,6 +66,7 @@
 		costSharingEnabled?: boolean;
 		rsvps?: Array<{ status: string; user?: { id: string; name: string | null; avatarUrl?: string | null } | null }>;
 		tripGalleryFiles?: GalleryFile[];
+		gamesUiEnabled?: boolean;
 	} = $props();
 
 	// Gallery: DB files + optimistic uploads (removed on success after invalidate)
@@ -479,14 +481,16 @@
 					{/if}
 				</div>
 
-				<!-- Game champion -->
-				<div class="r-trophy r-trophy--teal">
-					<span class="r-trophy-medal">🎮</span>
-					<span class="r-trophy-cat">Game Champion</span>
-					<span class="r-trophy-avatar r-trophy-avatar--empty" aria-hidden="true">?</span>
-					<span class="r-trophy-name r-trophy-name--empty">-</span>
-					<a href="/trips/{tripId}/games" class="r-trophy-link">View game results →</a>
-				</div>
+				{#if gamesUiEnabled}
+					<!-- Game champion -->
+					<div class="r-trophy r-trophy--teal">
+						<span class="r-trophy-medal">🎮</span>
+						<span class="r-trophy-cat">Game Champion</span>
+						<span class="r-trophy-avatar r-trophy-avatar--empty" aria-hidden="true">?</span>
+						<span class="r-trophy-name r-trophy-name--empty">-</span>
+						<a href="/trips/{tripId}/games" class="r-trophy-link">View game results →</a>
+					</div>
+				{/if}
 
 				<!-- Photographer -->
 				<div class="r-trophy r-trophy--indigo">

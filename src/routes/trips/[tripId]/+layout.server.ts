@@ -7,6 +7,7 @@ import { firstNameFromUserName } from '$lib/server/household-claim.js';
 import { computeCommittedFundsFromYesRsvps, getCostAtMaxParticipation } from '$lib/server/pricing-canonical.js';
 import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
 import type { InvoiceBreakdown } from '$lib/server/invoice-calculator.js';
+import { FEATURE_TRIP_GAMES } from '$lib/config/features.js';
 
 const INVITE_COOKIE_PREFIX = 'trip_invite_';
 
@@ -119,6 +120,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 		};
 
 		return {
+			gamesUiEnabled: FEATURE_TRIP_GAMES,
 			publicHouseholdClaim: false as const,
 			user: null,
 			invitePreview: true as const,
@@ -169,6 +171,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 		});
 		if (!t || !t.isPublished) throw error(404, 'Trip not found');
 		return {
+			gamesUiEnabled: FEATURE_TRIP_GAMES,
 			user: sUser,
 			publicHouseholdClaim: true as const,
 			invitePreview: false as const,
@@ -419,6 +422,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 	}
 
 	return {
+		gamesUiEnabled: FEATURE_TRIP_GAMES,
 		publicHouseholdClaim: false as const,
 		user,
 		invitePreview: false as const,

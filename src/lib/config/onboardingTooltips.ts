@@ -1,3 +1,5 @@
+import { FEATURE_TRIP_GAMES } from './features.js';
+
 export interface TooltipDef {
 	key: string;
 	title: string;
@@ -120,5 +122,13 @@ export const GUEST_TOOLTIPS: TooltipDef[] = [
 export const ALL_TOOLTIPS = [...HOST_TOOLTIPS, ...GUEST_TOOLTIPS];
 
 export function getTooltip(key: string): TooltipDef | undefined {
-	return ALL_TOOLTIPS.find((t) => t.key === key);
+	const t = ALL_TOOLTIPS.find((x) => x.key === key);
+	if (!t) return undefined;
+	if (key === 'host_recent_activity' && !FEATURE_TRIP_GAMES) {
+		return {
+			...t,
+			body: 'See who RSVPed, new activities, and polls\u2014all in real time.'
+		};
+	}
+	return t;
 }

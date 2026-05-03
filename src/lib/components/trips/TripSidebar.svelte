@@ -5,6 +5,7 @@
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import type { TripForSidebar } from '$lib/trips/types.js';
+	import { FEATURE_TRIP_GAMES } from '$lib/config/features.js';
 
 	let {
 		trip,
@@ -48,7 +49,9 @@
 		<TripNavItem href="/trips/{trip.id}/itinerary" iconName="itinerary" label="Itinerary" badge={badges.itinerary} />
 		<TripNavItem href="/trips/{trip.id}/activities" iconName="activities" label="Activities" />
 		<TripNavItem href="/trips/{trip.id}/polls" iconName="polls" label="Polls" />
-		<TripNavItem href="/trips/{trip.id}/games" iconName="games" label="Games" />
+		{#if FEATURE_TRIP_GAMES}
+			<TripNavItem href="/trips/{trip.id}/games" iconName="games" label="Games" />
+		{/if}
 		<TripNavItem href="/trips/{trip.id}/files" iconName="files" label="Files" badge={badges.files} />
 	</nav>
 

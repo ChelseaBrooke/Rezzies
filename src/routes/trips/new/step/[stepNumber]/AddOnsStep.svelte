@@ -5,6 +5,7 @@
 	import { computePerBedRangeByBedId } from '$lib/pricing/per-bed-selection.js';
 	import { SCAVENGER_BINGO_ITEMS } from '$lib/games/scavengerBingoItems.js';
 	import divviLogo from '$lib/assets/images/divvi logo.png';
+	import { FEATURE_TRIP_GAMES } from '$lib/config/features.js';
 
 	/** Faux "photo" squares on the add-ons bingo preview (indices match SCAVENGER_BINGO_ITEMS). */
 	const GAMES_BINGO_MOCK_PHOTOS = new Set([0, 8, 19]);
@@ -814,6 +815,7 @@
 			</div>
 		</div>
 
+		{#if FEATURE_TRIP_GAMES}
 		<!-- ── Games (always included, all games available to every trip) ──── -->
 		<!-- fullmock-mock-start: position:relative + overflow so the absolute fullmock layer is contained -->
 		<div class="addon-card addon-card--games addon-card--tall addon-card--fullmock-mock-start addon-card--always-on active">
@@ -908,6 +910,7 @@
 				</div>
 			</div>
 		</div>
+		{/if}
 		</div>
 		{/if}
 	</div>

@@ -16,10 +16,12 @@ import {
 	getLeaderboard,
 	CAPTION_MAX_LENGTH
 } from '$lib/server/caption-this.js';
+import { ensureTripGamesEnabled } from '$lib/server/trip-games-guard.js';
 
 const VALID_CATALOG_GAME_IDS = ['scavenger-bingo', 'caption-this', 'alphabet-hunt', 'daily-trivia'] as const;
 
 export const load: PageServerLoad = async ({ parent, url, params }) => {
+	ensureTripGamesEnabled(params.tripId);
 	const parentData = await parent();
 	const trip = parentData.trip;
 	const user = parentData.user;
@@ -120,6 +122,7 @@ export const load: PageServerLoad = async ({ parent, url, params }) => {
 
 export const actions: Actions = {
 	submitPhoto: async ({ request, params, cookies }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(403, { error: 'Unauthorized' });
 		const tripId = params.tripId;
@@ -133,6 +136,7 @@ export const actions: Actions = {
 		return { success: true };
 	},
 	removePhoto: async ({ request, params, cookies }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(403, { error: 'Unauthorized' });
 		const tripId = params.tripId;
@@ -145,6 +149,7 @@ export const actions: Actions = {
 		return { success: true };
 	},
 	submitCaption: async ({ request, params, cookies }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(403, { error: 'Unauthorized' });
 		const tripId = params.tripId;
@@ -158,6 +163,7 @@ export const actions: Actions = {
 		return { success: true };
 	},
 	submitVote: async ({ request, params, cookies }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(403, { error: 'Unauthorized' });
 		const tripId = params.tripId;
@@ -171,6 +177,7 @@ export const actions: Actions = {
 		return { success: true };
 	},
 	endRoundNow: async ({ request, params, cookies }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(403, { error: 'Unauthorized' });
 		const tripId = params.tripId;
@@ -183,6 +190,7 @@ export const actions: Actions = {
 		throw redirect(303, `/trips/${tripId}/games?game=caption-this`);
 	},
 	startNextRound: async ({ params, cookies }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(403, { error: 'Unauthorized' });
 		const tripId = params.tripId;
@@ -196,6 +204,7 @@ export const actions: Actions = {
 	},
 
 	addTripGame: async ({ request, params, cookies }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(403, { error: 'Unauthorized' });
 		const tripId = params.tripId;
@@ -217,6 +226,7 @@ export const actions: Actions = {
 	},
 
 	removeTripGame: async ({ request, params, cookies }) => {
+		ensureTripGamesEnabled(params.tripId);
 		const user = await getSessionUser(cookies);
 		if (!user) return fail(403, { error: 'Unauthorized' });
 		const tripId = params.tripId;

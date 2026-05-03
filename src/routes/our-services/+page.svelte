@@ -1,8 +1,21 @@
 <script lang="ts">
 	import MarketingShell from '$lib/components/MarketingShell.svelte';
 	import type { PageData } from './$types';
+	import { FEATURE_TRIP_GAMES } from '$lib/config/features.js';
 
 	let { data }: { data: PageData } = $props();
+
+	const gamesPollsFeature = {
+		icon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+		title: 'Games & polls',
+		desc: 'Quick polls and group games built into the trip dashboard. For when the group needs to pick a restaurant, or just a laugh on the drive in.'
+	};
+
+	const pollsOnlyFeature = {
+		icon: gamesPollsFeature.icon,
+		title: 'Polls',
+		desc: 'Quick polls built into the trip dashboard—pick a restaurant, settle a time, or let the group vote without another thread.'
+	};
 
 	const features = [
 		{
@@ -30,11 +43,7 @@
 			title: 'Trip chat & shared files',
 			desc: 'Every trip gets its own group chat and a shared drop for photos, packing lists, and the rental\'s check-in instructions. The trip lives in one place.'
 		},
-		{
-			icon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
-			title: 'Games & polls',
-			desc: 'Quick polls and group games built into the trip dashboard. For when the group needs to pick a restaurant, or just a laugh on the drive in.'
-		}
+		FEATURE_TRIP_GAMES ? gamesPollsFeature : pollsOnlyFeature
 	];
 
 	const steps = [

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TripDraft, MealsConfig, ActivitiesConfig } from '$lib/stores/tripDraft.js';
 	import { totalBedSpotCount } from '$lib/stores/tripDraft.js';
+	import { FEATURE_TRIP_GAMES } from '$lib/config/features.js';
 
 	let { draft }: { draft: TripDraft } = $props();
 
@@ -43,32 +44,43 @@
 		draft.rooms.find(r => r.photos && r.photos.length > 0)?.photos[0] || ''
 	);
 
-	const addons = $derived([
-		{
-			key: 'cost',
-			label: 'Cost-sharing',
-			enabled: draft.costSharingEnabled,
-			colorClass: 'addon-chip--cost',
-		},
-		{
-			key: 'meals',
-			label: 'Meal-planning',
-			enabled: true,
-			colorClass: 'addon-chip--meals',
-		},
-		{
-			key: 'activities',
-			label: 'Activity-planning',
-			enabled: true,
-			colorClass: 'addon-chip--activities',
-		},
-		{
-			key: 'games',
-			label: 'Games',
-			enabled: true,
-			colorClass: 'addon-chip--games',
-		},
-	]);
+	const addons = $derived(
+		[
+			{
+				key: 'cost',
+				label: 'Cost-sharing',
+				enabled: draft.costSharingEnabled,
+				colorClass: 'addon-chip--cost'
+			},
+			{
+				key: 'meals',
+				label: 'Meal-planning',
+				enabled: true,
+				colorClass: 'addon-chip--meals'
+			},
+			{
+				key: 'activities',
+				label: 'Activity-planning',
+				enabled: true,
+				colorClass: 'addon-chip--activities'
+			},
+			...(FEATURE_TRIP_GAMES
+				? [
+						{
+							key: 'games' as const,
+							label: 'Games',
+							enabled: true,
+							colorClass: 'addon-chip--games'
+						}
+					]
+				: [])
+		] as Array<{
+			key: 'cost' | 'meals' | 'activities' | 'games';
+			label: string;
+			enabled: boolean;
+			colorClass: string;
+		}>
+	);
 
 	const enabledAddons = $derived(addons.filter(a => a.enabled));
 	const disabledAddons = $derived(addons.filter(a => !a.enabled));

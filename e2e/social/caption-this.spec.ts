@@ -1,16 +1,20 @@
 import { test, expect } from '../fixtures/auth.fixture.js';
 import { PrismaClient } from '@prisma/client';
 import { TEST_TRIP } from '../fixtures/test-data.js';
+import { FEATURE_TRIP_GAMES } from '../../src/lib/config/features.js';
 
 const prisma = new PrismaClient();
 
-test.describe('Caption This game', () => {
+/** Reverts to `test.describe` when `FEATURE_TRIP_GAMES` is enabled in `src/lib/config/features.ts`. */
+const describeGames = FEATURE_TRIP_GAMES ? test.describe : test.describe.skip;
+
+describeGames('Caption This game', () => {
 	let tripId: string;
 
 	test.beforeAll(async () => {
 		const trip = await prisma.trip.findFirst({
-		where: { name: TEST_TRIP.name },
-	});
+			where: { name: TEST_TRIP.name }
+		});
 		tripId = trip!.id;
 	});
 
@@ -36,7 +40,8 @@ test.describe('Caption This game', () => {
 
 		// Should show some game-related content
 		const content = await hostPage.textContent('body');
-		const hasGameContent = content?.toLowerCase().includes('caption') ||
+		const hasGameContent =
+			content?.toLowerCase().includes('caption') ||
 			content?.toLowerCase().includes('photo') ||
 			content?.toLowerCase().includes('round');
 		expect(hasGameContent).toBeTruthy();
