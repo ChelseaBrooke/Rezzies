@@ -2,129 +2,54 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { tripDraft } from '$lib/stores/tripDraft.js';
-	import { isPerBedPricingSpotShortfall } from '$lib/trip/per-bed-pricing-guard.js';
-	import Step1 from './Step1.svelte';
-	import AddOnsStep from './AddOnsStep.svelte';
-	import Step4 from './Step4.svelte';
+	import FocusStep1 from './FocusStep1.svelte';
+	import CostStep from './CostStep.svelte';
+	import FocusShell from '$lib/components/wizard/FocusShell.svelte';
+	import RoomBedPicker from '$lib/components/wizard/RoomBedPicker.svelte';
 	import PublishPaymentModal from '$lib/components/wizard/PublishPaymentModal.svelte';
 
 	let { data } = $props();
-	
+
 	const stepNumber = $derived(() => {
 		const match = $page.url.pathname.match(/\/step\/(\d+)/);
 		return match ? parseInt(match[1]) : 1;
 	});
-	
+
 	let draft = $state({ ...$tripDraft });
 	let publishModalOpen = $state(false);
-	
+
 	$effect(() => {
 		const unsubscribe = tripDraft.subscribe((value) => {
 			draft = { ...value };
 		});
 		return unsubscribe;
 	});
-	
-	// Autosave with debounce
+
+	/* ── Redirect old steps 4 and 5 to step 3 ── */
+	$effect(() => {
+		const s = stepNumber();
+		if (s === 4 || s === 5) goto('/trips/new/step/3', { replaceState: true });
+	});
+
+	/* ── Autosave with debounce ── */
 	let autosaveTimeout: ReturnType<typeof setTimeout> | null = null;
 	function autosave() {
 		if (autosaveTimeout) clearTimeout(autosaveTimeout);
-		autosaveTimeout = setTimeout(() => {
-			tripDraft.save(draft);
-		}, 500);
-	}
-	
-	function nextStep() {
-		if (stepNumber() < 3) {
-			goto(`/trips/new/step/${stepNumber() + 1}`);
-		}
-	}
-	
-	function prevStep() {
-		if (stepNumber() === 1) {
-			goto('/trips');
-			return;
-		}
-		goto(`/trips/new/step/${stepNumber() - 1}`);
-	}
-	
-	let validationError = $state<string | null>(null);
-	
-	function checkCanProceed(): boolean {
-		const step = stepNumber();
-		if (step === 1) {
-			if (!draft.name || !draft.checkInDate || !draft.checkOutDate || draft.rooms.length === 0) {
-				return false;
-			}
-			if (!draft.locationCity || !String(draft.locationCity).trim()) {
-				return false;
-			}
-			if (!(Number(draft.expectedGuestCount) >= 1)) {
-				return false;
-			}
-			if (!(Number(draft.maxOccupancy) >= 1)) {
-				return false;
-			}
-			const hasPhotos =
-				(draft.galleryPhotos && draft.galleryPhotos.length > 0) ||
-				draft.rooms.some((room) => room.photos && room.photos.length > 0);
-			if (!hasPhotos) return false;
-			return true;
-		}
-		// Steps 2 and 3 are always progressable
-		return true;
-	}
-	
-	const canProceed = $derived(checkCanProceed());
-	const pricingStepBlocked = $derived(stepNumber() === 2 && isPerBedPricingSpotShortfall(draft));
-	
-	$effect(() => {
-		const step = stepNumber();
-		if (step === 1 && !canProceed) {
-			const hasPhotos =
-				(draft.galleryPhotos && draft.galleryPhotos.length > 0) ||
-				draft.rooms.some((room) => room.photos && room.photos.length > 0);
-			if (
-				draft.name &&
-				draft.checkInDate &&
-				draft.checkOutDate &&
-				draft.rooms.length > 0 &&
-				(!draft.locationCity || !String(draft.locationCity).trim())
-			) {
-				validationError = 'Please enter a destination.';
-			} else if (
-				draft.name &&
-				draft.checkInDate &&
-				draft.checkOutDate &&
-				draft.rooms.length > 0 &&
-				!(Number(draft.expectedGuestCount) >= 1)
-			) {
-				validationError = 'Please enter a minimum headcount (realistic low).';
-			} else if (
-				draft.name &&
-				draft.checkInDate &&
-				draft.checkOutDate &&
-				draft.rooms.length > 0 &&
-				!(Number(draft.maxOccupancy) >= 1)
-			) {
-				validationError = 'Please enter a maximum headcount (capacity limit).';
-			} else if (draft.name && draft.checkInDate && draft.checkOutDate && draft.rooms.length > 0 && !hasPhotos) {
-				validationError = 'Please upload at least one photo before continuing.';
-			} else {
-				validationError = null;
-			}
-		} else {
-			validationError = null;
-		}
-	});
-	
-	function handleNextStep() {
-		if (canProceed) {
-			validationError = null;
-			nextStep();
-		}
+		autosaveTimeout = setTimeout(() => tripDraft.save(draft), 500);
 	}
 
+	function prevStep() {
+		const s = stepNumber();
+		if (s <= 1) { goto('/trips'); return; }
+		goto(`/trips/new/step/${s - 1}`);
+	}
+
+	function handleNextStep() {
+		const s = stepNumber();
+		if (s < 3) goto(`/trips/new/step/${s + 1}`);
+	}
+
+	/* ── Publish modal handlers ── */
 	function openPublishModal() {
 		tripDraft.save(draft);
 		publishModalOpen = true;
@@ -147,11 +72,11 @@
 				...(opts.paymentIntentId ? { paymentIntentId: opts.paymentIntentId } : {})
 			})
 		});
-		const data = await res.json().catch(() => ({}));
-		if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-		if (!data.tripId) throw new Error(data.error || 'Failed to create trip');
+		const result = await res.json().catch(() => ({}));
+		if (!res.ok) throw new Error(result.error || `Request failed (${res.status})`);
+		if (!result.tripId) throw new Error(result.error || 'Failed to create trip');
 		tripDraft.clear();
-		goto(`/trips/${data.tripId}`);
+		goto(`/trips/${result.tripId}`);
 	}
 
 	async function handleSaveDraft(opts: { splitCost: boolean }) {
@@ -164,60 +89,64 @@
 				splitCost: opts.splitCost
 			})
 		});
-		const data = await res.json().catch(() => ({}));
-		if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-		if (!data.tripId) throw new Error(data.error || 'Failed to save draft');
+		const result = await res.json().catch(() => ({}));
+		if (!res.ok) throw new Error(result.error || `Request failed (${res.status})`);
+		if (!result.tripId) throw new Error(result.error || 'Failed to save draft');
 		tripDraft.clear();
-		goto(`/trips/${data.tripId}`);
+		goto(`/trips/${result.tripId}`);
 	}
+
+	/* ── Step 2 rooms validation ── */
+	const roomsCanContinue = $derived(
+		draft.rooms.length > 0 &&
+		draft.rooms.every((r) => r.beds && r.beds.length > 0)
+	);
 </script>
 
-<!-- Step Content -->
-<div class="step-wrapper" class:step-wrapper--grow={stepNumber() === 1}>
-	{#if stepNumber() === 1}
-		{#if validationError}
-			<div class="validation-error">{validationError}</div>
-		{/if}
-		<Step1 bind:draft {autosave} {prevStep} {handleNextStep} {canProceed} />
-	{:else if stepNumber() === 2}
-		<AddOnsStep bind:draft {autosave} />
-	{:else if stepNumber() === 3}
-		<Step4 {draft} />
-	{/if}
-</div>
+{#if stepNumber() === 1}
+	<FocusStep1 bind:draft {autosave} {handleNextStep} />
 
-<!-- Footer Actions -->
-{#if validationError}
-	<div class="validation-error">{validationError}</div>
+{:else if stepNumber() === 2}
+	<!-- Rooms page: FocusShell wraps the content at this level -->
+	<FocusShell progressPercent={80} stepLabel="Rooms" onBack={prevStep}>
+		<div class="rooms-page">
+			<!-- Header block -->
+			<header class="rooms-header">
+				<div class="rooms-accent" aria-hidden="true"></div>
+				<p class="rooms-eyebrow">Rooms</p>
+				<h1 class="rooms-heading">Add a card for each bedroom.</h1>
+				<p class="rooms-sub">One card per bedroom. Photo at the top so guests know what they're getting.</p>
+			</header>
+
+			<!-- Room cards via RoomBedPicker -->
+			<RoomBedPicker bind:draft {autosave} />
+
+
+			<!-- Sticky footer -->
+			<footer class="rooms-footer">
+				<button type="button" class="rooms-btn-back" onclick={prevStep}>Back</button>
+				<button
+					type="button"
+					class="rooms-btn-continue"
+					onclick={handleNextStep}
+					disabled={!roomsCanContinue}
+					title={!roomsCanContinue ? 'Add at least one room with beds to continue' : ''}
+				>
+					Rooms look good. Continue →
+				</button>
+			</footer>
+		</div>
+	</FocusShell>
+
+{:else if stepNumber() === 3}
+	<CostStep
+		bind:draft
+		{autosave}
+		{prevStep}
+		{openPublishModal}
+		{handleSaveDraft}
+	/>
 {/if}
-<div class="card-footer">
-	<button type="button" class="btn-back" onclick={prevStep}>
-		Back
-	</button>
-	<div class="footer-right">
-		<button type="button" class="btn-save-draft" onclick={() => tripDraft.save(draft)}>
-			Save Draft
-		</button>
-		{#if stepNumber() < 3}
-			<button
-				type="button"
-				class="btn-next"
-				onclick={handleNextStep}
-				disabled={!canProceed || pricingStepBlocked}
-			>
-				Next
-			</button>
-	{:else}
-		<button
-			type="button"
-			class="btn-publish"
-			onclick={openPublishModal}
-		>
-			Publish
-		</button>
-	{/if}
-	</div>
-</div>
 
 <PublishPaymentModal
 	open={publishModalOpen}
@@ -229,101 +158,116 @@
 />
 
 <style>
-	.step-wrapper {
-		display: flex;
-		flex-direction: column;
+	/* ── Rooms page layout ────────────────────────────────── */
+	.rooms-page {
+		width: 100%;
+		max-width: 640px;
+		margin: 0 auto;
+		padding-bottom: 6rem;
 	}
 
-	.step-wrapper--grow {
-		flex: 1;
-		min-height: 0;
+	/* ── Header block ─────────────────────────────────────── */
+	.rooms-header {
+		margin-bottom: 24px;
 	}
 
-	.card-footer {
-		position: sticky;
-		bottom: 0;
-		z-index: 10;
-		margin-top: auto;
-		padding: 1rem 0 1.25rem;
-		border-top: 1px solid var(--border);
-		background: white;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
+	.rooms-accent {
+		width: 36px;
+		height: 3px;
+		border-radius: 2px;
+		background: var(--sand);
+		margin-bottom: 14px;
 	}
 
-	.footer-right {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		gap: 0.75rem;
+	.rooms-eyebrow {
+		font-size: 0.625rem;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--muted);
+		margin: 0 0 10px;
 	}
-	
-	.validation-error {
-		color: var(--danger);
-		font-size: 0.875rem;
+
+	.rooms-heading {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 1.625rem;
+		font-weight: 600;
+		color: var(--text);
+		margin: 0 0 6px;
+		letter-spacing: -0.02em;
+	}
+
+	.rooms-sub {
+		font-size: 0.8125rem;
+		color: var(--muted);
 		margin: 0;
-		text-align: right;
+		line-height: 1.5;
 	}
-	
-	.btn-back,
-	.btn-save-draft,
-	.btn-next,
-	.btn-publish {
-		padding: 0.75rem 1.5rem;
-		border-radius: 0.5rem;
-		font-size: 0.9375rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s ease;
+
+	/* ── Sticky footer ────────────────────────────────────── */
+	.rooms-footer {
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		z-index: 50;
+		background: white;
+		border-top: 1px solid var(--border);
+		padding: 14px 24px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+	}
+
+	.rooms-btn-back {
+		background: none;
 		border: none;
 		font-family: inherit;
-	}
-	
-	.btn-back {
-		background: transparent;
+		font-size: 0.875rem;
 		color: var(--muted);
+		cursor: pointer;
+		padding: 0 8px;
 	}
-	
-	.btn-back:hover {
+
+	.rooms-btn-back:hover {
 		color: var(--text);
 	}
-	
-	.btn-save-draft {
-		background: white;
-		color: var(--text);
-		border: 1px solid var(--border);
-	}
-	
-	.btn-save-draft:hover {
-		background: var(--bg);
-	}
-	
-	.btn-next,
-	.btn-publish {
-		background: var(--primary);
+
+	.rooms-btn-continue {
+		height: 44px;
+		padding: 0 24px;
+		border-radius: 10px;
+		font-family: inherit;
+		font-size: 0.875rem;
+		font-weight: 600;
 		color: white;
+		background: var(--navy);
+		border: none;
+		cursor: pointer;
+		transition: opacity 150ms ease, transform 100ms ease;
 	}
-	
-	.btn-next:hover:not(:disabled),
-	.btn-publish:hover:not(:disabled) {
-		background: var(--primary-dark);
+
+	.rooms-btn-continue:hover:not(:disabled) {
+		opacity: 0.92;
+		transform: translateY(-1px);
 	}
-	
-	.btn-next:disabled {
-		opacity: 0.5;
+
+	.rooms-btn-continue:disabled {
+		opacity: 0.4;
 		cursor: not-allowed;
+		transform: none;
 	}
-	
-	@media (max-width: 768px) {
-		.card-footer {
-			flex-wrap: wrap;
-			gap: 0.75rem;
+
+	/* ── Mobile ───────────────────────────────────────────── */
+	@media (max-width: 480px) {
+		.rooms-footer {
+			padding: 12px 16px;
 		}
-		
-		.footer-right {
-			width: 100%;
-			justify-content: flex-end;
+
+		.rooms-btn-continue {
+			flex: 1;
+			font-size: 0.8125rem;
 		}
 	}
 </style>

@@ -96,4 +96,21 @@
 	 */
 	--surface-paper: #fbf9f6;
 	--shadow-paper: 0 30px 80px -30px rgba(10, 18, 22, 0.45);
+
+	/* Focus-mode wizard: room and pricing card borders, dividers, upload zone backgrounds.
+	 * Slightly warmer than --border so cards feel paper-like without a hard edge.
+	 */
+	--border-paper: #f0ede8;
+
+	/* Focus-mode wizard: very faint warm tint used for photo upload zone backgrounds
+	 * and unselected card backgrounds. Lighter than --surface-paper.
+	 */
+	--surface-faint: #fafaf8;
+
+	/* Per-bed success pill background (green, not in main palette). Only used for
+	 * the listing-import success indicator in FocusStep1 sub-screen 2.
+	 */
+	--success-bg: rgba(29, 158, 117, 0.08);
+	--success-border: rgba(29, 158, 117, 0.30);
+	--success-text: #0f5132;
 }

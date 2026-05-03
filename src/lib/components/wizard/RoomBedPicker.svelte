@@ -5,189 +5,29 @@
 	import twinBedIconUrl from '$lib/assets/images/beds/twin.svg.svg?url';
 	import bunkBedIconUrl from '$lib/assets/images/beds/bunk.svg.svg?url';
 	import sofaBedIconUrl from '$lib/assets/images/beds/sofabed.svg.svg?url';
-	
+
 	let { draft = $bindable(), autosave }: { draft: TripDraft; autosave: () => void } = $props();
-	
-	let draggedPhoto: { url: string } | null = $state(null);
-	let draggedOverRoomId: string | null = $state(null);
-	let galleryPhotos: string[] = $state([]);
-	let editingRoomId: string | null = $state(null);
-	let newRoomBedTypesArray: Array<{ bedType: string; quantity: number }> = $state([]);
-	let newRoomType: string = $state('');
-	let newRoomCustomDesc: string = $state('');
-	let isBedTypesDropdownOpen: boolean = $state(false);
-	let bedTypesDropdownElement: HTMLElement | null = $state(null);
-	let bedTypesDropdownMenu: HTMLElement | null = $state(null);
-	let dropdownPosition = $state({ top: 0, left: 0 });
-	let isInitialized = $state(false);
-	
-	// Initialize galleryPhotos from draft on mount
-	$effect(() => {
-		if (!isInitialized && draft.galleryPhotos && Array.isArray(draft.galleryPhotos)) {
-			galleryPhotos = [...draft.galleryPhotos];
-			isInitialized = true;
-		}
-	});
-	
-	// Sync local galleryPhotos back to draft when it changes (after initialization)
-	$effect(() => {
-		if (isInitialized) {
-			draft.galleryPhotos = [...galleryPhotos];
-			autosave();
-		}
-	});
-	
-	// Position dropdown when it opens
-	$effect(() => {
-		if (!isBedTypesDropdownOpen || !bedTypesDropdownElement) return;
-		
-		// Use setTimeout to ensure DOM is updated
-		setTimeout(() => {
-			if (bedTypesDropdownElement) {
-				const triggerRect = bedTypesDropdownElement.getBoundingClientRect();
-				dropdownPosition = {
-					top: triggerRect.bottom + 4,
-					left: triggerRect.left
-				};
-			}
-		}, 0);
-	});
-	
-	// Close dropdown when clicking outside
-	$effect(() => {
-		if (!isBedTypesDropdownOpen) return;
-		
-		function handleClickOutside(event: MouseEvent) {
-			const target = event.target as Node;
-			if (bedTypesDropdownElement && !bedTypesDropdownElement.contains(target) &&
-			    bedTypesDropdownMenu && !bedTypesDropdownMenu.contains(target)) {
-				isBedTypesDropdownOpen = false;
-			}
-		}
-		
-		// Use a small delay to avoid closing immediately when opening
-		const timeoutId = setTimeout(() => {
-			document.addEventListener('mousedown', handleClickOutside, true);
-		}, 10);
-		
-		return () => {
-			clearTimeout(timeoutId);
-			document.removeEventListener('mousedown', handleClickOutside, true);
-		};
-	});
-	
-	const roomTypeOptions = [
-		{ value: 'bedroom', label: 'Bedroom' },
-		{ value: 'master-bedroom', label: 'Master Bedroom' },
-		{ value: 'guest-room', label: 'Guest Room' },
-		{ value: 'living-room', label: 'Living Room' },
-		{ value: 'kitchen', label: 'Kitchen' },
-		{ value: 'dining-room', label: 'Dining Room' },
-		{ value: 'bathroom', label: 'Bathroom' },
-		{ value: 'office', label: 'Office / Study' },
-		{ value: 'other', label: 'Other' }
-	];
-	
+
 	const bedTypeOptions = [
-		{ value: 'king', label: 'King', iconUrl: kingBedIconUrl, fallbackIcon: '🛏️' },
-		{ value: 'queen', label: 'Queen', iconUrl: queenBedIconUrl, fallbackIcon: '🛏️' },
-		// If you add a dedicated "full" icon later, we can swap it in here.
-		{ value: 'full', label: 'Full', iconUrl: queenBedIconUrl, fallbackIcon: '🛏️' },
-		{ value: 'twin', label: 'Twin', iconUrl: twinBedIconUrl, fallbackIcon: '🛏️' },
-		{ value: 'bunk', label: 'Bunk', iconUrl: bunkBedIconUrl, fallbackIcon: '🛏️' },
-		{ value: 'sofa', label: 'Sofa Bed', iconUrl: sofaBedIconUrl, fallbackIcon: '🛋️' }
+		{ value: 'king',  label: 'King',     iconUrl: kingBedIconUrl,  fallbackIcon: '🛏️' },
+		{ value: 'queen', label: 'Queen',    iconUrl: queenBedIconUrl, fallbackIcon: '🛏️' },
+		{ value: 'full',  label: 'Full',     iconUrl: queenBedIconUrl, fallbackIcon: '🛏️' },
+		{ value: 'twin',  label: 'Twin',     iconUrl: twinBedIconUrl,  fallbackIcon: '🛏️' },
+		{ value: 'bunk',  label: 'Bunk',     iconUrl: bunkBedIconUrl,  fallbackIcon: '🛏️' },
+		{ value: 'sofa',  label: 'Sofa Bed', iconUrl: sofaBedIconUrl,  fallbackIcon: '🛋️' }
 	];
-	
-	/** Stable labels Room 1, Room 2, … by list order (used in wizard + pricing tables). */
-	function normalizeRoomNames() {
-		draft.rooms.forEach((r, i) => {
-			r.name = `Room ${i + 1}`;
-		});
+
+	/* ── Bed helpers ──────────────────────────────────────── */
+	type BedTypeQty = { bedType: string; quantity: number };
+
+	function bedsAsQtyMap(beds: TripDraft['rooms'][number]['beds']): BedTypeQty[] {
+		const map: Record<string, number> = {};
+		for (const b of beds) map[b.bedType] = (map[b.bedType] || 0) + 1;
+		return Object.entries(map).map(([bedType, quantity]) => ({ bedType, quantity }));
 	}
 
-	function getRoomDisplayName(room: { name?: string }, roomIndex: number): string {
-		const n = room.name?.trim();
-		if (n) return n;
-		return `Room ${roomIndex + 1}`;
-	}
-
-	/** Provisional number for the "add room" / edit card before fields are filled. */
-	function provisionalRoomNumber(): number {
-		if (editingRoomId && editingRoomId !== 'new') {
-			const idx = draft.rooms.findIndex((r) => r.id === editingRoomId);
-			if (idx >= 0) return idx + 1;
-		}
-		return draft.rooms.length + 1;
-	}
-	
-	function getBedIconMeta(bedType: string): { url?: string; alt: string; fallback: string } {
-		const option = bedTypeOptions.find((opt) => opt.value === bedType);
-		if (!option) return { alt: bedType, fallback: '🛏️' };
-		return { url: option.iconUrl, alt: option.label, fallback: option.fallbackIcon };
-	}
-	
-	function startAddingRoom() {
-		editingRoomId = 'new';
-		newRoomType = '';
-		newRoomCustomDesc = '';
-		newRoomBedTypesArray = [];
-		isBedTypesDropdownOpen = false;
-	}
-	
-	function cancelAddingRoom() {
-		editingRoomId = null;
-		newRoomBedTypesArray = [];
-		newRoomCustomDesc = '';
-		isBedTypesDropdownOpen = false;
-	}
-	
-	function getBedQuantity(bedType: string): number {
-		return newRoomBedTypesArray.find(b => b.bedType === bedType)?.quantity || 0;
-	}
-	
-	function incrementBedQuantity(bedType: string) {
-		const existing = newRoomBedTypesArray.find(b => b.bedType === bedType);
-		if (existing) {
-			newRoomBedTypesArray = newRoomBedTypesArray.map(b => 
-				b.bedType === bedType ? { ...b, quantity: b.quantity + 1 } : b
-			);
-		} else {
-			newRoomBedTypesArray = [...newRoomBedTypesArray, { bedType, quantity: 1 }];
-		}
-		newRoomBedTypesArray = [...newRoomBedTypesArray];
-	}
-	
-	function decrementBedQuantity(bedType: string) {
-		const existing = newRoomBedTypesArray.find(b => b.bedType === bedType);
-		if (existing) {
-			if (existing.quantity <= 1) {
-				newRoomBedTypesArray = newRoomBedTypesArray.filter(b => b.bedType !== bedType);
-			} else {
-				newRoomBedTypesArray = newRoomBedTypesArray.map(b => 
-					b.bedType === bedType ? { ...b, quantity: b.quantity - 1 } : b
-				);
-			}
-			newRoomBedTypesArray = [...newRoomBedTypesArray];
-		}
-	}
-	
-	function saveNewRoom() {
-		const totalBeds = newRoomBedTypesArray.reduce((sum, b) => sum + b.quantity, 0);
-		if (!newRoomType || totalBeds === 0) {
-			// Validation: ensure room type is selected
-			if (!newRoomType) {
-				alert('Please select a room type');
-				return;
-			}
-			if (totalBeds === 0) {
-				alert('Please select at least one bed type and set quantity');
-				return;
-			}
-			return;
-		}
-		
-		// Convert bed types array to beds array
-		const beds = newRoomBedTypesArray.flatMap(({ bedType, quantity }) => 
+	function qtyMapToBeds(map: BedTypeQty[]): TripDraft['rooms'][number]['beds'] {
+		return map.flatMap(({ bedType, quantity }) =>
 			Array.from({ length: quantity }, () => ({
 				id: crypto.randomUUID(),
 				bedType,
@@ -196,1352 +36,943 @@
 				notes: ''
 			}))
 		);
-		
-		const totalSlots = beds.reduce((s, b) => s + (b.count || 1), 0);
+	}
+
+	function getBedQuantity(roomId: string, bedType: string): number {
+		const room = draft.rooms.find((r) => r.id === roomId);
+		if (!room) return 0;
+		return bedsAsQtyMap(room.beds).find((b) => b.bedType === bedType)?.quantity || 0;
+	}
+
+	function setBedsForRoom(roomId: string, qtyMap: BedTypeQty[]) {
+		const room = draft.rooms.find((r) => r.id === roomId);
+		if (!room) return;
+		room.beds = qtyMapToBeds(qtyMap);
+		const totalSlots = room.beds.reduce((s, b) => s + (b.count || 1), 0);
+		room.type = totalSlots === 1 ? 'private' : 'shared';
+	}
+
+	function incrementBed(roomId: string, bedType: string) {
+		const room = draft.rooms.find((r) => r.id === roomId);
+		if (!room) return;
+		const qty = bedsAsQtyMap(room.beds);
+		const existing = qty.find((b) => b.bedType === bedType);
+		if (existing) existing.quantity += 1;
+		else qty.push({ bedType, quantity: 1 });
+		setBedsForRoom(roomId, qty);
+		autosave();
+	}
+
+	function decrementBed(roomId: string, bedType: string) {
+		const room = draft.rooms.find((r) => r.id === roomId);
+		if (!room) return;
+		const qty = bedsAsQtyMap(room.beds);
+		const existing = qty.find((b) => b.bedType === bedType);
+		if (!existing) return;
+		if (existing.quantity <= 1) {
+			setBedsForRoom(roomId, qty.filter((b) => b.bedType !== bedType));
+		} else {
+			existing.quantity -= 1;
+			setBedsForRoom(roomId, qty);
+		}
+		autosave();
+	}
+
+	function getRoomDisplayName(room: TripDraft['rooms'][number], idx: number): string {
+		return room.name?.trim() || `Room ${idx + 1}`;
+	}
+
+	function addRoom() {
 		draft.rooms = [
 			...draft.rooms,
 			{
 				id: crypto.randomUUID(),
 				name: '',
-				roomType: newRoomType,
-				customRoomDescription: newRoomType === 'other' ? newRoomCustomDesc : '',
-				type: totalSlots === 1 ? 'private' : 'shared',
+				roomType: 'bedroom',
+				customRoomDescription: '',
+				type: 'shared',
 				maxOccupants: 2,
 				notes: '',
 				photos: [],
-				beds
+				beds: []
 			}
 		];
-		normalizeRoomNames();
 		autosave();
-		cancelAddingRoom();
 	}
-	
-	function getSelectedBedTypesDisplay(): string {
-		const total = newRoomBedTypesArray.reduce((sum, b) => sum + b.quantity, 0);
-		if (total === 0) return 'Select bed types...';
-		return `${total} bed${total !== 1 ? 's' : ''} selected`;
-	}
-	
-	function editRoom(roomId: string) {
-		const room = draft.rooms.find(r => r.id === roomId);
-		if (!room) return;
-		
-		editingRoomId = roomId;
-		newRoomType = room.roomType;
-		newRoomCustomDesc = room.customRoomDescription || '';
-		isBedTypesDropdownOpen = false;
-		
-		// Convert beds array to bed types array
-		const bedTypesMap: Record<string, number> = {};
-		room.beds.forEach(bed => {
-			bedTypesMap[bed.bedType] = (bedTypesMap[bed.bedType] || 0) + 1;
-		});
-		newRoomBedTypesArray = Object.entries(bedTypesMap).map(([bedType, quantity]) => ({
-			bedType,
-			quantity
-		}));
-	}
-	
-	function saveEditedRoom() {
-		if (!editingRoomId || editingRoomId === 'new') return;
-		
-		const room = draft.rooms.find(r => r.id === editingRoomId);
-		if (!room) return;
-		
-		room.roomType = newRoomType;
-		room.customRoomDescription = newRoomType === 'other' ? newRoomCustomDesc : '';
-		
-		// Convert bed types array to beds array
-		room.beds = newRoomBedTypesArray.flatMap(({ bedType, quantity }) => 
-			Array.from({ length: quantity }, () => ({
-				id: crypto.randomUUID(),
-				bedType,
-				count: 1,
-				shared: false,
-				notes: ''
-			}))
-		);
-		// Single-slot room = private (costs more), multi-slot = shared
-		const totalSlots = room.beds.reduce((s, b) => s + (b.count || 1), 0);
-		room.type = totalSlots === 1 ? 'private' : 'shared';
 
-		normalizeRoomNames();
-		autosave();
-		editingRoomId = null;
-		newRoomBedTypesArray = [];
-		newRoomCustomDesc = '';
-		isBedTypesDropdownOpen = false;
-	}
-	
 	function removeRoom(roomId: string) {
 		draft.rooms = draft.rooms.filter((r) => r.id !== roomId);
-		normalizeRoomNames();
 		autosave();
 	}
-	
-	function handleGalleryUpload(event: Event) {
-		const input = event.target as HTMLInputElement;
-		const files = input.files;
-		if (!files || files.length === 0) return;
-		
-		const newPhotos: string[] = [];
-		let loadedCount = 0;
-		const totalFiles = files.length;
-		
-		Array.from(files).forEach((file) => {
-			const reader = new FileReader();
-			reader.onload = (e) => {
-				const photoUrl = e.target?.result as string;
-				newPhotos.push(photoUrl);
-				loadedCount++;
-				
-				// When all files are loaded, add them to gallery and set the last one as cover
-				if (loadedCount === totalFiles) {
-					galleryPhotos = [...galleryPhotos, ...newPhotos];
-					// Set the last uploaded photo as the cover photo
-					if (newPhotos.length > 0) {
-						draft.coverPhoto = newPhotos[newPhotos.length - 1];
-						autosave();
-					}
-				}
-			};
-			reader.readAsDataURL(file);
-		});
+
+	function getBedIconMeta(bedType: string): { url?: string; alt: string; fallback: string } {
+		const option = bedTypeOptions.find((opt) => opt.value === bedType);
+		if (!option) return { alt: bedType, fallback: '🛏️' };
+		return { url: option.iconUrl, alt: option.label, fallback: option.fallbackIcon };
 	}
-	
-	function removeGalleryPhoto(photoIndex: number) {
-		const removedPhoto = galleryPhotos[photoIndex];
-		galleryPhotos = galleryPhotos.filter((_, i) => i !== photoIndex);
-		// If the removed photo was the cover photo, clear it
-		if (removedPhoto === draft.coverPhoto) {
-			draft.coverPhoto = '';
-			autosave();
+
+	const totalBedsByRoom = $derived(
+		new Map(
+			(draft.rooms ?? []).map((r) => [
+				r.id,
+				(r.beds ?? []).reduce((s, b) => s + (b.count || 1), 0)
+			])
+		)
+	);
+
+	/* ── Photo upload ─────────────────────────────────────── */
+	let uploadingByRoom: Record<string, boolean> = $state({});
+	let uploadErrorByRoom: Record<string, string | null> = $state({});
+
+	async function uploadRoomPhotos(roomId: string, files: FileList | null) {
+		if (!files || files.length === 0) return;
+		uploadingByRoom = { ...uploadingByRoom, [roomId]: true };
+		uploadErrorByRoom = { ...uploadErrorByRoom, [roomId]: null };
+		try {
+			const uploaded: string[] = [];
+			for (const file of Array.from(files)) {
+				const fd = new FormData();
+				fd.set('file', file);
+				const res = await fetch('/api/upload-image', { method: 'POST', body: fd });
+				const json = await res.json().catch(() => ({}));
+				if (!res.ok || !json.url) {
+					uploadErrorByRoom = { ...uploadErrorByRoom, [roomId]: json?.error || 'Upload failed' };
+					continue;
+				}
+				const origin = typeof window !== 'undefined' ? window.location.origin : '';
+				const finalUrl = /^https?:\/\//i.test(json.url) ? json.url : `${origin}${json.url}`;
+				uploaded.push(finalUrl);
+			}
+			if (uploaded.length > 0) {
+				const room = draft.rooms.find((r) => r.id === roomId);
+				if (room) {
+					room.photos = [...room.photos, ...uploaded];
+					autosave();
+				}
+			}
+		} finally {
+			uploadingByRoom = { ...uploadingByRoom, [roomId]: false };
 		}
 	}
-	
-	function setAsCoverPhoto(photoUrl: string) {
-		draft.coverPhoto = photoUrl;
-		autosave();
+
+	function onPhotoInputChange(roomId: string, ev: Event) {
+		const input = ev.target as HTMLInputElement;
+		uploadRoomPhotos(roomId, input.files);
+		input.value = '';
 	}
-	
-	function removePhoto(roomId: string, photoIndex: number) {
+
+	function removeRoomPhoto(roomId: string, photoIndex: number) {
 		const room = draft.rooms.find((r) => r.id === roomId);
 		if (!room) return;
-		const removedPhoto = room.photos[photoIndex];
 		room.photos = room.photos.filter((_, i) => i !== photoIndex);
-		// Return photo to gallery if it exists there
-		if (removedPhoto && !galleryPhotos.includes(removedPhoto)) {
-			galleryPhotos = [...galleryPhotos, removedPhoto];
-		}
 		autosave();
 	}
-	
-	function handleDragStart(event: DragEvent, photoUrl: string) {
-		if (!event.dataTransfer) return;
-		event.dataTransfer.effectAllowed = 'move';
-		draggedPhoto = { url: photoUrl };
-	}
-	
-	function handleDragOver(event: DragEvent, roomId: string) {
-		event.preventDefault();
-		if (event.dataTransfer) {
-			event.dataTransfer.dropEffect = 'move';
-		}
-		draggedOverRoomId = roomId;
-	}
-	
-	function handleDrop(event: DragEvent, roomId: string) {
-		event.preventDefault();
-		if (draggedPhoto) {
-			const room = draft.rooms.find((r) => r.id === roomId);
-			if (room && !room.photos.includes(draggedPhoto.url)) {
-				// Remove from any other room that has this photo
-				draft.rooms.forEach(r => {
-					if (r.id !== roomId && r.photos.includes(draggedPhoto.url)) {
-						r.photos = r.photos.filter(url => url !== draggedPhoto.url);
-					}
-				});
-				// Add to target room
-				room.photos = [...room.photos, draggedPhoto.url];
-				// Remove from gallery if it's there (but keep it if it's the cover photo)
-				if (draft.coverPhoto !== draggedPhoto.url) {
-					galleryPhotos = galleryPhotos.filter(url => url !== draggedPhoto.url);
-				}
-				autosave();
+
+	/* ── Cover photo upload ───────────────────────────────── */
+	let uploadingCover = $state(false);
+	let coverError = $state<string | null>(null);
+
+	async function uploadCoverPhoto(files: FileList | null) {
+		if (!files || files.length === 0) return;
+		uploadingCover = true;
+		coverError = null;
+		try {
+			const fd = new FormData();
+			fd.set('file', files[0]);
+			const res = await fetch('/api/upload-image', { method: 'POST', body: fd });
+			const json = await res.json().catch(() => ({}));
+			if (!res.ok || !json.url) {
+				coverError = json?.error || 'Upload failed';
+				return;
 			}
+			const origin = typeof window !== 'undefined' ? window.location.origin : '';
+			draft.coverPhoto = /^https?:\/\//i.test(json.url) ? json.url : `${origin}${json.url}`;
+			autosave();
+		} finally {
+			uploadingCover = false;
 		}
-		draggedPhoto = null;
-		draggedOverRoomId = null;
 	}
-	
-	function handleDragEnd() {
-		draggedPhoto = null;
-		draggedOverRoomId = null;
+
+	function onCoverInputChange(ev: Event) {
+		const input = ev.target as HTMLInputElement;
+		uploadCoverPhoto(input.files);
+		input.value = '';
+	}
+
+	/* ── UI state ─────────────────────────────────────────── */
+	let expandedBedConfig = $state(new Set<string>());
+	let editingRoomName = $state(new Set<string>());
+	let moreOptionsOpen = $state(false);
+
+	function toggleBedConfig(roomId: string) {
+		expandedBedConfig = new Set(expandedBedConfig);
+		if (expandedBedConfig.has(roomId)) expandedBedConfig.delete(roomId);
+		else expandedBedConfig.add(roomId);
+	}
+
+	function startEditName(roomId: string) {
+		editingRoomName = new Set(editingRoomName);
+		editingRoomName.add(roomId);
+	}
+
+	function finishEditName(roomId: string) {
+		editingRoomName = new Set(editingRoomName);
+		editingRoomName.delete(roomId);
+		autosave();
+	}
+
+	function getRoomTypeBadge(room: TripDraft['rooms'][number]): string {
+		const total = (room.beds ?? []).reduce((s, b) => s + (b.count || 1), 0);
+		if (total === 0) return 'New room';
+		return total === 1 ? 'Private' : 'Shared';
+	}
+
+	function getRoomCapacity(room: TripDraft['rooms'][number]): number {
+		const BED_SPOT_COUNTS: Record<string, number> = {
+			twin: 1, single: 1, bunk: 2, full: 2, double: 2,
+			queen: 2, king: 2, sofa: 2, sofa_bed: 2, air_mattress: 2, other: 1
+		};
+		return (room.beds ?? []).reduce((s, b) => {
+			const key = b.bedType.toLowerCase().replace(/\s+/g, '_');
+			return s + (BED_SPOT_COUNTS[key] ?? 1) * (b.count || 1);
+		}, 0);
 	}
 </script>
 
-<div class="room-bed-picker">
-	<div class="rooms-grid">
-		<!-- Add Room Card -->
-		{#if editingRoomId === 'new'}
-			<div class="room-card add-room-editing">
-				<div class="editing-room-title">Room {provisionalRoomNumber()}</div>
-				<div class="add-room-dropdowns">
-					<div class="dropdown-wrapper">
-						<select class="room-type-dropdown" bind:value={newRoomType} required>
-							<option value="" disabled selected>Room Type</option>
-							{#each roomTypeOptions as option}
-								<option value={option.value}>{option.label}</option>
-							{/each}
-						</select>
-					</div>
-					
-					<div class="dropdown-wrapper" bind:this={bedTypesDropdownElement}>
-						<button 
-							type="button" 
-							class="bed-types-dropdown-trigger"
-							onclick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								isBedTypesDropdownOpen = !isBedTypesDropdownOpen;
-							}}
-						>
-							<span>{getSelectedBedTypesDisplay()}</span>
-							<span class="dropdown-arrow">{isBedTypesDropdownOpen ? '▲' : '▼'}</span>
-						</button>
-						{#if isBedTypesDropdownOpen}
-							<div 
-								class="bed-types-dropdown-menu" 
-								bind:this={bedTypesDropdownMenu}
-								style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px;"
-								onclick={(e) => e.stopPropagation()}
-								onmousedown={(e) => e.stopPropagation()}
-							>
-								{#each bedTypeOptions as bedOption}
-									<div class="bed-type-row">
-										<div class="bed-quantity-controls">
-											<button
-												type="button"
-												class="bed-quantity-btn bed-quantity-up"
-												onclick={() => incrementBedQuantity(bedOption.value)}
-											>
-												↑
-											</button>
-											<button
-												type="button"
-												class="bed-quantity-btn bed-quantity-down"
-												onclick={() => decrementBedQuantity(bedOption.value)}
-												disabled={getBedQuantity(bedOption.value) === 0}
-											>
-												↓
-											</button>
-										</div>
-										<div class="bed-type-row-main">
-											{#if bedOption.iconUrl}
-												<img class="bed-icon-img" src={bedOption.iconUrl} alt="" />
-											{:else}
-												<span class="bed-icon">{bedOption.fallbackIcon}</span>
-											{/if}
-											<span class="bed-label">{bedOption.label}</span>
-											{#if getBedQuantity(bedOption.value) > 0}
-												<span class="bed-quantity-display">{getBedQuantity(bedOption.value)}</span>
-											{/if}
-										</div>
-									</div>
-								{/each}
-							</div>
+<div class="rbp">
+	<!-- ── Room grid ── -->
+	{#if draft.rooms.length > 0}
+		<ul class="rbp-grid" aria-label="Rooms">
+			{#each draft.rooms as room, idx (room.id)}
+				{@const bedQty = bedsAsQtyMap(room.beds)}
+				{@const capacity = getRoomCapacity(room)}
+				{@const isBedOpen = expandedBedConfig.has(room.id)}
+				{@const isNameEditing = editingRoomName.has(room.id)}
+				<li class="rbp-card">
+					<!-- Photo zone -->
+					<div class="rbp-photo-zone" class:rbp-photo-zone--empty={room.photos.length === 0}>
+						{#if room.photos.length > 0}
+							<img
+								src={room.photos[0]}
+								alt={getRoomDisplayName(room, idx)}
+								class="rbp-photo-cover"
+							/>
+							<span class="rbp-type-badge">{getRoomTypeBadge(room)}</span>
+							<label class="rbp-photo-add-more" title="Add another photo">
+								<input
+									type="file"
+									accept="image/*"
+									class="visually-hidden"
+									onchange={(e) => onPhotoInputChange(room.id, e)}
+									multiple
+								/>
+								{#if uploadingByRoom[room.id]}
+									<span class="rbp-uploading-indicator" aria-label="Uploading..."></span>
+								{:else}
+									<span aria-hidden="true">+</span>
+								{/if}
+							</label>
+						{:else}
+							<label class="rbp-upload-zone" title="Add a photo for this room">
+								<input
+									type="file"
+									accept="image/*"
+									class="visually-hidden"
+									onchange={(e) => onPhotoInputChange(room.id, e)}
+								/>
+								{#if uploadingByRoom[room.id]}
+									<span class="rbp-upload-spinner" aria-label="Uploading..."></span>
+								{:else}
+									<svg
+										class="rbp-upload-icon"
+										width="22" height="22"
+										viewBox="0 0 24 24" fill="none"
+										stroke="currentColor" stroke-width="1.5"
+										stroke-linecap="round" stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+										<circle cx="12" cy="13" r="4"/>
+									</svg>
+									<span class="rbp-upload-label">Add a photo</span>
+								{/if}
+							</label>
+						{/if}
+						{#if uploadErrorByRoom[room.id]}
+							<p class="rbp-upload-error">{uploadErrorByRoom[room.id]}</p>
 						{/if}
 					</div>
-					
-					{#if newRoomType === 'other'}
-						<input
-							type="text"
-							class="room-description-input-inline"
-							bind:value={newRoomCustomDesc}
-							placeholder="Describe the room..."
-						/>
-					{/if}
-					
-					<div class="add-room-actions">
-						<button type="button" class="btn-save-room-small" onclick={saveNewRoom} disabled={newRoomBedTypesArray.reduce((sum, b) => sum + b.quantity, 0) === 0}>
-							Save
-						</button>
-						<button type="button" class="btn-cancel-room" onclick={cancelAddingRoom}>
-							Cancel
-						</button>
-					</div>
-				</div>
-			</div>
-		{:else}
-			<button type="button" class="room-card add-room-card" onclick={startAddingRoom}>
-				<span class="add-icon">+</span>
-				<span class="add-text">Add Room</span>
-			</button>
-		{/if}
-		
-		<!-- Existing Room Cards -->
-		{#each draft.rooms as room, index}
-			{#if editingRoomId === room.id}
-				<div class="room-card add-room-editing">
-					<div class="editing-room-title">{getRoomDisplayName(room, index)}</div>
-					<div class="add-room-dropdowns">
-						<div class="dropdown-wrapper">
-							<select class="room-type-dropdown" bind:value={newRoomType} required>
-								<option value="" disabled selected={!newRoomType}>Room Type</option>
-								{#each roomTypeOptions as option}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
-						</div>
-						
-						<div class="dropdown-wrapper" bind:this={bedTypesDropdownElement}>
-							<button 
-								type="button" 
-								class="bed-types-dropdown-trigger"
-								onclick={(e) => {
-									e.preventDefault();
-									e.stopPropagation();
-									isBedTypesDropdownOpen = !isBedTypesDropdownOpen;
-								}}
-							>
-								<span>{getSelectedBedTypesDisplay()}</span>
-								<span class="dropdown-arrow">{isBedTypesDropdownOpen ? '▲' : '▼'}</span>
-							</button>
-							{#if isBedTypesDropdownOpen}
-								<div 
-									class="bed-types-dropdown-menu" 
-									bind:this={bedTypesDropdownMenu}
-									style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px;"
-									onclick={(e) => e.stopPropagation()}
-									onmousedown={(e) => e.stopPropagation()}
-								>
-									{#each bedTypeOptions as bedOption}
-										<div class="bed-type-row">
-											<div class="bed-quantity-controls">
-												<button
-													type="button"
-													class="bed-quantity-btn bed-quantity-down"
-													onclick={() => decrementBedQuantity(bedOption.value)}
-													disabled={getBedQuantity(bedOption.value) === 0}
-												>
-													↓
-												</button>
-												<button
-													type="button"
-													class="bed-quantity-btn bed-quantity-up"
-													onclick={() => incrementBedQuantity(bedOption.value)}
-												>
-													↑
-												</button>
-											</div>
-											<div class="bed-type-row-main">
-												{#if bedOption.iconUrl}
-													<img class="bed-icon-img" src={bedOption.iconUrl} alt="" />
-												{:else}
-													<span class="bed-icon">{bedOption.fallbackIcon}</span>
-												{/if}
-												<span class="bed-label">{bedOption.label}</span>
-												{#if getBedQuantity(bedOption.value) > 0}
-													<span class="bed-quantity-display">{getBedQuantity(bedOption.value)}</span>
-												{/if}
-											</div>
-										</div>
-									{/each}
-								</div>
-							{/if}
-						</div>
-						
-						{#if newRoomType === 'other'}
+
+					<!-- Room info -->
+					<div class="rbp-info">
+						<!-- Inline-editable room name -->
+						{#if isNameEditing}
 							<input
 								type="text"
-								class="room-description-input-inline"
-								bind:value={newRoomCustomDesc}
-								placeholder="Describe the room..."
+								class="rbp-name-input"
+								bind:value={room.name}
+								onblur={() => finishEditName(room.id)}
+								onkeydown={(e) => e.key === 'Enter' && finishEditName(room.id)}
+								placeholder="e.g. Master suite"
+								autofocus
 							/>
+						{:else}
+							<button
+								type="button"
+								class="rbp-name-display"
+								onclick={() => startEditName(room.id)}
+								title="Click to rename"
+							>
+								{getRoomDisplayName(room, idx)}
+							</button>
 						{/if}
-						
-						<div class="add-room-actions">
-							<button type="button" class="btn-save-room-small" onclick={saveEditedRoom} disabled={newRoomBedTypesArray.reduce((sum, b) => sum + b.quantity, 0) === 0}>
-								Save
-							</button>
-							<button type="button" class="btn-cancel-room" onclick={() => { editingRoomId = null; isBedTypesDropdownOpen = false; }}>
-								Cancel
-							</button>
+
+						<!-- Bed chips row -->
+						<div class="rbp-chips-row">
+							{#if bedQty.length > 0}
+								{#each bedQty as { bedType, quantity }}
+									<span class="rbp-chip">{quantity} {bedType.charAt(0).toUpperCase() + bedType.slice(1)}</span>
+								{/each}
+								<button
+									type="button"
+									class="rbp-chip rbp-chip--edit"
+									onclick={() => toggleBedConfig(room.id)}
+									aria-expanded={isBedOpen}
+									title={isBedOpen ? 'Done editing beds' : 'Edit beds'}
+								>
+									{isBedOpen ? 'Done' : 'Edit'}
+								</button>
+							{:else}
+								<button
+									type="button"
+									class="rbp-chip rbp-chip--add"
+									onclick={() => toggleBedConfig(room.id)}
+									aria-expanded={isBedOpen}
+								>
+									+ Add beds
+								</button>
+							{/if}
 						</div>
-					</div>
-				</div>
-			{:else}
-				<div 
-					class="room-card display"
-					class:drag-over={draggedOverRoomId === room.id}
-					ondrop={(e) => handleDrop(e, room.id)}
-					ondragover={(e) => handleDragOver(e, room.id)}
-				>
-					<div class="room-card-header">
-						<h4>{getRoomDisplayName(room, index)}</h4>
-						<div class="room-actions">
-							<button type="button" class="btn-edit-room" onclick={() => editRoom(room.id)} title="Edit room">
-								✎
-							</button>
-							<button type="button" class="btn-remove-room" onclick={() => removeRoom(room.id)} title="Remove room">
-								×
-							</button>
-						</div>
-					</div>
-					{#if room.photos.length > 0}
-						<div class="room-photos-display">
-							<div class="room-photos-grid">
-								{#each room.photos.slice(0, 4) as photo, photoIndex}
-									<div
-										class="room-photo-thumbnail"
-										draggable="true"
-										ondragstart={(e) => handleDragStart(e, photo)}
-										ondragend={handleDragEnd}
-									>
-										<img src={photo} alt="Room photo" />
-										<button
-											type="button"
-											class="remove-photo-btn"
-											onclick={() => removePhoto(room.id, photoIndex)}
-											title="Remove photo"
-										>
-											×
-										</button>
+
+						<!-- Expandable bed configuration -->
+						{#if isBedOpen}
+							<div class="rbp-bed-config" role="group" aria-label="Bed configuration">
+								{#each bedTypeOptions as opt}
+									{@const qty = getBedQuantity(room.id, opt.value)}
+									<div class="rbp-bed-row">
+										<span class="rbp-bed-icon" aria-hidden="true">
+											{#if opt.iconUrl}
+												<img src={opt.iconUrl} alt={opt.label} width="16" height="16" />
+											{:else}
+												{opt.fallbackIcon}
+											{/if}
+										</span>
+										<span class="rbp-bed-type">{opt.label}</span>
+										<div class="rbp-stepper">
+											<button
+												type="button"
+												class="rbp-stepper-btn"
+												onclick={() => decrementBed(room.id, opt.value)}
+												disabled={qty === 0}
+												aria-label={`Remove ${opt.label}`}
+											>-</button>
+											<span class="rbp-stepper-val">{qty}</span>
+											<button
+												type="button"
+												class="rbp-stepper-btn"
+												onclick={() => incrementBed(room.id, opt.value)}
+												aria-label={`Add ${opt.label}`}
+											>+</button>
+										</div>
 									</div>
 								{/each}
-								{#if room.photos.length > 4}
-									<div class="photo-more-badge">
-										+{room.photos.length - 4}
-									</div>
-								{/if}
 							</div>
-						</div>
-					{/if}
-					<div class="room-beds-display">
-						{#each room.beds as bed}
-							{@const meta = getBedIconMeta(bed.bedType)}
-							<span class="bed-icon-badge" title={meta.alt}>
-								{#if meta.url}
-									<img class="bed-icon-badge-img" src={meta.url} alt={meta.alt} />
-								{:else}
-									<span aria-hidden="true">{meta.fallback}</span>
-								{/if}
-							</span>
-						{/each}
-						{#if room.beds.length === 0}
-							<span class="no-beds">No beds</span>
+						{/if}
+
+						<!-- Capacity badge -->
+						{#if capacity > 0}
+							<p class="rbp-capacity">{capacity} {capacity === 1 ? 'person' : 'people'}</p>
 						{/if}
 					</div>
-				</div>
-			{/if}
-		{/each}
-	</div>
-	
-	<!-- Gallery Section -->
-	<div class="gallery-section">
-		<div class="gallery-header">
-			<h4>Photo Gallery</h4>
-			<p class="gallery-description">Upload photos so your guests can see where they're staying. Drag to assign them to the rooms you've built above. Click the star icon to set a photo as the cover photo.</p>
-		</div>
-		<div class="gallery-grid" ondrop={(e) => e.preventDefault()} ondragover={(e) => e.preventDefault()}>
-			{#each galleryPhotos as photo, photoIndex}
-				<div
-					class="gallery-photo-item"
-					class:cover-photo={draft.coverPhoto === photo}
-					draggable="true"
-					ondragstart={(e) => handleDragStart(e, photo)}
-					ondragend={handleDragEnd}
-				>
-					<img src={photo} alt="Gallery photo" />
-					<button
-						type="button"
-						class="set-cover-btn"
-						onclick={(e) => {
-							e.stopPropagation();
-							setAsCoverPhoto(photo);
-						}}
-						title={draft.coverPhoto === photo ? "Cover photo" : "Set as cover photo"}
-					>
-						{draft.coverPhoto === photo ? '★' : '☆'}
-					</button>
-					<button
-						type="button"
-						class="remove-photo-btn"
-						onclick={() => removeGalleryPhoto(photoIndex)}
-						title="Remove photo"
-					>
-						×
-					</button>
-				</div>
+
+					<!-- Card footer -->
+					<footer class="rbp-card-footer">
+						<button
+							type="button"
+							class="rbp-remove"
+							onclick={() => removeRoom(room.id)}
+							aria-label={`Remove ${getRoomDisplayName(room, idx)}`}
+						>
+							Remove room
+						</button>
+					</footer>
+				</li>
 			{/each}
-			<label class="gallery-upload-tile">
-				<input
-					type="file"
-					accept="image/*"
-					multiple
-					onchange={handleGalleryUpload}
-					style="display: none;"
-				/>
-				<span class="upload-icon">📷</span>
-				<span class="upload-text">Upload Photos</span>
-			</label>
-		</div>
+		</ul>
+	{/if}
+
+	<!-- Add room button -->
+	<button type="button" class="rbp-add" onclick={addRoom} aria-label="Add another room">
+		<span class="rbp-add-plus" aria-hidden="true">+</span>
+		<span class="rbp-add-label">Add room</span>
+	</button>
+
+	<!-- More options expander -->
+	<div class="rbp-more">
+		<button
+			type="button"
+			class="rbp-more-toggle"
+			onclick={() => (moreOptionsOpen = !moreOptionsOpen)}
+			aria-expanded={moreOptionsOpen}
+		>
+			<span class="rbp-more-icon" aria-hidden="true">{moreOptionsOpen ? '−' : '+'}</span>
+			More options (cover photo, gallery)
+		</button>
+
+		{#if moreOptionsOpen}
+			<div class="rbp-more-body">
+				<!-- Cover photo -->
+				<div class="rbp-more-section">
+					<p class="rbp-more-label">Cover photo</p>
+					{#if draft.coverPhoto}
+						<div class="rbp-cover-preview">
+							<img src={draft.coverPhoto} alt="Trip cover" class="rbp-cover-img" />
+							<button
+								type="button"
+								class="rbp-cover-remove"
+								onclick={() => { draft.coverPhoto = ''; autosave(); }}
+								aria-label="Remove cover photo"
+							>Remove</button>
+						</div>
+					{:else}
+						<label class="rbp-cover-zone">
+							<input
+								type="file"
+								accept="image/*"
+								class="visually-hidden"
+								onchange={onCoverInputChange}
+							/>
+							{#if uploadingCover}
+								<span class="rbp-upload-spinner" aria-label="Uploading..."></span>
+							{:else}
+								<span class="rbp-cover-zone-text">Upload cover photo</span>
+							{/if}
+						</label>
+					{/if}
+					{#if coverError}
+						<p class="rbp-upload-error">{coverError}</p>
+					{/if}
+				</div>
+
+				<!-- Gallery photos placeholder -->
+				<div class="rbp-more-section">
+					<p class="rbp-more-label">Gallery photos</p>
+					<p class="rbp-more-hint">
+						Gallery photos can be added after the trip is created, from the trip settings.
+					</p>
+				</div>
+			</div>
+		{/if}
 	</div>
 </div>
 
 <style>
-	.room-bed-picker {
+	/* ── Grid ─────────────────────────────────────────────── */
+	.rbp {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
-		height: 100%;
-		min-height: 0;
-		overflow: visible;
-	}
-	
-	.picker-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-	
-	.picker-header h3 {
-		font-size: 1rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0;
-	}
-	
-	.btn-add-room {
-		padding: 0.4rem 0.75rem;
-		background: #ffffff;
-		color: #2d3748;
-		border: none;
-		border-radius: 0;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-	
-	.btn-add-room:hover {
-		background: #e2e8f0;
-		color: #1a202c;
-	}
-	
-	.rooms-grid {
-		display: grid;
-		grid-template-columns: repeat(6, 1fr);
-		gap: 0.5rem;
-		flex: 1;
-		overflow: visible;
-		min-height: 0;
-		align-content: start;
-	}
-	
-	.room-card {
-		border: 1px solid var(--border);
-		border-radius: 0;
-		padding: 0.75rem;
-		background: #fafafa;
-		transition: all 0.2s ease;
-		display: flex;
-		flex-direction: column;
-		min-height: 120px;
-	}
-	
-	.room-card.display {
-		cursor: default;
-	}
-	
-	.room-card.display:hover {
-		border-color: var(--primary);
-		background: #f5f5f5;
-	}
-	
-	.room-card.display.drag-over {
-		border-color: var(--primary);
-		background: #f0f4ff;
-		box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
-	}
-	
-	.add-room-editing {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		min-height: auto;
-		position: relative;
-		z-index: 100;
-		width: 100%;
-		overflow: visible;
-		box-sizing: border-box;
+		gap: 20px;
 	}
 
-	.editing-room-title {
-		font-size: 0.8125rem;
-		font-weight: 700;
-		color: var(--text);
-		letter-spacing: -0.02em;
-		margin: 0 0 -0.25rem;
-	}
-	
-	.add-room-dropdowns {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		width: 100%;
-		overflow: visible;
-	}
-	
-	.dropdown-wrapper {
-		position: relative;
-		width: 100%;
-		overflow: visible;
-		z-index: 1;
-	}
-	
-	.room-type-dropdown {
-		width: 100%;
-		padding: 0.5rem 0.75rem;
-		border: 1px solid var(--border);
-		border-radius: 0;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--text);
-		background: white;
-		cursor: pointer;
-		appearance: none;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231e293b' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-		background-repeat: no-repeat;
-		background-position: right 0.75rem center;
-		padding-right: 2.5rem;
-		box-sizing: border-box;
-		overflow-x: hidden;
-	}
-	
-	.room-type-dropdown option[value=""][disabled] {
-		color: var(--muted);
-	}
-	
-	.room-type-dropdown:invalid {
-		color: var(--muted);
-	}
-	
-	.room-type-dropdown:focus {
-		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
-	}
-	
-	.room-type-dropdown option {
-		background: white;
-		color: var(--text);
-	}
-	
-	.bed-types-dropdown-trigger {
-		width: 100%;
-		padding: 0.5rem 0.75rem;
-		border: 1px solid var(--border);
-		border-radius: 0;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: var(--text);
-		background: white;
-		cursor: pointer;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		text-align: left;
-		box-sizing: border-box;
-		overflow-x: hidden;
-	}
-	
-	.bed-types-dropdown-trigger:hover {
-		border-color: var(--primary);
-		background: #fafafa;
-	}
-	
-	.bed-types-dropdown-trigger:focus {
-		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
-	}
-	
-	.dropdown-arrow {
-		font-size: 0.75rem;
-		color: var(--muted);
-	}
-	
-	.bed-types-dropdown-menu {
-		position: fixed;
-		border: 1px solid #e5e7eb;
-		background: #fff;
-		padding: 0.75rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		z-index: 9999;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-		max-height: 300px;
-		overflow-y: auto;
-		overflow-x: hidden;
-		width: max-content;
-		min-width: 220px;
-		max-width: 220px;
-		box-sizing: border-box;
-		color: #111;
-	}
-	
-	.bed-types-dropdown-menu * {
-		color: #111;
-	}
-	
-	.room-description-input-inline {
-		width: 100%;
-		padding: 0.5rem 0.75rem;
-		border: 1px solid var(--border);
-		border-radius: 0;
-		font-size: 0.875rem;
-		font-weight: 400;
-		color: var(--text);
-		background: white;
-	}
-	
-	.room-description-input-inline::placeholder {
-		color: var(--muted);
-	}
-	
-	.room-description-input-inline:focus {
-		outline: none;
-		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
-	}
-	
-	.add-room-actions {
-		display: flex;
-		gap: 0.5rem;
-		margin-top: 0.25rem;
-	}
-	
-	.btn-save-room-small {
-		padding: 0.5rem 1rem;
-		background: #ffffff;
-		color: #2d3748;
-		border: none;
-		border-radius: 0;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		flex: 1;
-	}
-	
-	.btn-save-room-small:hover:not(:disabled) {
-		background: #e2e8f0;
-	}
-	
-	.btn-save-room-small:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-	
-	.btn-cancel-room {
-		padding: 0.5rem 1rem;
-		background: transparent;
-		color: var(--muted);
-		border: 1px solid var(--border);
-		border-radius: 0;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		flex: 1;
-	}
-	
-	.btn-cancel-room:hover {
-		border-color: var(--primary);
-		color: var(--text);
-		background: rgba(30, 58, 138, 0.05);
-	}
-	
-	.add-room-card {
-		background: #fafafa;
-		border: 1px dashed var(--border);
-		cursor: pointer;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		transition: all 0.2s ease;
-		min-height: 100px;
-		padding: 0.75rem;
-		aspect-ratio: 1;
-	}
-	
-	.add-room-card:hover {
-		border-color: var(--primary);
-		background: #f5f5f5;
-	}
-	
-	.add-icon {
-		font-size: 3.5rem;
-		color: var(--muted);
-		font-weight: 200;
-		line-height: 1;
-	}
-	
-	.add-text {
-		font-size: 0.9375rem;
-		color: var(--text);
-		font-weight: 500;
-	}
-	
-	.room-card-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 0.75rem;
-	}
-	
-	.room-card-header h4 {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: var(--text);
+	.rbp-grid {
+		list-style: none;
 		margin: 0;
-	}
-	
-	.room-actions {
-		display: flex;
-		gap: 0.25rem;
-	}
-	
-	.btn-edit-room {
-		width: 1.5rem;
-		height: 1.5rem;
-		background: transparent;
-		color: var(--muted);
-		border: 1px solid var(--border);
-		border-radius: 0;
-		cursor: pointer;
-		font-size: 0.875rem;
-		line-height: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: all 0.2s ease;
 		padding: 0;
-	}
-	
-	.btn-edit-room:hover {
-		background: rgba(30, 58, 138, 0.1);
-		border-color: var(--primary);
-		color: var(--primary);
-	}
-	
-	.btn-close {
-		width: 1.5rem;
-		height: 1.5rem;
-		background: transparent;
-		color: var(--muted);
-		border: none;
-		cursor: pointer;
-		font-size: 1.25rem;
-		line-height: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: all 0.2s ease;
-		padding: 0;
-	}
-	
-	.btn-close:hover {
-		color: var(--text);
-	}
-	
-	.room-type-select {
-		padding: 0.5rem 0.75rem;
-		border: 1px solid #718096;
-		border-radius: 0;
-		font-size: 0.875rem;
-		font-weight: 500;
-		color: #ffffff;
-		background: #1a202c;
-		cursor: pointer;
-		width: 100%;
-	}
-	
-	.room-type-select:focus {
-		outline: none;
-		border-color: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-	}
-	
-	.room-type-select option {
-		background: #1a202c;
-		color: #ffffff;
-	}
-	
-	.room-description-input {
-		padding: 0.5rem 0.75rem;
-		border: 1px solid #718096;
-		border-radius: 0;
-		font-size: 0.875rem;
-		font-weight: 400;
-		color: #ffffff;
-		background: #1a202c;
-		width: 100%;
-	}
-	
-	.room-description-input::placeholder {
-		color: #a0aec0;
-	}
-	
-	.room-description-input:focus {
-		outline: none;
-		border-color: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-	}
-	
-	.btn-remove-room {
-		width: 1.75rem;
-		height: 1.75rem;
-		background: transparent;
-		color: #cbd5e0;
-		border: 1px solid #718096;
-		border-radius: 0;
-		cursor: pointer;
-		font-size: 1.25rem;
-		line-height: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: all 0.2s ease;
-		flex-shrink: 0;
-	}
-	
-	.btn-remove-room:hover {
-		background: var(--danger);
-		color: white;
-		border-color: var(--danger);
-	}
-	
-	.room-edit-content {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-	
-	.edit-field {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-	
-	.edit-field label {
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: var(--muted);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-	
-	.bed-types-multiselect {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		border: 1px solid var(--border);
-		padding: 0.75rem;
-		background: white;
-		position: relative;
-		z-index: 1000;
-		overflow: visible;
-	}
-	
-	.bed-type-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.375rem 0;
-		width: 100%;
-		flex-wrap: nowrap;
-		min-width: 0;
-	}
-	
-	.bed-quantity-controls {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		flex-shrink: 0;
-	}
-	
-	.bed-quantity-btn {
-		width: 1.5rem;
-		height: 1.25rem;
-		padding: 0;
-		border: 1px solid var(--border);
-		background: white;
-		color: var(--text);
-		cursor: pointer;
-		font-size: 0.75rem;
-		line-height: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: all 0.2s ease;
-		flex-shrink: 0;
-	}
-	
-	.bed-quantity-btn:hover:not(:disabled) {
-		background: #f5f5f5;
-		border-color: var(--primary);
-		color: var(--primary);
-	}
-	
-	.bed-quantity-btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-	
-	.bed-type-row-main {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex: 1;
-		color: var(--text);
-		font-size: 0.875rem;
-		min-width: 0;
-		flex-shrink: 1;
-		overflow: visible;
-	}
-	
-	.bed-type-row-main .bed-label {
-		white-space: nowrap;
-		flex: 1;
-	}
-	
-	.bed-quantity-display {
-		font-weight: 600;
-		color: var(--text);
-		margin-left: auto;
-		flex-shrink: 0;
-	}
-	
-	.bed-icon {
-		font-size: 1rem;
-	}
-	
-	.bed-icon-img {
-		width: 16px;
-		height: 16px;
-		object-fit: contain;
-		flex-shrink: 0;
-	}
-	
-	.bed-label {
-		font-weight: 500;
-	}
-	
-	
-	.btn-save-room {
-		padding: 0.625rem 1rem;
-		background: #ffffff;
-		color: #2d3748;
-		border: none;
-		border-radius: 0;
-		font-size: 0.875rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		margin-top: 0.5rem;
-	}
-	
-	.btn-save-room:hover {
-		background: #e2e8f0;
-	}
-	
-	.room-photos-display {
-		margin-bottom: 0.5rem;
-	}
-	
-	.room-photos-grid {
 		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 0.25rem;
+		grid-template-columns: 1fr 1fr;
+		gap: 12px;
 	}
-	
-	.room-photo-thumbnail {
-		position: relative;
-		aspect-ratio: 1;
-		border-radius: 0;
+
+	/* ── Card ─────────────────────────────────────────────── */
+	.rbp-card {
+		border-radius: 14px;
+		border: 1px solid var(--border-paper);
 		overflow: hidden;
-		border: 1px solid var(--border);
-		cursor: move;
-		transition: all 0.2s ease;
+		display: flex;
+		flex-direction: column;
+		background: white;
+		transition: box-shadow 200ms ease;
 	}
-	
-	.room-photo-thumbnail:hover {
-		border-color: var(--primary);
-		transform: scale(1.05);
+
+	.rbp-card:hover {
+		box-shadow: 0 4px 16px rgba(29, 77, 78, 0.08);
 	}
-	
-	.room-photo-thumbnail img {
+
+	/* ── Photo zone ───────────────────────────────────────── */
+	.rbp-photo-zone {
+		position: relative;
+		height: 160px;
+		flex-shrink: 0;
+		background: var(--surface-faint);
+		overflow: hidden;
+	}
+
+	.rbp-photo-cover {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		display: block;
 	}
-	
-	.room-photo-thumbnail .remove-photo-btn {
+
+	.rbp-type-badge {
 		position: absolute;
-		top: 0.25rem;
-		right: 0.25rem;
-		width: 1.25rem;
-		height: 1.25rem;
-		background: rgba(0, 0, 0, 0.7);
-		color: white;
-		border: none;
+		bottom: 8px;
+		left: 8px;
+		background: white;
+		color: var(--navy);
+		font-size: 0.5625rem;
+		font-weight: 600;
+		padding: 3px 7px;
+		border-radius: 4px;
+		pointer-events: none;
+	}
+
+	.rbp-photo-add-more {
+		position: absolute;
+		bottom: 8px;
+		right: 8px;
+		width: 28px;
+		height: 28px;
 		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.85);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1rem;
+		font-weight: 700;
+		color: var(--navy);
 		cursor: pointer;
-		font-size: 0.875rem;
 		line-height: 1;
+	}
+
+	.rbp-photo-add-more input {
+		display: none;
+	}
+
+	.rbp-upload-zone {
+		width: 100%;
+		height: 100%;
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		opacity: 0;
-		transition: opacity 0.2s ease;
-		padding: 0;
+		gap: 6px;
+		cursor: pointer;
+		border: 1.5px dashed var(--border-paper);
+		background: var(--surface-faint);
+		transition: background 150ms ease;
 	}
-	
-	.room-photo-thumbnail:hover .remove-photo-btn {
-		opacity: 1;
+
+	.rbp-upload-zone:hover {
+		background: var(--border-paper);
 	}
-	
-	.photo-more-badge {
-		aspect-ratio: 1;
+
+	.rbp-upload-icon {
+		color: var(--muted);
+	}
+
+	.rbp-upload-label {
+		font-size: 0.6875rem;
+		color: var(--muted);
+	}
+
+	.rbp-upload-spinner {
+		width: 20px;
+		height: 20px;
+		border: 2px solid var(--border);
+		border-top-color: var(--slate);
+		border-radius: 50%;
+		animation: rbpSpin 600ms linear infinite;
+		display: inline-block;
+	}
+
+	@keyframes rbpSpin {
+		to { transform: rotate(360deg); }
+	}
+
+	.rbp-uploading-indicator {
+		width: 14px;
+		height: 14px;
+		border: 2px solid rgba(255, 255, 255, 0.4);
+		border-top-color: white;
+		border-radius: 50%;
+		animation: rbpSpin 600ms linear infinite;
+		display: inline-block;
+	}
+
+	.rbp-upload-error {
+		position: absolute;
+		bottom: 4px;
+		left: 6px;
+		right: 6px;
+		font-size: 0.625rem;
+		color: var(--warm);
+		background: white;
+		padding: 2px 5px;
+		border-radius: 4px;
+		margin: 0;
+	}
+
+	/* ── Room info ────────────────────────────────────────── */
+	.rbp-info {
+		padding: 12px 14px 4px;
+		flex: 1;
 		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: #1a202c;
-		border: 1px solid #718096;
-		border-radius: 0;
-		color: #cbd5e0;
-		font-size: 0.75rem;
-		font-weight: 500;
+		flex-direction: column;
+		gap: 8px;
 	}
-	
-	.room-beds-display {
+
+	/* Inline editable name */
+	.rbp-name-display {
+		background: none;
+		border: none;
+		border-bottom: 1.5px solid transparent;
+		font-family: inherit;
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--text);
+		cursor: pointer;
+		padding: 2px 0;
+		text-align: left;
+		transition: border-color 150ms;
+		width: 100%;
+		min-width: 0;
+	}
+
+	.rbp-name-display:hover {
+		border-bottom-color: var(--border);
+	}
+
+	.rbp-name-input {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--text);
+		background: none;
+		border: none;
+		border-bottom: 1.5px solid var(--navy);
+		outline: none;
+		padding: 2px 0;
+		width: 100%;
+		font-family: inherit;
+	}
+
+	/* Bed chips */
+	.rbp-chips-row {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.5rem;
+		gap: 5px;
+	}
+
+	.rbp-chip {
+		display: inline-flex;
 		align-items: center;
+		background: rgba(29, 77, 78, 0.07);
+		color: var(--navy);
+		border-radius: 999px;
+		padding: 3px 10px;
+		font-size: 0.6875rem;
+		font-family: inherit;
+		font-weight: 500;
+		border: none;
+		cursor: default;
+		line-height: 1.4;
+	}
+
+	.rbp-chip--edit,
+	.rbp-chip--add {
+		cursor: pointer;
+		background: none;
+		border: 1.5px dashed var(--border);
+		color: var(--muted);
+		font-weight: 500;
+	}
+
+	.rbp-chip--edit:hover,
+	.rbp-chip--add:hover {
+		border-color: var(--navy);
+		color: var(--navy);
+	}
+
+	/* Bed config expander */
+	.rbp-bed-config {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		background: var(--surface-faint);
+		border-radius: 8px;
+		padding: 10px 12px;
+	}
+
+	.rbp-bed-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.rbp-bed-icon {
+		width: 18px;
+		text-align: center;
+		flex-shrink: 0;
+		line-height: 1;
+	}
+
+	.rbp-bed-icon img {
+		display: block;
+	}
+
+	.rbp-bed-type {
+		flex: 1;
+		font-size: 0.75rem;
+		color: var(--text);
+	}
+
+	.rbp-stepper {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.rbp-stepper-btn {
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		border: 1px solid var(--border);
+		background: white;
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--navy);
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		line-height: 1;
+		transition: background 150ms, border-color 150ms;
+	}
+
+	.rbp-stepper-btn:hover:not(:disabled) {
+		background: var(--navy);
+		border-color: var(--navy);
+		color: white;
+	}
+
+	.rbp-stepper-btn:disabled {
+		opacity: 0.3;
+		cursor: not-allowed;
+	}
+
+	.rbp-stepper-val {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: var(--text);
+		min-width: 14px;
+		text-align: center;
+	}
+
+	.rbp-capacity {
+		font-size: 0.6875rem;
+		color: var(--muted);
+		margin: 0;
+	}
+
+	/* ── Card footer ──────────────────────────────────────── */
+	.rbp-card-footer {
+		padding: 8px 14px 12px;
+		border-top: 0.5px solid var(--surface-faint);
+		display: flex;
+		justify-content: flex-end;
 		margin-top: auto;
 	}
-	
-	.bed-icon-badge {
+
+	.rbp-remove {
+		background: none;
+		border: none;
+		font-family: inherit;
+		font-size: 0.6875rem;
+		color: var(--muted);
+		cursor: pointer;
+		text-decoration: underline;
+		text-underline-offset: 3px;
+		padding: 0;
+	}
+
+	.rbp-remove:hover {
+		color: var(--warm);
+	}
+
+	/* ── Add room button ──────────────────────────────────── */
+	.rbp-add {
+		width: 100%;
+		height: 64px;
+		border: 1.5px dashed var(--border-paper);
+		border-radius: 14px;
+		background: none;
+		cursor: pointer;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 4px;
+		transition: border-color 150ms, background 150ms;
+	}
+
+	.rbp-add:hover {
+		border-color: var(--warm);
+		background: rgba(206, 86, 18, 0.03);
+	}
+
+	.rbp-add-plus {
+		font-size: 1.375rem;
+		color: var(--warm);
+		line-height: 1;
+	}
+
+	.rbp-add-label {
+		font-size: 0.6875rem;
+		color: var(--muted);
+	}
+
+	/* ── More options expander ────────────────────────────── */
+	.rbp-more {
+		border-top: 1px solid var(--border-paper);
+		padding-top: 12px;
+	}
+
+	.rbp-more-toggle {
+		background: none;
+		border: none;
+		font-family: inherit;
+		font-size: 0.75rem;
+		color: var(--muted);
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 0;
+		width: 100%;
+		min-height: 44px;
+		text-align: left;
+	}
+
+	.rbp-more-toggle:hover {
+		color: var(--text);
+	}
+
+	.rbp-more-icon {
+		font-size: 0.875rem;
+		flex-shrink: 0;
+	}
+
+	.rbp-more-body {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		padding: 12px 0 4px;
+	}
+
+	.rbp-more-section {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.rbp-more-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text);
+		margin: 0;
+	}
+
+	.rbp-more-hint {
+		font-size: 0.6875rem;
+		color: var(--muted);
+		margin: 0;
+		line-height: 1.5;
+	}
+
+	.rbp-cover-zone {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 18px;
-		height: 18px;
-		line-height: 1;
-	}
-	
-	.bed-icon-badge-img {
-		width: 14px;
-		height: 14px;
-		object-fit: contain;
-	}
-	
-	.no-beds {
+		height: 44px;
+		padding: 0 16px;
+		border: 1.5px dashed var(--border);
+		border-radius: 8px;
+		background: var(--surface-faint);
+		cursor: pointer;
 		font-size: 0.75rem;
 		color: var(--muted);
-		font-style: italic;
+		transition: background 150ms, border-color 150ms;
 	}
-	
-	.empty-state {
-		text-align: center;
-		padding: 2rem;
-		color: var(--muted);
-		font-size: 0.9375rem;
+
+	.rbp-cover-zone:hover {
+		background: var(--border-paper);
+		border-color: var(--navy);
 	}
-	
-	.gallery-section {
-		border-top: 1px solid var(--border);
-		padding-top: 1rem;
-		margin-top: 1rem;
+
+	.rbp-cover-zone-text {
+		pointer-events: none;
 	}
-	
-	.gallery-header {
-		margin-bottom: 0.75rem;
+
+	.rbp-cover-preview {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 	}
-	
-	.gallery-header h4 {
-		font-size: 0.9375rem;
-		font-weight: 600;
-		color: var(--text);
-		margin: 0 0 0.25rem 0;
-	}
-	
-	.gallery-description {
-		font-size: 0.75rem;
-		color: var(--muted);
-		margin: 0;
-		line-height: 1.4;
-	}
-	
-	.gallery-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-		gap: 0.5rem;
-	}
-	
-	.gallery-photo-item {
-		position: relative;
-		aspect-ratio: 1;
-		border-radius: 0.5rem;
-		overflow: hidden;
-		border: 2px solid var(--border);
-		cursor: move;
-		transition: all 0.2s ease;
-	}
-	
-	.gallery-photo-item.cover-photo {
-		border-color: #fbbf24;
-		border-width: 3px;
-		box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
-	}
-	
-	.gallery-photo-item:hover {
-		border-color: var(--primary);
-		transform: scale(1.05);
-		box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2);
-	}
-	
-	.gallery-photo-item.cover-photo:hover {
-		border-color: #fbbf24;
-		box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.5);
-	}
-	
-	.gallery-photo-item img {
-		width: 100%;
-		height: 100%;
+
+	.rbp-cover-img {
+		width: 60px;
+		height: 40px;
 		object-fit: cover;
+		border-radius: 4px;
 	}
-	
-	.gallery-photo-item .set-cover-btn {
-		position: absolute;
-		top: 0.25rem;
-		left: 0.25rem;
-		width: 1.5rem;
-		height: 1.5rem;
-		background: rgba(0, 0, 0, 0.7);
-		color: #fbbf24;
+
+	.rbp-cover-remove {
+		background: none;
 		border: none;
-		border-radius: 50%;
+		font-family: inherit;
+		font-size: 0.6875rem;
+		color: var(--muted);
 		cursor: pointer;
-		font-size: 1rem;
-		line-height: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		opacity: 0;
-		transition: opacity 0.2s ease, background 0.2s ease;
+		text-decoration: underline;
+		text-underline-offset: 3px;
 		padding: 0;
-		z-index: 10;
 	}
-	
-	.gallery-photo-item.cover-photo .set-cover-btn {
-		opacity: 1;
-		background: rgba(251, 191, 36, 0.9);
-		color: white;
+
+	.rbp-cover-remove:hover {
+		color: var(--warm);
 	}
-	
-	.gallery-photo-item:hover .set-cover-btn {
-		opacity: 1;
-	}
-	
-	.gallery-photo-item .set-cover-btn:hover {
-		background: rgba(251, 191, 36, 0.9);
-		color: white;
-	}
-	
-	.gallery-photo-item .remove-photo-btn {
+
+	/* ── Utility ──────────────────────────────────────────── */
+	.visually-hidden {
 		position: absolute;
-		top: 0.25rem;
-		right: 0.25rem;
-		width: 1.25rem;
-		height: 1.25rem;
-		background: rgba(0, 0, 0, 0.7);
-		color: white;
-		border: none;
-		border-radius: 50%;
-		cursor: pointer;
-		font-size: 0.875rem;
-		line-height: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		opacity: 0;
-		transition: opacity 0.2s ease;
+		width: 1px;
+		height: 1px;
 		padding: 0;
-		z-index: 10;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
-	
-	.gallery-photo-item:hover .remove-photo-btn {
-		opacity: 1;
-	}
-	
-	.gallery-photo-item .remove-photo-btn:hover {
-		background: rgba(239, 68, 68, 0.9);
-	}
-	
-	.gallery-upload-tile {
-		aspect-ratio: 1;
-		border: 2px dashed var(--border);
-		border-radius: 0;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		background: #fafafa;
-		gap: 0.5rem;
-		min-height: 120px;
-	}
-	
-	.gallery-upload-tile:hover {
-		border-color: var(--primary);
-		background: #f5f5f5;
-	}
-	
-	.upload-icon {
-		font-size: 1.5rem;
-		color: var(--muted);
-	}
-	
-	.upload-text {
-		font-size: 0.8125rem;
-		color: var(--muted);
-		font-weight: 500;
-	}
-	
-	@media (max-width: 1400px) {
-		.rooms-grid {
-			grid-template-columns: repeat(4, 1fr);
+
+	/* ── Mobile ───────────────────────────────────────────── */
+	@media (max-width: 580px) {
+		.rbp-grid {
+			grid-template-columns: 1fr;
 		}
-	}
-	
-	@media (max-width: 1024px) {
-		.rooms-grid {
-			grid-template-columns: repeat(3, 1fr);
-		}
-	}
-	
-	@media (max-width: 768px) {
-		.rooms-grid {
-			grid-template-columns: repeat(2, 1fr);
+
+		.rbp-photo-zone {
+			height: 140px;
 		}
 	}
 </style>

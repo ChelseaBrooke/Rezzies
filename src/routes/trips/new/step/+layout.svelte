@@ -1,15 +1,41 @@
 <script lang="ts">
-	import CreateTripShell from '$lib/components/wizard/CreateTripShell.svelte';
-	import { page } from '$app/stores';
-	
-	let { children, data } = $props();
-	
-	const currentStep = $derived(() => {
-		const stepMatch = $page.url.pathname.match(/\/step\/(\d+)/);
-		return stepMatch ? parseInt(stepMatch[1]) - 1 : 0;
+	import { onNavigate } from '$app/navigation';
+
+	let { children } = $props();
+
+	onNavigate((navigation) => {
+		if (typeof document === 'undefined' || !document.startViewTransition) return;
+		return new Promise((resolve) => {
+			document.startViewTransition(async () => {
+				resolve();
+				await navigation.complete;
+			});
+		});
 	});
 </script>
 
-<CreateTripShell currentStep={currentStep()} {data} hideStepperBack>
-	{@render children()}
-</CreateTripShell>
+{@render children()}
+
+<style>
+	@keyframes fade-in {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+	}
+
+	@keyframes fade-out {
+		to {
+			opacity: 0;
+			transform: translateY(-8px);
+		}
+	}
+
+	:global(::view-transition-old(root)) {
+		animation: 180ms ease both fade-out;
+	}
+
+	:global(::view-transition-new(root)) {
+		animation: 220ms ease both fade-in;
+	}
+</style>
