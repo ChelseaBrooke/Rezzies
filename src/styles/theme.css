@@ -83,7 +83,7 @@
 	--transition-base: 200ms ease;
 	--transition-slow: 300ms ease;
 
-	/* Editorial display scale — used by marketing pages (/our-services) where the
+	/* Editorial display scale - used by marketing pages (/our-services) where the
 	 * page sits on a light "paper" surface inside MarketingShell's dark canvas.
 	 * Three Fraunces sizes: hero display, section opener, CTA closer.
 	 */
@@ -113,4 +113,13 @@
 	--success-bg: rgba(29, 158, 117, 0.08);
 	--success-border: rgba(29, 158, 117, 0.30);
 	--success-text: #0f5132;
+
+	/* Guest page semantic tokens */
+	--surface-attention: #fdf8f0;
+	--bg-warm: #f9f7f4;
+	--amber-text: #92660a;
+	--amber-text-dark: #7a5200;
+	--green-deep: #0a5c45;
+	--green-mid: #1D9E75;
+	--red-text: #991b1b;
 }

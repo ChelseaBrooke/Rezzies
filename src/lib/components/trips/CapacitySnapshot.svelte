@@ -141,14 +141,7 @@
 		z-index: 2;
 	}
 	.cs-fill--pending {
-		/* gentle amber stripe using repeating-linear-gradient */
-		background: repeating-linear-gradient(
-			90deg,
-			rgba(245, 158, 11, 0.55) 0px,
-			rgba(245, 158, 11, 0.55) 6px,
-			rgba(245, 158, 11, 0.2) 6px,
-			rgba(245, 158, 11, 0.2) 10px
-		);
+		background: rgba(247, 170, 41, 0.35);
 		border-radius: 0 999px 999px 0;
 		z-index: 1;
 	}
