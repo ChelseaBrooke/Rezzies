@@ -454,7 +454,7 @@
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
-		color: var(--primary, #2563eb);
+		color: var(--primary, #2F7778);
 		margin: 0 0 0.6rem;
 	}
 
@@ -604,7 +604,7 @@
 	.social-proof {
 		padding: 1.1rem 1.35rem;
 		background: rgba(248, 250, 252, 0.8);
-		border-left: 3px solid var(--primary, #2563eb);
+		border-left: 3px solid var(--primary, #2F7778);
 		border-radius: 0 0.75rem 0.75rem 0;
 	}
 
@@ -759,7 +759,7 @@
 	}
 
 	.btn-apply:hover:not(:disabled) {
-		background: var(--primary-dark, #1e3a8a);
+		background: var(--primaryHover, #245a5b);
 	}
 
 	.btn-apply:disabled {
@@ -895,7 +895,7 @@
 	}
 
 	.btn-publish:hover:not(:disabled) {
-		background: var(--primary-dark, #1e3a8a);
+		background: var(--primaryHover, #245a5b);
 		transform: translateY(-1px);
 	}
 

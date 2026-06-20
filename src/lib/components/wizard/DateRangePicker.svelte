@@ -261,7 +261,7 @@
 	.trigger-input:focus {
 		outline: none;
 		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+		box-shadow: 0 0 0 3px rgba(47, 119, 120, 0.1);
 	}
 
 	.trigger-text {
@@ -387,7 +387,7 @@
 	}
 
 	.day-cell.in-range {
-		background: rgba(30, 58, 138, 0.15);
+		background: rgba(47, 119, 120, 0.15);
 	}
 
 	.day-cell.range-start,

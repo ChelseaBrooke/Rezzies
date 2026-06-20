@@ -156,7 +156,7 @@
 		padding: 0.6rem 1.25rem;
 		font-size: 0.9375rem;
 		font-weight: 600;
-		background: var(--primary, #e85d04);
+		background: var(--primary, #2F7778);
 		color: white;
 		border: none;
 		border-radius: 8px;

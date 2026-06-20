@@ -427,11 +427,11 @@
 		border: 1px solid var(--border); border-radius: var(--radius-md);
 		background: var(--bg); color: var(--text);
 	}
-	.search-input:focus { outline: none; border-color: var(--primary, #e85d04); }
+	.search-input:focus { outline: none; border-color: var(--primary, #2F7778); }
 	.btn-primary {
 		display: inline-flex; align-items: center; gap: .35rem;
 		padding: .5rem 1rem;
-		background: var(--primary, #e85d04); color: white;
+		background: var(--primary, #2F7778); color: white;
 		border: none; border-radius: var(--radius-md);
 		font-weight: 500; font-size: .875rem; cursor: pointer;
 	}
@@ -445,7 +445,7 @@
 		background: transparent; font: inherit;
 	}
 	.upload-zone:hover, .gallery-upload-zone:hover {
-		border-color: var(--primary, #e85d04);
+		border-color: var(--primary, #2F7778);
 		background: rgba(232,93,4,.04);
 	}
 	.upload-zone p, .gallery-upload-zone p { margin: 0 0 .25rem; font-size: .9375rem; }

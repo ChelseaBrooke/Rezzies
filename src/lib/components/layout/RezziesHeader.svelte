@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import DivviLogo from '$lib/components/DivviLogo.svelte';
 </script>
 
 <header class="rezzies-header">
 	<div class="header-left">
-		<RezziesLogo href="/" class="logo-link" />
+		<DivviLogo href="/" class="logo-link" />
 		<span class="tagline">for the host that does the most</span>
 	</div>
 	

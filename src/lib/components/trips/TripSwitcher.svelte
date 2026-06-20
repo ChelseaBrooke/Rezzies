@@ -190,7 +190,7 @@
 	}
 
 	.switcher-item.current {
-		background: rgba(30, 58, 138, 0.08);
+		background: rgba(47, 119, 120, 0.08);
 		color: var(--primary);
 		font-weight: 500;
 	}

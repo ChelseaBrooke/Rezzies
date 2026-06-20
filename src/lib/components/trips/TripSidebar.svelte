@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { getTripBadges } from '$lib/trips/selectors.js';
 	import TripNavItem from './TripNavItem.svelte';
-	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import DivviLogo from '$lib/components/DivviLogo.svelte';
 	import ProfileTooltip from '$lib/components/profile/ProfileTooltip.svelte';
 	import { openProfileCard } from '$lib/stores/profileOverlay.js';
 	import type { TripForSidebar } from '$lib/trips/types.js';
@@ -38,7 +38,7 @@
 
 <aside class="sidebar">
 	<div class="sidebar-overlay" aria-hidden="true"></div>
-	<RezziesLogo href="/trips" class="sidebar-brand" />
+	<DivviLogo href="/trips" class="sidebar-brand" />
 
 	<div class="sidebar-content">
 	<!-- Nav Items -->

@@ -158,7 +158,7 @@
 	}
 	.empty-state:not(:has(.empty-file-overlay:disabled)):hover,
 	.empty-state:has(.empty-file-overlay:hover:not(:disabled)) {
-		border-color: var(--primary, #e85d04);
+		border-color: var(--primary, #2F7778);
 		background: rgba(232, 93, 4, 0.06);
 	}
 	.empty-state:has(.empty-file-overlay:disabled) {

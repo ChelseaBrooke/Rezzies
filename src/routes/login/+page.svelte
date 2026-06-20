@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { page } from '$app/stores';
-	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import DivviLogo from '$lib/components/DivviLogo.svelte';
 	import type { ActionData } from './$types';
 
 	let { form } = $props();
@@ -18,7 +18,7 @@
 
 	<header class="auth-header">
 		<div class="auth-header-left">
-			<RezziesLogo href="/" class="auth-logo" />
+			<DivviLogo href="/" class="auth-logo" />
 		</div>
 		<div class="auth-header-right">
 			<a href={signupHref} class="auth-header-btn auth-header-btn-primary">Sign up</a>

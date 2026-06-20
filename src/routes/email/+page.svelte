@@ -1,7 +1,11 @@
 <script lang="ts">
-	import type { PageData } from './$types';
+	import { enhance } from '$app/forms';
+	import type { ActionData, PageData } from './$types';
 
-	let { data }: { data: PageData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	let sendResult = $derived(form?.sendPreview);
+	let sendingId = $state<string | null>(null);
 
 	/** Full HTML documents break attribute parsing; set srcdoc in JS. */
 	function emailIframe(node: HTMLIFrameElement, html: string) {
@@ -24,6 +28,7 @@
 		<p class="ep-hint">
 			Live HTML from <code>src/lib/server/email/render/</code>. Links use placeholder URLs. Available in
 			<strong>development</strong> or when <code>EMAIL_PREVIEW_ENABLED=true</code> in server env.
+			Use <strong>Send test</strong> to deliver the sample to <code>{data.previewRecipient}</code> via Resend.
 		</p>
 	</header>
 
@@ -36,8 +41,36 @@
 	<main class="ep-main">
 		{#each data.previews as p (p.id)}
 			<section class="ep-section" id={p.id}>
-				<h2 class="ep-section-title">{p.label}</h2>
-				<p class="ep-section-id"><code>{p.id}</code></p>
+				<div class="ep-section-head">
+					<div class="ep-section-meta">
+						<h2 class="ep-section-title">{p.label}</h2>
+						<p class="ep-section-id"><code>{p.id}</code></p>
+					</div>
+					<form
+						method="POST"
+						action="?/sendPreview"
+						class="ep-send-form"
+						use:enhance={() => {
+							sendingId = p.id;
+							return async ({ update }) => {
+								await update({ reset: false });
+								sendingId = null;
+							};
+						}}
+					>
+						<input type="hidden" name="previewId" value={p.id} />
+						<button type="submit" class="ep-send-btn" disabled={sendingId === p.id}>
+							{sendingId === p.id ? 'Sending…' : 'Send test → chelsea.nilon@gmail.com'}
+						</button>
+					</form>
+				</div>
+				{#if sendResult?.previewId === p.id}
+					{#if sendResult.success}
+						<p class="ep-send-ok" role="status">Sent to {data.previewRecipient}.</p>
+					{:else if sendResult.error}
+						<p class="ep-send-err" role="alert">{sendResult.error}</p>
+					{/if}
+				{/if}
 				<div class="ep-frame-wrap">
 					<iframe
 						class="ep-frame"
@@ -115,6 +148,17 @@
 	.ep-section {
 		scroll-margin-top: 1rem;
 	}
+	.ep-section-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.75rem 1rem;
+		margin-bottom: 0.75rem;
+	}
+	.ep-section-meta {
+		min-width: 0;
+	}
 	.ep-section-title {
 		font-size: 1.125rem;
 		font-weight: 700;
@@ -122,9 +166,51 @@
 		color: #111827;
 	}
 	.ep-section-id {
-		margin: 0 0 0.75rem;
+		margin: 0;
 		font-size: 0.75rem;
 		color: #6b7280;
+	}
+	.ep-send-form {
+		margin: 0;
+		flex-shrink: 0;
+	}
+	.ep-send-btn {
+		border: 1px solid rgba(206, 86, 18, 0.35);
+		background: #ce5612;
+		color: #fff;
+		font-family: inherit;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		padding: 0.45rem 0.85rem;
+		border-radius: 10px;
+		cursor: pointer;
+		white-space: nowrap;
+		box-shadow: 0 4px 14px rgba(206, 86, 18, 0.25);
+	}
+	.ep-send-btn:hover:not(:disabled) {
+		background: #a5440e;
+	}
+	.ep-send-btn:disabled {
+		opacity: 0.7;
+		cursor: wait;
+	}
+	.ep-send-ok {
+		margin: 0 0 0.75rem;
+		font-size: 0.8125rem;
+		color: #1f5e3a;
+		background: #e6f4ec;
+		border: 1px solid #b6dcc4;
+		border-radius: 8px;
+		padding: 0.4rem 0.65rem;
+	}
+	.ep-send-err {
+		margin: 0 0 0.75rem;
+		font-size: 0.8125rem;
+		color: #9a1f1f;
+		background: #fdecec;
+		border: 1px solid #f0b4b4;
+		border-radius: 8px;
+		padding: 0.4rem 0.65rem;
 	}
 	.ep-frame-wrap {
 		background: #e5e7eb;

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { page } from '$app/stores';
-	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import DivviLogo from '$lib/components/DivviLogo.svelte';
 	import { TRAVEL_STYLE_OPTIONS } from '$lib/travel-style.js';
 	import type { ActionData } from './$types';
 
@@ -19,7 +19,7 @@
 
 	<header class="auth-header">
 		<div class="auth-header-left">
-			<RezziesLogo href="/" class="auth-logo" />
+			<DivviLogo href="/" class="auth-logo" />
 		</div>
 		<div class="auth-header-right">
 			<a href={loginHref} class="auth-header-btn">Log in</a>

@@ -34,39 +34,46 @@ const CSS = `
 body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
 table,td{mso-table-lspace:0pt;mso-table-rspace:0pt}
 img{-ms-interpolation-mode:bicubic;border:0;height:auto;line-height:100%;outline:none;text-decoration:none}
-body{margin:0!important;padding:0!important;width:100%!important}
+body{margin:0!important;padding:0!important;width:100%!important;background-color:${B.wrapBg}}
 a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
-.wrap{background-color:${B.wrapBg}}
-.card{background-color:${B.cardBg};border-radius:${B.radiusCard};overflow:hidden;border:1px solid ${B.cardBorder};box-shadow:${B.cardShadow}}
-.accent-strip{height:5px;background:linear-gradient(90deg,${B.sky} 0%,${B.sand} 38%,${B.carrot} 72%,${B.accent} 100%)}
-.hero-band{background:linear-gradient(135deg,${B.primaryDark} 0%,${B.primary} 50%,${B.primaryDark} 100%);padding:28px 32px 32px}
-.logo-mark{display:inline-block;font-family:${B.fontSerif};font-size:22px;font-weight:800;color:${B.logoMark};letter-spacing:-0.02em;margin:0 0 10px}
-.logo-img{display:block;max-height:52px;width:auto;margin:0 0 16px}
-.hero-kicker{margin:0 0 12px}
-.eyebrow{display:inline-block;font-family:${B.fontSans};font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.95);background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.24);border-radius:999px;padding:5px 11px}
-h1{font-family:${B.fontSerif};font-size:26px;line-height:1.15;font-weight:800;color:${B.heroText};margin:0 0 8px;letter-spacing:-0.025em}
-.hero-sub{font-family:${B.fontSans};font-size:15px;line-height:1.55;color:${B.heroMuted};margin:0;font-weight:500}
-.body-pad{padding:28px 32px 32px}
-.lead{font-family:${B.fontSans};font-size:16px;line-height:1.65;color:${B.textDark};margin:0 0 20px}
+.wrap{background-color:${B.wrapBg};width:100%}
+.shell{width:100%;max-width:${B.maxWidth}px;background-color:${B.cardBg}}
+.hero{background-color:${B.primaryDark};background-image:linear-gradient(158deg,${B.primary} 0%,${B.primaryDark} 70%);padding:44px 48px 46px}
+.logo-mark{display:inline-block;font-family:${B.fontSerif};font-size:22px;font-weight:700;color:${B.logoMark};letter-spacing:-0.02em;margin:0 0 30px}
+.logo-img{display:block;max-height:42px;width:auto;margin:0 0 30px}
+.hero-kicker{margin:0 0 18px;font-size:0;line-height:0}
+.eyebrow{font-family:${B.fontSerif};font-style:italic;font-weight:400;font-size:15px;letter-spacing:0;color:${B.carrot};vertical-align:middle}
+.eyebrow-rule{display:inline-block;width:34px;height:1px;background-color:${B.sand};opacity:0.5;vertical-align:middle;margin-left:14px;font-size:0;line-height:1px}
+.shell h1{font-family:${B.fontSerif};font-size:36px;line-height:1.06;font-weight:600;color:${B.heroText};margin:0 0 14px;letter-spacing:-0.035em}
+.hero-sub{font-family:${B.fontSans};font-size:16px;line-height:1.6;color:rgba(255,255,255,0.82);margin:0;font-weight:400}
+.body-pad{padding:42px 48px 16px}
+.lead{font-family:${B.fontSans};font-size:16.5px;line-height:1.75;color:${B.textBody};margin:0 0 22px;font-weight:400}
+.lead strong{font-weight:700;color:${B.navyHeading}}
 .lead--tight{margin-bottom:0!important}
-.meta-table{width:100%;border-collapse:collapse;margin:0 0 24px}
-.meta-row td{font-family:${B.fontSans};font-size:14px;line-height:1.5;padding:10px 0;border-bottom:1px solid ${B.borderLight};color:${B.textBody}}
-.meta-label{font-weight:600;color:${B.primary};width:38%;padding-right:12px}
-.digest{width:100%;border-collapse:collapse;margin:0 0 24px;border-spacing:0}
-.digest td{font-family:${B.fontSans};font-size:15px;padding:8px 0;color:${B.textBody};border-bottom:1px solid ${B.borderLight}}
-.digest tr:last-child td{border-bottom:none}
-.digest--muted td{color:${B.textLight};border-bottom:none!important}
-.callout{background:${B.calloutBg};border:1.5px solid ${B.calloutBorder};border-radius:${B.radiusCallout};padding:20px 24px;text-align:center;margin:0 0 24px;box-shadow:0 4px 14px -8px rgba(47,119,120,0.35)}
-.callout-label{font-family:${B.fontSans};font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:${B.calloutLabel};margin:0 0 8px}
-.callout-value{font-family:${B.fontSerif};font-size:36px;font-weight:800;color:${B.navyHeading};line-height:1.2;margin:0 0 4px}
-.callout-note{font-family:${B.fontSans};font-size:13px;color:${B.textLight};margin:0}
-.btn-wrap{margin:8px 0 28px;text-align:center}
-.btn{display:inline-block;font-family:${B.fontSans};font-size:16px;font-weight:700;line-height:1;text-decoration:none!important;color:${B.heroText}!important;background-color:${B.accent};border-radius:${B.radiusBtn};padding:15px 28px;box-shadow:${B.ctaShadow}}
-.secondary-link{font-family:${B.fontSans};font-size:13px;color:${B.primary};text-align:center;display:block;margin:-12px 0 24px}
-.fine{font-family:${B.fontSans};font-size:13px;line-height:1.55;color:${B.textLight};margin:0 0 16px}
-.footer{font-family:${B.fontSans};font-size:12px;line-height:1.55;color:${B.textMuted};text-align:center;padding:0 24px 28px}
-.footer a{color:${B.primary}!important;text-decoration:underline!important}
-@media screen and (max-width:600px){.hero-band,.body-pad{padding-left:22px!important;padding-right:22px!important}h1{font-size:22px!important}.meta-label{width:42%}.callout-value{font-size:30px!important}}
+.surface{margin:10px 0 30px}
+.meta-table{width:100%;border-collapse:separate;border-spacing:0;margin:10px 0 30px;background-color:#ffffff;border:1px solid ${B.borderLight};border-radius:${B.radiusSurface}}
+.meta-row td{font-family:${B.fontSans};font-size:15px;line-height:1.45;padding:15px 22px;border-top:1px solid ${B.borderLight};color:${B.textDark}}
+.meta-row:first-child td{border-top:none}
+.meta-label{font-weight:600;color:${B.primary};width:40%;padding-right:14px}
+.digest{width:100%;border-collapse:separate;border-spacing:0;margin:10px 0 30px;background-color:#ffffff;border:1px solid ${B.borderLight};border-radius:${B.radiusSurface}}
+.digest td{font-family:${B.fontSans};font-size:15px;line-height:1.5;padding:14px 22px;color:${B.textDark};border-top:1px solid ${B.borderLight}}
+.digest tr:first-child td{border-top:none}
+.digest--muted td{color:${B.textLight}}
+.callout{background-color:${B.calloutBg};border:1px solid ${B.calloutBorder};border-radius:${B.radiusCallout};padding:30px 26px;text-align:center;margin:0 0 30px}
+.callout-label{font-family:${B.fontSerif};font-style:italic;font-size:15px;font-weight:400;letter-spacing:0;text-transform:none;color:${B.calloutLabel};margin:0 0 10px}
+.callout-value{font-family:${B.fontSerif};font-size:44px;font-weight:600;color:${B.navyHeading};line-height:1.05;margin:0 0 8px;letter-spacing:-0.02em}
+.callout-note{font-family:${B.fontSans};font-size:13px;line-height:1.5;color:${B.textLight};margin:0}
+.cta-table{width:100%;margin:8px 0 26px}
+.cta-cell{background-color:${B.accent};border-radius:${B.radiusBtn}}
+.btn{display:block;font-family:${B.fontSans};font-size:16px;font-weight:700;line-height:1.2;text-decoration:none!important;color:${B.heroText}!important;padding:18px 24px;text-align:center;letter-spacing:0.01em}
+.secondary-link{font-family:${B.fontSans};font-size:13.5px;color:${B.primary};text-align:center;display:block;margin:-10px 0 26px}
+.fine{font-family:${B.fontSans};font-size:13px;line-height:1.65;color:${B.textLight};margin:0 0 6px}
+.footer{background-color:${B.footerBg};padding:30px 48px 34px;border-top:1px solid ${B.borderLight}}
+.footer-brand{font-family:${B.fontSerif};font-size:18px;font-weight:700;color:${B.primary};letter-spacing:-0.02em;margin:0 0 8px}
+.footer-note{font-family:${B.fontSans};font-size:12.5px;line-height:1.65;color:${B.textMuted};margin:0 0 10px}
+.footer-note a{color:${B.primary}!important;text-decoration:underline!important}
+.footer-tag{font-family:${B.fontSerif};font-style:italic;font-size:13px;color:${B.textLight};margin:0}
+@media screen and (max-width:620px){.hero{padding-left:28px!important;padding-right:28px!important;padding-top:36px!important}.body-pad{padding-left:28px!important;padding-right:28px!important}.footer{padding-left:28px!important;padding-right:28px!important}.shell h1{font-size:29px!important}.meta-label{width:42%}.meta-row td{padding-left:18px!important;padding-right:18px!important}.digest td{padding-left:18px!important;padding-right:18px!important}.callout-value{font-size:36px!important}}
 `;
 
 const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -81,7 +88,13 @@ function buildFooterHtml(footerNoteEscaped: string): string {
 		const href = escapeHtml(`${base}/`);
 		linkLine = `<br /><a href="${href}" target="_blank" rel="noopener">Open Divvi</a>`;
 	}
-	return `<p class="footer">${footerNoteEscaped}${linkLine}</p>`;
+	return `<tr>
+		<td class="footer" align="center">
+			<div class="footer-brand">${escapeHtml(B.name)}</div>
+			<p class="footer-note">${footerNoteEscaped}${linkLine}</p>
+			<p class="footer-tag">${escapeHtml(B.tagline)}</p>
+		</td>
+	</tr>`;
 }
 
 /** Wrap content in the standard Divvi coastal email template. */
@@ -100,8 +113,8 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 
 	const ctaBlock =
 		opts.ctaUrl && opts.ctaLabel
-			? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-					<tr><td class="btn-wrap" align="center">
+			? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="cta-table">
+					<tr><td class="cta-cell" align="center" bgcolor="${B.accent}" style="border-radius:${B.radiusBtn};">
 						<a href="${escapeHtml(opts.ctaUrl)}" target="_blank" class="btn" rel="noopener">${escapeHtml(opts.ctaLabel)}</a>
 					</td></tr>
 				</table>`
@@ -134,13 +147,12 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 	<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preheader}</div>
 	<table role="presentation" class="wrap" width="100%" cellspacing="0" cellpadding="0" border="0">
 		<tr>
-			<td align="center" style="padding:32px 16px;">
-				<table role="presentation" class="card" width="100%" style="max-width:${B.maxWidth}px;" cellspacing="0" cellpadding="0" border="0">
-					<tr><td class="accent-strip"></td></tr>
+			<td align="center">
+				<table role="presentation" class="shell" width="100%" style="max-width:${B.maxWidth}px;" cellspacing="0" cellpadding="0" border="0">
 					<tr>
-						<td class="hero-band">
+						<td class="hero">
 							${logoBlock}
-							<div class="hero-kicker"><span class="eyebrow">${kicker}</span></div>
+							<div class="hero-kicker"><span class="eyebrow">${kicker}</span><span class="eyebrow-rule">&nbsp;</span></div>
 							<h1>${heading}</h1>
 							${subheading ? `<p class="hero-sub">${subheading}</p>` : ''}
 						</td>
@@ -154,8 +166,8 @@ export function renderEmailLayout(opts: EmailLayoutOptions): string {
 							${finePrint}
 						</td>
 					</tr>
+					${footerHtml}
 				</table>
-				${footerHtml}
 			</td>
 		</tr>
 	</table>

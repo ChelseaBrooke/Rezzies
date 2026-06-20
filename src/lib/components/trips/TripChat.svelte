@@ -301,7 +301,7 @@
 		max-width: 500px;
 		height: 48px;
 		border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
-		background: linear-gradient(135deg, var(--primary, #3b82f6) 0%, var(--primaryHover, #2563eb) 100%);
+		background: linear-gradient(135deg, var(--primary, #2F7778) 0%, var(--primaryHover, #245a5b) 100%);
 		color: white;
 		border: none;
 		border-top: 1px solid rgba(255, 255, 255, 0.25);
@@ -333,7 +333,7 @@
 	}
 
 	.chat-toggle:active {
-		background: var(--primary, #3b82f6);
+		background: var(--primary, #2F7778);
 		box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 	}
 
@@ -452,10 +452,10 @@
 	}
 
 	.message.own .message-content {
-		background: linear-gradient(135deg, var(--primary, #3b82f6) 0%, var(--primaryHover, #2563eb) 100%);
+		background: linear-gradient(135deg, var(--primary, #2F7778) 0%, var(--primaryHover, #245a5b) 100%);
 		color: white;
 		border-color: rgba(255, 255, 255, 0.2);
-		box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+		box-shadow: 0 2px 6px rgba(47, 119, 120, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 	}
 
 	.message-content.has-color,
@@ -564,7 +564,7 @@
 	.chat-input:focus {
 		outline: none;
 		border-color: var(--primary);
-		box-shadow: 0 0 0 3px var(--focusRing, rgba(59, 130, 246, 0.1));
+		box-shadow: 0 0 0 3px var(--focusRing, rgba(47, 119, 120, 0.1));
 	}
 
 	.chat-input:disabled {
@@ -576,7 +576,7 @@
 		width: 40px;
 		height: 40px;
 		border-radius: var(--radius-md, 8px);
-		background: linear-gradient(135deg, var(--primary, #3b82f6) 0%, var(--primaryHover, #2563eb) 100%);
+		background: linear-gradient(135deg, var(--primary, #2F7778) 0%, var(--primaryHover, #245a5b) 100%);
 		color: white;
 		border: none;
 		cursor: pointer;
@@ -589,7 +589,7 @@
 	}
 
 	.send-button:hover:not(:disabled) {
-		background: linear-gradient(135deg, var(--primaryHover, #2563eb) 0%, #1d4ed8 100%);
+		background: linear-gradient(135deg, var(--primaryHover, #245a5b) 0%, #1d4d4e 100%);
 		transform: scale(1.05);
 		box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 	}

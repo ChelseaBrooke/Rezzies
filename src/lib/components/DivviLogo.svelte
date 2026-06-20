@@ -1,5 +1,6 @@
 <script lang="ts">
 	import whiteLogo from '$lib/assets/images/white logo.png';
+	import darkLogo from '$lib/assets/images/divvi logo.png';
 
 	interface Props {
 		/** Link href. Default "/" */
@@ -8,15 +9,22 @@
 		class?: string;
 		/** When true, show only the logo image (e.g. for collapsed sidebars) */
 		compact?: boolean;
+		/**
+		 * Which logo asset to use based on the surface behind it:
+		 *   - "light" (default): white logo, for dark backgrounds
+		 *   - "dark": navy logo, for light backgrounds
+		 */
+		variant?: 'light' | 'dark';
 	}
 
-	let { href = '/', class: className = '', compact = false }: Props = $props();
+	let { href = '/', class: className = '', compact = false, variant = 'light' }: Props = $props();
 
 	const classList = $derived(`divvi-logo ${className ?? ''}`.trim());
+	const logoSrc = $derived(variant === 'dark' ? darkLogo : whiteLogo);
 </script>
 
-<a {href} class={classList} class:compact aria-label="divvi">
-	<img src={whiteLogo} alt="" class="divvi-logo-img" />
+<a {href} class={classList} class:compact aria-label="Divvi">
+	<img src={logoSrc} alt="Divvi" class="divvi-logo-img" />
 </a>
 
 <style>

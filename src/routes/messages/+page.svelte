@@ -479,7 +479,7 @@
 	}
 	.message { display: flex; justify-content: flex-start; }
 	.message.own { justify-content: flex-end; }
-	.message.own .message-bubble { background: var(--primary, #2563eb); color: white; }
+	.message.own .message-bubble { background: var(--primary, #2F7778); color: white; }
 	.message-bubble {
 		max-width: 75%;
 		padding: 0.5rem 0.75rem;
@@ -503,7 +503,7 @@
 	}
 	.send-btn {
 		padding: 0.5rem 1rem;
-		background: var(--primary, #2563eb);
+		background: var(--primary, #2F7778);
 		color: white;
 		border: none;
 		border-radius: 8px;

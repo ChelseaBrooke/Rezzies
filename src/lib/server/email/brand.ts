@@ -46,12 +46,12 @@ export const BRAND = {
 	eyebrowBorder: 'rgba(206,86,18,0.25)',
 	heroSubText: '#475569',
 
-	// Surfaces
-	wrapBg: '#f4f5f7',
-	cardBg: '#ffffff',
-	/** Card drop shadow, slightly deeper like wizard cost card */
-	cardShadow: '0 18px 44px -24px rgba(47,119,120,0.22)',
-	cardBorder: 'rgba(47,119,120,0.18)',
+	// Surfaces — warm editorial "paper" card on a soft neutral canvas (matches Our Services)
+	wrapBg: '#efeae3',
+	cardBg: '#fbf9f6',
+	/** Soft, deep drop shadow like the Our Services paper surface */
+	cardShadow: '0 24px 60px -30px rgba(29,77,78,0.32)',
+	cardBorder: 'rgba(29,77,78,0.10)',
 
 	// Text
 	textDark: '#111827',
@@ -70,9 +70,9 @@ export const BRAND = {
 	// Borders
 	borderLight: 'rgba(47,119,120,0.12)',
 
-	// Callout box, wizard toggle-card vibe (white inset on soft teal)
+	// Callout box, white inset card on the cream paper surface
 	calloutBg: '#ffffff',
-	calloutBorder: 'rgba(47,119,120,0.22)',
+	calloutBorder: 'rgba(29,77,78,0.14)',
 	calloutLabel: '#2F7778',
 
 	// CTA, shadow uses warm channel
@@ -82,13 +82,16 @@ export const BRAND = {
 	fontSerif: "'Fraunces',Georgia,'Times New Roman',serif",
 	fontSans: "'Plus Jakarta Sans',Helvetica,Arial,sans-serif",
 
-	// Layout
-	maxWidth: 560,
+	// Layout — full-bleed shell at the standard email width
+	maxWidth: 600,
+	/** Slightly deeper cream used to anchor the footer band */
+	footerBg: '#f1ece4',
 
-	/** Border radii, closer to wizard cs-hero (1.25rem) */
-	radiusCard: '20px',
-	radiusBtn: '12px',
-	radiusCallout: '12px'
+	/** Border radii, generous like the Our Services paper + buttons */
+	radiusCard: '24px',
+	radiusBtn: '14px',
+	radiusCallout: '16px',
+	radiusSurface: '16px'
 } as const;
 
 /**

@@ -957,7 +957,7 @@
 	}
 
 	.section-title {
-		font-family: Georgia, 'Times New Roman', serif;
+		font-family: var(--font-display);
 		font-size: 1.05rem;
 		font-weight: 400;
 		color: #2c2419;

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import DivviLogo from '$lib/components/DivviLogo.svelte';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 
@@ -10,7 +10,7 @@
 
 <nav class="navbar">
 	<div class="nav-container">
-		<RezziesLogo href="/" class="nav-logo" />
+		<DivviLogo href="/" class="nav-logo" variant="dark" />
 		
 		<div class="nav-links">
 			<a href="/" class="nav-link" class:active={$page.url.pathname === '/'}>Home</a>

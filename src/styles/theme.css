@@ -91,6 +91,13 @@
 	--display-lg: clamp(2rem, 4vw, 3rem);       /* section titles */
 	--display-md: clamp(1.5rem, 2.5vw, 2rem);   /* CTA headline */
 
+	/* Typography families - use these instead of re-declaring stacks per component.
+	 * --font-display: Fraunces serif for headings / editorial display.
+	 * --font-body: Plus Jakarta Sans for everything else.
+	 */
+	--font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+	--font-body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+
 	/* Warm off-white "magazine page" surface for editorial marketing layouts.
 	 * Paired with --shadow-paper so a light page floats on the dark MarketingShell bg.
 	 */

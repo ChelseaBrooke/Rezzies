@@ -546,7 +546,7 @@
 	}
 
 	.btn-apply:hover:not(:disabled) {
-		background: var(--primary-dark, #1e3a8a);
+		background: var(--primaryHover, #245a5b);
 	}
 
 	.btn-apply:disabled {
@@ -704,7 +704,7 @@
 	}
 
 	.btn-publish:hover:not(:disabled) {
-		background: var(--primary-dark, #1e3a8a);
+		background: var(--primaryHover, #245a5b);
 		transform: translateY(-1px);
 	}
 

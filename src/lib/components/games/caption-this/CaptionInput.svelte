@@ -103,7 +103,7 @@
 	}
 	.caption-textarea:focus {
 		outline: none;
-		border-color: var(--primary, #e85d04);
+		border-color: var(--primary, #2F7778);
 	}
 	.caption-form-footer {
 		display: flex;
@@ -123,7 +123,7 @@
 		padding: 0.5rem 1rem;
 		font-size: 0.875rem;
 		font-weight: 600;
-		background: var(--primary, #e85d04);
+		background: var(--primary, #2F7778);
 		color: white;
 		border: none;
 		border-radius: 8px;

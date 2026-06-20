@@ -35,7 +35,7 @@
 	}
 
 	.error-code {
-		font-family: Georgia, 'Times New Roman', serif;
+		font-family: var(--font-display);
 		font-size: 4.5rem;
 		font-weight: 700;
 		color: #1e1a15;

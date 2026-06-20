@@ -748,7 +748,7 @@
 	.cost-pill {
 		font-size: 0.7rem;
 		padding: 0.2rem 0.5rem;
-		background: rgba(30, 58, 138, 0.12);
+		background: rgba(47, 119, 120, 0.12);
 		color: var(--primary);
 		border-radius: 999px;
 		font-weight: 500;

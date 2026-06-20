@@ -1,5 +1,5 @@
 <script lang="ts">
-	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import DivviLogo from '$lib/components/DivviLogo.svelte';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 	import type { PageData } from './$types';
@@ -18,7 +18,7 @@
 	<!-- Header -->
 	<header class="home-header">
 		<div class="header-left">
-			<RezziesLogo href="/" class="logo-link" />
+			<DivviLogo href="/" class="logo-link" />
 		</div>
 		
 		<div class="header-right">
@@ -261,13 +261,13 @@
 	}
 
 	.action-btn.primary {
-		background: var(--slate);
+		background: var(--warm);
 		color: white;
 		box-shadow: var(--shadow-md);
 	}
 
 	.action-btn.primary:hover {
-		background: var(--primaryHover);
+		background: var(--chocolate);
 		transform: translateY(-2px);
 		box-shadow: var(--shadow-lg);
 	}

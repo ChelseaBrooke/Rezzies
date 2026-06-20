@@ -562,7 +562,7 @@
 
 	.day-detail-back:hover {
 		text-decoration: underline;
-		color: #1d4ed8;
+		color: var(--primary);
 	}
 
 	.calendar-sidebar .day-detail-title {

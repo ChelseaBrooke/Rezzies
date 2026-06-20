@@ -20,6 +20,7 @@ import { renderTripRecapHtml } from '$lib/server/email/render/trip-recap.js';
 import { renderTripStartingSoonHtml } from '$lib/server/email/render/trip-starting-soon.js';
 import { renderWaitlistAddedHtml } from '$lib/server/email/render/waitlist-added.js';
 import { renderWelcomeCoHostHtml } from '$lib/server/email/render/welcome-co-host.js';
+import { TEMPLATE_KEYS, type EmailTemplateKey } from '$lib/server/email/templates.js';
 
 const TRIP = 'Lake House Weekend';
 const TRIP_URL = 'https://preview.divvi.test/trips/demo-trip';
@@ -30,6 +31,9 @@ export type EmailPreviewEntry = {
 	id: string;
 	/** Human-readable name */
 	label: string;
+	/** Production-style subject line (sample data). */
+	subject: string;
+	templateKey: EmailTemplateKey;
 	html: string;
 };
 
@@ -38,6 +42,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'bed-removed',
 			label: 'Bed removed',
+			subject: `Action needed: your bed on "${TRIP}" was removed`,
+			templateKey: TEMPLATE_KEYS.BED_REMOVED,
 			html: renderBedRemovedHtml({
 				guestName: 'Alex Rivera',
 				tripName: TRIP,
@@ -47,6 +53,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'daily-digest',
 			label: 'Daily digest',
+			subject: `Today's plan: ${TRIP}`,
+			templateKey: TEMPLATE_KEYS.DAILY_DIGEST,
 			html: renderDailyDigestHtml({
 				recipientName: 'Jordan',
 				tripName: TRIP,
@@ -58,6 +66,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'daily-digest-empty',
 			label: 'Daily digest (no events)',
+			subject: `Today's plan: ${TRIP}`,
+			templateKey: TEMPLATE_KEYS.DAILY_DIGEST,
 			html: renderDailyDigestHtml({
 				recipientName: 'Jordan',
 				tripName: TRIP,
@@ -69,6 +79,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'day-of-trip',
 			label: 'Day of trip',
+			subject: `Today's the day, "${TRIP}" starts now`,
+			templateKey: TEMPLATE_KEYS.DAY_OF_TRIP,
 			html: renderDayOfTripHtml({
 				recipientName: 'Sam',
 				tripName: TRIP,
@@ -78,6 +90,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'feedback-request',
 			label: 'Feedback request',
+			subject: `How was "${TRIP}"?`,
+			templateKey: TEMPLATE_KEYS.FEEDBACK_REQUEST,
 			html: renderFeedbackRequestHtml({
 				recipientName: 'Sam',
 				tripName: TRIP,
@@ -87,6 +101,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'guest-confirmation',
 			label: 'Guest confirmation',
+			subject: "You're booked, Master Bedroom",
+			templateKey: TEMPLATE_KEYS.GUEST_CONFIRMATION,
 			html: renderGuestConfirmationHtml({
 				guestName: 'Alex Rivera',
 				roomName: 'Master Bedroom',
@@ -101,6 +117,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'guest-joined',
 			label: 'Guest joined',
+			subject: `You've joined "${TRIP}"`,
+			templateKey: TEMPLATE_KEYS.GUEST_JOINED,
 			html: renderGuestJoinedHtml({
 				guestName: 'Taylor Kim',
 				tripName: TRIP,
@@ -110,6 +128,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'invitation-reminder',
 			label: 'Invitation reminder',
+			subject: `Reminder: you haven't responded to "${TRIP}" yet`,
+			templateKey: TEMPLATE_KEYS.INVITATION_REMINDER,
 			html: renderInvitationReminderHtml({
 				recipientName: 'Alex',
 				tripName: TRIP,
@@ -120,6 +140,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'new-rsvp-host',
 			label: 'New RSVP (host)',
+			subject: 'Taylor Kim just RSVP\'d to "Lake House Weekend"',
+			templateKey: TEMPLATE_KEYS.NEW_RSVP_HOST,
 			html: renderNewRsvpHostHtml({
 				hostName: 'Morgan Lee',
 				guestName: 'Taylor Kim',
@@ -132,6 +154,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'removed-from-trip',
 			label: 'Removed from trip',
+			subject: `Update on "${TRIP}"`,
+			templateKey: TEMPLATE_KEYS.REMOVED_FROM_TRIP,
 			html: renderRemovedFromTripHtml({
 				guestName: 'Alex Rivera',
 				tripName: TRIP
@@ -140,6 +164,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'rsvp-confirmed',
 			label: 'RSVP confirmed',
+			subject: `You're going to "${TRIP}"`,
+			templateKey: TEMPLATE_KEYS.RSVP_CONFIRMED,
 			html: renderRsvpConfirmedHtml({
 				guestName: 'Alex Rivera',
 				tripName: TRIP,
@@ -151,6 +177,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'rsvp-updated',
 			label: 'RSVP updated',
+			subject: `Your RSVP for "${TRIP}" was updated`,
+			templateKey: TEMPLATE_KEYS.RSVP_UPDATED,
 			html: renderRsvpUpdatedHtml({
 				guestName: 'Alex Rivera',
 				tripName: TRIP,
@@ -160,6 +188,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'spot-opened',
 			label: 'Spot opened (waitlist)',
+			subject: `2 spots opened on "${TRIP}", first come, first served`,
+			templateKey: TEMPLATE_KEYS.SPOT_OPENED,
 			html: renderSpotOpenedHtml({
 				guestName: 'Jordan',
 				tripName: TRIP,
@@ -169,6 +199,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'trip-canceled',
 			label: 'Trip canceled',
+			subject: `"${TRIP}" was canceled`,
+			templateKey: TEMPLATE_KEYS.TRIP_CANCELED,
 			html: renderTripCanceledHtml({
 				recipientName: 'Sam',
 				tripName: TRIP
@@ -177,6 +209,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'trip-filling-up',
 			label: 'Trip filling up (host)',
+			subject: `"${TRIP}" is 80% full`,
+			templateKey: TEMPLATE_KEYS.TRIP_FILLING_UP_80,
 			html: renderTripFillingUpHtml({
 				hostName: 'Morgan Lee',
 				tripName: TRIP,
@@ -189,6 +223,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'trip-invite',
 			label: 'Trip invite',
+			subject: `Morgan Lee invited you to ${TRIP}`,
+			templateKey: TEMPLATE_KEYS.TRIP_INVITE,
 			html: renderTripInviteHtml({
 				hostName: 'Morgan Lee',
 				tripName: TRIP,
@@ -201,6 +237,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'trip-recap',
 			label: 'Trip recap',
+			subject: `Your trip recap: "${TRIP}"`,
+			templateKey: TEMPLATE_KEYS.TRIP_RECAP,
 			html: renderTripRecapHtml({
 				recipientName: 'Sam',
 				tripName: TRIP,
@@ -210,6 +248,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'trip-starting-soon',
 			label: 'Trip starting soon',
+			subject: `"${TRIP}" starts in 3 days`,
+			templateKey: TEMPLATE_KEYS.TRIP_STARTING_SOON,
 			html: renderTripStartingSoonHtml({
 				recipientName: 'Alex',
 				tripName: TRIP,
@@ -222,6 +262,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'waitlist-added',
 			label: 'Waitlist added',
+			subject: `You're on the waitlist for "${TRIP}"`,
+			templateKey: TEMPLATE_KEYS.WAITLIST_ADDED,
 			html: renderWaitlistAddedHtml({
 				guestName: 'Jordan',
 				tripName: TRIP,
@@ -231,6 +273,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 		{
 			id: 'welcome-co-host',
 			label: 'Welcome co-host',
+			subject: `You're a co-host of "${TRIP}"`,
+			templateKey: TEMPLATE_KEYS.WELCOME_CO_HOST,
 			html: renderWelcomeCoHostHtml({
 				coHostName: 'Taylor Kim',
 				hostName: 'Morgan Lee',
@@ -239,4 +283,8 @@ export function buildEmailPreviews(): EmailPreviewEntry[] {
 			})
 		}
 	];
+}
+
+export function getEmailPreviewById(id: string): EmailPreviewEntry | undefined {
+	return buildEmailPreviews().find((p) => p.id === id);
 }

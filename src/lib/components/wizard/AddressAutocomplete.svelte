@@ -176,7 +176,7 @@
 	.address-input:focus {
 		outline: none;
 		border-color: var(--primary);
-		box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+		box-shadow: 0 0 0 3px rgba(47, 119, 120, 0.1);
 	}
 	
 	.address-input::placeholder {

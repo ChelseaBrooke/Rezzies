@@ -2,7 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import DivviLogo from '$lib/components/DivviLogo.svelte';
 	
 	let { user, isCollapsed = false }: { user?: { email?: string; name?: string } | null; isCollapsed?: boolean } = $props();
 	
@@ -105,7 +105,7 @@
 	<div class="sidebar-content">
 		<!-- Top Branding Section -->
 		<div class="branding-section">
-			<RezziesLogo href="/trips" class="wizard-brand" compact={collapsed} />
+			<DivviLogo href="/trips" class="wizard-brand" compact={collapsed} variant="dark" />
 			{#if !collapsed}
 				<p class="brand-subtitle">Group Trip Planning</p>
 			{/if}
@@ -309,12 +309,12 @@
 	}
 	
 	.nav-item:hover {
-		background: rgba(30, 58, 138, 0.05);
+		background: rgba(47, 119, 120, 0.05);
 		color: var(--primary);
 	}
 	
 	.nav-item.active {
-		background: rgba(30, 58, 138, 0.1);
+		background: rgba(47, 119, 120, 0.1);
 		color: var(--primary);
 		font-weight: 500;
 	}
@@ -437,7 +437,7 @@
 		align-items: center;
 		gap: 0.75rem;
 		padding: 0.75rem;
-		background: rgba(30, 58, 138, 0.02);
+		background: rgba(47, 119, 120, 0.02);
 		border-radius: 0.75rem;
 		border: 1px solid var(--border);
 		cursor: pointer;
@@ -445,8 +445,8 @@
 	}
 	
 	.user-profile:hover {
-		background: rgba(30, 58, 138, 0.05);
-		border-color: rgba(30, 58, 138, 0.2);
+		background: rgba(47, 119, 120, 0.05);
+		border-color: rgba(47, 119, 120, 0.2);
 	}
 	
 	.user-avatar {

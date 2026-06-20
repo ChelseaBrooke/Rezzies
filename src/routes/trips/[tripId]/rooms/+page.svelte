@@ -301,7 +301,7 @@
 	.manage-link {
 		display: inline-block;
 		font-size: 0.8125rem;
-		color: #2563eb;
+		color: var(--primary);
 		text-decoration: none;
 		font-weight: 500;
 		margin: 0;

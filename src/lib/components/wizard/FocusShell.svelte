@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import FocusBackground from './FocusBackground.svelte';
+	import divviLogo from '$lib/assets/images/divvi logo.png';
 
 	let {
 		progressPercent = 0,
@@ -19,7 +20,9 @@
 	<FocusBackground />
 
 	<header class="fs-top">
-		<a href="/trips" class="fs-wordmark" aria-label="Back to all trips">divvi</a>
+		<a href="/trips" class="fs-wordmark" aria-label="Back to all trips">
+			<img src={divviLogo} alt="Divvi" class="fs-wordmark-img" />
+		</a>
 
 		<div
 			class="fs-progress-wrap"
@@ -76,13 +79,18 @@
 
 	/* ── Wordmark ─────────────────────────────────────────── */
 	.fs-wordmark {
-		font-family: 'Fraunces', Georgia, serif;
-		font-weight: 600;
-		font-size: 1.125rem;
-		color: var(--navy);
+		display: inline-flex;
+		align-items: center;
 		text-decoration: none;
 		line-height: 1;
-		letter-spacing: -0.01em;
+	}
+
+	.fs-wordmark-img {
+		display: block;
+		height: 1.75rem;
+		width: auto;
+		max-width: 7rem;
+		object-fit: contain;
 	}
 
 	.fs-wordmark:hover {
@@ -145,8 +153,8 @@
 			height: 48px;
 		}
 
-		.fs-wordmark {
-			font-size: 1rem;
+		.fs-wordmark-img {
+			height: 1.5rem;
 		}
 
 		.fs-step-label {

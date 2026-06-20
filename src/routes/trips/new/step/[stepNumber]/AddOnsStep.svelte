@@ -1318,8 +1318,8 @@
 				to left,
 				transparent 0%,
 				transparent 34%,
-				rgba(30, 58, 138, 0.22) 48%,
-				#2563eb 56%
+				rgba(47, 119, 120, 0.22) 48%,
+				#2F7778 56%
 			) border-box;
 		background-clip: padding-box, border-box;
 	}
@@ -1360,11 +1360,11 @@
 	/* Activity-planning – blue (discover / itinerary) */
 	.addon-card--activity.active,
 	.addon-card--compact.active:has(.activity-icon) {
-		background: rgba(30, 58, 138, 0.045);
+		background: rgba(47, 119, 120, 0.045);
 		box-shadow:
-			0 0 0 1.5px rgba(59, 130, 246, 0.55),
-			0 0 14px rgba(59, 130, 246, 0.22),
-			0 0 30px rgba(59, 130, 246, 0.1);
+			0 0 0 1.5px rgba(47, 119, 120, 0.55),
+			0 0 14px rgba(47, 119, 120, 0.22),
+			0 0 30px rgba(47, 119, 120, 0.1);
 	}
 
 	/* Games – purple */
@@ -1541,7 +1541,7 @@
 		background: rgba(249, 115, 22, 0.14);
 		color: #ea580c;
 	}
-	.activity-icon { background: rgba(30, 58, 138, 0.1); color: #1e40af; }
+	.activity-icon { background: rgba(47, 119, 120, 0.1); color: #1d4d4e; }
 	.game-icon { background: rgba(120, 80, 180, 0.1); color: #7850b4; }
 
 	.addon-title {
@@ -2250,8 +2250,8 @@
 	}
 
 	.activity-itin-mock--fullmock .itin-mini-event--activity {
-		background: rgba(30, 58, 138, 0.08);
-		border: 1px solid rgba(30, 58, 138, 0.14);
+		background: rgba(47, 119, 120, 0.08);
+		border: 1px solid rgba(47, 119, 120, 0.14);
 	}
 
 	.activity-itin-mock--fullmock .itin-mini-event--activity .itin-mini-evt-title {
@@ -2264,7 +2264,7 @@
 	}
 
 	.activity-itin-mock--fullmock .itin-mini-event--meal {
-		background: rgba(30, 58, 138, 0.05);
+		background: rgba(47, 119, 120, 0.05);
 		border: 1px solid rgba(15, 23, 42, 0.12);
 	}
 
@@ -2498,8 +2498,8 @@
 	}
 
 	.addon-fullmock-layer--start .games-trivia-mock-opt--selected {
-		border-color: rgba(30, 58, 138, 0.28);
-		background: rgba(30, 58, 138, 0.08);
+		border-color: rgba(47, 119, 120, 0.28);
+		background: rgba(47, 119, 120, 0.08);
 		color: var(--text);
 		font-weight: 600;
 	}
@@ -2618,7 +2618,7 @@
 	}
 
 	.meal-add-modal-mock-opt--selected {
-		border-color: var(--primary, #e85d04);
+		border-color: var(--primary, #2F7778);
 		background: rgba(var(--primary-rgb, 232, 93, 38), 0.1);
 	}
 
@@ -2656,7 +2656,7 @@
 	}
 
 	.meal-add-modal-mock-btn--primary {
-		background: var(--primary, #e85d04);
+		background: var(--primary, #2F7778);
 		color: #fff;
 		border: 1px solid transparent;
 	}
@@ -2677,8 +2677,8 @@
 	}
 
 	.addon-fullmock-layer--start .meal-add-modal-mock-opt--selected {
-		border-color: rgba(30, 58, 138, 0.22);
-		background: rgba(30, 58, 138, 0.08);
+		border-color: rgba(47, 119, 120, 0.22);
+		background: rgba(47, 119, 120, 0.08);
 	}
 
 	.addon-fullmock-layer--start .meal-add-modal-mock-btn--secondary {
@@ -3087,7 +3087,7 @@
 
 	.config-input:focus {
 		border-color: var(--primary);
-		box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
+		box-shadow: 0 0 0 2px rgba(47, 119, 120, 0.1);
 	}
 
 	/* ── Radio options (meals) ────────────────────────────── */
@@ -3111,7 +3111,7 @@
 
 	.radio-option:has(input:checked) {
 		border-color: var(--primary);
-		background: rgba(30, 58, 138, 0.04);
+		background: rgba(47, 119, 120, 0.04);
 	}
 
 	.radio-option input[type='radio'] {
@@ -3476,9 +3476,9 @@
 		transition: background 0.1s;
 	}
 
-	.pt-row:hover { background: rgba(30,58,138,0.04); }
+	.pt-row:hover { background: rgba(47,119,120,0.04); }
 
-	.pt-row.pt-selected { background: rgba(30,58,138,0.07); }
+	.pt-row.pt-selected { background: rgba(47,119,120,0.07); }
 
 	.pt-row--per-bed-warn {
 		cursor: default;

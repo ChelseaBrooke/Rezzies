@@ -259,7 +259,7 @@
 		margin-bottom: 0.5rem;
 	}
 	.back-link:hover {
-		color: var(--primary, #e85d04);
+		color: var(--primary, #2F7778);
 	}
 	.title {
 		margin: 0 0 0.5rem 0;

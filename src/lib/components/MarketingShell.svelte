@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import RezziesLogo from '$lib/components/RezziesLogo.svelte';
+	import DivviLogo from '$lib/components/DivviLogo.svelte';
 	import NotificationTray from '$lib/components/NotificationTray.svelte';
 	import AvatarMenu from '$lib/components/AvatarMenu.svelte';
 
@@ -15,7 +15,7 @@
 
 	<header class="marketing-header">
 		<div class="marketing-header-left">
-			<RezziesLogo href="/" class="marketing-logo" />
+			<DivviLogo href="/" class="marketing-logo" />
 		</div>
 		<div class="marketing-header-right">
 			{#if user}

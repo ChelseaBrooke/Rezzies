@@ -70,7 +70,7 @@
 	
 	.upload-tile:hover {
 		border-color: var(--primary);
-		background: rgba(30, 58, 138, 0.02);
+		background: rgba(47, 119, 120, 0.02);
 	}
 	
 	.file-input {
@@ -119,7 +119,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.5rem 0.75rem;
-		background: rgba(30, 58, 138, 0.1);
+		background: rgba(47, 119, 120, 0.1);
 		border-radius: 0.5rem;
 		font-size: 0.875rem;
 		color: var(--text);
