@@ -227,6 +227,7 @@
 							bind:value={draft.expectedGuestCount}
 							oninput={autosave}
 							min="1"
+							max={Number(draft.maxOccupancy) >= 1 ? draft.maxOccupancy : undefined}
 							placeholder="8"
 							aria-label="Minimum headcount"
 						/>
@@ -238,7 +239,7 @@
 							class="s1-input"
 							bind:value={draft.maxOccupancy}
 							oninput={autosave}
-							min="1"
+							min={Number(draft.expectedGuestCount) >= 1 ? draft.expectedGuestCount : 1}
 							placeholder="12"
 							aria-label="Maximum headcount"
 						/>

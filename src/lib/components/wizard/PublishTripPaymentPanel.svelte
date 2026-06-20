@@ -368,8 +368,7 @@
 					></div>
 				{:else if finalPrice > 0 && stripeDisabled}
 					<p class="stripe-dev-note">
-						Add <code>STRIPE_SECRET_KEY</code> and <code>STRIPE_PUBLISHABLE_KEY</code> to <code>.env</code>,
-						restart dev, or publish without card in this environment.
+						Card payment is temporarily unavailable. You can still continue and publish your trip.
 					</p>
 				{/if}
 

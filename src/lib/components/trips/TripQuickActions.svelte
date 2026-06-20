@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { onDestroy } from 'svelte';
 	import ShareButton from '$lib/components/ShareButton.svelte';
 
@@ -94,11 +93,6 @@
 		});
 	}
 
-	function handleEdit() {
-		goto(`/trips/${tripId}/settings`);
-		editOpen = false;
-	}
-
 	function handleDelete() {
 		showToast?.('Delete requires confirmation, coming soon');
 		editOpen = false;
@@ -174,8 +168,15 @@
 					onmouseenter={clearCloseSchedule}
 					onmouseleave={scheduleClose}
 				>
-					<button type="button" class="dropdown-item" onclick={handleEdit}>Edit trip</button>
-					<button type="button" class="dropdown-item danger" onclick={handleDelete}>Delete trip</button>
+				<a
+					href="/trips/{tripId}/settings"
+					class="dropdown-item"
+					data-sveltekit-preload-data="hover"
+					onclick={closeAll}
+				>
+					Edit trip
+				</a>
+				<button type="button" class="dropdown-item danger" onclick={handleDelete}>Delete trip</button>
 				</div>
 			{/if}
 		</div>
@@ -295,6 +296,8 @@
 		color: var(--text);
 		cursor: pointer;
 		font-family: inherit;
+		text-decoration: none;
+		box-sizing: border-box;
 	}
 
 	.dropdown-item:hover {

@@ -135,6 +135,16 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
 	if (maxOccupancy == null || maxOccupancy < 1) {
 		return json({ error: 'Maximum headcount (capacity limit) is required' }, { status: 400 });
 	}
+	if (
+		expectedGuestCount != null &&
+		maxOccupancy != null &&
+		expectedGuestCount > maxOccupancy
+	) {
+		return json(
+			{ error: 'Minimum headcount cannot be higher than the maximum.' },
+			{ status: 400 }
+		);
+	}
 
 	const existingTripForPerBedCheck = await prisma.trip.findUnique({
 		where: { id: tripId },

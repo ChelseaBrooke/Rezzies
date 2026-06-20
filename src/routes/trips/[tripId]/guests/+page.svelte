@@ -51,6 +51,7 @@
 	let filterApproval = $state<'all' | 'not-approved'>('all');
 	let sortBy = $state<'name' | 'rsvp' | 'party-size'>('name');
 	let sortDir = $state<'asc' | 'desc'>('asc');
+	let viewMode = $state<'list' | 'party'>('list');
 	let removeTarget = $state<GuestRow | null>(null);
 	let pendingInviteDeleteTarget = $state<GuestRow | null>(null);
 	let pendingInviteDeleteError = $state('');
@@ -395,6 +396,70 @@
 		return row.userId ?? row.inviteId ?? '';
 	}
 
+	type PartyGroup = {
+		id: string;
+		title: string;
+		rows: GuestRow[];
+		extraNames: string[];
+		size: number;
+		isParty: boolean;
+	};
+
+	const partiesById = $derived(
+		new Map((data.parties ?? []).map((p) => [p.id, p]))
+	);
+
+	const partyGroups = $derived.by<PartyGroup[]>(() => {
+		const rows = filteredAndSorted;
+		const grouped = new Map<string, GuestRow[]>();
+		const solos: GuestRow[] = [];
+		for (const r of rows) {
+			if (r.householdId) {
+				const arr = grouped.get(r.householdId) ?? [];
+				arr.push(r);
+				grouped.set(r.householdId, arr);
+			} else {
+				solos.push(r);
+			}
+		}
+		const result: PartyGroup[] = [];
+		for (const [hid, grpRows] of grouped) {
+			const party = partiesById.get(hid);
+			const lead =
+				grpRows.find((r) => party && r.userId && r.userId === party.primaryUserId) ?? grpRows[0];
+			const ordered = [lead, ...grpRows.filter((r) => r !== lead)];
+			const claimedUserIds = new Set(grpRows.map((r) => r.userId).filter(Boolean));
+			const extraNames = (party?.members ?? [])
+				.filter((m) => !m.userId || !claimedUserIds.has(m.userId))
+				.map((m) => [m.firstName, m.lastName].filter(Boolean).join(' '))
+				.filter(Boolean);
+			const firstName = (lead.name || lead.email || 'Guest').split(' ')[0];
+			result.push({
+				id: hid,
+				title: party?.name?.trim() || `${firstName}'s party`,
+				rows: ordered,
+				extraNames,
+				size: grpRows.length + extraNames.length,
+				isParty: true
+			});
+		}
+		for (const r of solos) {
+			result.push({
+				id: `solo:${getRowId(r)}`,
+				title: r.name || r.email,
+				rows: [r],
+				extraNames: [],
+				size: Math.max(1, r.partySize || 1),
+				isParty: (r.partySize || 1) > 1
+			});
+		}
+		result.sort((a, b) => {
+			if (a.isParty !== b.isParty) return a.isParty ? -1 : 1;
+			return a.title.localeCompare(b.title);
+		});
+		return result;
+	});
+
 	function toggleRowSelection(row: GuestRow) {
 		const id = getRowId(row);
 		if (!id) return;
@@ -689,18 +754,6 @@
 		return null;
 	}
 
-	const confirmedRows = $derived(filteredAndSorted.filter((r) => r.rsvpStatus === 'yes'));
-	const pendingRows = $derived(
-		filteredAndSorted.filter(
-			(r) =>
-				r.type === 'invite' ||
-				(!r.rsvpStatus && r.type === 'member') ||
-				r.rsvpStatus === 'no-response' ||
-				(r.rsvpStatus === 'yes' && r.yesSubstatus === 'reconfirm_required')
-		)
-	);
-	const declinedRows = $derived(filteredAndSorted.filter((r) => r.rsvpStatus === 'no'));
-
 	const rsvpByDateFormatted = $derived(
 		data.trip?.rsvpByDate
 			? new Date(data.trip.rsvpByDate).toLocaleDateString('en-US', {
@@ -730,79 +783,109 @@
 
 	const hasCostSharing = $derived((data.trip as Record<string, unknown>)?.costSharingEnabled === true);
 
+	// ── Donut chart (RSVP split) ───────────────────────────────────────────
+	const DONUT_RADIUS = 52;
+	const DONUT_CIRC = 2 * Math.PI * DONUT_RADIUS;
+
+	const donutSegments = $derived.by(() => {
+		const o = guestOverview;
+		const raw = [
+			{ key: 'yes', label: 'Confirmed', value: o.rsvpYes, color: 'var(--green-mid)' },
+			{ key: 'pending', label: 'Pending', value: o.awaiting, color: 'var(--carrot)' },
+			{ key: 'no', label: 'Declined', value: o.rsvpNo, color: '#e0654f' }
+		].filter((s) => s.value > 0);
+		const total = raw.reduce((sum, s) => sum + s.value, 0) || 1;
+		let offset = 0;
+		return raw.map((s) => {
+			const len = (s.value / total) * DONUT_CIRC;
+			const seg = { ...s, dash: `${len} ${DONUT_CIRC - len}`, offset: -offset };
+			offset += len;
+			return seg;
+		});
+	});
+
+	const openSlotsLabel = $derived.by(() => {
+		const o = guestOverview;
+		if (o.cap <= 0) return null;
+		if (o.overCap) return 'Over capacity';
+		if (o.openSlots === 0) return 'Full';
+		return `${o.openSlots} open ${o.openSlots === 1 ? 'spot' : 'spots'}`;
+	});
+
 </script>
 
 <div class="gp-page">
 
 	<!-- ── ZONE 1: COMMAND STRIP ─────────────────────────────────────── -->
 	<div class="gp-cmd">
-		<div class="gp-cmd__main">
-
-			<!-- Stats -->
-			<div class="gp-cmd__stats">
-				<div class="gp-stat">
-					<div class="gp-stat__num">{guestOverview.rsvpYes}</div>
-					<div class="gp-stat__label">confirmed</div>
-					{#if guestOverview.expected}
-						<div class="gp-stat__sub">of {guestOverview.expected} expected</div>
-					{/if}
-				</div>
-				<div class="gp-cmd__div" aria-hidden="true"></div>
-				<div class="gp-stat">
-					<div class="gp-stat__num gp-stat__num--carrot">{guestOverview.awaiting}</div>
-					<div class="gp-stat__label">pending</div>
-					<div class="gp-stat__sub">haven't responded</div>
-				</div>
-				<div class="gp-cmd__div" aria-hidden="true"></div>
-				<div class="gp-stat">
-					<div class="gp-stat__num gp-stat__num--dim">{guestOverview.onList}</div>
-					<div class="gp-stat__label">on list</div>
-					{#if guestOverview.cap > 0}
-						<div class="gp-stat__sub">of {guestOverview.cap} max</div>
-					{/if}
-				</div>
+		<!-- Header -->
+		<div class="gp-head">
+			<div class="gp-head__titles">
+				<h1 class="gp-head__title">Guests</h1>
+				{#if headerSubLine}<p class="gp-head__sub">{headerSubLine}</p>{/if}
 			</div>
-
-			<!-- Actions -->
-			<div class="gp-cmd__actions">
+			<div class="gp-head__actions">
+				<button type="button" class="gp-hbtn" onclick={handleCopyInviteLink}>
+					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+					Copy link
+				</button>
+				<button type="button" class="gp-hbtn" onclick={exportCsv}>
+					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+					Export
+				</button>
 				{#if data.canManageGuests}
-					<button type="button" class="gp-invite-btn" onclick={openInvitePanel}>Invite guests</button>
-				{/if}
-				<div class="gp-cmd__links">
-					<button type="button" class="gp-cmd-link" onclick={handleCopyInviteLink}>Copy invite link</button>
-					<span class="gp-cmd-sep" aria-hidden="true">·</span>
-					<button type="button" class="gp-cmd-link" onclick={exportCsv}>Export CSV</button>
-				</div>
-				{#if rsvpByDateFormatted}
-					<div class="gp-cmd__rsvpby">RSVP by {rsvpByDateFormatted}</div>
+					<button type="button" class="gp-hbtn gp-hbtn--primary" onclick={openInvitePanel}>
+						<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+						Invite guests
+					</button>
 				{/if}
 			</div>
 		</div>
 
-		<!-- Progress bar -->
-		{#if guestOverview.cap > 0}
-			<div class="gp-cmd__bar-row">
-				<div
-					class="gp-cmd__track"
-					role="img"
-					aria-label="{guestOverview.rsvpYes} of {guestOverview.cap} confirmed"
-				>
-					<div
-						class="gp-cmd__fill"
-						style="width: {Math.min(100, guestOverview.cap > 0 ? (guestOverview.rsvpYes / guestOverview.cap) * 100 : 0)}%"
-					></div>
-					{#if guestOverview.expected && guestOverview.expected > 0 && guestOverview.cap > 0}
-						<div
-							class="gp-cmd__marker"
-							style="left: {Math.min(100, (guestOverview.expected / guestOverview.cap) * 100)}%"
-							aria-hidden="true"
-						>
-							<span class="gp-cmd__marker-lbl">min</span>
-						</div>
-					{/if}
+		<!-- Stat cards -->
+		<div class="gp-stats">
+			<div class="gp-statcard">
+				<span class="gp-statcard__icon gp-statcard__icon--green" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+				</span>
+				<div class="gp-statcard__num">{guestOverview.rsvpYes}</div>
+				<div class="gp-statcard__label">Confirmed</div>
+				<div class="gp-statcard__sub">
+					{#if guestOverview.expected}of {guestOverview.expected} expected{:else}{guestOverview.peopleIn} {guestOverview.peopleIn === 1 ? 'person' : 'people'} going{/if}
 				</div>
 			</div>
-		{/if}
+
+			<div class="gp-statcard">
+				<span class="gp-statcard__icon gp-statcard__icon--amber" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+				</span>
+				<div class="gp-statcard__num">{guestOverview.awaiting}</div>
+				<div class="gp-statcard__label">Pending</div>
+				<div class="gp-statcard__sub">haven't responded</div>
+			</div>
+
+			<div class="gp-statcard">
+				<span class="gp-statcard__icon gp-statcard__icon--navy" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+				</span>
+				<div class="gp-statcard__num">{guestOverview.onList}</div>
+				<div class="gp-statcard__label">On the list</div>
+				<div class="gp-statcard__sub">
+					{#if guestOverview.rsvpNo > 0}{guestOverview.rsvpNo} declined{:else}invited so far{/if}
+				</div>
+			</div>
+
+			<div class="gp-statcard">
+				<span class="gp-statcard__icon gp-statcard__icon--teal" aria-hidden="true">
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>
+				</span>
+				<div class="gp-statcard__num">{guestOverview.peopleIn}</div>
+				<div class="gp-statcard__label">Headcount</div>
+				<div class="gp-statcard__sub">
+					{#if openSlotsLabel}<span class:gp-statcard__sub--warn={guestOverview.overCap}>{openSlotsLabel}</span>{:else}people with a bed{/if}
+				</div>
+			</div>
+		</div>
 
 		<!-- Inline invite panel -->
 		{#if invitePanelOpen}
@@ -942,86 +1025,56 @@
 
 				{#if unassignedConfirmedCount > 0}
 					<div class="gp-acard">
-						<div class="gp-acard__hdr">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>
+						<span class="gp-acard__ic" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg></span>
+						<div class="gp-acard__main">
 							<span class="gp-acard__label">Unassigned</span>
+							<p class="gp-acard__text">{unassignedConfirmedCount} confirmed {unassignedConfirmedCount === 1 ? 'guest' : 'guests'} without a bed</p>
 						</div>
-						<p class="gp-acard__text">
-							{unassignedConfirmedCount} confirmed {unassignedConfirmedCount === 1 ? 'guest' : 'guests'} without a bed
-						</p>
-						<button
-							type="button"
-							class="gp-acard__btn"
-							onclick={() => scrollToSection('section-confirmed', 'unassigned')}
-						>Assign beds</button>
+						<button type="button" class="gp-acard__btn" onclick={() => scrollToSection('section-roster', 'unassigned')}>Assign</button>
 					</div>
 				{/if}
 
 				{#if guestOverview.awaiting > 3}
 					<div class="gp-acard">
-						<div class="gp-acard__hdr">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+						<span class="gp-acard__ic" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+						<div class="gp-acard__main">
 							<span class="gp-acard__label">No response</span>
+							<p class="gp-acard__text">{guestOverview.awaiting} haven't responded</p>
 						</div>
-						<p class="gp-acard__text">{guestOverview.awaiting} people haven't responded</p>
-						<p class="gp-acard__sub">Tap Remind to send a nudge.</p>
-						<button
-							type="button"
-							class="gp-acard__btn"
-							onclick={nudgeAllPending}
-							disabled={nudgeAllLoading}
-						>{nudgeAllLoading ? 'Sending...' : 'Remind all'}</button>
+						<button type="button" class="gp-acard__btn" onclick={nudgeAllPending} disabled={nudgeAllLoading}>{nudgeAllLoading ? '…' : 'Remind all'}</button>
 					</div>
 				{/if}
 
 				{#if reconfirmNeededCount > 0}
 					<div class="gp-acard">
-						<div class="gp-acard__hdr">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v6h6"/><path d="M21 12A9 9 0 0 0 6 5.3L3 8"/><path d="M21 22v-6h-6"/><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"/></svg>
+						<span class="gp-acard__ic" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M21 12A9 9 0 0 0 6 5.3L3 8"/><path d="M21 22v-6h-6"/><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"/></svg></span>
+						<div class="gp-acard__main">
 							<span class="gp-acard__label">Reconfirm needed</span>
+							<p class="gp-acard__text">{reconfirmNeededCount} {reconfirmNeededCount === 1 ? 'guest needs' : 'guests need'} to reconfirm</p>
 						</div>
-						<p class="gp-acard__text">
-							{reconfirmNeededCount} {reconfirmNeededCount === 1 ? 'guest needs' : 'guests need'} to reconfirm
-						</p>
-						<button
-							type="button"
-							class="gp-acard__btn"
-							onclick={() => scrollToSection('section-confirmed')}
-						>Send reminder</button>
+						<button type="button" class="gp-acard__btn" onclick={() => scrollToSection('section-roster')}>Remind</button>
 					</div>
 				{/if}
 
 				{#if hasCostSharing && unpaidConfirmedCount > 0}
 					<div class="gp-acard">
-						<div class="gp-acard__hdr">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+						<span class="gp-acard__ic" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+						<div class="gp-acard__main">
 							<span class="gp-acard__label">Unpaid</span>
+							<p class="gp-acard__text">{unpaidConfirmedCount} {unpaidConfirmedCount === 1 ? 'guest has' : 'guests have'} a balance</p>
 						</div>
-						<p class="gp-acard__text">
-							{unpaidConfirmedCount} {unpaidConfirmedCount === 1 ? 'guest has' : 'guests have'} an outstanding balance
-						</p>
-						<button
-							type="button"
-							class="gp-acard__btn"
-							onclick={() => scrollToSection('section-roster', 'unpaid')}
-						>View unpaid</button>
+						<button type="button" class="gp-acard__btn" onclick={() => scrollToSection('section-roster', 'unpaid')}>View</button>
 					</div>
 				{/if}
 
 				{#if joinRequestCount > 0}
 					<div class="gp-acard">
-						<div class="gp-acard__hdr">
-							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+						<span class="gp-acard__ic" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
+						<div class="gp-acard__main">
 							<span class="gp-acard__label">Join requests</span>
+							<p class="gp-acard__text">{joinRequestCount} {joinRequestCount === 1 ? 'person wants' : 'people want'} to join</p>
 						</div>
-						<p class="gp-acard__text">
-							{joinRequestCount} {joinRequestCount === 1 ? 'person wants' : 'people want'} to join
-						</p>
-						<button
-							type="button"
-							class="gp-acard__btn"
-							onclick={() => scrollToSection('section-pending')}
-						>Review</button>
+						<button type="button" class="gp-acard__btn" onclick={() => scrollToSection('section-roster', 'pending')}>Review</button>
 					</div>
 				{/if}
 
@@ -1029,114 +1082,153 @@
 		</div>
 	{/if}
 
-	<!-- ── ZONE 3: ROSTER ─────────────────────────────────────────────── -->
-	<div class="gp-roster" id="section-roster">
+	<!-- ── ZONE 3: ROSTER + SUMMARY ─────────────────────────────────────────────── -->
+	<div class="gp-grid">
 
-		<!-- Filter pills -->
-		<div class="gp-filters" role="group" aria-label="Filter guests">
-			<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'all'} onclick={() => setActiveFilter('all')}>Everyone</button>
-			<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'confirmed'} onclick={() => setActiveFilter('confirmed')}>Confirmed</button>
-			<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'pending'} onclick={() => setActiveFilter('pending')}>Pending</button>
-			<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'declined'} onclick={() => setActiveFilter('declined')}>Declined</button>
-			<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'unassigned'} onclick={() => setActiveFilter('unassigned')}>Unassigned</button>
-			{#if hasCostSharing}
-				<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'unpaid'} onclick={() => setActiveFilter('unpaid')}>Unpaid</button>
-			{/if}
-		</div>
-
-		{#if roomSaveError}
-			<div class="gp-err-bar" role="alert">
-				{roomSaveError}
-				<button type="button" class="gp-err-dismiss" onclick={() => (roomSaveError = null)} aria-label="Dismiss">x</button>
-			</div>
-		{/if}
-
-		<!-- Confirmed section -->
-		<div class="gp-section" id="section-confirmed">
-			<div class="gp-section__hdr">
-				<h2 class="gp-section__title">Confirmed</h2>
-				<span class="gp-section__badge">{confirmedRows.length}</span>
-			</div>
-			<div class="gp-section__rule" role="separator"></div>
-			{#if confirmedRows.length === 0}
-				<div class="gp-empty">
-					<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gp-empty__icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-					<h3 class="gp-empty__title">No one has confirmed yet</h3>
-					<p class="gp-empty__sub">Share the invite link to start getting RSVPs.</p>
+		<!-- Left: guest table -->
+		<section class="gp-card gp-tablecard" id="section-roster">
+			<div class="gp-tablecard__head">
+				<h2 class="gp-card__title">Guest list</h2>
+				<div class="gp-head-controls">
+					<div class="gp-viewtoggle" role="group" aria-label="View mode">
+						<button type="button" class="gp-viewtoggle__btn" class:gp-viewtoggle__btn--active={viewMode === 'list'} onclick={() => (viewMode = 'list')}>List</button>
+						<button type="button" class="gp-viewtoggle__btn" class:gp-viewtoggle__btn--active={viewMode === 'party'} onclick={() => (viewMode = 'party')}>Parties</button>
+					</div>
+					<div class="gp-filters" role="group" aria-label="Filter guests">
+						<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'all'} onclick={() => setActiveFilter('all')}>Everyone</button>
+						<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'confirmed'} onclick={() => setActiveFilter('confirmed')}>Confirmed</button>
+						<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'pending'} onclick={() => setActiveFilter('pending')}>Pending</button>
+						<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'declined'} onclick={() => setActiveFilter('declined')}>Declined</button>
+						<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'unassigned'} onclick={() => setActiveFilter('unassigned')}>Unassigned</button>
+						{#if hasCostSharing}
+							<button type="button" class="gp-fpill" class:gp-fpill--active={activeFilter === 'unpaid'} onclick={() => setActiveFilter('unpaid')}>Unpaid</button>
+						{/if}
+					</div>
 				</div>
-			{:else}
-				<div class="gp-rows">
-					{#each confirmedRows as row (row.userId ?? row.inviteId)}
-						{@render guestRow(row)}
-					{/each}
+			</div>
+
+			{#if roomSaveError}
+				<div class="gp-err-bar" role="alert">
+					{roomSaveError}
+					<button type="button" class="gp-err-dismiss" onclick={() => (roomSaveError = null)} aria-label="Dismiss">x</button>
 				</div>
 			{/if}
-		</div>
 
-		<!-- Pending section -->
-		<div class="gp-section" id="section-pending">
-			<div class="gp-section__hdr">
-				<h2 class="gp-section__title">Pending</h2>
-				<span class="gp-section__badge">{pendingRows.length}</span>
-			</div>
-			<div class="gp-section__rule" role="separator"></div>
-			{#if pendingRows.length === 0}
-				<div class="gp-empty">
-					<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gp-empty__icon gp-empty__icon--green"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-					<h3 class="gp-empty__title">Everyone has responded.</h3>
+			<div class="gp-table" class:gp-table--cost={hasCostSharing}>
+				<div class="gp-tr gp-tr--head">
+					<span class="gp-cell gp-cell--guest">Guest</span>
+					<span class="gp-cell gp-cell--status">Status</span>
+					<span class="gp-cell gp-cell--room">Room &amp; bed</span>
+					{#if hasCostSharing}<span class="gp-cell gp-cell--amount">Balance</span>{/if}
+					<span class="gp-cell gp-cell--actions"></span>
 				</div>
-			{:else}
-				<div class="gp-rows">
-					{#each pendingRows as row (row.userId ?? row.inviteId)}
-						{@render guestRow(row)}
-					{/each}
-				</div>
-			{/if}
-		</div>
 
-		<!-- Declined section (hidden when empty) -->
-		{#if declinedRows.length > 0}
-			<div class="gp-section" id="section-declined">
-				<div class="gp-section__hdr">
-					<h2 class="gp-section__title">Declined</h2>
-					<span class="gp-section__badge">{declinedRows.length}</span>
-				</div>
-				<div class="gp-section__rule" role="separator"></div>
-				<div class="gp-rows">
-					{#each declinedRows as row (row.userId ?? row.inviteId)}
-						{@render guestRow(row)}
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		<!-- Waitlist section -->
-		{#if data.canManageGuests && (data.waitlistCount ?? 0) > 0}
-			{@const waitlistEntries = data.waitlistEntries ?? []}
-			<div class="gp-section">
-				<div class="gp-section__hdr">
-					<h2 class="gp-section__title">Waitlist ({data.waitlistCount})</h2>
-				</div>
-				<p class="gp-section__hint">Guests are notified automatically when a spot opens.</p>
-				<div class="gp-section__rule" role="separator"></div>
-				<div class="gp-rows">
-					{#each waitlistEntries as entry, i (entry.userId)}
-						<div class="gp-row">
-							<div class="gp-row__av-wrap">
-								<span class="gp-av gp-av--init">{initials(entry.name, entry.email)}</span>
+				{#if filteredAndSorted.length === 0}
+					<div class="gp-empty">
+						<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="gp-empty__icon"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+						<h3 class="gp-empty__title">{activeFilter === 'all' ? 'No guests yet' : 'No guests match this filter'}</h3>
+						<p class="gp-empty__sub">
+							{activeFilter === 'all' ? 'Invite people or share your trip link to start getting RSVPs.' : 'Try a different filter above.'}
+						</p>
+						{#if data.canManageGuests && activeFilter === 'all'}
+							<button type="button" class="gp-btn gp-btn--primary" onclick={openInvitePanel}>Invite guests</button>
+						{/if}
+					</div>
+				{:else if viewMode === 'party'}
+					{#each partyGroups as group (group.id)}
+						<div class="gp-party">
+							<div class="gp-party__head">
+								<span class="gp-party__name">{group.title}</span>
+								<span class="gp-party__size">{group.size === 1 ? 'Just them' : `Party of ${group.size}`}</span>
 							</div>
-							<div class="gp-row__identity">
-								<span class="gp-row__name">{entry.name}</span>
-								{#if entry.email}<span class="gp-row__email">{entry.email}</span>{/if}
-							</div>
-							<div class="gp-row__status">
-								<span class="gp-pill gp-pill--waitlist">#{entry.waitlistPosition ?? i + 1}</span>
-							</div>
+							{#each group.rows as row (row.userId ?? row.inviteId)}
+								{@render guestRow(row)}
+							{/each}
+							{#each group.extraNames as nm (nm)}
+								<div class="gp-party__extra">
+									<span class="gp-party__extra-av" aria-hidden="true">{initials(nm, '')}</span>
+									<span class="gp-party__extra-name">{nm}</span>
+									<span class="gp-tag">No account yet</span>
+								</div>
+							{/each}
 						</div>
 					{/each}
-				</div>
+				{:else}
+					{#each filteredAndSorted as row (row.userId ?? row.inviteId)}
+						{@render guestRow(row)}
+					{/each}
+				{/if}
 			</div>
-		{/if}
+		</section>
+
+		<!-- Right: summary -->
+		<aside class="gp-side">
+
+			<!-- RSVP overview -->
+			<div class="gp-card gp-panel">
+				<div class="gp-panel__head">
+					<h3 class="gp-card__title">RSVP overview</h3>
+					{#if rsvpByDateFormatted}<span class="gp-panel__meta">by {rsvpByDateFormatted}</span>{/if}
+				</div>
+				<div class="gp-donut">
+					<svg class="gp-donut__svg" viewBox="0 0 140 140" role="img" aria-label="{guestOverview.rsvpYes} confirmed, {guestOverview.awaiting} pending, {guestOverview.rsvpNo} declined">
+						<circle class="gp-donut__track" cx="70" cy="70" r="52" fill="none" stroke-width="16" />
+						{#each donutSegments as seg (seg.key)}
+							<circle cx="70" cy="70" r="52" fill="none" stroke={seg.color} stroke-width="16" stroke-dasharray={seg.dash} stroke-dashoffset={seg.offset} transform="rotate(-90 70 70)" />
+						{/each}
+					</svg>
+					<div class="gp-donut__center">
+						<span class="gp-donut__num">{guestOverview.onList}</span>
+						<span class="gp-donut__lbl">on the list</span>
+					</div>
+				</div>
+				<div class="gp-legend">
+					<div class="gp-legend__item"><span class="gp-legend__dot gp-legend__dot--green"></span><span class="gp-legend__txt">Confirmed</span><b>{guestOverview.rsvpYes}</b></div>
+					<div class="gp-legend__item"><span class="gp-legend__dot gp-legend__dot--amber"></span><span class="gp-legend__txt">Pending</span><b>{guestOverview.awaiting}</b></div>
+					{#if guestOverview.rsvpNo > 0}
+						<div class="gp-legend__item"><span class="gp-legend__dot gp-legend__dot--red"></span><span class="gp-legend__txt">Declined</span><b>{guestOverview.rsvpNo}</b></div>
+					{/if}
+				</div>
+				{#if guestOverview.cap > 0}
+					<div class="gp-capbar">
+						<div class="gp-capbar__track">
+							<div class="gp-capbar__fill gp-capbar__fill--green" style="width: {Math.min(100, (guestOverview.rsvpYes / guestOverview.cap) * 100)}%"></div>
+							<div class="gp-capbar__fill gp-capbar__fill--amber" style="left: {Math.min(100, (guestOverview.rsvpYes / guestOverview.cap) * 100)}%; width: {Math.min(Math.max(0, 100 - (guestOverview.rsvpYes / guestOverview.cap) * 100), (guestOverview.awaiting / guestOverview.cap) * 100)}%"></div>
+						</div>
+						<div class="gp-capbar__line">
+							<span><b>{guestOverview.peopleIn}</b> of {guestOverview.cap} max headcount</span>
+							{#if openSlotsLabel}<span class:gp-capbar__warn={guestOverview.overCap}>{openSlotsLabel}</span>{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Waitlist -->
+			{#if data.canManageGuests && (data.waitlistCount ?? 0) > 0}
+				{@const waitlistEntries = data.waitlistEntries ?? []}
+				<div class="gp-card gp-panel">
+					<div class="gp-panel__head">
+						<h3 class="gp-card__title">Waitlist</h3>
+						<span class="gp-panel__count">{data.waitlistCount}</span>
+					</div>
+					<p class="gp-panel__hint">Guests are notified automatically when a spot opens.</p>
+					<ul class="gp-wl">
+						{#each waitlistEntries as entry, i (entry.userId)}
+							<li class="gp-wl__row">
+								<span class="gp-wl__pos">#{entry.waitlistPosition ?? i + 1}</span>
+								{#if entry.avatarUrl}
+									<img src={entry.avatarUrl} alt="" class="gp-av gp-av--img gp-av--sm" />
+								{:else}
+									<span class="gp-av gp-av--init gp-av--sm">{initials(entry.name, entry.email)}</span>
+								{/if}
+								<span class="gp-wl__name">{entry.name}</span>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+
+		</aside>
 
 	</div>
 
@@ -1227,80 +1319,47 @@
 	{@const isDeclined = row.rsvpStatus === 'no'}
 	{@const isPendingApproval = row.type === 'member' && row.memberTripState === 'requested'}
 	{@const isInvite = row.type === 'invite'}
-	<div class="gp-row">
+	<div class="gp-tr">
 
-		<!-- Avatar -->
-		<div class="gp-row__av-wrap">
-			{#if row.avatarUrl}
-				<img src={row.avatarUrl} alt="" class="gp-av gp-av--img" />
-			{:else}
-				<span class="gp-av gp-av--init">{initials(row.name, row.email)}</span>
-			{/if}
-			{#if row.role === 'co-host'}
-				<span class="gp-av__star" aria-label="Co-host">
-					<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-				</span>
-			{/if}
-		</div>
-
-		<!-- Identity -->
-		<div class="gp-row__identity">
-			{#if row.userId}
-				<ProfileTooltip userId={row.userId}>
-					<button type="button" class="gp-row__name-btn" onclick={() => openProfileCard(row.userId!)}>
-						<span class="gp-row__name">{row.name || row.email}</span>
-					</button>
-				</ProfileTooltip>
-			{:else}
-				<span class="gp-row__name">{row.name || row.email}</span>
-			{/if}
-			{#if row.partySize > 1 && isConfirmed}
-				<span class="gp-party-chip">Party of {row.partySize}</span>
-			{/if}
-			{#if row.email && row.email !== '-' && row.name}
-				<span class="gp-row__email">{row.email}</span>
-			{/if}
-		</div>
-
-		<!-- Room and bed -->
-		<div class="gp-row__room">
-			{#if roomName}
-				<span class="gp-row__room-name">{roomName}</span>
-				{#if bedType}<span class="gp-row__bed-type">{bedType}</span>{/if}
-			{:else if (isConfirmed || isReconfirm) && data.canManageGuests}
-				<button type="button" class="gp-row__assign-link" onclick={() => (editModalRow = row)}>Assign bed</button>
-			{:else}
-				<span class="gp-row__dash">-</span>
-			{/if}
-		</div>
-
-		<!-- Amount -->
-		<div class="gp-row__amount">
-			{#if (row.toPayTotal ?? 0) > 0}
-				{#if data.canManageGuests && row.userId}
-					<button
-						type="button"
-						class="gp-row__amount-val gp-row__amount-val--btn"
-						onclick={() => (invoiceModalRow = row)}
-						title="View invoice"
-					>{formatCurrency(row.toPayTotal ?? 0)}</button>
+		<!-- Guest (avatar + identity) -->
+		<div class="gp-cell gp-cell--guest">
+			<div class="gp-row__av-wrap">
+				{#if row.avatarUrl}
+					<img src={row.avatarUrl} alt="" class="gp-av gp-av--img" />
 				{:else}
-					<span class="gp-row__amount-val">{formatCurrency(row.toPayTotal ?? 0)}</span>
+					<span class="gp-av gp-av--init">{initials(row.name, row.email)}</span>
 				{/if}
-				{#if row.type === 'member' && row.userId}
-					{#if row.invoicePaid}
-						<span class="gp-row__pay gp-row__pay--paid">Paid</span>
+				{#if row.role === 'co-host'}
+					<span class="gp-av__star" aria-label="Co-host">
+						<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+					</span>
+				{/if}
+			</div>
+			<div class="gp-row__identity">
+				<div class="gp-row__name-line">
+					{#if row.userId}
+						<ProfileTooltip userId={row.userId}>
+							<button type="button" class="gp-row__name-btn" onclick={() => openProfileCard(row.userId!)}>
+								<span class="gp-row__name">{row.name || row.email}</span>
+							</button>
+						</ProfileTooltip>
 					{:else}
-						<span class="gp-row__pay gp-row__pay--unpaid">Unpaid</span>
+						<span class="gp-row__name">{row.name || row.email}</span>
 					{/if}
+					{#if row.role === 'co-host'}<span class="gp-tag gp-tag--cohost">Co-host</span>{/if}
+					{#if row.partySize > 1 && isConfirmed}<span class="gp-tag">+{row.partySize - 1}</span>{/if}
+					{#if row.hasDietaryFlags}
+						<span class="gp-tag gp-tag--diet" title={[row.dietaryRestrictions, row.allergies].filter(Boolean).join(' · ')}>Dietary</span>
+					{/if}
+				</div>
+				{#if row.email && row.email !== '-' && row.name}
+					<span class="gp-row__email">{row.email}</span>
 				{/if}
-			{:else}
-				<span class="gp-row__dash">-</span>
-			{/if}
+			</div>
 		</div>
 
 		<!-- Status -->
-		<div class="gp-row__status">
+		<div class="gp-cell gp-cell--status">
 			{#if isReconfirm}
 				<span class="gp-pill gp-pill--reconfirm">Needs reconfirm</span>
 				{#if row.reconfirmDeadlineAt}
@@ -1311,7 +1370,7 @@
 			{:else if isDeclined}
 				<span class="gp-pill gp-pill--no">Declined</span>
 			{:else if isPendingApproval}
-				<span class="gp-pill gp-pill--requested">Requested to join</span>
+				<span class="gp-pill gp-pill--requested">Requested</span>
 			{:else if isInvite}
 				<span class="gp-pill gp-pill--invited">Invited</span>
 			{:else}
@@ -1319,9 +1378,48 @@
 			{/if}
 		</div>
 
+		<!-- Room and bed -->
+		<div class="gp-cell gp-cell--room">
+			{#if roomName}
+				<span class="gp-row__room-name">{roomName}</span>
+				{#if bedType}<span class="gp-row__bed-type">{bedType}</span>{/if}
+			{:else if (isConfirmed || isReconfirm) && data.canManageGuests}
+				<button type="button" class="gp-row__assign-link" onclick={() => (editModalRow = row)}>Assign bed</button>
+			{:else}
+				<span class="gp-row__dash">—</span>
+			{/if}
+		</div>
+
+		<!-- Amount -->
+		{#if hasCostSharing}
+			<div class="gp-cell gp-cell--amount">
+				{#if (row.toPayTotal ?? 0) > 0}
+					{#if data.canManageGuests && row.userId}
+						<button
+							type="button"
+							class="gp-row__amount-val gp-row__amount-val--btn"
+							onclick={() => (invoiceModalRow = row)}
+							title="View invoice"
+						>{formatCurrency(row.toPayTotal ?? 0)}</button>
+					{:else}
+						<span class="gp-row__amount-val">{formatCurrency(row.toPayTotal ?? 0)}</span>
+					{/if}
+					{#if row.type === 'member' && row.userId}
+						{#if row.invoicePaid}
+							<span class="gp-row__pay gp-row__pay--paid">Paid</span>
+						{:else}
+							<span class="gp-row__pay gp-row__pay--unpaid">Unpaid</span>
+						{/if}
+					{/if}
+				{:else}
+					<span class="gp-row__dash">—</span>
+				{/if}
+			</div>
+		{/if}
+
 		<!-- Actions -->
-		{#if data.canManageGuests}
-			<div class="gp-row__actions">
+		<div class="gp-cell gp-cell--actions">
+			{#if data.canManageGuests}
 				{#if isPendingApproval}
 					<form method="POST" action="?/restoreGuest" use:enhance={() => invalidateAll()}>
 						<input type="hidden" name="userId" value={row.userId ?? ''} />
@@ -1347,8 +1445,8 @@
 					{/if}
 					<button type="button" class="gp-act" onclick={() => (editModalRow = row)}>Edit</button>
 				{/if}
-			</div>
-		{/if}
+			{/if}
+		</div>
 
 	</div>
 {/snippet}
@@ -1480,177 +1578,147 @@
 	.gp-page {
 		display: flex;
 		flex-direction: column;
+		gap: 20px;
 		min-height: 100%;
-		background: var(--bg-warm);
+		padding: 26px 32px 40px;
+		box-sizing: border-box;
+		background: var(--bg);
 	}
 
 	/* ═══════════════════════════════════════════════════════════
-	   ZONE 1 - COMMAND STRIP
+	   ZONE 1 - HEADER + STAT CARDS
 	   ═══════════════════════════════════════════════════════════ */
 
 	.gp-cmd {
-		background: var(--navy);
-		color: white;
-		padding: 20px 36px;
 		display: flex;
 		flex-direction: column;
-		gap: 14px;
+		gap: 20px;
 	}
 
-	.gp-cmd__main {
+	.gp-head {
 		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 24px;
-		flex-wrap: wrap;
-	}
-
-	.gp-cmd__stats {
-		display: flex;
-		align-items: center;
-		gap: 0;
-		flex-wrap: wrap;
-	}
-
-	.gp-cmd__div {
-		width: 1px;
-		height: 56px;
-		background: rgba(255, 255, 255, 0.2);
-		margin: 0 28px;
-		flex-shrink: 0;
-		align-self: center;
-	}
-
-	.gp-stat { display: flex; flex-direction: column; gap: 2px; }
-
-	.gp-stat__num {
-		font-family: 'Fraunces', Georgia, serif;
-		font-size: 48px;
-		font-weight: 600;
-		color: white;
-		line-height: 1;
-		letter-spacing: -0.03em;
-	}
-	.gp-stat__num--carrot { color: var(--carrot); }
-	.gp-stat__num--dim { color: rgba(255, 255, 255, 0.75); }
-
-	.gp-stat__label {
-		font-family: 'Plus Jakarta Sans', sans-serif;
-		font-size: 12px;
-		color: rgba(255, 255, 255, 0.6);
-	}
-
-	.gp-stat__sub {
-		font-family: 'Plus Jakarta Sans', sans-serif;
-		font-size: 11px;
-		color: rgba(255, 255, 255, 0.45);
-	}
-
-	.gp-cmd__actions {
-		display: flex;
-		flex-direction: column;
 		align-items: flex-end;
-		gap: 8px;
-		flex-shrink: 0;
+		justify-content: space-between;
+		gap: 16px;
+		flex-wrap: wrap;
 	}
 
-	.gp-invite-btn {
-		height: 42px;
-		padding: 0 20px;
-		background: var(--warm);
-		color: white;
-		border: none;
+	.gp-head__title {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 30px;
+		font-weight: 600;
+		color: var(--navy);
+		margin: 0;
+		letter-spacing: -0.02em;
+		line-height: 1.1;
+	}
+
+	.gp-head__sub {
+		font-family: 'Plus Jakarta Sans', sans-serif;
+		font-size: 13px;
+		color: var(--muted);
+		margin: 4px 0 0;
+	}
+
+	.gp-head__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+	.gp-hbtn {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		height: 38px;
+		padding: 0 14px;
+		background: var(--surfaceSolid);
+		color: var(--text);
+		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 13px;
-		font-weight: 700;
+		font-weight: 600;
 		cursor: pointer;
-		transition: background 140ms;
+		transition: background 140ms, border-color 140ms, color 140ms;
 		white-space: nowrap;
 	}
-	.gp-invite-btn:hover { background: var(--chocolate); }
+	.gp-hbtn:hover { border-color: var(--navy); color: var(--navy); }
+	.gp-hbtn svg { opacity: 0.7; }
 
-	.gp-cmd__links { display: flex; align-items: center; gap: 8px; }
+	.gp-hbtn--primary { background: var(--warm); color: white; border-color: var(--warm); }
+	.gp-hbtn--primary:hover { background: var(--chocolate); border-color: var(--chocolate); color: white; }
+	.gp-hbtn--primary svg { opacity: 1; }
 
-	.gp-cmd-link {
-		background: none;
-		border: none;
-		color: rgba(255, 255, 255, 0.7);
+	/* Stat cards */
+	.gp-stats {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 16px;
+	}
+
+	.gp-statcard {
+		background: var(--surfaceSolid);
+		border: 1px solid var(--border);
+		border-radius: 16px;
+		padding: 18px 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		box-shadow: var(--shadow-sm);
+	}
+
+	.gp-statcard__icon {
+		width: 34px;
+		height: 34px;
+		border-radius: 10px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 10px;
+	}
+	.gp-statcard__icon--green { background: rgba(29, 158, 117, 0.12); color: var(--green-deep); }
+	.gp-statcard__icon--amber { background: rgba(247, 170, 41, 0.16); color: var(--amber-text-dark); }
+	.gp-statcard__icon--navy { background: rgba(29, 77, 78, 0.1); color: var(--navy); }
+	.gp-statcard__icon--teal { background: rgba(47, 119, 120, 0.12); color: var(--slate); }
+
+	.gp-statcard__num {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 36px;
+		font-weight: 600;
+		color: var(--navy);
+		line-height: 1.05;
+		letter-spacing: -0.03em;
+	}
+
+	.gp-statcard__label {
+		font-family: 'Plus Jakarta Sans', sans-serif;
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--text);
+		margin-top: 4px;
+	}
+
+	.gp-statcard__sub {
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 12px;
-		text-decoration: underline;
-		cursor: pointer;
-		padding: 0;
-		transition: color 140ms;
+		color: var(--muted);
+		margin-top: 1px;
 	}
-	.gp-cmd-link:hover { color: white; }
+	.gp-statcard__sub--warn { color: var(--warm); font-weight: 600; }
 
-	.gp-cmd-sep { color: rgba(255, 255, 255, 0.3); font-size: 12px; }
-
-	.gp-cmd__rsvpby {
-		font-family: 'Plus Jakarta Sans', sans-serif;
-		font-size: 11px;
-		color: rgba(255, 255, 255, 0.5);
-	}
-
-	/* Progress bar */
-	.gp-cmd__bar-row { width: 100%; }
-
-	.gp-cmd__track {
-		position: relative;
-		height: 6px;
-		border-radius: 3px;
-		background: rgba(255, 255, 255, 0.12);
-		overflow: visible;
-	}
-
-	.gp-cmd__fill {
-		position: absolute;
-		left: 0;
-		top: 0;
-		height: 100%;
-		background: white;
-		border-radius: 3px;
-		transition: width 0.4s ease;
-		min-width: 0;
-	}
-
-	.gp-cmd__marker {
-		position: absolute;
-		top: -4px;
-		width: 1.5px;
-		height: 14px;
-		background: rgba(255, 255, 255, 0.5);
-		border-radius: 1px;
-		transform: translateX(-50%);
-	}
-
-	.gp-cmd__marker-lbl {
-		position: absolute;
-		top: -16px;
-		left: 50%;
-		transform: translateX(-50%);
-		font-family: 'Plus Jakarta Sans', sans-serif;
-		font-size: 9px;
-		color: rgba(255, 255, 255, 0.4);
-		font-weight: 500;
-		white-space: nowrap;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-	}
-
-	/* Inline invite panel */
+	/* Inline invite panel (light card) */
 	.gp-ipanel {
-		border-top: 1px solid rgba(255, 255, 255, 0.1);
-		padding-top: 20px;
+		background: var(--surfaceSolid);
+		border: 1px solid var(--border);
+		border-radius: 16px;
+		padding: 18px 20px;
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
+		box-shadow: var(--shadow-sm);
 	}
 
 	.gp-ipanel__tabs {
 		display: flex;
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--bg);
+		border: 1px solid var(--border);
 		border-radius: 8px;
 		padding: 2px;
 		width: fit-content;
@@ -1659,7 +1727,7 @@
 	.gp-itab {
 		background: none;
 		border: none;
-		color: rgba(255, 255, 255, 0.6);
+		color: var(--muted);
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 13px;
 		font-weight: 600;
@@ -1668,7 +1736,7 @@
 		cursor: pointer;
 		transition: all 140ms;
 	}
-	.gp-itab--active { background: white; color: var(--navy); }
+	.gp-itab--active { background: var(--navy); color: white; }
 
 	.gp-ipanel__form {
 		display: flex;
@@ -1680,8 +1748,8 @@
 	.gp-ifield {
 		height: 44px;
 		padding: 0 14px;
-		background: white;
-		border: none;
+		background: var(--surfaceSolid);
+		border: 1px solid var(--border);
 		border-radius: 10px;
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 14px;
@@ -1689,13 +1757,15 @@
 		outline: none;
 		width: 100%;
 		box-sizing: border-box;
+		transition: border-color 140ms;
 	}
 	.gp-ifield--sm { height: 38px; font-size: 13px; }
-	.gp-ifield:focus { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4); }
+	.gp-ifield:focus { border-color: var(--slate); box-shadow: 0 0 0 3px rgba(47, 119, 120, 0.12); }
 
 	.gp-rtoggle-wrap {
 		display: flex;
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--bg);
+		border: 1px solid var(--border);
 		border-radius: 8px;
 		padding: 2px;
 		width: fit-content;
@@ -1704,7 +1774,7 @@
 	.gp-rtoggle {
 		background: none;
 		border: none;
-		color: rgba(255, 255, 255, 0.6);
+		color: var(--muted);
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 12px;
 		font-weight: 600;
@@ -1713,7 +1783,7 @@
 		cursor: pointer;
 		transition: all 140ms;
 	}
-	.gp-rtoggle--active { background: white; color: var(--navy); }
+	.gp-rtoggle--active { background: var(--navy); color: white; }
 
 	.gp-isubmit {
 		height: 44px;
@@ -1753,8 +1823,8 @@
 		flex-shrink: 0;
 	}
 	.gp-ifriends__av--init {
-		background: rgba(255, 255, 255, 0.15);
-		color: white;
+		background: linear-gradient(135deg, rgba(29, 77, 78, 0.1), rgba(47, 119, 120, 0.2));
+		color: var(--navy);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1763,29 +1833,29 @@
 		font-weight: 600;
 	}
 
-	.gp-ifriends__name { flex: 1; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: white; }
+	.gp-ifriends__name { flex: 1; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: var(--text); }
 
 	.gp-ifriends__btn {
 		height: 28px;
 		padding: 0 12px;
-		background: rgba(255, 255, 255, 0.12);
-		color: white;
-		border: 1px solid rgba(255, 255, 255, 0.3);
+		background: var(--surfaceSolid);
+		color: var(--navy);
+		border: 1px solid var(--border);
 		border-radius: 6px;
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 11px;
 		font-weight: 600;
 		cursor: pointer;
-		transition: background 140ms;
+		transition: background 140ms, border-color 140ms;
 	}
-	.gp-ifriends__btn:hover { background: rgba(255, 255, 255, 0.22); }
+	.gp-ifriends__btn:hover { background: var(--bg); border-color: var(--navy); }
 
 	.gp-ipanel__footer { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
 	.gp-ipanel__cancel {
 		background: none;
 		border: none;
-		color: rgba(255, 255, 255, 0.6);
+		color: var(--muted);
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 12px;
 		cursor: pointer;
@@ -1793,12 +1863,12 @@
 		padding: 0;
 		transition: color 140ms;
 	}
-	.gp-ipanel__cancel:hover { color: white; }
+	.gp-ipanel__cancel:hover { color: var(--navy); }
 
 	.gp-ipanel__manual {
 		background: none;
 		border: none;
-		color: rgba(255, 255, 255, 0.45);
+		color: var(--muted);
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 12px;
 		cursor: pointer;
@@ -1806,11 +1876,11 @@
 		padding: 0;
 		transition: color 140ms;
 	}
-	.gp-ipanel__manual:hover { color: rgba(255, 255, 255, 0.7); }
+	.gp-ipanel__manual:hover { color: var(--navy); }
 
-	.gp-ipanel__err { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: rgba(255, 140, 140, 1); margin: 0; }
-	.gp-ipanel__warn { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: var(--carrot); margin: 0; }
-	.gp-ipanel__hint { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: rgba(255, 255, 255, 0.6); margin: 0; }
+	.gp-ipanel__err { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: var(--red-text); margin: 0; }
+	.gp-ipanel__warn { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: var(--amber-text-dark); margin: 0; }
+	.gp-ipanel__hint { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: var(--muted); margin: 0; }
 
 	.gp-cmd-toast {
 		position: fixed;
@@ -1834,14 +1904,14 @@
 
 	.gp-attn {
 		background: var(--surface-attention);
-		border-top: 1px solid rgba(247, 170, 41, 0.2);
-		border-bottom: 2px solid rgba(247, 170, 41, 0.18);
-		padding: 16px 36px;
+		border: 1px solid rgba(247, 170, 41, 0.25);
+		border-radius: 12px;
+		padding: 8px;
 	}
 
 	.gp-attn__cards {
 		display: flex;
-		gap: 12px;
+		gap: 8px;
 		overflow-x: auto;
 		-ms-overflow-style: none;
 		scrollbar-width: none;
@@ -1851,57 +1921,65 @@
 	.gp-acard {
 		background: white;
 		border: 1px solid rgba(247, 170, 41, 0.3);
-		border-radius: 12px;
-		padding: 14px 16px;
-		min-width: 200px;
-		max-width: 260px;
-		flex-shrink: 0;
+		border-radius: 10px;
+		padding: 8px 10px;
+		flex: 1 1 0;
+		min-width: 210px;
 		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		box-shadow: 0 1px 4px rgba(247, 170, 41, 0.08);
+		align-items: center;
+		gap: 9px;
+		box-shadow: 0 1px 3px rgba(247, 170, 41, 0.07);
 	}
 
-	.gp-acard__hdr { display: flex; align-items: center; gap: 5px; color: var(--amber-text); }
+	.gp-acard__ic {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		flex-shrink: 0;
+		border-radius: 8px;
+		background: var(--surface-attention);
+		color: var(--amber-text);
+	}
+
+	.gp-acard__main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
 
 	.gp-acard__label {
 		font-family: 'Plus Jakarta Sans', sans-serif;
-		font-size: 10px;
+		font-size: 9px;
 		font-weight: 700;
-		letter-spacing: 0.08em;
+		letter-spacing: 0.07em;
 		text-transform: uppercase;
 		color: var(--amber-text);
-		margin-bottom: 6px;
-		display: flex;
-		align-items: center;
-		gap: 5px;
 	}
 
 	.gp-acard__text {
 		font-family: 'Plus Jakarta Sans', sans-serif;
-		font-size: 14px;
+		font-size: 12.5px;
 		font-weight: 600;
 		color: var(--text);
-		margin: 0 0 4px;
-		line-height: 1.3;
+		margin: 0;
+		line-height: 1.25;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.gp-acard__sub { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; color: var(--muted); margin: 0 0 10px; }
-
 	.gp-acard__btn {
-		height: 28px;
-		padding: 0 12px;
+		height: 26px;
+		padding: 0 11px;
 		border: 1px solid rgba(206, 86, 18, 0.35);
 		background: white;
 		color: var(--warm);
-		border-radius: 8px;
+		border-radius: 7px;
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 11px;
 		font-weight: 600;
 		cursor: pointer;
 		transition: background 150ms, color 150ms;
-		margin-top: 2px;
-		align-self: flex-start;
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 	.gp-acard__btn:hover { background: var(--warm); color: white; }
 	.gp-acard__btn:disabled { opacity: 0.5; cursor: default; }
@@ -1910,11 +1988,40 @@
 	   ZONE 3 - ROSTER
 	   ═══════════════════════════════════════════════════════════ */
 
-	.gp-roster {
-		background: var(--bg-warm);
-		padding: 32px 36px;
+	.gp-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 320px;
+		gap: 16px;
+		align-items: start;
+	}
+
+	/* Cards */
+	.gp-card {
+		background: var(--surfaceSolid);
+		border: 1px solid var(--border);
+		border-radius: 16px;
+		box-shadow: var(--shadow-sm);
+	}
+
+	.gp-card__title {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 17px;
+		font-weight: 600;
+		color: var(--navy);
+		margin: 0;
+		letter-spacing: -0.01em;
+	}
+
+	/* Table card */
+	.gp-tablecard { padding: 4px 6px 8px; }
+
+	.gp-tablecard__head {
 		display: flex;
-		flex-direction: column;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 14px 14px 12px;
+		flex-wrap: wrap;
 	}
 
 	.gp-filters {
@@ -1923,16 +2030,15 @@
 		overflow-x: auto;
 		-ms-overflow-style: none;
 		scrollbar-width: none;
-		margin-bottom: 32px;
 		flex-wrap: nowrap;
 	}
 	.gp-filters::-webkit-scrollbar { display: none; }
 
 	.gp-fpill {
-		background: white;
+		background: var(--surfaceSolid);
 		border: 1px solid var(--border);
 		color: var(--muted);
-		padding: 6px 14px;
+		padding: 5px 12px;
 		border-radius: 999px;
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 12px;
@@ -1946,6 +2052,97 @@
 	.gp-fpill--active { background: var(--navy); color: white; border-color: var(--navy); font-weight: 700; }
 	.gp-fpill--active:hover { background: var(--navy); }
 
+	.gp-head-controls {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+
+	.gp-viewtoggle {
+		display: inline-flex;
+		padding: 2px;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		flex-shrink: 0;
+	}
+	.gp-viewtoggle__btn {
+		border: none;
+		background: transparent;
+		color: var(--muted);
+		padding: 4px 12px;
+		border-radius: 999px;
+		font-family: 'Plus Jakarta Sans', sans-serif;
+		font-size: 12px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background 140ms, color 140ms;
+	}
+	.gp-viewtoggle__btn--active { background: var(--surfaceSolid); color: var(--navy); box-shadow: var(--shadow-sm); }
+
+	/* Party groups */
+	.gp-party {
+		border: 1px solid var(--border);
+		border-radius: 12px;
+		margin: 0 6px 10px;
+		overflow: hidden;
+	}
+	.gp-party__head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		padding: 9px 14px;
+		background: var(--bg-warm);
+		border-bottom: 1px solid var(--border);
+	}
+	.gp-party__name {
+		font-family: 'Fraunces', Georgia, serif;
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--navy);
+		letter-spacing: -0.01em;
+	}
+	.gp-party__size {
+		font-family: 'Plus Jakarta Sans', sans-serif;
+		font-size: 10px;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+	.gp-party .gp-tr { border-radius: 0; }
+	.gp-party__extra {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 9px 14px;
+		border-top: 1px dashed var(--border);
+	}
+	.gp-party__extra-av {
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		background: var(--bg);
+		color: var(--muted);
+		font-family: 'Plus Jakarta Sans', sans-serif;
+		font-size: 11px;
+		font-weight: 700;
+	}
+	.gp-party__extra-name {
+		font-family: 'Plus Jakarta Sans', sans-serif;
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--text);
+		flex: 1;
+		min-width: 0;
+	}
+
 	.gp-err-bar {
 		display: flex;
 		align-items: center;
@@ -1957,72 +2154,50 @@
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 13px;
 		color: var(--red-text);
-		margin-bottom: 16px;
+		margin: 0 8px 8px;
 	}
 	.gp-err-dismiss { background: none; border: none; cursor: pointer; color: inherit; font-size: 16px; padding: 0; }
 
-	.gp-section { display: flex; flex-direction: column; margin-bottom: 48px; }
-	.gp-section:last-child { margin-bottom: 0; }
+	/* Table */
+	.gp-table { display: flex; flex-direction: column; }
 
-	.gp-section__hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-
-	.gp-section__title {
-		font-family: 'Fraunces', Georgia, serif;
-		font-size: 20px;
-		font-weight: 600;
-		color: var(--navy);
-		margin: 0;
-		letter-spacing: -0.02em;
-	}
-
-	.gp-section__badge {
-		display: inline-flex;
+	.gp-tr {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 124px 136px 150px;
 		align-items: center;
-		justify-content: center;
-		min-width: 22px;
-		height: 22px;
-		border-radius: 999px;
-		padding: 0 7px;
-		margin-left: 8px;
-		vertical-align: middle;
-		font-family: 'Plus Jakarta Sans', sans-serif;
-		font-size: 12px;
-		font-weight: 700;
-		background: rgba(29, 77, 78, 0.08);
-		color: var(--navy);
+		gap: 14px;
+		padding: 11px 12px;
+		border-radius: 10px;
 	}
-
-	#section-confirmed .gp-section__badge {
-		background: rgba(29, 158, 117, 0.14);
-		color: var(--green-deep);
+	.gp-table--cost .gp-tr {
+		grid-template-columns: minmax(0, 1fr) 124px 136px 104px 150px;
 	}
+	.gp-table .gp-tr:not(.gp-tr--head) { transition: background 120ms; }
+	.gp-table .gp-tr:not(.gp-tr--head):hover { background: var(--bg-warm); }
 
-	#section-pending .gp-section__badge {
-		background: rgba(247, 170, 41, 0.16);
-		color: var(--amber-text-dark);
-	}
-
-	#section-declined .gp-section__badge {
-		background: rgba(239, 68, 68, 0.1);
-		color: var(--red-text);
-	}
-
-	.gp-section__rule { height: 1px; background: var(--border); }
-
-	.gp-section__hint { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: var(--muted); margin: 0 0 8px; }
-
-	/* Guest rows */
-	.gp-rows { display: flex; flex-direction: column; }
-
-	.gp-row {
-		display: flex;
-		align-items: center;
-		gap: 16px;
-		padding: 14px 0;
+	.gp-tr--head {
+		padding-top: 6px;
+		padding-bottom: 10px;
 		border-bottom: 1px solid var(--border);
-		min-height: 64px;
+		border-radius: 0;
+		margin-bottom: 2px;
 	}
-	.gp-row:last-child { border-bottom: none; }
+	.gp-tr--head .gp-cell {
+		font-family: 'Plus Jakarta Sans', sans-serif;
+		font-size: 10px;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--muted);
+	}
+
+	.gp-cell { min-width: 0; }
+	.gp-cell--guest { display: flex; align-items: center; gap: 12px; }
+	.gp-cell--status { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+	.gp-cell--room { display: flex; flex-direction: column; gap: 1px; }
+	.gp-cell--amount { display: flex; flex-direction: column; gap: 2px; }
+	.gp-cell--actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+	.gp-cell--actions form { display: contents; }
 
 	/* Avatar */
 	.gp-row__av-wrap { position: relative; flex-shrink: 0; }
@@ -2066,9 +2241,11 @@
 	}
 
 	/* Identity */
-	.gp-row__identity { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+	.gp-row__identity { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 
-	.gp-row__name-btn { background: none; border: none; padding: 0; cursor: pointer; text-align: left; width: fit-content; }
+	.gp-row__name-line { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+
+	.gp-row__name-btn { background: none; border: none; padding: 0; cursor: pointer; text-align: left; min-width: 0; }
 
 	.gp-row__name {
 		font-family: 'Plus Jakarta Sans', sans-serif;
@@ -2095,22 +2272,25 @@
 		display: block;
 	}
 
-	.gp-party-chip {
-		display: inline-block;
+	/* Inline tags next to name */
+	.gp-tag {
+		display: inline-flex;
+		align-items: center;
 		background: var(--bg);
 		border: 1px solid var(--border);
+		color: var(--muted);
 		border-radius: 999px;
-		padding: 2px 7px;
+		padding: 1px 7px;
 		font-family: 'Plus Jakarta Sans', sans-serif;
 		font-size: 10px;
-		color: var(--muted);
-		width: fit-content;
-		margin-top: 2px;
+		font-weight: 600;
+		white-space: nowrap;
+		flex-shrink: 0;
 	}
+	.gp-tag--cohost { background: rgba(47, 119, 120, 0.08); color: var(--slate); border-color: rgba(47, 119, 120, 0.2); }
+	.gp-tag--diet { background: rgba(247, 170, 41, 0.12); color: var(--amber-text-dark); border-color: rgba(247, 170, 41, 0.3); cursor: default; }
 
 	/* Room / bed */
-	.gp-row__room { width: 120px; flex-shrink: 0; display: flex; flex-direction: column; gap: 1px; }
-
 	.gp-row__room-name { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 600; color: var(--text); }
 
 	.gp-row__bed-type { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; color: var(--muted); }
@@ -2132,8 +2312,6 @@
 	.gp-row__dash { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: var(--muted); }
 
 	/* Amount */
-	.gp-row__amount { width: 88px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; }
-
 	.gp-row__amount-val {
 		font-family: 'Fraunces', Georgia, serif;
 		font-size: 14px;
@@ -2149,13 +2327,11 @@
 	.gp-row__amount-val--btn { cursor: pointer; }
 	.gp-row__amount-val--btn:hover { text-decoration: underline; }
 
-	.gp-row__pay { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10px; font-weight: 600; margin-top: 2px; }
+	.gp-row__pay { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10px; font-weight: 600; }
 	.gp-row__pay--paid { color: var(--green-mid); }
 	.gp-row__pay--unpaid { color: var(--warm); }
 
 	/* Status pills */
-	.gp-row__status { width: 110px; flex-shrink: 0; display: flex; flex-direction: column; gap: 3px; }
-
 	.gp-pill {
 		display: inline-flex;
 		align-items: center;
@@ -2174,19 +2350,15 @@
 	.gp-pill--invited { background: var(--bg); color: var(--muted); border: 1px solid var(--border); font-weight: 600; }
 	.gp-pill--requested { background: rgba(47, 119, 120, 0.08); color: var(--slate); border: 1px solid rgba(47, 119, 120, 0.2); }
 	.gp-pill--no { background: rgba(239, 68, 68, 0.07); color: var(--red-text); border: 1px solid rgba(239, 68, 68, 0.15); }
-	.gp-pill--waitlist { background: var(--bg); color: var(--muted); border: 1px solid var(--border); font-weight: 600; }
 
-	.gp-pill-sub { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10px; color: var(--muted); margin-top: 3px; font-weight: 500; }
+	.gp-pill-sub { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 10px; color: var(--muted); font-weight: 500; }
 
-	/* Row action buttons */
-	.gp-row__actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-	.gp-row__actions form { display: contents; }
-
+	/* Action buttons */
 	.gp-act {
 		height: 28px;
 		padding: 0 11px;
 		border: 1px solid var(--border);
-		background: white;
+		background: var(--surfaceSolid);
 		color: var(--muted);
 		border-radius: 8px;
 		font-family: 'Plus Jakarta Sans', sans-serif;
@@ -2201,14 +2373,13 @@
 	.gp-act--approve { background: var(--navy); color: white; border-color: var(--navy); }
 	.gp-act--approve:hover { opacity: 0.88; background: var(--navy); border-color: var(--navy); color: white; }
 
-	.gp-act--decline { border: 1px solid rgba(206, 86, 18, 0.3); color: var(--warm); background: white; }
+	.gp-act--decline { border: 1px solid rgba(206, 86, 18, 0.3); color: var(--warm); background: var(--surfaceSolid); }
 	.gp-act--decline:hover { background: rgba(206, 86, 18, 0.05); }
 
 	/* Empty states */
-	.gp-empty { display: flex; flex-direction: column; align-items: center; padding: 40px 0; gap: 8px; text-align: center; }
+	.gp-empty { display: flex; flex-direction: column; align-items: center; padding: 48px 16px; gap: 8px; text-align: center; }
 
 	.gp-empty__icon { color: var(--muted); }
-	.gp-empty__icon--green { color: var(--green-mid); }
 
 	.gp-empty__title {
 		font-family: 'Fraunces', Georgia, serif;
@@ -2220,6 +2391,64 @@
 	}
 
 	.gp-empty__sub { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: var(--muted); margin: 0; }
+	.gp-empty .gp-btn { margin-top: 10px; }
+
+	/* ── Side column (summary / waitlist) ── */
+	.gp-side { display: flex; flex-direction: column; gap: 16px; }
+
+	.gp-panel { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+
+	.gp-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+	.gp-panel__meta { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; color: var(--muted); }
+	.gp-panel__hint { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: var(--muted); margin: 0; }
+	.gp-panel__count {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 22px;
+		height: 22px;
+		padding: 0 7px;
+		border-radius: 999px;
+		background: rgba(29, 77, 78, 0.08);
+		color: var(--navy);
+		font-family: 'Plus Jakarta Sans', sans-serif;
+		font-size: 12px;
+		font-weight: 700;
+	}
+
+	/* Donut */
+	.gp-donut { position: relative; width: 150px; height: 150px; margin: 4px auto 0; }
+	.gp-donut__svg { width: 100%; height: 100%; display: block; }
+	.gp-donut__track { stroke: var(--border); }
+	.gp-donut__center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+	.gp-donut__num { font-family: 'Fraunces', Georgia, serif; font-size: 32px; font-weight: 600; color: var(--navy); line-height: 1; letter-spacing: -0.02em; }
+	.gp-donut__lbl { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+	/* Legend */
+	.gp-legend { display: flex; flex-direction: column; gap: 9px; }
+	.gp-legend__item { display: flex; align-items: center; gap: 9px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: var(--text); }
+	.gp-legend__dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+	.gp-legend__dot--green { background: var(--green-mid); }
+	.gp-legend__dot--amber { background: var(--carrot); }
+	.gp-legend__dot--red { background: #e0654f; }
+	.gp-legend__txt { flex: 1; }
+	.gp-legend__item b { font-weight: 700; color: var(--navy); }
+
+	/* Capacity mini-bar */
+	.gp-capbar { display: flex; flex-direction: column; gap: 7px; padding-top: 14px; border-top: 1px solid var(--border); }
+	.gp-capbar__track { position: relative; height: 8px; border-radius: 999px; background: var(--bg-warm); overflow: hidden; }
+	.gp-capbar__fill { position: absolute; top: 0; height: 100%; border-radius: 999px; transition: width 400ms ease; }
+	.gp-capbar__fill--green { left: 0; background: var(--green-mid); z-index: 2; }
+	.gp-capbar__fill--amber { background: rgba(247, 170, 41, 0.5); z-index: 1; }
+	.gp-capbar__line { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; color: var(--muted); }
+	.gp-capbar__line b { color: var(--navy); }
+	.gp-capbar__warn { color: var(--warm); font-weight: 600; }
+
+	/* Waitlist */
+	.gp-wl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+	.gp-wl__row { display: flex; align-items: center; gap: 10px; }
+	.gp-wl__pos { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 700; color: var(--muted); min-width: 22px; }
+	.gp-wl__name { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 	/* ── Shared utilities ── */
 	.gp-ghost-btn {
@@ -2261,7 +2490,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-		margin: 0 36px 24px;
+		margin: 0;
 	}
 
 	.gp-legacy-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -2309,7 +2538,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-		margin: 0 36px 24px;
+		margin: 0;
 	}
 
 	.gp-removed-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
@@ -2405,26 +2634,50 @@
 	.gp-form-error { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; color: var(--red-text); margin: 0; }
 
 	/* ── Responsive ── */
+
+	/* Stack the summary column under the table on narrower viewports */
+	@media (max-width: 1080px) {
+		.gp-grid { grid-template-columns: minmax(0, 1fr); }
+		.gp-side { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-items: start; }
+	}
+
+	@media (max-width: 900px) {
+		.gp-stats { grid-template-columns: repeat(2, 1fr); }
+	}
+
+	@media (max-width: 720px) {
+		.gp-side { grid-template-columns: minmax(0, 1fr); }
+	}
+
 	@media (max-width: 640px) {
-		.gp-cmd { padding: 20px; gap: 16px; }
-		.gp-stat__num { font-size: 32px; }
-		.gp-cmd__div { height: 40px; margin: 0 16px; }
-		.gp-cmd__main { flex-direction: column; align-items: stretch; gap: 16px; }
-		.gp-cmd__actions { align-items: stretch; }
-		.gp-invite-btn { width: 100%; }
-		.gp-cmd__links { justify-content: center; }
-		.gp-attn { padding: 14px 20px; }
+		.gp-page { padding: 18px 16px 32px; }
+		.gp-head__title { font-size: 25px; }
+		.gp-statcard__num { font-size: 30px; }
 		.gp-attn__cards { flex-direction: column; overflow-x: unset; }
 		.gp-acard { max-width: 100%; min-width: unset; }
-		.gp-roster { padding: 20px; }
-		.gp-row { flex-wrap: wrap; min-height: unset; }
-		.gp-row__room { width: auto; min-width: 80px; }
-		.gp-row__amount { width: auto; min-width: 60px; }
-		.gp-row__status { width: auto; }
-		.gp-row__actions { width: 100%; justify-content: flex-start; padding-top: 4px; }
+
+		/* Collapse table rows into stacked cards */
+		.gp-tr--head { display: none; }
+		.gp-tr,
+		.gp-table--cost .gp-tr {
+			grid-template-columns: 1fr auto;
+			grid-template-areas:
+				'guest actions'
+				'status status'
+				'room room'
+				'amount amount';
+			row-gap: 8px;
+			padding: 14px 12px;
+			border-bottom: 1px solid var(--border);
+			border-radius: 0;
+		}
+		.gp-table .gp-tr:not(.gp-tr--head):hover { background: transparent; }
+		.gp-cell--guest { grid-area: guest; }
+		.gp-cell--actions { grid-area: actions; align-items: flex-start; }
+		.gp-cell--status { grid-area: status; }
+		.gp-cell--room { grid-area: room; flex-direction: row; gap: 6px; align-items: center; }
+		.gp-cell--amount { grid-area: amount; flex-direction: row; gap: 6px; align-items: center; }
 		.gp-act { height: 32px; }
-		.gp-legacy-card { margin: 0 16px 16px; }
-		.gp-removed-card { margin: 0 16px 16px; }
 	}
 
 </style>

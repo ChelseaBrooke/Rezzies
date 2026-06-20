@@ -131,9 +131,15 @@
 	/* ── Sub-screen 3 ── Headcount ── */
 	let skipped3 = $state(false);
 
+	const minOverMax = $derived(
+		Number(draft.expectedGuestCount) >= 1 &&
+		Number(draft.maxOccupancy) >= 1 &&
+		Number(draft.expectedGuestCount) > Number(draft.maxOccupancy)
+	);
+
 	const canAdvance3 = $derived(
 		skipped3 ||
-		(Number(draft.expectedGuestCount) >= 1 && Number(draft.maxOccupancy) >= 1)
+		(Number(draft.expectedGuestCount) >= 1 && Number(draft.maxOccupancy) >= 1 && !minOverMax)
 	);
 
 	function skipHeadcount() {
@@ -295,6 +301,7 @@
 							bind:value={draft.expectedGuestCount}
 							oninput={autosave}
 							min="1"
+							max={Number(draft.maxOccupancy) >= 1 ? draft.maxOccupancy : undefined}
 							placeholder="8"
 							aria-label="Minimum headcount"
 						/>
@@ -306,16 +313,22 @@
 							class="fs1-num-input"
 							bind:value={draft.maxOccupancy}
 							oninput={autosave}
-							min="1"
+							min={Number(draft.expectedGuestCount) >= 1 ? draft.expectedGuestCount : 1}
 							placeholder="14"
 							aria-label="Maximum headcount"
 						/>
 					</label>
 				</div>
 
-				<p class="fs1-hint">
-					We show your group a price range between these two numbers. Locks in as people RSVP.
-				</p>
+				{#if minOverMax}
+					<p class="fs1-hint" style="color: var(--danger);">
+						Minimum can’t be higher than the maximum.
+					</p>
+				{:else}
+					<p class="fs1-hint">
+						We show your group a price range between these two numbers. Locks in as people RSVP.
+					</p>
+				{/if}
 
 				<button type="button" class="fs1-skip" onclick={skipHeadcount}>
 					Skip for now

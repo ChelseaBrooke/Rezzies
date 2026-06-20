@@ -88,6 +88,9 @@
 			if (!(Number(draft.maxOccupancy) >= 1)) {
 				return false;
 			}
+			if (Number(draft.expectedGuestCount) > Number(draft.maxOccupancy)) {
+				return false;
+			}
 			return true;
 		}
 		return true;
@@ -130,6 +133,14 @@
 				!(Number(draft.maxOccupancy) >= 1)
 			) {
 				validationError = 'Please enter a maximum headcount (capacity limit).';
+			} else if (
+				draft.name &&
+				draft.checkInDate &&
+				draft.checkOutDate &&
+				draft.rooms.length > 0 &&
+				Number(draft.expectedGuestCount) > Number(draft.maxOccupancy)
+			) {
+				validationError = 'Minimum headcount cannot be higher than the maximum.';
 			} else {
 				validationError = null;
 			}

@@ -99,7 +99,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	if (!checkInDateStr || !checkOutDateStr) {
 		return json({ error: 'Check-in and check-out dates are required' }, { status: 400 });
 	}
-	if (!locationCity) {
+	// Location is only required to publish; drafts can be saved without it.
+	if (isPublished && !locationCity) {
 		return json({ error: 'Location is required' }, { status: 400 });
 	}
 
@@ -135,15 +136,27 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		!!coverPhoto ||
 		(Array.isArray(d.galleryPhotos) && d.galleryPhotos.length > 0) ||
 		rooms.some((r: { photos?: string[] }) => Array.isArray(r?.photos) && r.photos.length > 0);
-	if (!hasPhotos) {
+	// Photos and headcount are only required to publish; drafts can be saved without them.
+	if (isPublished && !hasPhotos) {
 		return json({ error: 'Please add at least one photo (cover or room photo)' }, { status: 400 });
 	}
 
-	if (expectedGuestCount == null || expectedGuestCount < 1) {
+	if (isPublished && (expectedGuestCount == null || expectedGuestCount < 1)) {
 		return json({ error: 'Minimum headcount (realistic low) is required' }, { status: 400 });
 	}
-	if (maxOccupancy == null || maxOccupancy < 1) {
+	if (isPublished && (maxOccupancy == null || maxOccupancy < 1)) {
 		return json({ error: 'Maximum headcount (capacity limit) is required' }, { status: 400 });
+	}
+	// Minimum can never exceed maximum (applies to drafts and published trips).
+	if (
+		expectedGuestCount != null &&
+		maxOccupancy != null &&
+		expectedGuestCount > maxOccupancy
+	) {
+		return json(
+			{ error: 'Minimum headcount cannot be higher than the maximum.' },
+			{ status: 400 }
+		);
 	}
 
 	if (isPublished && !waivePlatformFee && isStripeConfigured()) {

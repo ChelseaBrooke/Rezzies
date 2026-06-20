@@ -62,7 +62,22 @@ export type GuestRow = {
 	memberTripState?: MemberTripState;
 	/** Trip role for this member (host, co-host, guest) so UI can e.g. hide Remove for host. */
 	role?: string;
+	/** Household ("party") this guest belongs to, if any. */
+	householdId?: string | null;
 }
+
+export type PartyInfo = {
+	id: string;
+	name: string | null;
+	primaryUserId: string;
+	members: Array<{
+		firstName: string;
+		lastName: string | null;
+		ageGroup: string;
+		accountStatus: string;
+		userId: string | null;
+	}>;
+};
 
 export type RemovedRow = {
 	userId: string;
@@ -344,6 +359,38 @@ export const load: PageServerLoad = async ({ parent }) => {
 		}));
 	}
 
+	// Households ("parties"): primary guest + claimable plus-one / proxy members
+	let parties: PartyInfo[] = [];
+	if (canManageGuests && tripId) {
+		const households = await prisma.household.findMany({
+			where: { tripId },
+			include: { members: true },
+			orderBy: { createdAt: 'asc' }
+		});
+		parties = households.map((h) => ({
+			id: h.id,
+			name: h.name,
+			primaryUserId: h.primaryUserId,
+			members: h.members.map((m) => ({
+				firstName: m.firstName,
+				lastName: m.lastName,
+				ageGroup: m.ageGroup,
+				accountStatus: m.accountStatus,
+				userId: m.userId
+			}))
+		}));
+		const userToHousehold = new Map<string, string>();
+		for (const p of parties) {
+			userToHousehold.set(p.primaryUserId, p.id);
+			for (const m of p.members) if (m.userId) userToHousehold.set(m.userId, p.id);
+		}
+		for (const row of guestRows) {
+			if (row.userId && userToHousehold.has(row.userId)) {
+				row.householdId = userToHousehold.get(row.userId) ?? null;
+			}
+		}
+	}
+
 	let legacyReservations: { id: string; name: string; email: string; roomName: string; bedType: string | null; checkInDate: string; checkOutDate: string; nights: number; numberOfGuests: number; calculatedPrice: number; submittedAt: string }[] = [];
 	let legacyStats: { totalReservations: number; totalRevenue: number; totalNights: number; averagePrice: number } | null = null;
 	if (canManageGuests && tripId) {
@@ -388,6 +435,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 			: null,
 		guestRows,
 		removedRows,
+		parties,
 		summary: {
 			totalInvited,
 			goingCount,
