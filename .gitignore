@@ -50,3 +50,6 @@ logs
 
 # Debug HTML files (saved for price extraction debugging)
 debug-html/
+
+# Local page load benchmark log (PerfBadge)
+perf-log.csv

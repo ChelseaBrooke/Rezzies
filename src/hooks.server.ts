@@ -27,6 +27,8 @@ function hasTripEnded(checkOutDate: Date | null): boolean {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	const perfStart = performance.now();
+
 	// Attach user to locals once per request so child load functions can
 	// read event.locals.user without hitting the DB again.
 	event.locals.user = await getSessionUser(event.cookies);
@@ -63,5 +65,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	return resolve(event);
+	const response = await resolve(event);
+
+	// Expose total server time so the dev-only PerfBadge can read it via the
+	// browser's Server-Timing / resource-timing APIs. Cheap header, safe to
+	// leave on in prod (it's just a timing number, no PII).
+	const serverMs = performance.now() - perfStart;
+	response.headers.set('Server-Timing', `srv;dur=${serverMs.toFixed(1)};desc="server"`);
+
+	return response;
 };

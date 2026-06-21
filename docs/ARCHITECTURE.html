@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Divvi — Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1d4d4e;
+    --slate: #2F7778;
+    --slate-hover: #245a5b;
+    --beige: #E3CEAA;
+    --carrot: #F7AA29;
+    --warm: #CE5612;
+    --chocolate: #a5440e;
+    --sky: #7ACED3;
+    --sand: #E3CEAA;
+
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface-paper: #fbf9f6;
+    --surface-faint: #fafaf8;
+    --surface-attention: #fdf8f0;
+    --text: #111827;
+    --text-body: #374151;
+    --text-muted: #6b7280;
+    --border: rgba(47,119,120,0.18);
+    --border-soft: rgba(47,119,120,0.12);
+    --border-paper: #f0ede8;
+
+    --shadow-card: 0 18px 44px -24px rgba(47,119,120,0.22);
+    --shadow-paper: 0 30px 80px -30px rgba(10, 18, 22, 0.18);
+
+    --code-bg: #0f2c2d;
+    --code-text: #d8ede8;
+    --code-comment: #6f9a9c;
+    --code-keyword: #7ACED3;
+    --code-string: #F7AA29;
+    --code-fn: #E3CEAA;
+
+    --eyebrow-bg: rgba(206,86,18,0.1);
+    --eyebrow-border: rgba(206,86,18,0.25);
+
+    --hero-gradient: linear-gradient(135deg, rgba(227,206,170,0.55) 0%, rgba(227,206,170,0.18) 55%, rgba(255,255,255,0.96) 100%);
+
+    --radius-card: 20px;
+    --radius-btn: 12px;
+    --radius-pill: 999px;
+
+    --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-sans: 'Plus Jakarta Sans', Helvetica, Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    color: var(--text-body);
+    background: var(--bg);
+    line-height: 1.65;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .top-bar {
+    height: 4px;
+    background: linear-gradient(90deg, var(--warm) 0%, var(--carrot) 100%);
+    width: 100%;
+  }
+
+  /* Nav */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .nav-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .nav-brand {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--navy);
+    letter-spacing: -0.02em;
+    text-decoration: none;
+  }
+  .nav-brand span { color: var(--warm); }
+  .nav-doc-label {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .nav-links {
+    display: flex;
+    gap: 18px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .nav-links a {
+    color: var(--slate);
+    text-decoration: none;
+  }
+  .nav-links a:hover { color: var(--warm); }
+  @media (max-width: 840px) {
+    .nav-links { display: none; }
+  }
+
+  /* Hero */
+  .hero {
+    background: var(--hero-gradient);
+    border-bottom: 1px solid rgba(47,119,120,0.18);
+  }
+  .hero-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 60px 32px 64px;
+  }
+  .eyebrow {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--eyebrow-bg);
+    border: 1px solid var(--eyebrow-border);
+    color: var(--warm);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: var(--radius-pill);
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: clamp(2.25rem, 5vw, 3.75rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin: 0 0 16px;
+  }
+  .hero-sub {
+    font-size: 18px;
+    color: #475569;
+    max-width: 64ch;
+    margin: 0 0 24px;
+    line-height: 1.55;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .meta-chip {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--border-soft);
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    color: var(--slate);
+    font-weight: 500;
+  }
+  .meta-chip strong { color: var(--navy); font-weight: 600; }
+
+  /* Main */
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+  }
+  section {
+    margin-bottom: 56px;
+    scroll-margin-top: 80px;
+  }
+  .section-num {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 500;
+    color: var(--warm);
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+  }
+  h2 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: clamp(1.75rem, 2.8vw, 2.25rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 20px;
+  }
+  h3 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: 1.25rem;
+    line-height: 1.3;
+    margin: 28px 0 12px;
+    letter-spacing: -0.015em;
+  }
+  h4 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    color: var(--slate);
+    font-size: 0.85rem;
+    margin: 22px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  p { margin: 0 0 14px; }
+  ul, ol { padding-left: 22px; margin: 0 0 16px; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--navy); font-weight: 600; }
+  a { color: var(--warm); text-decoration: none; border-bottom: 1px solid rgba(206,86,18,0.3); }
+  a:hover { color: var(--chocolate); border-bottom-color: var(--chocolate); }
+
+  /* Inline code */
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: rgba(47,119,120,0.08);
+    color: var(--navy);
+    padding: 2px 6px;
+    border-radius: 5px;
+    border: 1px solid rgba(47,119,120,0.12);
+    white-space: nowrap;
+  }
+
+  /* Block code (deep teal panel) */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 20px 24px;
+    border-radius: 14px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 16px 0 20px;
+    box-shadow: 0 10px 30px -16px rgba(15,44,45,0.55);
+    border: 1px solid rgba(122,206,211,0.18);
+  }
+  pre code {
+    background: transparent;
+    color: inherit;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    white-space: pre;
+  }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 26px 30px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 18px;
+  }
+
+  /* Tables */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin: 16px 0 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  thead th {
+    background: rgba(47,119,120,0.06);
+    text-align: left;
+    padding: 12px 18px;
+    font-weight: 600;
+    color: var(--navy);
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  tbody td {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(122,206,211,0.05); }
+
+  /* TOC */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 22px 28px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 40px;
+  }
+  .toc-title {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--warm);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 6px 24px;
+  }
+  .toc-list li { margin: 0; }
+  .toc-list a {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    color: var(--navy);
+    border-bottom: none;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 4px 0;
+  }
+  .toc-list a:hover { color: var(--warm); }
+  .toc-list a span {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--warm);
+    font-weight: 500;
+    min-width: 22px;
+  }
+
+  /* TODO / concern callouts — for user to fill in during review */
+  .todo-block {
+    background: var(--surface-attention);
+    border: 1px dashed rgba(206,86,18,0.5);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin: 14px 0;
+    position: relative;
+  }
+  .todo-block::before {
+    content: 'TODO / REVIEW';
+    position: absolute;
+    top: -10px;
+    left: 18px;
+    background: var(--warm);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+  }
+  .todo-block p:last-child { margin-bottom: 0; }
+  .todo-block p { color: #7a5200; font-style: italic; }
+
+  /* Concern (broken decision / confusion to flag) */
+  .concern {
+    background: rgba(247,170,41,0.12);
+    border-left: 4px solid var(--carrot);
+    padding: 14px 18px;
+    border-radius: 0 10px 10px 0;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  .concern strong { color: #92660a; }
+
+  /* Inline TODO marker (for in-line review notes) */
+  .todo {
+    display: inline-block;
+    background: rgba(206,86,18,0.08);
+    color: var(--warm);
+    border: 1px dashed rgba(206,86,18,0.4);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+  }
+
+  /* Diagram block (ASCII renderings) */
+  .diagram {
+    background: rgba(47,119,120,0.04);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    padding: 20px 24px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--navy);
+    white-space: pre;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+
+  /* File path callout */
+  .file-path {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--slate);
+    background: rgba(122,206,211,0.12);
+    border: 1px solid rgba(47,119,120,0.18);
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+
+  /* Footer */
+  footer {
+    background: var(--navy);
+    color: rgba(255,255,255,0.7);
+    padding: 40px 32px 48px;
+    text-align: center;
+    margin-top: 48px;
+  }
+  footer .footer-inner { max-width: 1180px; margin: 0 auto; }
+  footer .footer-brand {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    color: #ffffff;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  footer .footer-brand span { color: var(--carrot); }
+  footer p { margin: 4px 0; font-size: 13px; }
+  footer a { color: var(--carrot); border-bottom-color: rgba(247,170,41,0.4); }
+
+  /* Print */
+  @media print {
+    .nav { display: none; }
+    body { background: white; }
+    .card, .table-wrap, .toc { box-shadow: none; break-inside: avoid; }
+    pre { background: #f4f5f7; color: var(--navy); border: 1px solid var(--border); }
+    section { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <div class="top-bar"></div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#top" class="nav-brand">divv<span>i</span> <span class="nav-doc-label" style="color: var(--text-muted); font-weight: 500; margin-left: 8px;">/ architecture</span></a>
+      <div class="nav-links">
+        <a href="#stack">Stack</a>
+        <a href="#repo">Repo</a>
+        <a href="#lifecycle">Lifecycle</a>
+        <a href="#auth">Auth</a>
+        <a href="#data">Data</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#reapproval">Re-approval</a>
+        <a href="#notifications">Notifications</a>
+        <a href="#integrations">Integrations</a>
+        <a href="#security">Security</a>
+        <a href="#deploy">Deploy</a>
+        <a href="#debt">Debt</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="hero-inner">
+      <span class="eyebrow">Engineering · Architecture</span>
+      <h1>How Divvi is built.</h1>
+      <p class="hero-sub">Companion to the PRD. The PRD describes <em>what</em> Divvi is; this doc describes <em>how it's built</em> — request lifecycle, pricing engine, cost re-approval, security model, and the technical debt to clean up.</p>
+      <div class="meta-row">
+        <span class="meta-chip"><strong>Updated:</strong>&nbsp;2026-06-14</span>
+        <span class="meta-chip"><strong>Owner:</strong>&nbsp;Brett Burbidge</span>
+        <span class="meta-chip"><strong>Pair with:</strong>&nbsp;<a href="./PRD.html" style="border:none;color:var(--slate)">PRD.html</a></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <nav class="toc" aria-label="Table of contents">
+      <div class="toc-title">Contents</div>
+      <ol class="toc-list">
+        <li><a href="#stack"><span>01</span> Stack at a glance</a></li>
+        <li><a href="#repo"><span>02</span> Repo layout</a></li>
+        <li><a href="#lifecycle"><span>03</span> Request lifecycle</a></li>
+        <li><a href="#auth"><span>04</span> Auth &amp; sessions</a></li>
+        <li><a href="#data"><span>05</span> Data model</a></li>
+        <li><a href="#pricing"><span>06</span> Pricing engine</a></li>
+        <li><a href="#reapproval"><span>07</span> Cost re-approval</a></li>
+        <li><a href="#notifications"><span>08</span> Notifications</a></li>
+        <li><a href="#integrations"><span>09</span> Integrations</a></li>
+        <li><a href="#api"><span>10</span> API surface</a></li>
+        <li><a href="#security"><span>11</span> Security model</a></li>
+        <li><a href="#deploy"><span>12</span> Deployment</a></li>
+        <li><a href="#perf"><span>13</span> Performance</a></li>
+        <li><a href="#debt"><span>14</span> Tech debt</a></li>
+      </ol>
+    </nav>
+
+    <div class="card" style="background: var(--surface-paper); border-color: var(--border-paper);">
+      <strong style="color: var(--warm); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 8px;">How to review this doc</strong>
+      <p style="margin-bottom: 8px;">Look for the dashed orange <span class="todo">TODO</span> tags inline and the orange <strong>TODO / REVIEW</strong> blocks. Add notes to the markdown twin (<code>docs/ARCHITECTURE.md</code>) or just call them out and I'll patch both files.</p>
+      <p style="margin-bottom: 0;">Yellow <em>concern</em> bars mark things I think are confused or broken-by-decision — your call whether to fix or accept.</p>
+    </div>
+
+    <section id="stack">
+      <span class="section-num">Section 01</span>
+      <h2>Stack at a glance</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th style="width: 22%">Layer</th><th style="width: 30%">Choice</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Framework</td><td><strong>SvelteKit 2.x</strong></td><td>Form actions for SSR routes; <code>+server.ts</code> for REST</td></tr>
+            <tr><td>UI</td><td><strong>Svelte 5</strong> (runes)</td><td>Per-component CSS; design tokens in <span class="file-path">src/styles/theme.css</span></td></tr>
+            <tr><td>Language</td><td><strong>TypeScript 5.x</strong></td><td><code>svelte-check</code> for type/diagnostics</td></tr>
+            <tr><td>Build / dev</td><td><strong>Vite 7.x</strong></td><td><code>npm run dev</code> for HMR, <code>npm run build</code> for adapter output</td></tr>
+            <tr><td>Adapter</td><td><strong>@sveltejs/adapter-vercel</strong></td><td>Produces Vercel-native serverless output</td></tr>
+            <tr><td>Runtime</td><td><strong>Node 20.x</strong></td><td><code>engines.node</code> pinned in <code>package.json</code></td></tr>
+            <tr><td>DB</td><td><strong>PostgreSQL</strong> via Supabase</td><td>Pooled (<code>6543</code>) for app, direct (<code>5432</code>) for migrations</td></tr>
+            <tr><td>ORM</td><td><strong>Prisma 5.x</strong></td><td>Schema at <span class="file-path">prisma/schema.prisma</span>; <code>postinstall</code> regenerates client</td></tr>
+            <tr><td>Auth</td><td><strong>Native password</strong> (bcryptjs) + DB sessions</td><td>No Supabase auth, no OAuth</td></tr>
+            <tr><td>Email</td><td><strong>Resend</strong></td><td>HTML templates rendered server-side in <span class="file-path">src/lib/server/email/render/</span></td></tr>
+            <tr><td>Payments</td><td><strong>Stripe</strong></td><td>Single PaymentIntent flow: $25 publish fee</td></tr>
+            <tr><td>Maps</td><td><strong>Google Maps JS</strong> + <strong>Places</strong></td><td>Client autocomplete + server Nearby Search</td></tr>
+            <tr><td>Hosting</td><td><strong>Vercel</strong> (region <code>iad1</code>)</td><td>Single project, single region</td></tr>
+            <tr><td>Tests</td><td><strong>Vitest</strong> (unit) + <strong>Playwright</strong> (E2E)</td><td>E2E suite under <span class="file-path">/e2e/</span>; pass-state unverified</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="repo">
+      <span class="section-num">Section 02</span>
+      <h2>Repo layout</h2>
+      <p>Annotated tree of the parts that matter for understanding the system. Components and route leaves elided for brevity.</p>
+<pre><code>src/
+├── app.css, app.html            # SvelteKit entry
+├── hooks.server.ts              # Auth + write-gate + Server-Timing header
+├── routes/
+│   ├── +layout.svelte           # App shell (header, nav, modals)
+│   ├── +page.svelte             # Public homepage
+│   ├── (auth)/                  # signup, login, logout
+│   ├── trips/
+│   │   ├── new/                 # Multi-step wizard
+│   │   └── [tripId]/            # Trip dashboard + sub-routes
+│   │       ├── rooms/, guests/, settings/, publish/, payments/, invoice/, files/
+│   │       ├── rsvp/, join/
+│   │       └── itinerary/, activities/, polls/, games/, chat/
+│   ├── messages/                # Direct user-to-user DMs
+│   ├── settings/                # User account settings
+│   └── api/                     # REST + form-action helpers
+│       ├── trips/[tripId]/...   # Trip CRUD, rooms, beds, invoices, re-approval
+│       ├── stripe/              # PaymentIntent creation + verification
+│       ├── activities/search    # Google Places proxy
+│       ├── cron/                # waitlist, emails, polls
+│       ├── mobile/auth          # Native-app login/register endpoint
+│       └── ...
+├── lib/
+│   ├── components/              # Svelte UI components
+│   ├── server/                  # Server-only modules
+│   │   ├── prisma.ts            # Singleton Prisma client
+│   │   ├── session.ts           # DB-backed session cookies
+│   │   ├── pricing.ts           # Public entry: calculatePrice()
+│   │   ├── pricing-canonical.ts # Per-bed canonical math + bed weighting
+│   │   ├── cost-reapproval.ts   # Asymmetric re-approval evaluator
+│   │   ├── invoice-calculator.ts
+│   │   ├── stripe.ts            # Publish-fee PaymentIntent + verification
+│   │   ├── notification-service.ts
+│   │   ├── cron-email-service.ts
+│   │   ├── api-protection.ts    # X-Internal-Api-Key gate
+│   │   ├── cron-auth.ts         # Bearer CRON_SECRET gate
+│   │   ├── mobile-cors.ts       # CORS for /api/mobile/*
+│   │   ├── validation.ts        # Zod schemas
+│   │   ├── trip-access.ts, trip-games-guard.ts
+│   │   └── email/               # Resend templates + brand tokens
+│   ├── stores/                  # Client-side Svelte stores
+│   ├── config/features.ts       # FEATURE_TRIP_GAMES flag
+│   └── utils/
+└── styles/theme.css             # Design tokens (palette + shadows + radii)
+
+prisma/
+├── schema.prisma                # ~30 models
+├── migrations/
+└── seed.ts
+
+e2e/                             # Playwright tests
+scripts/                         # Vocabulary linter + utilities
+static/                          # Public assets
+</code></pre>
+    </section>
+
+    <section id="lifecycle">
+      <span class="section-num">Section 03</span>
+      <h2>Request lifecycle</h2>
+      <p>Every request flows through <span class="file-path">src/hooks.server.ts</span> → SvelteKit router → either a route's <code>+page.server.ts</code> <code>load</code>/form actions, or a <code>+server.ts</code> REST handler.</p>
+
+      <div class="diagram">Browser
+   │
+   ▼
+hooks.server.ts                  (src/hooks.server.ts)
+   │   1. event.locals.user = await getSessionUser(cookies)
+   │   2. ~1% chance: fire-and-forget cleanupExpiredSessions()
+   │   3. If POST/PUT/PATCH/DELETE to a trip-edit route AND trip ended → 403
+   │   4. await resolve(event)
+   │   5. Set Server-Timing header for the dev PerfBadge
+   ▼
+SvelteKit Router
+   │
+   ├──► /routes/.../+page.server.ts   (load + form actions)
+   │       │
+   │       ▼
+   │   Server logic → Prisma → Supabase Postgres
+   │
+   └──► /routes/api/.../+server.ts    (REST handler)
+           │
+           ▼
+       Server logic → Prisma / Stripe / Google / Resend</div>
+
+      <h3>Key properties</h3>
+      <ul>
+        <li><strong>Single auth checkpoint.</strong> <code>event.locals.user</code> is hydrated once in <span class="file-path">hooks.server.ts:34</span>; downstream handlers read it without touching the DB again.</li>
+        <li><strong>No middleware chain.</strong> SvelteKit doesn't have Express-style middleware. Cross-cutting concerns (auth, key checks, CORS) are explicit helper calls inside each handler.</li>
+        <li><strong>Lazy maintenance.</strong> Session GC piggybacks on real traffic (1% probability per request) instead of a dedicated cron.</li>
+        <li><strong>Closed-trip write gate.</strong> Lines <code>43–66</code> block writes to <code>/trips/[tripId]/(guests|itinerary|rooms|settings)</code> and <code>/api/trips/[tripId]/update</code> once <code>checkOutDate</code> is in the past.</li>
+      </ul>
+
+      <div class="concern"><strong>Concern:</strong> the closed-trip gate covers four route prefixes and one API path explicitly. Any new write endpoint added outside this list (<em>e.g.</em> a new <code>/api/trips/[tripId]/rooms/...</code> write) won't be gated automatically. Worth replacing with a per-handler guard helper.</div>
+
+      <div class="todo-block">
+        <p><strong>Reviewer note space.</strong> Anything about the lifecycle that doesn't match how it actually behaves? Add notes here or to the markdown twin.</p>
+      </div>
+    </section>
+
+    <section id="auth">
+      <span class="section-num">Section 04</span>
+      <h2>Auth &amp; sessions</h2>
+      <p>Pure native-password + DB session cookies. No third-party identity provider, no OAuth.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width: 28%">Concern</th><th>Implementation</th></tr></thead>
+          <tbody>
+            <tr><td>Password hashing</td><td>bcryptjs at signup/login (<span class="file-path">src/lib/server/user-auth.ts</span>)</td></tr>
+            <tr><td>Session model</td><td>Prisma <code>Session</code> row — <code>userId</code>, opaque UUID <code>token</code>, <code>expiresAt</code></td></tr>
+            <tr><td>Web cookie</td><td><code>user_session</code> · <code>httpOnly</code> · <code>sameSite=strict</code> · <code>secure</code> in prod · <strong>7-day TTL</strong></td></tr>
+            <tr><td>Mobile token</td><td>Same <code>Session</code> table, <strong>90-day TTL</strong>, issued via <code>/api/mobile/auth</code>, sent as Bearer header</td></tr>
+            <tr><td>Logout</td><td><code>destroySession()</code> deletes the row + clears the cookie</td></tr>
+            <tr><td>GC</td><td><code>cleanupExpiredSessions()</code> fires ~1% of requests from <code>hooks.server.ts</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>requireAuth()</code> wraps <code>getSessionUser()</code> and returns <code>null</code> when no user — handlers throw <code>redirect(302, '/login')</code> themselves. This is per-handler, not a global gate.</p>
+
+      <div class="concern"><strong>Concern:</strong> the 7-day web cookie / 90-day mobile token split is arbitrary. If the same <code>Session</code> table is shared but TTL differs based on issue site, a long-lived mobile token compromised on a device persists much longer than a web session. Document the threat model or unify.</div>
+    </section>
+
+    <section id="data">
+      <span class="section-num">Section 05</span>
+      <h2>Data model — orientation</h2>
+      <p>Full schema is in <span class="file-path">prisma/schema.prisma</span>. <code>Trip</code> is the center of the graph.</p>
+      <div class="diagram">                    User ──┬── Session
+                           ├── RSVP ──── Trip
+                           ├── TripMember
+                           ├── Invoice
+                           ├── ChatMessage / DirectMessage
+                           ├── Notification
+                           ├── Friendship / FriendRequest
+                           └── HouseholdMember
+
+       Trip ──┬── Room ── Bed
+              ├── RoomAssignment
+              ├── RSVP
+              ├── Household ── HouseholdMember
+              ├── Activity ── ActivityParticipant
+              ├── MealPlan ── MealSlot ── MealSlotAttendance
+              ├── Poll ── PollOption / PollVote / PollWatcher
+              ├── CaptionThisRound ── Caption / Vote
+              ├── TripGame
+              ├── Invite
+              ├── Invoice
+              ├── ExtraCostRule ── GuestExtraSelection
+              ├── ChatMessage
+              ├── TripFile
+              └── TripActivity (append-only log)</div>
+
+      <h3>Pricing-critical fields on Trip</h3>
+      <ul>
+        <li><code>pricingModel</code> — <code>PER_PERSON | PER_PERSON_PER_NIGHT | PER_ROOM | PER_BED</code></li>
+        <li><code>totalCost</code>, <code>costSharingEnabled</code></li>
+        <li><code>bedWeights</code> (JSON), <code>sharingExponentAlpha</code>, <code>privacyPremiumP</code> — backend tuning knobs (PRD §5.1)</li>
+        <li><code>publishFeePaymentIntentId</code> — uniqueness gate for the $25 fee</li>
+      </ul>
+
+      <h3>Cost-re-approval fields on RSVP</h3>
+      <ul>
+        <li><code>acceptedEstimateLowCents</code>, <code>acceptedEstimateHighCents</code> — the range the guest accepted at RSVP time</li>
+        <li><code>originalRangeMinCents</code>, <code>originalRangeMaxCents</code> — frozen originals</li>
+        <li><code>approvedCostShareCents</code> — most recent re-approved share (raises the ceiling)</li>
+        <li><code>costApprovalStatus</code> (<code>approved | pending | hostApproved</code>), <code>costReapprovalReason</code>, <code>reApprovalDeadline</code></li>
+      </ul>
+
+      <div class="concern"><strong>Confusion:</strong> two parallel sources of truth for the accepted range — <code>(originalRangeMinCents, originalRangeMaxCents)</code> and <code>(acceptedEstimateLowCents, acceptedEstimateHighCents)</code>. <code>cost-reapproval.ts:64–65</code> falls back from one to the other (<code>origMax ?? acceptedEstimateHighCents</code>) — implying historical migration. Worth deciding which is canonical and dropping the other.</div>
+
+      <p><strong>Legacy / superseded</strong> (audit before deleting): <code>Reservation</code>, <code>GuestSubmission</code>.</p>
+    </section>
+
+    <section id="pricing">
+      <span class="section-num">Section 06</span>
+      <h2>Pricing engine</h2>
+      <p>Three forms of the same enum coexist — keep them straight:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Form</th><th>Example</th></tr></thead>
+          <tbody>
+            <tr><td>DB / REST API</td><td><code>lowercase_underscore</code></td><td><code>per_bed</code></td></tr>
+            <tr><td>Canonical (server math)</td><td><code>UPPER_SNAKE</code></td><td><code>PER_BED</code></td></tr>
+            <tr><td>UI / wizard</td><td><code>kebab-case</code></td><td><code>per-bed</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="concern"><strong>Confusion:</strong> three forms of the same enum across the codebase. Translation lives in a comment at the top of <span class="file-path">pricing.ts</span>; <code>calculatePrice()</code> normalizes via <code>.toLowerCase()</code> and accepts both DB and canonical. Worth collapsing to one canonical form across all layers — pure technical debt.</div>
+
+      <h3>6.1 Flow</h3>
+<pre><code>+page.server.ts / +server.ts
+        │
+        ▼
+calculatePrice(params)        (pricing.ts)
+        │ switch on pricingModel
+        │
+        ├── per_room      → calculatePerRoomPrice()
+        ├── per_person    → flat totalCost / headcount
+        ├── per_person_per_night → totalCost / headcount / nights
+        └── per_bed       → delegates to calculateReservationPrice()
+                                          (pricing-canonical.ts)</code></pre>
+
+      <h3>6.2 Per-bed math (canonical model)</h3>
+      <p><span class="file-path">pricing-canonical.ts</span> (1,200+ lines) implements the bed-weighting + privacy-premium model. The file references a <code>PRICING.md</code> cross-reference for the formula. High-level shape:</p>
+      <ul>
+        <li>Each <code>Bed</code> has a <strong>weight</strong> by type (<code>DEFAULT_BED_WEIGHTS</code>: king &gt; queen &gt; full &gt; twin &gt; sofa &gt; bunk).</li>
+        <li>Each <code>Room</code> has a <strong>privacy factor</strong> (default 1.0; private rooms up to 1.25).</li>
+        <li>Trip total $ is allocated across all sleep slots based on <code>bedWeight × roomPrivacy</code>, then multiplied by occupancy fraction per slot.</li>
+        <li><code>effectiveSleepSlots()</code> computes how many slots a bed counts for given current occupancy.</li>
+        <li><code>quoteForUserId</code> + <code>provisionalPick</code> let the quote flow simulate "what would this cost if I picked this bed?" without persisting.</li>
+      </ul>
+      <p><strong>None of these knobs are host-facing.</strong> Hosts pick a model; the rest is server-side tuning the team can adjust by editing constants.</p>
+
+      <div class="concern"><strong>Concern:</strong> the comment block in <code>pricing-canonical.ts</code> calls <code>sharingExponentAlpha</code> and <code>privacyPremiumP</code> "legacy" — but they're still part of the <code>PricingSettings</code> interface and stored on <code>Trip</code>. If they're legacy, deprecate and drop; if they're live, remove the "legacy" comment.</div>
+
+      <div class="todo-block">
+        <p><strong>Reviewer note space — pricing engine.</strong> If <code>PRICING.md</code> exists somewhere with the actual formula, link it here. If not, worth writing.</p>
+      </div>
+    </section>
+
+    <section id="reapproval">
+      <span class="section-num">Section 07</span>
+      <h2>Cost re-approval</h2>
+      <p>Implemented in <span class="file-path">src/lib/server/cost-reapproval.ts</span>. The rule (PRD §5.2): an RSVP gets <code>costApprovalStatus = 'pending'</code> whenever its invoice total exceeds its personal ceiling. <strong>Decreases never trigger.</strong></p>
+
+      <h3>7.1 When the evaluator runs</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Caller</th><th>When</th></tr></thead>
+          <tbody>
+            <tr><td><span class="file-path">invoice-calculator.ts:201, :217</span></td><td>After any invoice recompute (host changes, activity added, room/bed shuffled)</td></tr>
+            <tr><td><span class="file-path">/api/trips/[tripId]/cost-reapproval/withdraw/+server.ts:85</span></td><td>After a guest withdraws an RSVP (fewer splitters → others' shares go up)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>It is <strong>idempotent</strong> — RSVPs already <code>pending</code> are skipped (<code>cost-reapproval.ts:58</code>).</p>
+
+      <h3>7.2 The asymmetric check</h3>
+<pre><code>const ceiling = r.approvedCostShareCents ?? origMax;
+if (currentCents &lt;= ceiling) continue;   // decreases or in-range: no-op
+// else: mark pending, notify, set deadline</code></pre>
+      <ul>
+        <li><strong>Ceiling</strong> = most recently re-approved share, or the original accepted high.</li>
+        <li><strong>On approval</strong>, <code>approvedCostShareCents</code> is updated to the new value → ceiling rises → range only expands.</li>
+        <li><strong>Deadline</strong> = 48 hours before <code>Trip.checkInDate</code> (<code>cost-reapproval.ts:4–8</code>).</li>
+        <li><strong>Notification fan-out</strong>: writes a <code>Notification</code> row + sends a Resend email via <code>sendCostShareReapprovalToGuest</code>.</li>
+      </ul>
+
+      <h3>7.3 Decreases</h3>
+      <p>Intentionally a no-op (PRD §5.2). The guest sees the lower share next time they log in. Keeps re-approval traffic focused on the only thing that matters: someone potentially owing more than they agreed to.</p>
+
+      <div class="todo-block">
+        <p><strong>Reviewer note space — re-approval.</strong> Does the 48-hour-before-checkin deadline match how you want it to behave? What happens to a guest who doesn't re-approve before the deadline — auto-withdraw, host decides, or status sticks?</p>
+      </div>
+    </section>
+
+    <section id="notifications">
+      <span class="section-num">Section 08</span>
+      <h2>Notifications</h2>
+      <p><strong>Event-driven by default</strong> (PRD §5.10). Almost every notification — invite received, RSVP accepted, room assigned, cost re-approval needed, waitlist promotion — fires in real time at the moment the event happens, via <span class="file-path">src/lib/server/notification-service.ts</span>.</p>
+      <p>Each event writes a <code>Notification</code> row (in-app) and conditionally calls Resend (email) based on the user's notification preferences.</p>
+
+      <h3>8.1 Scheduled jobs</h3>
+      <p><strong>Current</strong> <code>vercel.json</code> (will be slimmed for MVP):</p>
+<pre><code>{
+  "crons": [
+    { "path": "/api/cron/waitlist", "schedule": "0 12 * * *"  },
+    { "path": "/api/cron/emails",   "schedule": "15 12 * * *" },
+    { "path": "/api/cron/polls",    "schedule": "30 12 * * *" }
+  ]
+}</code></pre>
+
+      <p><strong>Planned for MVP</strong> — only poll lifecycle nudges, three times daily at 7am / 12pm / 8pm ET:</p>
+<pre><code>{
+  "crons": [
+    { "path": "/api/cron/polls", "schedule": "0 11 * * *" },   // 7am ET (UTC-4)
+    { "path": "/api/cron/polls", "schedule": "0 16 * * *" },   // 12pm ET
+    { "path": "/api/cron/polls", "schedule": "0 0 * * *"  }    // 8pm ET
+  ]
+}</code></pre>
+
+      <div class="concern"><strong>Concern (DST drift):</strong> Vercel crons run in UTC. The 7am/12pm/8pm ET targets drift one hour at DST boundaries. Acceptable for MVP; for year-round precision, move the schedule decision into the handler.</div>
+
+      <p><code>/api/cron/waitlist</code> and <code>/api/cron/emails</code> are slated for removal. <strong>Audit the upstream callers in <code>cron-email-service.ts</code> first</strong> — any event that currently relies on the batched send needs to be wired to the event-driven path before the cron is deleted.</p>
+
+      <h3>8.2 Cron auth</h3>
+      <p><span class="file-path">src/lib/server/cron-auth.ts</span> — if <code>CRON_SECRET</code> is set, the handler requires <code>Authorization: Bearer &lt;CRON_SECRET&gt;</code>. Vercel injects this header automatically when calling its own cron endpoints. Returns 401 when invalid; <strong>silently allows when unset</strong> (so local invocation works).</p>
+
+      <div class="concern"><strong>Concern:</strong> "silently allows when unset" is fine for dev but means a production deploy with missing <code>CRON_SECRET</code> leaves cron endpoints world-callable. Consider failing hard in production builds.</div>
+    </section>
+
+    <section id="integrations">
+      <span class="section-num">Section 09</span>
+      <h2>External integrations</h2>
+
+      <h3>9.1 Stripe</h3>
+      <p>Single flow: the $25 publish fee. File: <span class="file-path">src/lib/server/stripe.ts</span>.</p>
+      <ul>
+        <li><strong>Key pairing guard</strong> refuses to start if <code>STRIPE_SECRET_KEY</code> and <code>STRIPE_PUBLISHABLE_KEY</code> are on different test/live modes (lines 25–50). Catches a common deployment footgun.</li>
+        <li><strong>PaymentIntent</strong>: card-only (<code>payment_method_types: ['card']</code>) — hides Klarna / Amazon Pay / redirect-based methods.</li>
+        <li><strong>Metadata</strong>: <code>userId</code>, <code>purpose: 'platform_publish_fee'</code>, optional <code>tripId</code>.</li>
+        <li><strong>Replay protection</strong> (<code>verifyPublishPaymentIntent</code>, lines 104–145):
+          <ul>
+            <li>status must be <code>succeeded</code></li>
+            <li>amount must equal <code>PLATFORM_PUBLISH_FEE_CENTS</code> (2500)</li>
+            <li>currency must be <code>usd</code></li>
+            <li><code>purpose</code> and <code>userId</code> in metadata must match</li>
+            <li><strong><code>publishFeePaymentIntentId</code> must not already exist on any Trip</strong> — one PaymentIntent = one publish</li>
+          </ul>
+        </li>
+        <li><strong>No webhooks.</strong> Verification is request/response — the trip page polls <code>/api/stripe/verify</code> after the Payment Element confirms.</li>
+      </ul>
+
+      <div class="concern"><strong>Concern (no webhooks):</strong> request/response verification means a successful Stripe payment with a flaky network on the return trip can leave a guest charged but the trip not marked published. The metadata replay-protection makes retry safe — the same PaymentIntent can verify on a refresh — but the user-facing failure mode needs a clear retry path. Worth testing.</div>
+
+      <h3>9.2 Google APIs</h3>
+      <ul>
+        <li><strong>Client:</strong> <code>@googlemaps/js-api-loader</code> + <code>VITE_GOOGLE_MAPS_API_KEY</code> → Places Autocomplete for the wizard's location field.</li>
+        <li><strong>Server:</strong> <code>GOOGLE_PLACES_API_KEY</code> → Nearby Search / Text Search / Geocoding via <code>/api/trips/[tripId]/activities/discover</code>.</li>
+      </ul>
+      <p>Keys are distinct because the client one is publicly visible (should be domain-restricted in Google Cloud); the server one should be IP-restricted to Vercel egress.</p>
+
+      <h3>9.3 Resend</h3>
+      <p>Transactional email. Templates live in <span class="file-path">src/lib/server/email/render/</span>. Brand tokens come from <span class="file-path">src/lib/server/email/brand.ts</span>, which mirrors <code>theme.css</code> (emails can't use CSS variables, so hex codes are duplicated).</p>
+      <p>Env: <code>RESEND_API_KEY</code>, <code>RESEND_FROM_EMAIL</code> (verified domain), <code>RESEND_FROM_NAME</code>, optional <code>EMAIL_LOGO_URL</code>.</p>
+
+      <h3>9.4 Supabase</h3>
+      <p>Used <strong>only for the Postgres database</strong>. The codebase imports <code>@supabase/supabase-js</code> but auth is fully native (bcryptjs + DB sessions). The Supabase service-role key is set but not exercised for auth.</p>
+      <ul>
+        <li>App connection: Supabase <strong>pooler</strong> on port <code>6543</code></li>
+        <li>Migrations: <strong>direct</strong> connection on port <code>5432</code></li>
+      </ul>
+
+      <div class="concern"><strong>Concern:</strong> if Supabase auth isn't used, why is the SDK imported? Either remove the dependency or document where it's needed. Carrying a 60kb SDK for no reason is debt.</div>
+    </section>
+
+    <section id="api">
+      <span class="section-num">Section 10</span>
+      <h2>API surface</h2>
+
+      <h3>10.1 Web</h3>
+      <p>REST endpoints at <code>/api/*</code> are SvelteKit <code>+server.ts</code> files. Conventions:</p>
+      <ul>
+        <li><strong>Input validation</strong> via Zod schemas in <span class="file-path">src/lib/server/validation.ts</span>. <code>createErrorResponse(code, message)</code> standardizes error shape.</li>
+        <li><strong>Authn check</strong> is per-handler (no global middleware). Write endpoints typically call <code>requireAuth()</code> then <code>requireTripAccess()</code>.</li>
+        <li><strong>Internal-only writes</strong> gate with <code>requireInternalApiKey(event)</code> and require <code>X-Internal-Api-Key</code>.</li>
+        <li><strong>Rate limit</strong> via <span class="file-path">rate-limit.ts</span> (in-memory token bucket; single-region appropriate).</li>
+      </ul>
+
+      <h3>10.2 Mobile</h3>
+      <p><code>/api/mobile/auth</code> handles login/register for a future native client.</p>
+      <ul>
+        <li><strong>Token-based</strong>: returns a session token in the JSON body; client supplies as <code>Authorization: Bearer …</code> on subsequent calls.</li>
+        <li><strong>90-day TTL</strong> for mobile sessions (web is 7 days).</li>
+        <li><strong>CORS</strong>: <span class="file-path">src/lib/server/mobile-cors.ts</span> returns permissive headers for native clients. The web app does <strong>not</strong> use these endpoints.</li>
+      </ul>
+      <p>Native app isn't in v1 scope (PRD §6), but the surface is preserved.</p>
+
+      <div class="concern"><strong>Concern:</strong> a scaffolded API with no consumer drifts. Either ship the native app or freeze the mobile contract and version it — otherwise future schema changes will silently break a not-yet-built client.</div>
+    </section>
+
+    <section id="security">
+      <span class="section-num">Section 11</span>
+      <h2>Security model</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Concern</th><th>Mechanism</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td>Web session</td><td><code>user_session</code> cookie · httpOnly + sameSite=strict + secure</td><td><code>session.ts</code></td></tr>
+            <tr><td>Mobile session</td><td>Bearer token · 90-day TTL · CORS-restricted endpoint</td><td><code>/api/mobile/auth</code>, <code>mobile-cors.ts</code></td></tr>
+            <tr><td>Password storage</td><td>bcryptjs</td><td><code>user-auth.ts</code></td></tr>
+            <tr><td>Internal-only API writes</td><td><code>X-Internal-Api-Key</code> header</td><td><code>api-protection.ts</code></td></tr>
+            <tr><td>Cron endpoints</td><td><code>Authorization: Bearer $CRON_SECRET</code> (when set)</td><td><code>cron-auth.ts</code></td></tr>
+            <tr><td>Stripe replay</td><td>Once-only PaymentIntent ID stored on Trip</td><td><code>stripe.ts:136–142</code></td></tr>
+            <tr><td>Closed-trip write gate</td><td>403 on edit routes after <code>checkOutDate</code></td><td><code>hooks.server.ts:43–66</code></td></tr>
+            <tr><td>Trip-membership check</td><td><code>requireTripAccess()</code></td><td><code>trip-access.ts</code></td></tr>
+            <tr><td>Input validation</td><td>Zod schemas</td><td><code>validation.ts</code></td></tr>
+            <tr><td>Rate limiting</td><td>In-memory token bucket</td><td><code>rate-limit.ts</code></td></tr>
+            <tr><td>Session GC</td><td>Lazy 1%-per-request cleanup</td><td><code>hooks.server.ts:37</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>No CSRF tokens.</strong> SvelteKit form actions ship with built-in same-origin CSRF protection; same-origin enforcement is enabled by default.</p>
+      <p><strong>Known gaps:</strong> No Sentry / error tracking. No structured audit log beyond the trip-scoped <code>TripActivity</code> append-only model. No analytics or anomaly detection.</p>
+
+      <div class="todo-block">
+        <p><strong>Reviewer note space — security.</strong> Anything in the threat model that's not covered here? Worth a row in the table?</p>
+      </div>
+    </section>
+
+    <section id="deploy">
+      <span class="section-num">Section 12</span>
+      <h2>Deployment</h2>
+      <ul>
+        <li><strong>Adapter:</strong> <code>@sveltejs/adapter-vercel</code> → Vercel serverless functions (Node 20 runtime).</li>
+        <li><strong>Region:</strong> <code>iad1</code> (US-East). Single region, matching the US-only launch.</li>
+        <li><strong>Build:</strong> <code>npm run build</code>. <code>postinstall</code> regenerates the Prisma client.</li>
+        <li><strong>DB migrations:</strong> <code>prisma migrate deploy</code> (<code>npm run db:migrate</code>). <span class="todo">CI doesn't gate on this</span> — run manually before app deploy when schema changes.</li>
+      </ul>
+
+      <h3>Required env vars</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Group</th><th>Vars</th></tr></thead>
+          <tbody>
+            <tr><td>Database</td><td><code>DATABASE_URL</code> (pooler), <code>DIRECT_URL</code> (direct, for migrations)</td></tr>
+            <tr><td>Supabase</td><td><code>PUBLIC_SUPABASE_URL</code>, <code>PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code></td></tr>
+            <tr><td>Stripe</td><td><code>STRIPE_SECRET_KEY</code>, <code>STRIPE_PUBLISHABLE_KEY</code> (or <code>STRIPE_PUBLIC_KEY</code>) — same mode</td></tr>
+            <tr><td>Google</td><td><code>VITE_GOOGLE_MAPS_API_KEY</code> (client, domain-restricted), <code>GOOGLE_PLACES_API_KEY</code> (server, IP-restricted)</td></tr>
+            <tr><td>Resend</td><td><code>RESEND_API_KEY</code>, <code>RESEND_FROM_EMAIL</code>, <code>RESEND_FROM_NAME</code>, optional <code>EMAIL_LOGO_URL</code></td></tr>
+            <tr><td>Auth / misc</td><td><code>INTERNAL_API_KEY</code> (required), <code>CRON_SECRET</code> (recommended), <code>APP_BASE_URL</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="todo-block">
+        <p><strong>Reviewer note space — deployment.</strong> Missing any env vars from this list? Anything that needs to move from .env to Vercel secrets or vice versa?</p>
+      </div>
+    </section>
+
+    <section id="perf">
+      <span class="section-num">Section 13</span>
+      <h2>Performance</h2>
+      <ul>
+        <li><strong>Server-Timing header</strong> added in <span class="file-path">hooks.server.ts:73</span>. A dev-only <code>&lt;PerfBadge&gt;</code> reads it client-side via the <code>Server-Timing</code> / Resource Timing APIs.</li>
+        <li><strong>Lazy session GC</strong> (1% per-request probability) avoids a separate scheduled job.</li>
+        <li><strong>Prisma client singleton</strong> avoids cold-start connection storms.</li>
+        <li><strong>Postgres connection pooler</strong> (Supabase 6543) handles per-function-invocation connections.</li>
+        <li><strong><code>web-vitals</code></strong> package is installed — wire-up TBD; no visible reporting endpoint.</li>
+      </ul>
+
+      <div class="concern"><strong>Concern:</strong> <code>web-vitals</code> is a dependency with no apparent consumer. Either wire it to a reporting endpoint (Vercel Analytics, custom) or remove.</div>
+    </section>
+
+    <section id="debt">
+      <span class="section-num">Section 14</span>
+      <h2>Known technical debt</h2>
+      <ol>
+        <li><strong>Legacy models.</strong> <code>Reservation</code> and <code>GuestSubmission</code> look superseded by <code>RSVP + RoomAssignment</code>. Audit before deleting.</li>
+        <li><strong>No error tracking.</strong> Sentry (or equivalent) needs to land before public launch.</li>
+        <li><strong>No analytics / event instrumentation.</strong> Re-approval funnel data is the single most important thing to measure.</li>
+        <li><strong>E2E test status unknown.</strong> Playwright tests exist in <span class="file-path">/e2e/</span> — confirm pass/fail status, wire into CI.</li>
+        <li><strong>Cron cleanup pending.</strong> <code>waitlist</code> and <code>emails</code> crons to be removed; upstream callers need event-driven rewiring first.</li>
+        <li><strong>DST drift on cron schedule.</strong> Vercel crons run UTC; ET targets drift one hour at DST boundaries.</li>
+        <li><strong>In-memory rate limiter</strong> won't survive multi-region deployment. Fine for <code>iad1</code>-only MVP.</li>
+        <li><strong>Mobile API scaffold</strong> is in place but unused. Ship the app or freeze and document.</li>
+        <li><strong><code>@sveltejs/adapter-auto</code></strong> in <code>devDependencies</code> alongside <code>adapter-vercel</code>. Config uses <code>adapter-vercel</code>; remove the auto package.</li>
+        <li><strong>Pricing enum tri-form</strong> (DB / canonical / UI) — collapse to one form.</li>
+        <li><strong>Two RSVP range sources</strong> (<code>originalRange*</code> vs <code>acceptedEstimate*</code>) — pick canonical.</li>
+        <li><strong><code>@supabase/supabase-js</code></strong> imported but not used for auth — drop the SDK if not needed.</li>
+        <li><strong><code>web-vitals</code></strong> installed but no consumer — wire or drop.</li>
+        <li><strong>"Legacy" knobs still live.</strong> <code>sharingExponentAlpha</code>, <code>privacyPremiumP</code> are tagged legacy in code but persisted on Trip and read by the pricing engine.</li>
+      </ol>
+
+      <div class="todo-block">
+        <p><strong>Reviewer note space — debt.</strong> Add or strike items. Anything here you want to actively schedule for v1, vs accept as v1.1 cleanup?</p>
+      </div>
+    </section>
+
+    <section id="appendix">
+      <span class="section-num">Appendix</span>
+      <h2>Where to find things</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Looking for</th><th>Open</th></tr></thead>
+          <tbody>
+            <tr><td>Pricing math</td><td><span class="file-path">src/lib/server/pricing-canonical.ts</span></td></tr>
+            <tr><td>Cost re-approval rule</td><td><span class="file-path">src/lib/server/cost-reapproval.ts</span></td></tr>
+            <tr><td>Auth &amp; sessions</td><td><span class="file-path">src/lib/server/session.ts</span>, <code>user-auth.ts</code>, <code>hooks.server.ts</code></td></tr>
+            <tr><td>Stripe replay protection</td><td><span class="file-path">src/lib/server/stripe.ts:104–145</span></td></tr>
+            <tr><td>Cron auth</td><td><span class="file-path">src/lib/server/cron-auth.ts</span></td></tr>
+            <tr><td>Email templates</td><td><span class="file-path">src/lib/server/email/render/</span></td></tr>
+            <tr><td>Design tokens</td><td><span class="file-path">src/styles/theme.css</span>, <code>email/brand.ts</code></td></tr>
+            <tr><td>Feature flags</td><td><span class="file-path">src/lib/config/features.ts</span></td></tr>
+            <tr><td>Validation schemas</td><td><span class="file-path">src/lib/server/validation.ts</span></td></tr>
+            <tr><td>Trip access checks</td><td><span class="file-path">src/lib/server/trip-access.ts</span></td></tr>
+            <tr><td>Vercel config (regions, crons)</td><td><span class="file-path">vercel.json</span></td></tr>
+            <tr><td>DB schema</td><td><span class="file-path">prisma/schema.prisma</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">divv<span>i</span></div>
+      <p>Architecture Document · 2026-06-14</p>
+      <p style="margin-top: 14px; font-size: 12px; opacity: 0.65;">Companion to <a href="./PRD.html">PRD.html</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>

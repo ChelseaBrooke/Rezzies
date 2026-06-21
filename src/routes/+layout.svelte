@@ -4,6 +4,8 @@
 	import Navigation from '$lib/components/Navigation.svelte';
 	import ProfileCard from '$lib/components/profile/ProfileCard.svelte';
 	import EditProfileModal from '$lib/components/profile/EditProfileModal.svelte';
+	import PerfBadge from '$lib/components/PerfBadge.svelte';
+	import { dev } from '$app/environment';
 	import { page } from '$app/stores';
 
 	let { children, data } = $props();
@@ -40,6 +42,10 @@
 
 <ProfileCard />
 <EditProfileModal />
+
+{#if dev}
+	<PerfBadge />
+{/if}
 
 <main
 	class:no-padding={isNewTripWizardFlow}
