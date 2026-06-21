@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Divvi — Product Requirements Document</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1d4d4e;
+    --slate: #2F7778;
+    --slate-hover: #245a5b;
+    --beige: #E3CEAA;
+    --carrot: #F7AA29;
+    --warm: #CE5612;
+    --chocolate: #a5440e;
+    --sky: #7ACED3;
+    --sand: #E3CEAA;
+
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface-paper: #fbf9f6;
+    --surface-faint: #fafaf8;
+    --surface-attention: #fdf8f0;
+    --text: #111827;
+    --text-body: #374151;
+    --text-muted: #6b7280;
+    --border: rgba(47,119,120,0.18);
+    --border-soft: rgba(47,119,120,0.12);
+    --border-paper: #f0ede8;
+
+    --shadow-card: 0 18px 44px -24px rgba(47,119,120,0.22);
+    --shadow-paper: 0 30px 80px -30px rgba(10, 18, 22, 0.18);
+    --shadow-soft: 0 10px 30px rgba(29,77,78,0.07);
+
+    --eyebrow-bg: rgba(206,86,18,0.1);
+    --eyebrow-border: rgba(206,86,18,0.25);
+
+    --hero-gradient: linear-gradient(135deg, rgba(227,206,170,0.55) 0%, rgba(227,206,170,0.18) 55%, rgba(255,255,255,0.96) 100%);
+
+    --radius-card: 20px;
+    --radius-btn: 12px;
+    --radius-pill: 999px;
+
+    --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-sans: 'Plus Jakarta Sans', Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    color: var(--text-body);
+    background: var(--bg);
+    line-height: 1.65;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Top progress bar (orange) */
+  .top-bar {
+    height: 4px;
+    background: linear-gradient(90deg, var(--warm) 0%, var(--carrot) 100%);
+    width: 100%;
+  }
+
+  /* Sticky nav */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .nav-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .nav-brand {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--navy);
+    letter-spacing: -0.02em;
+    text-decoration: none;
+  }
+  .nav-brand span { color: var(--warm); }
+  .nav-links {
+    display: flex;
+    gap: 22px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .nav-links a {
+    color: var(--slate);
+    text-decoration: none;
+    transition: color 150ms ease;
+  }
+  .nav-links a:hover { color: var(--warm); }
+  @media (max-width: 720px) {
+    .nav-links { display: none; }
+  }
+
+  /* Hero */
+  .hero {
+    background: var(--hero-gradient);
+    border-bottom: 1px solid rgba(47,119,120,0.18);
+    box-shadow: 0 18px 40px -22px rgba(47,119,120,0.28);
+  }
+  .hero-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 72px 32px 80px;
+  }
+  .eyebrow {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--eyebrow-bg);
+    border: 1px solid var(--eyebrow-border);
+    color: var(--warm);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: var(--radius-pill);
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: clamp(2.5rem, 5.5vw, 4.25rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin: 0 0 20px;
+    max-width: 18ch;
+  }
+  .hero-sub {
+    font-size: 19px;
+    color: #475569;
+    max-width: 60ch;
+    margin: 0 0 28px;
+    line-height: 1.55;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .meta-chip {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--border-soft);
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    color: var(--slate);
+    font-weight: 500;
+  }
+  .meta-chip strong { color: var(--navy); font-weight: 600; }
+
+  /* Main container */
+  main {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 56px 32px 96px;
+  }
+
+  /* Sections */
+  section {
+    margin-bottom: 64px;
+    scroll-margin-top: 80px;
+  }
+  .section-num {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 500;
+    color: var(--warm);
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: block;
+  }
+  h2 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: clamp(1.85rem, 3vw, 2.5rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 24px;
+  }
+  h3 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: 1.35rem;
+    line-height: 1.3;
+    margin: 32px 0 12px;
+    letter-spacing: -0.015em;
+  }
+  h4 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    color: var(--slate);
+    font-size: 1rem;
+    margin: 24px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  p { margin: 0 0 16px; }
+  ul, ol { padding-left: 22px; margin: 0 0 18px; }
+  li { margin-bottom: 8px; }
+  strong { color: var(--navy); font-weight: 600; }
+  em { color: var(--text); }
+
+  a { color: var(--warm); text-decoration: none; border-bottom: 1px solid rgba(206,86,18,0.3); transition: all 150ms ease; }
+  a:hover { color: var(--chocolate); border-bottom-color: var(--chocolate); }
+
+  /* Card / paper */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 28px 32px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 20px;
+  }
+  .card-paper {
+    background: var(--surface-paper);
+    border-color: var(--border-paper);
+  }
+  .card-faint {
+    background: var(--surface-faint);
+    border-color: var(--border-paper);
+  }
+
+  /* Pull quote */
+  .pull {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.5rem;
+    line-height: 1.45;
+    color: var(--navy);
+    border-left: 4px solid var(--warm);
+    padding: 8px 0 8px 24px;
+    margin: 32px 0;
+    max-width: 60ch;
+  }
+
+  /* Persona grid */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+    margin: 24px 0;
+  }
+  .persona {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 28px;
+    box-shadow: var(--shadow-card);
+  }
+  .persona-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--warm);
+    margin-bottom: 10px;
+  }
+  .persona h3 {
+    margin-top: 0;
+    margin-bottom: 14px;
+    color: var(--navy);
+    font-size: 1.3rem;
+  }
+  .persona ul { margin-bottom: 0; }
+
+  /* Feature blocks */
+  .feature {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 24px 28px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 14px;
+    transition: transform 200ms ease, box-shadow 200ms ease;
+  }
+  .feature:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 22px 50px -22px rgba(47,119,120,0.28);
+  }
+  .feature-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .feature-num {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--warm);
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+  .feature h3 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+  .badge-wip {
+    display: inline-block;
+    background: rgba(247,170,41,0.18);
+    color: #92660a;
+    border: 1px solid rgba(247,170,41,0.45);
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .badge-flag {
+    display: inline-block;
+    background: rgba(122,206,211,0.2);
+    color: #0f5a5d;
+    border: 1px solid rgba(122,206,211,0.5);
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* Principles */
+  .principles {
+    list-style: none;
+    padding: 0;
+    counter-reset: principle;
+  }
+  .principles li {
+    counter-increment: principle;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 22px 26px 22px 78px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .principles li::before {
+    content: counter(principle, decimal-leading-zero);
+    font-family: var(--font-serif);
+    font-style: italic;
+    position: absolute;
+    left: 24px;
+    top: 22px;
+    font-size: 1.8rem;
+    color: var(--warm);
+    font-weight: 500;
+    line-height: 1;
+  }
+  .principles strong {
+    display: block;
+    color: var(--navy);
+    font-size: 1.05rem;
+    margin-bottom: 6px;
+  }
+
+  /* Metric cards */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+  }
+  .metric {
+    background: var(--surface-faint);
+    border: 1px solid var(--border-paper);
+    border-radius: var(--radius-card);
+    padding: 22px;
+  }
+  .metric-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--slate);
+    margin-bottom: 12px;
+  }
+  .metric ul { margin: 0; padding-left: 18px; }
+  .metric li { font-size: 14px; }
+
+  /* Risk box */
+  .risk-block {
+    background: var(--surface-attention);
+    border: 1px solid rgba(247,170,41,0.4);
+    border-radius: var(--radius-card);
+    padding: 22px 26px;
+    margin-bottom: 14px;
+  }
+  .risk-block h4 { color: #92660a; margin-top: 0; }
+  .risk-block ul { margin-bottom: 0; }
+
+  /* Decided/closed block (teal, calm) */
+  .closed-block {
+    background: rgba(122,206,211,0.08);
+    border: 1px solid rgba(47,119,120,0.22);
+    border-radius: var(--radius-card);
+    padding: 22px 26px;
+    margin-bottom: 14px;
+  }
+  .closed-block h4 { color: var(--slate); margin-top: 0; }
+  .closed-block ul { margin-bottom: 0; padding-left: 22px; }
+  .closed-block li { margin-bottom: 8px; }
+  .closed-block .strike {
+    text-decoration: line-through;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .closed-block .answer {
+    color: var(--navy);
+    font-weight: 600;
+  }
+
+  /* Glossary */
+  .glossary {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 14px 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 28px 32px;
+    box-shadow: var(--shadow-card);
+  }
+  .glossary dt {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: 0.95rem;
+  }
+  .glossary dd {
+    margin: 0;
+    color: var(--text-body);
+    font-size: 0.95rem;
+  }
+  @media (max-width: 600px) {
+    .glossary { grid-template-columns: 1fr; gap: 4px 0; }
+    .glossary dd { margin-bottom: 14px; }
+  }
+
+  /* TODO marker */
+  .todo {
+    display: inline-block;
+    background: rgba(206,86,18,0.08);
+    color: var(--warm);
+    border: 1px dashed rgba(206,86,18,0.4);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    font-family: var(--font-sans);
+  }
+
+  /* Non-goals list */
+  .non-goals li {
+    position: relative;
+    padding-left: 4px;
+  }
+  .non-goals li::marker { color: var(--warm); }
+
+  /* TOC */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 24px 28px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 48px;
+  }
+  .toc-title {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--warm);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+  .toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 8px 24px;
+  }
+  .toc-list li { margin: 0; }
+  .toc-list a {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    color: var(--navy);
+    border-bottom: none;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 4px 0;
+    transition: color 150ms ease, transform 150ms ease;
+  }
+  .toc-list a:hover { color: var(--warm); transform: translateX(2px); }
+  .toc-list a span {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--warm);
+    font-weight: 500;
+    min-width: 22px;
+  }
+
+  /* Footer */
+  footer {
+    background: var(--navy);
+    color: rgba(255,255,255,0.7);
+    padding: 48px 32px 56px;
+    text-align: center;
+    margin-top: 48px;
+  }
+  footer .footer-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  footer .footer-brand {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    color: #ffffff;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  footer .footer-brand span { color: var(--carrot); }
+  footer p { margin: 4px 0; font-size: 14px; }
+  footer a { color: var(--carrot); border-bottom-color: rgba(247,170,41,0.4); }
+
+  /* Print */
+  @media print {
+    .nav { display: none; }
+    body { background: white; }
+    .card, .feature, .persona, .glossary, .toc, .principles li, .risk-block, .metric { box-shadow: none; break-inside: avoid; }
+    section { break-inside: avoid; }
+    .hero { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="top-bar"></div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#top" class="nav-brand">divv<span>i</span></a>
+      <div class="nav-links">
+        <a href="#pitch">Pitch</a>
+        <a href="#users">Users</a>
+        <a href="#features">Features</a>
+        <a href="#monetization">Money</a>
+        <a href="#metrics">Metrics</a>
+        <a href="#risks">Risks</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="hero-inner">
+      <span class="eyebrow">Product Requirements · v1 · doc rev 2</span>
+      <h1>Group trips, squared away.</h1>
+      <p class="hero-sub">Divvi turns the most painful part of a group trip — figuring out who pays what, who sleeps where, and who's actually coming — into one shared link.</p>
+      <div class="meta-row">
+        <span class="meta-chip"><strong>Status:</strong>&nbsp;Living document</span>
+        <span class="meta-chip"><strong>Updated:</strong>&nbsp;2026-06-14</span>
+        <span class="meta-chip"><strong>Owner:</strong>&nbsp;Brett Burbidge</span>
+        <span class="meta-chip"><strong>Target:</strong>&nbsp;Public launch · US only</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <nav class="toc" aria-label="Table of contents">
+      <div class="toc-title">Contents</div>
+      <ol class="toc-list">
+        <li><a href="#pitch"><span>01</span> The Pitch</a></li>
+        <li><a href="#users"><span>02</span> Who It's For</a></li>
+        <li><a href="#why-now"><span>03</span> Why Now</a></li>
+        <li><a href="#principles"><span>04</span> Product Principles</a></li>
+        <li><a href="#features"><span>05</span> Core Features (v1)</a></li>
+        <li><a href="#non-goals"><span>06</span> Non-Goals</a></li>
+        <li><a href="#monetization"><span>07</span> Monetization</a></li>
+        <li><a href="#metrics"><span>08</span> Success Metrics</a></li>
+        <li><a href="#risks"><span>09</span> Risks &amp; Open Questions</a></li>
+        <li><a href="#glossary"><span>10</span> Glossary</a></li>
+      </ol>
+    </nav>
+
+    <section id="pitch">
+      <span class="section-num">Section 01</span>
+      <h2>The Pitch</h2>
+      <p><strong>Divvi turns the most painful part of a group trip — figuring out who pays what, who sleeps where, and who's actually coming — into one shared link.</strong></p>
+      <p>Anyone who has ever tried to organize a beach week with three other families, a ski trip with college friends, or a bachelorette weekend knows the drill: a spreadsheet that nobody trusts, a group chat with 400 unread messages, and that one person who keeps changing their mind two days before the rental is booked.</p>
+      <p>Divvi replaces that with a single hosted trip page where the rental is described, the rooms are visible, the cost split is transparent, and the RSVP/payment loop is closed.</p>
+      <div class="pull">The host publishes once ($25), invites guests, and watches RSVPs, room picks, and the cost split update in real time. Guests see exactly what they owe and why.</div>
+    </section>
+
+    <section id="users">
+      <span class="section-num">Section 02</span>
+      <h2>Who It's For</h2>
+      <p>Divvi serves <strong>anyone who organizes a group rental</strong> — the person who books the house and then has to chase everyone else. Two equally important personas:</p>
+
+      <div class="grid-2">
+        <article class="persona">
+          <div class="persona-label">Persona A</div>
+          <h3>The Family Organizer</h3>
+          <ul>
+            <li>Parent or aunt/uncle planning a multi-family vacation (beach week, lake house, ski cabin, holiday gathering)</li>
+            <li>Coordinating 2–6 households, often with kids and pets in the mix</li>
+            <li><strong>Needs:</strong> handle uneven family sizes fairly, manage room assignments by family unit, surface allergies and dietary needs, coordinate meals</li>
+            <li><strong>Pain point:</strong> a per-night rental for 14 people where families have different headcounts and want different rooms feels impossible to split fairly</li>
+          </ul>
+        </article>
+
+        <article class="persona">
+          <div class="persona-label">Persona B</div>
+          <h3>The Friend-Group Organizer</h3>
+          <ul>
+            <li>20s/30s coordinating bachelor/bachelorette, ski trips, birthday weekends, friend reunions</li>
+            <li>Coordinating 4–12 individuals, mostly adults</li>
+            <li><strong>Needs:</strong> fast RSVPs, easy bed-by-bed selection, polls for "where should we eat Saturday," group chat in-context</li>
+            <li><strong>Pain point:</strong> someone always pays more than their share, late RSVPs throw off the per-person math, group chat is a mess</li>
+          </ul>
+        </article>
+      </div>
+
+      <p>Both personas share the same core need: <strong>a transparent, fair, real-time split</strong>. The difference is mostly in the surrounding tools they lean on (meal planning and plus-ones for families; polls, chat, and activities for friends).</p>
+    </section>
+
+    <section id="why-now">
+      <span class="section-num">Section 03</span>
+      <h2>Why Now / Why This</h2>
+      <p>Group rental volume has grown faster than the tools around it. Airbnb and Vrbo solve the booking. Splitwise and Venmo solve the after-the-fact reimbursement. Nothing in the middle handles <strong>the trip itself</strong> — the headcount/cost feedback loop, who's actually committed, who picked which bed, and what happens when the rental price changes after some guests have already said yes.</p>
+      <div class="pull">The clearest wedge: honest cost-splitting that recalculates as the trip evolves.</div>
+      <p>If two guests drop out, the per-person price goes up — and Divvi forces a re-approval flow so guests aren't surprised by a higher charge after the fact. That alone is something spreadsheets and Splitwise can't do.</p>
+    </section>
+
+    <section id="principles">
+      <span class="section-num">Section 04</span>
+      <h2>Product Principles</h2>
+      <p>These should guide every feature and design decision:</p>
+      <ol class="principles">
+        <li>
+          <strong>The split must always be defensible.</strong>
+          A guest should be able to look at their invoice and immediately understand why their number is what it is. No magic, no hidden adjustments.
+        </li>
+        <li>
+          <strong>Hosts shouldn't be financial intermediaries.</strong>
+          Divvi is the source of truth on what everyone owes; payment can route through Stripe but the host shouldn't have to play accountant.
+        </li>
+        <li>
+          <strong>The link is the product.</strong>
+          Everything a guest needs lives on one page, no app install required. Auth is needed but light.
+        </li>
+        <li>
+          <strong>Real-time over locked-in.</strong>
+          Plans change. Headcount changes. Prices change. Divvi recalculates and walks affected guests through a re-approval — it never silently overcharges.
+        </li>
+        <li>
+          <strong>The host stays in control.</strong>
+          Approvals, capacity, invites, and final cost are the host's call. Divvi proposes; the host disposes.
+        </li>
+      </ol>
+    </section>
+
+    <section id="features">
+      <span class="section-num">Section 05</span>
+      <h2>Core Features (v1)</h2>
+      <p>This section covers what ships at public launch. Features marked <span class="badge-wip">WIP</span> exist in code but need finishing touches before launch.</p>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.1</span><h3>Trip Creation Wizard</h3></div>
+        <p>A guided multi-step flow that takes a host from blank canvas to publishable trip in under ten minutes.</p>
+        <ul>
+          <li><strong>Step 1 — Basics:</strong> Trip name, location (Google Places autocomplete), check-in/out dates, timezone.</li>
+          <li><strong>Step 2 — Rooms &amp; Beds:</strong> Add rooms (with photos and descriptions), specify beds inside each (king/queen/twin/bunk/sofa/full), set capacity and max occupancy per room.</li>
+          <li><strong>Step 3 — Pricing model:</strong> Host picks one of Per Person, Per Person Per Night, Per Room, Per Bed (with built-in privacy premium and bed-type weighting), or "skip cost-sharing entirely." The model is required. The underlying algorithm parameters (<code>sharingExponentAlpha</code>, <code>privacyPremiumP</code>, <code>bedWeights</code>) are backend tuning knobs — never exposed to the host.</li>
+          <li><strong>Step 4 — Publish:</strong> $25 one-time fee via Stripe. After payment, the trip goes live and invites can be sent.</li>
+        </ul>
+        <p>The wizard persists progress to localStorage so a half-finished trip survives a closed tab.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.2</span><h3>RSVP &amp; Headcount Management</h3></div>
+        <p>The center of gravity for the whole product.</p>
+        <ul>
+          <li>Guests RSVP yes/no/maybe (or land on the waitlist if capacity is full)</li>
+          <li>Adult/kid/pet counts per guest, with optional partial-stay support</li>
+          <li><strong>Cost commitment:</strong> when a guest says "yes," they accept an <em>estimated cost range</em> based on current headcount — locked into a range they've explicitly approved, not a single number</li>
+          <li><strong>Cost re-approval (over-budget only):</strong> triggered whenever a "yes" guest's share rises <em>above</em> their personal ceiling (the high end of their accepted range, or the most recent re-approved share). On re-approval, the ceiling rises to the new value — the accepted range only ever expands. <strong>Decreases never trigger</strong> — if a guest's share drops, they discover the good news next time they log in. Triggers include: guest dropouts, host cost edits, added activities/meals, and room/bed assignment changes.</li>
+          <li><strong>Waitlist:</strong> when full, additional RSVPs queue. If someone drops, the next person in line gets a time-windowed claim notification</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.3</span><h3>Room &amp; Bed Assignment</h3></div>
+        <p>After RSVP'ing yes, guests pick where they sleep:</p>
+        <ul>
+          <li>Per-room trips: pick a room</li>
+          <li>Per-bed trips: pick a specific bed</li>
+          <li>Per-person trips: assignment is informational, not pricing-load-bearing</li>
+          <li>Host can lock or override assignments; photos and descriptions per room help guests understand what they're picking</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.4</span><h3>Itinerary (Activities + Meals)</h3></div>
+        <p>A shared calendar/grid view of everything happening on the trip.</p>
+        <ul>
+          <li><strong>Activities:</strong> Title, date/time, location, price-per-person, max participants. Guests RSVP individually to each activity.</li>
+          <li><strong>Meals:</strong> Per-meal slots (breakfast/lunch/dinner/snack) with an assigned cook, menu text, and dietary opt-outs. Optional host-budget mode for shared groceries.</li>
+          <li><strong>Discovery:</strong> Search nearby points of interest via Google Places. Add a discovered place directly to the itinerary or use it as a poll option.</li>
+          <li>Drag-to-reschedule on the grid for fast iteration.</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.5</span><h3>Polls</h3></div>
+        <p>Group decision-making in context, not in a separate group chat.</p>
+        <ul>
+          <li>Single-choice, multi-choice, or datetime polls</li>
+          <li>Categories: Scheduling / Meals / Activities / Rooms &amp; Beds / Other</li>
+          <li>Optional anonymous voting; live results or hidden-until-close</li>
+          <li>Polls can be spun up directly from a discovered activity ("vote: which restaurant Saturday?")</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.6</span><h3>Group Chat &amp; Direct Messages</h3></div>
+        <ul>
+          <li>Trip-scoped group chat — all members can post, with per-user chat bubble colors</li>
+          <li>Direct messages between any two users on the platform (private)</li>
+          <li>File and photo uploads via the shared files area</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.7</span><h3>Shared Files</h3></div>
+        <p>Photos, receipts, packing lists, check-in instructions, signed waivers — anything the group needs in one place. Trip-scoped, member-only access.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.8</span><h3>Invoicing &amp; Payment Tracking</h3></div>
+        <p>For MVP, <strong>Divvi is the source of truth on what each guest owes — not a payment processor for guest balances.</strong> The only Stripe checkout in the entire product is the host's one-time $25 publish fee at trip creation.</p>
+        <ul>
+          <li>Per-guest invoice page showing the full breakdown (room/bed share, activity costs, meal contributions, extra costs)</li>
+          <li><strong>Host marks guests as paid</strong> to track who's settled up; status is visible to the guest</li>
+          <li>Money moves off-platform — guests Venmo / Zelle / cash the host directly, however the host normally collects</li>
+          <li>Cost re-approval still gates the invoice: a guest with a <code>pending</code> re-approval sees their breakdown but is asked to re-confirm before the number is considered final</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.9</span><h3>Guest Profiles</h3></div>
+        <ul>
+          <li>Per-trip profile: dietary restrictions, allergies, emergency contact, payment preference</li>
+          <li>Per-user profile: name, phone, avatar, travel style, home city, timezone, friend graph</li>
+          <li>Emergency contact can optionally be shared with hosts only</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.10</span><h3>Notifications</h3></div>
+        <ul>
+          <li>In-app notification center (invite received, RSVP accepted, room assigned, cost re-approval needed, poll closed, etc.)</li>
+          <li>Transactional emails via Resend for the same events — sent <strong>event-driven</strong> when the event happens. Invite emails, RSVP confirmations, cost re-approval prompts, and waitlist promotion alerts all fire in real time (no daily batch).</li>
+          <li><strong>One</strong> scheduled cron — poll lifecycle nudges (open polls expiring soon, polls just closed) — runs three times daily at <strong>7am, 12pm, and 8pm ET</strong>.</li>
+        </ul>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.11</span><h3>Mobile API Surface</h3><span class="badge-wip">WIP</span></div>
+        <p>A REST surface at <code>/api/mobile/*</code> with token-based auth (90-day session TTL, CORS configured) is scaffolded for a future native mobile client. v1 is web-only at launch but the API is exposed for the eventual app.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.12</span><h3>Trip Games</h3><span class="badge-flag">Off for v1 · v1.1 candidate</span></div>
+        <p>A set of light, in-trip games designed to make the trip itself more fun (not just the logistics). Code is complete but stays behind <code>FEATURE_TRIP_GAMES</code> for public launch.</p>
+        <ul>
+          <li><strong>Caption This</strong> — Daily photo gets captioned by the group, then voted on. Daily winner.</li>
+          <li><strong>Scavenger Bingo</strong> — Pre-built bingo cards of trip-relevant items and experiences.</li>
+          <li><strong>Alphabet Hunt</strong> — Find things starting with each letter of the alphabet.</li>
+          <li><strong>Daily Trivia</strong> — Lightweight trivia rounds.</li>
+        </ul>
+        <p>The flag stays false for v1. v1.1 is the planned vehicle for turning it on after the core flow has been stress-tested with real users.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.13</span><h3>Household Plus-Ones</h3><span class="badge-wip">WIP</span></div>
+        <p>A primary guest can bring "plus ones" (spouse, kids, friends) without each requiring a full account. The data model is fully in place; the UI is partial. Likely target for first post-launch polish.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-head"><span class="feature-num">5.14</span><h3>SMS Invites</h3><span class="badge-wip">WIP</span></div>
+        <p>Email invites work today. SMS invites are wired through the data model and invite-service but the actual SMS sending (Twilio) is unimplemented. Optional for v1 launch.</p>
+      </div>
+    </section>
+
+    <section id="non-goals">
+      <span class="section-num">Section 06</span>
+      <h2>Non-Goals (for v1)</h2>
+      <p>What Divvi is explicitly <em>not</em> doing at launch:</p>
+      <div class="card card-paper">
+        <ul class="non-goals">
+          <li><strong>Processing guest payments.</strong> The only Stripe checkout in MVP is the host's $25 publish fee. Guests pay the host off-platform (Venmo, Zelle, cash); Divvi tracks "paid / not paid" but never moves the money.</li>
+          <li><strong>Booking the actual rental.</strong> Divvi assumes the host has already booked or is about to. No Airbnb/Vrbo integration.</li>
+          <li><strong>Multi-currency or i18n.</strong> USD only, English only.</li>
+          <li><strong>Non-US users.</strong> US-only at launch — US timezones, US English, USD pricing.</li>
+          <li><strong>Native mobile app.</strong> API is ready, app is not in v1 scope.</li>
+          <li><strong>Travel insurance, refunds, or chargeback mediation.</strong> Stripe handles the publish fee; disputes go through Stripe. Guest-balance disputes are off-platform and host-managed.</li>
+          <li><strong>Hosts as professional property managers.</strong> Divvi is for ad-hoc group organizers, not commercial short-term-rental businesses.</li>
+          <li><strong>AI/LLM features.</strong> No AI in v1.</li>
+          <li><strong>In-product games.</strong> <code>FEATURE_TRIP_GAMES</code> stays off for v1.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="monetization">
+      <span class="section-num">Section 07</span>
+      <h2>Monetization</h2>
+      <div class="card">
+        <h3 style="margin-top:0;">$25 one-time publish fee per trip.</h3>
+        <p>Charged via Stripe when the host publishes. <strong>This is the only Stripe checkout flow in the entire product.</strong> No subscriptions, no markup on guest payments (Divvi doesn't move guest money at all in MVP), no ads.</p>
+        <p>The fee is enforced server-side: a single <code>publishFeePaymentIntentId</code> on the Trip record prevents re-use, and the trip is gated until paid.</p>
+        <p style="margin-bottom:0;color:var(--text-muted);font-size:14px;"><em>Long-term monetization is intentionally out of scope for this PRD.</em></p>
+      </div>
+    </section>
+
+    <section id="metrics">
+      <span class="section-num">Section 08</span>
+      <h2>Success Metrics <span class="todo">TODO: confirm targets</span></h2>
+      <p>The PRD doesn't lock these in — they're starting points to refine.</p>
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="metric-label">Activation</div>
+          <ul>
+            <li>% of new accounts that create a trip</li>
+            <li>% of created trips that reach publish</li>
+            <li>% of published trips that reach 5+ confirmed RSVPs</li>
+          </ul>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Engagement</div>
+          <ul>
+            <li>Median time from creation to publish</li>
+            <li>Median RSVPs per trip</li>
+            <li>% of trips using ≥2 collab features</li>
+          </ul>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Retention</div>
+          <ul>
+            <li>% of hosts planning a second trip within 12 months</li>
+            <li>% of guests who become hosts (leading indicator for organic growth)</li>
+          </ul>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Revenue</div>
+          <ul>
+            <li>Published trips per week (= revenue ÷ $25)</li>
+            <li>Cost per acquired host (channel-dependent)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="risks">
+      <span class="section-num">Section 09</span>
+      <h2>Risks &amp; Open Questions</h2>
+      <p>Things the inherited code couldn't answer and need your judgment.</p>
+
+      <h4>Product risks (live)</h4>
+      <div class="risk-block">
+        <ul>
+          <li><strong>Cost re-approval friction.</strong> Each re-approval prompt is a chance for a guest to drop out. Worth instrumenting carefully: how often it fires per trip, what % of prompts get re-approved within the deadline, and which causes trigger it most (dropouts vs host edits vs added activities/meals). The asymmetric design — only over-budget triggers; under-budget changes are a pleasant log-in surprise — is intentional and keeps surprise charges out.</li>
+          <li><strong>Off-platform payment hand-off.</strong> "Host marks paid" is a tracking field, not a payment guarantee. Some guests will pay late, some hosts will forget to flip the status. The risk is the guest's view of "what I owe / what's settled" goes stale. Mitigation: clear copy that this is host-tracked, not Divvi-enforced.</li>
+        </ul>
+      </div>
+
+      <h4>Technical risks (live)</h4>
+      <div class="risk-block">
+        <ul>
+          <li><strong>Legacy models</strong> (<code>Reservation</code>, <code>GuestSubmission</code>) may indicate incomplete migrations. Worth auditing whether they're actually unused or still referenced.</li>
+          <li><strong>No analytics or error tracking.</strong> No Sentry, no PostHog. Going to public launch blind would be a mistake — recommend adding before launch.</li>
+          <li><strong>Test coverage is unknown.</strong> Playwright E2E tests exist in <code>/e2e/</code>, pass/fail status unverified.</li>
+          <li><strong>Email deliverability</strong> depends on the verified Resend domain. Confirm DNS is set up before launch traffic.</li>
+          <li><strong>Removed crons.</strong> Waitlist-promotion and cost-re-approval-reminder crons are out of scope for MVP. The corresponding triggers need to be wired event-driven (or accepted as no-reminder for MVP). Audit existing paths in <code>cron-email-service.ts</code> and <code>/api/cron/*</code> before deleting — don't orphan event sources.</li>
+        </ul>
+      </div>
+
+      <h4>Decided / closed</h4>
+      <div class="closed-block">
+        <ul>
+          <li><span class="strike">Games on or off at launch?</span> → <span class="answer">Off.</span> <code>FEATURE_TRIP_GAMES</code> stays <code>false</code> for v1; revisit in v1.1.</li>
+          <li><span class="strike">Geography focus?</span> → <span class="answer">US only at launch.</span> USD, English, US timezones.</li>
+          <li><span class="strike">Pricing model "overload"?</span> → Not a risk. Host picks one model from a list; algorithmic tuning (bed weights, sharing exponent, privacy premium) is backend-only and never exposed.</li>
+          <li><span class="strike">Legal docs (TOS, Privacy, refund policy)?</span> → Owned by Brett before launch.</li>
+          <li><span class="strike">Support plan?</span> → <span class="answer">Email-based support for MVP.</span> No helpdesk or in-product chat; one support inbox handles "my charge is wrong" / "I can't log in" / etc.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="glossary">
+      <span class="section-num">Section 10</span>
+      <h2>Glossary</h2>
+      <dl class="glossary">
+        <dt>Trip</dt><dd>A planned group stay at a specific rental. The top-level entity in the data model.</dd>
+        <dt>Host</dt><dd>The user who created the trip. Has admin rights over the trip.</dd>
+        <dt>Co-host</dt><dd>A trusted guest with elevated permissions (assign rooms, manage invites).</dd>
+        <dt>Guest</dt><dd>Any user who's been invited to or RSVP'd for the trip.</dd>
+        <dt>RSVP</dt><dd>A guest's response record. Includes status (yes/no/maybe/waitlisted), headcount, and cost commitment.</dd>
+        <dt>Cost commitment</dt><dd>A guest's explicit approval of an estimated cost range, accepted at RSVP time. Re-approval is required if costs move outside the range.</dd>
+        <dt>Privacy premium</dt><dd>A multiplier applied to private (single-occupant) rooms when using per-bed pricing.</dd>
+        <dt>Sharing exponent (α)</dt><dd>A configurable parameter in per-bed pricing that controls how aggressively shared occupancy discounts the per-person rate.</dd>
+        <dt>Household</dt><dd>A unit of guests traveling together where one primary guest manages the others (plus-ones). Designed for families.</dd>
+        <dt>Publish fee</dt><dd>The $25 one-time Stripe charge that activates a trip.</dd>
+        <dt>Waitlist claim window</dt><dd>The configurable time window during which a promoted waitlist guest can accept their spot.</dd>
+      </dl>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">divv<span>i</span></div>
+      <p>Product Requirements Document · v1 · doc rev 2 · 2026-06-14</p>
+      <p style="margin-top:18px;font-size:13px;opacity:0.7;">Built from <code style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:6px;">prisma/schema.prisma</code>, <code style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:6px;">src/routes/</code>, and a healthy dose of guesswork.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx prisma migrate dev:*)"
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(node -e \"try{require\\('marked'\\);console.log\\('marked OK'\\)}catch\\(e\\){console.log\\('no marked'\\)}\")",
+      "Bash(node -e \"try{require\\('markdown-it'\\);console.log\\('markdown-it OK'\\)}catch\\(e\\){console.log\\('no markdown-it'\\)}\")",
+      "Bash(python3 /tmp/md2html.py)"
     ]
   }
 }
