@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Divvi — Design Tokens Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* mirrored from src/styles/theme.css */
+  :root{
+    --navy:#1d4d4e; --slate:#2F7778; --beige:#E3CEAA; --carrot:#F7AA29; --warm:#CE5612;
+    --chocolate:#a5440e; --sky:#7ACED3; --sand:#E3CEAA;
+    --bg:#f4f5f7; --surfaceSolid:#ffffff; --surface2:#eef0f3; --text:#111827;
+    --muted:var(--slate); --border:#2F777833; --primary:var(--slate); --primaryHover:#245a5b;
+    --danger:var(--chocolate); --font-display:'Fraunces',Georgia,serif;
+    --font-body:'Plus Jakarta Sans',system-ui,sans-serif;
+    --radius-md:.375rem; --radius-lg:.5rem; --radius-2xl:10px;
+    --shadow-soft:0 10px 30px rgba(29,77,78,0.07);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);padding:48px 24px;line-height:1.5}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-family:var(--font-display);font-size:clamp(2rem,4vw,3rem);margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 8px}
+  .src{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted);margin-bottom:36px}
+  h2{font-family:var(--font-display);font-size:22px;margin:40px 0 14px;padding-top:18px;border-top:1px solid var(--border)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+  .sw{background:var(--surfaceSolid);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-soft)}
+  .chip{height:84px}
+  .meta{padding:10px 12px}
+  .meta .role{font-weight:600;font-size:13px}
+  .meta .hex,.meta .tok{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted)}
+  .type-row{background:var(--surfaceSolid);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:12px}
+  .type-row .label{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);margin-bottom:6px}
+  .btn{display:inline-block;font-family:var(--font-body);font-weight:600;border-radius:var(--radius-md);padding:11px 20px;border:none;cursor:pointer;font-size:14px}
+  .btn-cta{background:var(--warm);color:#fff}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-ghost{background:transparent;color:var(--primary);border:1px solid var(--border)}
+  .card-ex{background:var(--surfaceSolid);border:1px solid var(--border);border-radius:var(--radius-2xl);padding:20px;box-shadow:var(--shadow-soft);max-width:340px}
+  .card-ex .ey{display:inline-block;background:rgba(206,86,18,0.1);color:var(--warm);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin-bottom:10px}
+  .card-ex h3{font-family:var(--font-display);margin:0 0 6px;font-size:20px}
+  .card-ex p{margin:0;color:var(--muted);font-size:14px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .radii{display:flex;gap:16px;flex-wrap:wrap}
+  .radii .b{width:64px;height:64px;background:var(--primary);opacity:.9}
+  .radii figcaption{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Divvi — Design Tokens</h1>
+  <p class="sub">Rendered preview of the coastal palette + tokens. Review before we codify the UI rules in CLAUDE.md.</p>
+  <p class="src">source of truth: <strong>src/styles/theme.css</strong> · this file mirrors it for viewing only</p>
+
+  <h2>Core palette &amp; roles</h2>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#2F7778"></div><div class="meta"><div class="role">Myrtle Green — primary &amp; borders</div><div class="hex">#2F7778</div><div class="tok">--slate / --primary</div></div></div>
+    <div class="sw"><div class="chip" style="background:#CE5612"></div><div class="meta"><div class="role">Alloy Orange — CTAs &amp; logo</div><div class="hex">#CE5612</div><div class="tok">--warm</div></div></div>
+    <div class="sw"><div class="chip" style="background:#F7AA29"></div><div class="meta"><div class="role">Bright Yellow — accents</div><div class="hex">#F7AA29</div><div class="tok">--carrot</div></div></div>
+    <div class="sw"><div class="chip" style="background:#7ACED3"></div><div class="meta"><div class="role">Middle Blue — soft accent</div><div class="hex">#7ACED3</div><div class="tok">--sky</div></div></div>
+    <div class="sw"><div class="chip" style="background:#E3CEAA"></div><div class="meta"><div class="role">Desert Sand — warm neutral</div><div class="hex">#E3CEAA</div><div class="tok">--beige / --sand</div></div></div>
+    <div class="sw"><div class="chip" style="background:#1d4d4e"></div><div class="meta"><div class="role">Deep Navy — dark surfaces</div><div class="hex">#1d4d4e</div><div class="tok">--navy</div></div></div>
+    <div class="sw"><div class="chip" style="background:#a5440e"></div><div class="meta"><div class="role">Chocolate — danger</div><div class="hex">#a5440e</div><div class="tok">--chocolate / --danger</div></div></div>
+  </div>
+
+  <h2>Key semantic tokens</h2>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#f4f5f7"></div><div class="meta"><div class="role">Page background</div><div class="hex">#f4f5f7</div><div class="tok">--bg</div></div></div>
+    <div class="sw"><div class="chip" style="background:#ffffff;border-bottom:1px solid var(--border)"></div><div class="meta"><div class="role">Surface (cards)</div><div class="hex">#ffffff</div><div class="tok">--surfaceSolid</div></div></div>
+    <div class="sw"><div class="chip" style="background:#eef0f3"></div><div class="meta"><div class="role">Surface 2 / sticky</div><div class="hex">#eef0f3</div><div class="tok">--surface2</div></div></div>
+    <div class="sw"><div class="chip" style="background:#245a5b"></div><div class="meta"><div class="role">Primary hover</div><div class="hex">#245a5b</div><div class="tok">--primaryHover</div></div></div>
+  </div>
+
+  <h2>Typography</h2>
+  <div class="type-row"><div class="label">--font-display · Fraunces · headings &amp; editorial</div><div style="font-family:var(--font-display);font-size:40px;font-weight:600">Fair splitting, without the spreadsheet.</div></div>
+  <div class="type-row"><div class="label">--font-body · Plus Jakarta Sans · everything else</div><div style="font-size:16px">Guests see exactly what they owe and why — before they even RSVP. The quick brown fox jumps over the lazy dog.</div></div>
+
+  <h2>Applied examples</h2>
+  <div class="row" style="margin-bottom:20px">
+    <button class="btn btn-cta">Publish trip ($25)</button>
+    <button class="btn btn-primary">Save</button>
+    <button class="btn btn-ghost">Cancel</button>
+  </div>
+  <div class="card-ex">
+    <span class="ey">Cost Sharing</span>
+    <h3>Your estimated share</h3>
+    <p>$500 if the trip fills to the host's max · $833 based on who's confirmed so far.</p>
+  </div>
+
+  <h2>Radius scale</h2>
+  <div class="radii">
+    <figure><div class="b" style="border-radius:.375rem"></div><figcaption>--radius-md</figcaption></figure>
+    <figure><div class="b" style="border-radius:.5rem"></div><figcaption>--radius-lg</figcaption></figure>
+    <figure><div class="b" style="border-radius:10px"></div><figcaption>--radius-2xl</figcaption></figure>
+    <figure><div class="b" style="border-radius:14px"></div><figcaption>--radius-3xl</figcaption></figure>
+  </div>
+</div>
+</body>
+</html>

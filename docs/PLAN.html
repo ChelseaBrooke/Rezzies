@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Divvi — Pre-Launch Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1d4d4e;
+    --slate: #2F7778;
+    --slate-hover: #245a5b;
+    --beige: #E3CEAA;
+    --carrot: #F7AA29;
+    --warm: #CE5612;
+    --chocolate: #a5440e;
+    --sky: #7ACED3;
+    --sand: #E3CEAA;
+
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface-paper: #fbf9f6;
+    --surface-faint: #fafaf8;
+    --surface-attention: #fdf8f0;
+    --text: #111827;
+    --text-body: #374151;
+    --text-muted: #6b7280;
+    --border: rgba(47,119,120,0.18);
+    --border-soft: rgba(47,119,120,0.12);
+    --border-paper: #f0ede8;
+
+    --shadow-card: 0 18px 44px -24px rgba(47,119,120,0.22);
+    --shadow-paper: 0 30px 80px -30px rgba(10, 18, 22, 0.18);
+
+    --code-bg: #0f2c2d;
+    --code-text: #d8ede8;
+    --code-comment: #6f9a9c;
+    --code-keyword: #7ACED3;
+    --code-string: #F7AA29;
+    --code-fn: #E3CEAA;
+
+    --eyebrow-bg: rgba(206,86,18,0.1);
+    --eyebrow-border: rgba(206,86,18,0.25);
+
+    --hero-gradient: linear-gradient(135deg, rgba(227,206,170,0.55) 0%, rgba(227,206,170,0.18) 55%, rgba(255,255,255,0.96) 100%);
+
+    --radius-card: 20px;
+    --radius-btn: 12px;
+    --radius-pill: 999px;
+
+    --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-sans: 'Plus Jakarta Sans', Helvetica, Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    color: var(--text-body);
+    background: var(--bg);
+    line-height: 1.65;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .top-bar {
+    height: 4px;
+    background: linear-gradient(90deg, var(--warm) 0%, var(--carrot) 100%);
+    width: 100%;
+  }
+
+  /* Nav */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .nav-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .nav-brand {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--navy);
+    letter-spacing: -0.02em;
+    text-decoration: none;
+  }
+  .nav-brand span { color: var(--warm); }
+  .nav-doc-label {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .nav-links {
+    display: flex;
+    gap: 18px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .nav-links a {
+    color: var(--slate);
+    text-decoration: none;
+  }
+  .nav-links a:hover { color: var(--warm); }
+  @media (max-width: 840px) {
+    .nav-links { display: none; }
+  }
+
+  /* Hero */
+  .hero {
+    background: var(--hero-gradient);
+    border-bottom: 1px solid rgba(47,119,120,0.18);
+  }
+  .hero-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 60px 32px 64px;
+  }
+  .eyebrow {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--eyebrow-bg);
+    border: 1px solid var(--eyebrow-border);
+    color: var(--warm);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: var(--radius-pill);
+    margin-bottom: 18px;
+  }
+  .hero h1 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: clamp(2.25rem, 5vw, 3.75rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin: 0 0 16px;
+  }
+  .hero-sub {
+    font-size: 18px;
+    color: #475569;
+    max-width: 64ch;
+    margin: 0 0 24px;
+    line-height: 1.55;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .meta-chip {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--border-soft);
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    color: var(--slate);
+    font-weight: 500;
+  }
+  .meta-chip strong { color: var(--navy); font-weight: 600; }
+
+  /* Main */
+  main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+  }
+  section {
+    margin-bottom: 56px;
+    scroll-margin-top: 80px;
+  }
+  .section-num {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 500;
+    color: var(--warm);
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+  }
+  h2 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: clamp(1.75rem, 2.8vw, 2.25rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 20px;
+  }
+  h3 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: 1.25rem;
+    line-height: 1.3;
+    margin: 28px 0 12px;
+    letter-spacing: -0.015em;
+  }
+  h4 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    color: var(--slate);
+    font-size: 0.85rem;
+    margin: 22px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  p { margin: 0 0 14px; }
+  ul, ol { padding-left: 22px; margin: 0 0 16px; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--navy); font-weight: 600; }
+  a { color: var(--warm); text-decoration: none; border-bottom: 1px solid rgba(206,86,18,0.3); }
+  a:hover { color: var(--chocolate); border-bottom-color: var(--chocolate); }
+
+  /* Inline code */
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: rgba(47,119,120,0.08);
+    color: var(--navy);
+    padding: 2px 6px;
+    border-radius: 5px;
+    border: 1px solid rgba(47,119,120,0.12);
+    white-space: nowrap;
+  }
+
+  /* Block code (deep teal panel) */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 20px 24px;
+    border-radius: 14px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 16px 0 20px;
+    box-shadow: 0 10px 30px -16px rgba(15,44,45,0.55);
+    border: 1px solid rgba(122,206,211,0.18);
+  }
+  pre code {
+    background: transparent;
+    color: inherit;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    white-space: pre;
+  }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 26px 30px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 18px;
+  }
+
+  /* Tables */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin: 16px 0 20px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  thead th {
+    background: rgba(47,119,120,0.06);
+    text-align: left;
+    padding: 12px 18px;
+    font-weight: 600;
+    color: var(--navy);
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  tbody td {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(122,206,211,0.05); }
+
+  /* TOC */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 22px 28px;
+    box-shadow: var(--shadow-card);
+    margin-bottom: 40px;
+  }
+  .toc-title {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--warm);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 6px 24px;
+  }
+  .toc-list li { margin: 0; }
+  .toc-list a {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    color: var(--navy);
+    border-bottom: none;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 4px 0;
+  }
+  .toc-list a:hover { color: var(--warm); }
+  .toc-list a span {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--warm);
+    font-weight: 500;
+    min-width: 22px;
+  }
+
+  /* TODO / concern callouts — for user to fill in during review */
+  .todo-block {
+    background: var(--surface-attention);
+    border: 1px dashed rgba(206,86,18,0.5);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin: 14px 0;
+    position: relative;
+  }
+  .todo-block::before {
+    content: 'TODO / REVIEW';
+    position: absolute;
+    top: -10px;
+    left: 18px;
+    background: var(--warm);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+  }
+  .todo-block p:last-child { margin-bottom: 0; }
+  .todo-block p { color: #7a5200; font-style: italic; }
+
+  /* Concern (broken decision / confusion to flag) */
+  .concern {
+    background: rgba(247,170,41,0.12);
+    border-left: 4px solid var(--carrot);
+    padding: 14px 18px;
+    border-radius: 0 10px 10px 0;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  .concern strong { color: #92660a; }
+
+  /* Inline TODO marker (for in-line review notes) */
+  .todo {
+    display: inline-block;
+    background: rgba(206,86,18,0.08);
+    color: var(--warm);
+    border: 1px dashed rgba(206,86,18,0.4);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+  }
+
+  /* Diagram block (ASCII renderings) */
+  .diagram {
+    background: rgba(47,119,120,0.04);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    padding: 20px 24px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--navy);
+    white-space: pre;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+
+  /* File path callout */
+  .file-path {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--slate);
+    background: rgba(122,206,211,0.12);
+    border: 1px solid rgba(47,119,120,0.18);
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+
+  /* Footer */
+  footer {
+    background: var(--navy);
+    color: rgba(255,255,255,0.7);
+    padding: 40px 32px 48px;
+    text-align: center;
+    margin-top: 48px;
+  }
+  footer .footer-inner { max-width: 1180px; margin: 0 auto; }
+  footer .footer-brand {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    color: #ffffff;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  footer .footer-brand span { color: var(--carrot); }
+  footer p { margin: 4px 0; font-size: 13px; }
+  footer a { color: var(--carrot); border-bottom-color: rgba(247,170,41,0.4); }
+
+  /* Print */
+  @media print {
+    .nav { display: none; }
+    body { background: white; }
+    .card, .table-wrap, .toc { box-shadow: none; break-inside: avoid; }
+    pre { background: #f4f5f7; color: var(--navy); border: 1px solid var(--border); }
+    section { break-inside: avoid; }
+  }
+</style><style>
+ main .doc-body{max-width:1000px;margin:0 auto}
+ .doc-body h1{font-family:var(--font-serif);font-size:38px;line-height:1.1;margin:8px 0 16px;color:var(--text)}
+ .doc-body h2{font-family:var(--font-serif);font-size:25px;margin:38px 0 14px;padding-top:18px;border-top:1px solid var(--border-soft);color:var(--navy)}
+ .doc-body h3{font-size:18px;margin:24px 0 10px;color:var(--slate)}
+ .doc-body h4{font-size:15px;margin:18px 0 8px;color:var(--text)}
+ .doc-body p{color:var(--text-body);line-height:1.65;margin:0 0 14px}
+ .doc-body ul,.doc-body ol{margin:0 0 16px;padding-left:22px}
+ .doc-body li{color:var(--text-body);line-height:1.6;margin:4px 0}
+ .doc-body li.task{list-style:none;margin-left:-22px}.doc-body li.task input{margin-right:8px}
+ .doc-body blockquote{background:var(--surface-paper);border-left:3px solid var(--carrot);border-radius:10px;padding:14px 18px;margin:0 0 22px;color:var(--text-muted);font-size:14px}
+ .doc-body table{width:100%;border-collapse:collapse;font-size:13.5px}
+ .doc-body th{text-align:left;background:var(--surface-faint);color:var(--navy);font-weight:600;padding:9px 12px;border-bottom:2px solid var(--border)}
+ .doc-body td{padding:9px 12px;border-bottom:1px solid var(--border-soft);color:var(--text-body);vertical-align:top}
+ .doc-body .table-wrap{overflow-x:auto;margin:0 0 22px;border:1px solid var(--border-soft);border-radius:12px}
+ .doc-body code{font-family:var(--font-mono);font-size:.86em;background:rgba(47,119,120,0.08);color:var(--chocolate);padding:1px 5px;border-radius:5px}
+ .doc-body hr{border:none;border-top:1px solid var(--border-soft);margin:28px 0}
+ .doc-body a{color:var(--slate)}
+</style>
+</head>
+
+<body>
+ <div class="top-bar"></div>
+ <nav class="nav"><div class="nav-inner">
+   <a href="#top" class="nav-brand">divv<span>i</span> <span class="nav-doc-label" style="color:var(--text-muted);font-weight:500;margin-left:8px;">/ plan</span></a>
+   <div class="nav-links"><a href="./LAUNCH_CUTLINE.html">Cutline</a><a href="./PRD.html">PRD</a><a href="./ARCHITECTURE.html">Architecture</a></div>
+ </div></nav>
+ <header class="hero" id="top"><div class="hero-inner">
+   <span class="eyebrow">Planning · Backlog</span>
+   <h1 style="font-family:var(--font-serif);">Pre-Launch Plan.</h1>
+   <p class="hero-sub">The full story-level backlog — scope, owners, acceptance criteria, and status. <strong>49 stories across 12 epics.</strong></p>
+   <div class="meta-row"><span class="meta-chip"><strong>Updated:</strong>&nbsp;2026-06-21</span><span class="meta-chip"><strong>Owner:</strong>&nbsp;Brett</span></div>
+ </div></header>
+ <main><section class="doc-body">
+<h1 id="divvi--pre-launch-plan--story-backlog">Divvi — Pre-Launch Plan &amp; Story Backlog</h1>
+<blockquote><strong>Purpose:</strong> the formal, story-level checklist for v1 launch. Each story is sized, owned, and has acceptance criteria so it can be handed to a dev/agent and marked complete for buyoff &amp; tracking.<br><strong>Companions:</strong> <code>LAUNCH_CUTLINE.md</code> (scope decisions) · <code>PRICING_ANALYSIS.md</code> (pricing detail) · <code>CLAUDE.md</code> (how-we-build rules — *to be authored*).<br><strong>Doc strategy:</strong> <code>PRD.md</code> / <code>ARCHITECTURE.md</code> are <strong>as-built</strong>; this file holds the <strong>divergence</strong> (target behavior) + the backlog.<br><strong>Last updated:</strong> 2026-06-21 · <strong>Owner:</strong> Brett</blockquote>
+<p><strong>Status legend:</strong> ☐ Todo · ◐ In progress · ⊙ In review (PR open) · ✅ Done (<strong>merged to main</strong>) · ⊘ Cut/deferred <strong>Estimate:</strong> S (≤½ day) · M (~1–2 days) · L (3+ days / needs design)</p>
+<p><strong>Running this plan — type <code>/go</code>:</strong> picks up the next eligible story, does the work on a branch (via the owner agent), runs <code>check + test</code>, then <strong>pushes and opens a draft PR</strong> that's already been <strong>code-reviewed</strong> (the review is posted as a PR comment), and marks the story <strong>⊙ In review</strong>. You just review the draft PR and <strong>squash-merge</strong>. The next <code>/go</code> reconciles the merge to <strong>✅</strong> and moves on. Work a specific story with <code>/go &lt;ID&gt;</code> (e.g. <code>/go B2</code>). One story per run; merges stay in your control (pricing/migration/auth/money need your approval).</p>
+<hr>
+<h2 id="agent-roster-approved">Agent roster (approved)</h2>
+<div class="table-wrap"><table><thead><tr><th>Agent</th><th>Type</th><th>Owns</th></tr></thead><tbody><tr><td><strong>divvi-backend</strong></td><td>role</td><td>SvelteKit server, Prisma, APIs — guests, invites, notifications, cuts, waitlist</td></tr><tr><td><strong>divvi-frontend</strong></td><td>role</td><td>Svelte 5 UI + design system — wizard, guest UI, copy</td></tr><tr><td><strong>pricing-be</strong></td><td>specialist</td><td>Pricing engine consolidation (intricate; follows <code>PRICING_ANALYSIS.md</code>)</td></tr><tr><td><strong>perf-be</strong></td><td>specialist</td><td>Backend performance profiling &amp; fixes</td></tr><tr><td><strong>observability</strong></td><td>specialist</td><td>Sentry + PostHog setup</td></tr><tr><td><strong>docs</strong></td><td>specialist</td><td>As-built doc rewrites; conventions; keeps planning docs synced</td></tr><tr><td><strong>code-review</strong></td><td>specialist</td><td>Reviews every PR against <code>CLAUDE.md</code> (correctness, tests-present, footguns, security)</td></tr></tbody></table></div>
+<p>All agents follow <strong><code>CLAUDE.md</code></strong> (how-we-build rules) once authored.</p>
+<p><strong>Standards (locked this session):</strong> mandatory tests (unit for pricing/money, e2e for spine funnels) · <strong>PR-per-story</strong> workflow · design tokens codified from current code · hard rules with a short "why."</p>
+<hr>
+<h2 id="dashboard">Dashboard</h2>
+<div class="table-wrap"><table><thead><tr><th>Epic</th><th>Stories</th><th>Done</th><th>Lead</th></tr></thead><tbody><tr><td>1. Bugs (testing)</td><td>3</td><td>0</td><td>divvi-backend</td></tr><tr><td>2. Pricing</td><td>11</td><td>0</td><td>pricing-be</td></tr><tr><td>3. Cost re-approval redesign</td><td>3</td><td>0</td><td>divvi-backend</td></tr><tr><td>4. Notifications &amp; cron</td><td>4</td><td>0</td><td>divvi-backend</td></tr><tr><td>5. Waitlist</td><td>2</td><td>0</td><td>divvi-backend</td></tr><tr><td>6. Itinerary trim</td><td>2</td><td>0</td><td>divvi-frontend</td></tr><tr><td>7. Cuts</td><td>6</td><td>0</td><td>divvi-backend</td></tr><tr><td>8. Wizard UI</td><td>2</td><td>0</td><td>divvi-frontend</td></tr><tr><td>9. Performance</td><td>3</td><td>0</td><td>perf-be</td></tr><tr><td>10. Observability</td><td>2</td><td>0</td><td>observability</td></tr><tr><td>11. Loose tech-debt</td><td>3</td><td>0</td><td>divvi-backend</td></tr><tr><td>12. Documentation &amp; process</td><td>8</td><td>3</td><td>docs</td></tr><tr><td><strong>Total</strong></td><td><strong>49</strong></td><td><strong>3</strong></td><td></td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-1--bugs-found-in-testing-2026-06-21">Epic 1 — Bugs found in testing (2026-06-21)</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>B1</strong></td><td><strong>Invite link 404.</strong> <code>/invite/&lt;token&gt;</code> → <code>/trips/&lt;tripId&gt;?invite=&lt;token&gt;</code> 404s for the invited user. Root-cause the guard in <code>trips/[tripId]/+layout.server.ts</code> (~<code>throw error(404)</code> line 84, invite-preview / not-yet-member path). *Acceptance: clicking a fresh invite link (logged-out and logged-in-non-member) lands on the trip join page, never 404.*</td><td>divvi-backend</td><td>M</td><td>☐</td></tr><tr><td><strong>B2</strong></td><td><strong>Guest edit "Missing user".</strong> Setting a guest's status/room from the guest list fails. Param mismatch: actions read <code>targetUserId</code> (<code>guests/+page.server.ts:978…1161</code>) vs <code>userId</code> (:638/:713/:795); form posts the wrong name. *Acceptance: host sets status + room with no error; regression test.*</td><td>divvi-backend</td><td>S</td><td>☐</td></tr><tr><td><strong>B3</strong></td><td><strong>Delete guest.</strong> Today <code>removeGuest</code> only soft-removes (<code>:629</code>). Add a hard delete (remove <code>TripMember</code> + cascade RSVP/assignments) behind a <strong>confirmation dialog</strong>. *Acceptance: host deletes a guest after confirming; guest gone from list + trip; cancel aborts.*</td><td>divvi-backend (+FE confirm)</td><td>M</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-2--pricing-detail-in-pricing_analysismd-6">Epic 2 — Pricing (detail in <code>PRICING_ANALYSIS.md §6</code>)</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>PR1</strong></td><td>Remove dead <code>sharingExponentAlpha</code> + <code>privacyPremiumP</code> (validator, interface fields) + dead <code>Room.privacyFactor</code>; Prisma migration drops the columns. *No pricing-number change.*</td><td>pricing-be</td><td>M</td><td>☐</td></tr><tr><td><strong>PR2</strong></td><td>Fix stale <code>bedWeights</code> schema comment (<code>schema.prisma:59</code>) to real defaults.</td><td>pricing-be</td><td>S</td><td>☐</td></tr><tr><td><strong>PR3</strong></td><td>Remove <code>per_person_per_night</code>: engines + validator + wizard option; map legacy rows → <code>per_person</code>.</td><td>pricing-be (+FE)</td><td>M</td><td>☐</td></tr><tr><td><strong>PR4</strong></td><td>Kill legacy <code>pricing.ts:calculatePrice</code>: repoint <code>trips/[tripId]/+page.server.ts</code> (+<code>/api/submit</code> per CU6) to canonical <code>calculateReservationPrice</code>; delete <code>pricing.ts</code>.</td><td>pricing-be</td><td>M</td><td>☐</td></tr><tr><td><strong>PR5</strong></td><td>Retire weighted <code>computeRoomPricing</code> + fallback (PerRoom is flat); verify no live consumer first.</td><td>pricing-be</td><td>M</td><td>☐</td></tr><tr><td><strong>PR6</strong></td><td><strong>PerPerson ÷ attendance:</strong> canonical per_person divides by Σ(party of YES rsvps), not Σ(room.maxOccupancy). <strong>Kids = full share</strong> (include children in party size).</td><td>pricing-be</td><td>M</td><td>☐</td></tr><tr><td><strong>PR7</strong></td><td>Verify invoice recompute + re-approval fire on RSVP yes/drop for per_person.</td><td>pricing-be</td><td>S</td><td>☐</td></tr><tr><td><strong>PR8</strong></td><td>Tests: Σ(per_person invoices) == totalCost; a drop raises others' shares.</td><td>pricing-be</td><td>S</td><td>☐</td></tr><tr><td><strong>PR9</strong></td><td>Reconcile display/preview path (<code>getPerBedRangeGuestCounts</code>/<code>computePerBedPricingAtHeadcount</code>) to use <code>closing-range.ts</code> so host tiles match guest-approved ranges. Heed "don't merge caps blindly."</td><td>pricing-be (+FE)</td><td>M</td><td>☐</td></tr><tr><td><strong>PR10</strong></td><td>PerRoom range = single fixed number (<code>computeGuestEstimateRange</code> per_room → low=high=totalCost/#rooms); FE shows one price, not a range.</td><td>pricing-be (+FE)</td><td>S</td><td>☐</td></tr><tr><td><strong>PR11</strong></td><td>Rewrite <code>PRICING.md</code> to the final model (remove α/P/ppn; PerRoom flat; PerPerson ÷attendance; kids; partial-stay out).</td><td>docs</td><td>M</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-3--cost-re-approval-redesign-r1">Epic 3 — Cost re-approval redesign (R1)</h2>
+<p><strong>Intent:</strong> inform, don't pressure. One quiet notification, host drives the nudge — never bombard a guest with "your trip is too expensive."</p>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>RA1</strong></td><td>Guest email on <strong>first</strong> over-range crossing is <strong>content-light: no price/amount</strong>, just "something about your trip cost changed — log in to see." (<code>cost-reapproval.ts</code> already idempotent per pending cycle; change the email template.) *Acceptance: triggering re-approval sends one no-amount email; logging in shows the detail.*</td><td>divvi-backend</td><td>M</td><td>☐</td></tr><tr><td><strong>RA2</strong></td><td>Ensure <strong>no automatic reminders</strong> to the guest (ties to NJ1 cron removal). *Acceptance: no scheduled/repeat re-approval emails fire.*</td><td>divvi-backend</td><td>S</td><td>☐</td></tr><tr><td><strong>RA3</strong></td><td><strong>Host-initiated manual nudge</strong> for a guest needing re-approval (mirror existing nudge pattern). Host sees who's pending and can send one nudge. *Acceptance: host sees pending guests; clicking nudge sends one email; no auto-send.*</td><td>divvi-backend (+FE)</td><td>M</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-4--notifications--cron-ws-j">Epic 4 — Notifications &amp; cron (WS-J)</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>NJ1</strong></td><td>Remove waitlist-promotion + cost-reapproval <strong>reminder crons</strong>; keep poll-lifecycle cron + event-driven sends.</td><td>divvi-backend</td><td>M</td><td>☐</td></tr><tr><td><strong>NJ2</strong></td><td>Wire event-driven equivalents for any orphaned triggers (or accept no-reminder); audit <code>cron-email-service.ts</code> + <code>/api/cron/*</code> before deleting.</td><td>divvi-backend</td><td>M</td><td>☐</td></tr><tr><td><strong>NJ3</strong></td><td>Implement <code>nudgeAllPending</code> (TECH_DEBT #1, currently a stub) via the email pipeline.</td><td>divvi-backend</td><td>S</td><td>☐</td></tr><tr><td><strong>NJ4</strong></td><td>Implement poll non-responder notifications (TECH_DEBT #2, stub).</td><td>divvi-backend</td><td>S</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-5--waitlist-ws-k">Epic 5 — Waitlist (WS-K)</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>WK1</strong></td><td>Keep + verify capacity-cap enforcement (server + client).</td><td>divvi-backend</td><td>S</td><td>☐</td></tr><tr><td><strong>WK2</strong></td><td>Replace the timed claim-window automation with <strong>manual host promote</strong>. *Acceptance: host manually promotes the next waitlisted guest; no auto-rolling timer.*</td><td>divvi-backend</td><td>M</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-6--itinerary-trim-ws-i">Epic 6 — Itinerary trim (WS-I)</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>IT1</strong></td><td><strong>Hide "Discover"</strong> — remove the Google Places / Divvi Events discovery UI + its API dependency from the itinerary/activities flow.</td><td>divvi-frontend (+BE)</td><td>M</td><td>☐</td></tr><tr><td><strong>IT2</strong></td><td>Verify manual activity/meal add + meal-fund still work without Discover.</td><td>divvi-frontend</td><td>S</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-7--cuts">Epic 7 — Cuts</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>CU1</strong></td><td>Cut <strong>invite-from-friends</strong>: remove <code>inviteFriend</code> action + "From friends" UI. Co-host invite role stays.</td><td>divvi-backend (+FE)</td><td>S</td><td>☐</td></tr><tr><td><strong>CU2</strong></td><td>Strip <strong>SMS/Twilio</strong> invite placeholder (TECH_DEBT #3).</td><td>divvi-backend</td><td>S</td><td>☐</td></tr><tr><td><strong>CU3</strong></td><td>Strip <strong>Mobile API</strong> — remove <code>/api/mobile/*</code> (routes + CORS / 90-day-TTL scaffolding).</td><td>divvi-backend</td><td>M</td><td>☐</td></tr><tr><td><strong>CU4</strong></td><td>Confirm <strong>Trip Games</strong> fully hidden behind <code>FEATURE_TRIP_GAMES</code> everywhere; defer the sessionStorage→DB debt (TECH_DEBT #7).</td><td>divvi-backend</td><td>S</td><td>☐</td></tr><tr><td><strong>CU5</strong></td><td>Disable partial <strong>plus-ones</strong> UI (WS-S); keep adults/kids counts pricing needs.</td><td>divvi-frontend</td><td>S</td><td>☐</td></tr><tr><td><strong>CU6</strong></td><td><strong>WS-P:</strong> sever <code>/api/submit</code> dependency on <code>pricing.ts</code> (disable/repoint route); leave <code>Reservation</code>/<code>GuestSubmission</code> models + login backfill <strong>dormant</strong>.</td><td>divvi-backend</td><td>M</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-8--wizard-ui-u1">Epic 8 — Wizard UI (U1)</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>UI1</strong></td><td>Reuse the edit-trip cards from <code>/trips/[tripId]/settings/step/*</code> in the new-trip flow <code>/trips/new/step/*</code>; keep the new-trip background (little-icons). Share components from settings → new-trip so both render identically.</td><td>divvi-frontend</td><td>L</td><td>☐</td></tr><tr><td><strong>UI2</strong></td><td>Pricing step: remove the PPN option from the wizard (FE side of PR3); show only PerPerson / PerRoom / PerBed (+ skip cost-sharing).</td><td>divvi-frontend</td><td>S</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-9--performance-p1">Epic 9 — Performance (P1)</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>PF1</strong></td><td>Profile the trip dashboard load (<code>trips/[tripId]/+layout.server.ts</code> + <code>+page.server.ts</code>); identify the 3.8–5.0s server cost (suspect: per-request pricing sims + N+1 queries). *Read-only diagnosis → report.*</td><td>perf-be</td><td>M</td><td>☐</td></tr><tr><td><strong>PF2</strong></td><td>Fix N+1 / batch Prisma queries on the trip load (<code>include</code>/batched fetches). *Acceptance: trip-page server time materially down (target &lt;800ms).*</td><td>perf-be</td><td>M</td><td>☐</td></tr><tr><td><strong>PF3</strong></td><td>Memoize/cache pricing per request (don't recompute estimates repeatedly); cache where safe.</td><td>perf-be</td><td>M</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-10--observability-ws-t">Epic 10 — Observability (WS-T)</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>OB1</strong></td><td>Add <strong>Sentry</strong> (server + client error tracking), minimal config.</td><td>observability</td><td>M</td><td>☐</td></tr><tr><td><strong>OB2</strong></td><td>Add <strong>PostHog</strong> (product analytics) for the core funnel events.</td><td>observability</td><td>M</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-11--loose-tech-debt">Epic 11 — Loose tech-debt</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>TD1</strong></td><td>Contacts modal dead button on invite step (TECH_DEBT #5) — remove or wire.</td><td>divvi-frontend</td><td>S</td><td>☐</td></tr><tr><td><strong>TD2</strong></td><td><code>locked</code> RSVP status referenced but unwired (TECH_DEBT #6) — remove the reference or implement. Low priority.</td><td>divvi-backend</td><td>S</td><td>☐</td></tr><tr><td><strong>TD3</strong></td><td>Bed-removed email is listed both <strong>open and resolved</strong> in TECH_DEBT.md (#4) — verify actual state, fix the register.</td><td>divvi-backend</td><td>S</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="epic-12--documentation">Epic 12 — Documentation</h2>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Story · acceptance</th><th>Owner</th><th>Est</th><th>Status</th></tr></thead><tbody><tr><td><strong>DC0</strong></td><td>Author <strong><code>CONTRIBUTING.md</code></strong> — the PR-per-story workflow + behavior-change guide for the dev (branch naming, commit format, review/merge, git snippets, FAQ).</td><td>docs (+Brett)</td><td>M</td><td>✅</td></tr><tr><td><strong>DC1</strong></td><td>Author <strong><code>CLAUDE.md</code></strong> — how-we-build Divvi (prime directives, BE/FE rules, UI/UX + codified design tokens via <code>docs/PALETTE.html</code>, naming, mandatory-test bar, git rules → links to CONTRIBUTING, footguns).</td><td>docs (+Brett)</td><td>M</td><td>✅</td></tr><tr><td><strong>DC7</strong></td><td>Build the <strong>code-review agent</strong> (<code>.claude/agents/code-review.md</code>) — reviews PRs vs <code>CLAUDE.md</code>; enforces tests-present + footguns + tiered gate.</td><td>docs (+Brett)</td><td>M</td><td>✅</td></tr><tr><td><strong>DC2</strong></td><td>As-built <strong>PRD.md</strong> rewrite — full current feature inventory (co-host, waitlist, manual guest add, profiles, DMs, files, polls, itinerary, games-behind-flag, etc.).</td><td>docs</td><td>L</td><td>☐</td></tr><tr><td><strong>DC3</strong></td><td>As-built <strong>ARCHITECTURE.md</strong> rewrite to match consolidated code.</td><td>docs</td><td>M</td><td>☐</td></tr><tr><td><strong>DC4</strong></td><td>Fix <strong><code>DIVVI.md</code></strong> — stale (still documents the removed anonymous reserve flow).</td><td>docs</td><td>S</td><td>☐</td></tr><tr><td><strong>DC5</strong></td><td>Confirm <strong>Resend</strong> in all docs; scrub any SendGrid mention (none in code).</td><td>docs</td><td>S</td><td>☐</td></tr><tr><td><strong>DC6</strong></td><td>Keep <code>LAUNCH_CUTLINE.md</code> (+.html) and this plan in sync as decisions land.</td><td>docs</td><td>S</td><td>☐</td></tr></tbody></table></div>
+<hr>
+<h2 id="suggested-sequencing">Suggested sequencing</h2>
+<ol><li><strong>DC1</strong> (<code>CLAUDE.md</code>) first — rules in place before the other dev starts.</li><li><strong>Now-safe / high-value:</strong> PF1 (read-only), B1, B2, B3.</li><li><strong>Pricing PR1–PR5</strong> (deletions/consolidation) — also unblocks perf; CU6 rides with PR4.</li><li><strong>PR6–PR10</strong>, RA1–RA3, UI1–UI2, NJ1–NJ4.</li><li><strong>Cuts</strong> (CU1–CU5), <strong>Waitlist</strong> (WK), <strong>Itinerary</strong> (IT), <strong>Observability</strong> (OB).</li><li><strong>PF2–PF3</strong> after pricing settles; <strong>Docs</strong> DC2–DC5 once behavior is stable.</li></ol>
+<blockquote><strong>Gate:</strong> execution starts once <code>LAUNCH_CUTLINE.md</code> is approved. B1–B3 + PF1 + DC1 can start sooner — Brett to confirm.</blockquote>
+ </section></main>
+ <footer><div class="footer-inner"><div class="footer-brand">divv<span>i</span></div><p>Pre-Launch Plan. · 2026-06-21</p></div></footer>
+</body></html>

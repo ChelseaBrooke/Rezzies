@@ -59,6 +59,7 @@ The cost feedback loop is the product (PRD §3). These ship complete.
 | A′ | **Legacy pricing paths** | `pricing.ts:calculatePrice`, `per_person_per_night` (model + wizard option), `sharingExponentAlpha` + `privacyPremiumP` (dead fields + columns), dead `Room.privacyFactor`. |
 | Q | **SMS / Twilio invites** | Email invites only — strip the placeholder (TECH_DEBT #3). |
 | R | **Mobile API** | Strip `/api/mobile/*` entirely (routes + CORS / 90-day-TTL scaffolding). |
+| U | **Invite from friends list** | Cut the `inviteFriend` action + "From friends" UI for v1 (unclear UX, low value now). **Co-host invites stay** — that's just an invite *role* on the email invite, not a separate flow. |
 
 ## ⚙️ Infra — add before launch
 
