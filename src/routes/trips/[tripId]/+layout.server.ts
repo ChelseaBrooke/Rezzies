@@ -8,6 +8,7 @@ import { computeCommittedFundsFromYesRsvps, getCostAtMaxParticipation } from '$l
 import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
 import type { InvoiceBreakdown } from '$lib/server/invoice-calculator.js';
 import { FEATURE_TRIP_GAMES } from '$lib/config/features.js';
+import { hasValidInviteForTrip } from '$lib/server/invite-access.js';
 
 const INVITE_COOKIE_PREFIX = 'trip_invite_';
 
@@ -232,6 +233,12 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			});
 
 			if (!joinTrip) {
+				throw error(404, 'Trip not found');
+			}
+
+			// Same draft-trip-with-a-valid-invite exception as join/+page.server.ts: don't leak
+			// even this minimal trip preview to a non-member who isn't published or invited.
+			if (!joinTrip.isPublished && !(await hasValidInviteForTrip(inviteFromQuery, tripId))) {
 				throw error(404, 'Trip not found');
 			}
 

@@ -3,11 +3,12 @@ import { prisma } from './prisma.js';
 export type InviteRecordForAccessCheck = {
 	tripId: string;
 	expiresAt: Date | null;
+	status: string;
 };
 
 /**
  * Pure guard: is this invite record usable to access `tripId` right now?
- * Requires the invite to exist, match the trip, and not be expired.
+ * Requires the invite to exist, match the trip, not be expired, and not have been declined.
  * Kept side-effect-free (no DB access) so the membership/token guard logic is unit-testable
  * without mocking Prisma.
  */
@@ -19,6 +20,7 @@ export function isInviteValidForTrip(
 	if (!invite) return false;
 	if (invite.tripId !== tripId) return false;
 	if (invite.expiresAt && invite.expiresAt < now) return false;
+	if (invite.status === 'declined') return false;
 	return true;
 }
 
@@ -37,7 +39,7 @@ export async function hasValidInviteForTrip(
 
 	const invite = await prisma.invite.findUnique({
 		where: { token: trimmed },
-		select: { tripId: true, expiresAt: true }
+		select: { tripId: true, expiresAt: true, status: true }
 	});
 
 	return isInviteValidForTrip(invite, tripId);
