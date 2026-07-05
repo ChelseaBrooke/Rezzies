@@ -34,7 +34,7 @@ All agents follow **`CLAUDE.md`** (how-we-build rules) once authored.
 
 | Epic | Stories | Done | Lead |
 |---|---|---|---|
-| 1. Bugs (testing) | 3 | 0 | divvi-backend |
+| 1. Bugs (testing) | 3 | 1 | divvi-backend |
 | 2. Pricing | 11 | 0 | pricing-be |
 | 3. Cost re-approval redesign | 3 | 0 | divvi-backend |
 | 4. Notifications & cron | 4 | 0 | divvi-backend |
@@ -46,7 +46,7 @@ All agents follow **`CLAUDE.md`** (how-we-build rules) once authored.
 | 10. Observability | 2 | 0 | observability |
 | 11. Loose tech-debt | 3 | 0 | divvi-backend |
 | 12. Documentation & process | 8 | 3 | docs |
-| **Total** | **49** | **3** | |
+| **Total** | **49** | **4** | |
 
 ---
 
@@ -54,9 +54,13 @@ All agents follow **`CLAUDE.md`** (how-we-build rules) once authored.
 
 | ID | Story · acceptance | Owner | Est | Status |
 |---|---|---|---|---|
-| **B1** | **Invite link 404.** `/invite/<token>` → `/trips/<tripId>?invite=<token>` 404s for the invited user. Root-cause the guard in `trips/[tripId]/+layout.server.ts` (~`throw error(404)` line 84, invite-preview / not-yet-member path). *Acceptance: clicking a fresh invite link (logged-out and logged-in-non-member) lands on the trip join page, never 404.* | divvi-backend | M | ☐ |
+| **B1** | **Invite link 404.** `/invite/<token>` → `/trips/<tripId>?invite=<token>` 404s for the invited user. Root-cause the guard in `trips/[tripId]/+layout.server.ts` (~`throw error(404)` line 84, invite-preview / not-yet-member path). *Acceptance: clicking a fresh invite link (logged-out and logged-in-non-member) lands on the trip join page, never 404.* | divvi-backend | M | ✅ |
 | **B2** | **Guest edit "Missing user".** Setting a guest's status/room from the guest list fails. Param mismatch: actions read `targetUserId` (`guests/+page.server.ts:978…1161`) vs `userId` (:638/:713/:795); form posts the wrong name. *Acceptance: host sets status + room with no error; regression test.* | divvi-backend | S | ☐ |
 | **B3** | **Delete guest.** Today `removeGuest` only soft-removes (`:629`). Add a hard delete (remove `TripMember` + cascade RSVP/assignments) behind a **confirmation dialog**. *Acceptance: host deletes a guest after confirming; guest gone from list + trip; cancel aborts.* | divvi-backend (+FE confirm) | M | ☐ |
+
+> **Found while fixing B1 (not fixed — out of scope, flagging for backlog):**
+> - `trips/[tripId]/+layout.server.ts`: the `membership.inviteStatus === 'pending'` / `'denied'` branches unconditionally `redirect(303, …/pending|/denied)`, the same self-redirect-loop shape B1 had for `/join`. A pending/denied member landing directly on `/trips/<id>/pending` or `/trips/<id>/denied` will loop. Same fix shape as the B1 `isJoinRoute` guard would apply.
+> - `lint:vocabulary` currently fails on a pre-existing comment: `src/lib/components/trips/dashboard/GuestRsvpSummaryCard.svelte:107` uses "booking" in a doc comment. Not touched by B1; needs a wording pass.
 
 ---
 
