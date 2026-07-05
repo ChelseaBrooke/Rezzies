@@ -44,7 +44,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			select: { tripId: true, expiresAt: true, status: true }
 		});
 
-		if (!invite || invite.tripId !== tripId) {
+		if (!invite || invite.tripId !== tripId || invite.status === 'declined') {
 			cookies.delete(inviteCookieName, { path: `/trips/${tripId}` });
 			throw redirect(303, `/login?redirect=${encodeURIComponent(`/trips/${tripId}`)}`);
 		}
