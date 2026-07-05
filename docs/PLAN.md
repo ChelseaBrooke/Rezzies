@@ -145,7 +145,7 @@ All agents follow **`CLAUDE.md`** (how-we-build rules) once authored.
 
 | ID | Story · acceptance | Owner | Est | Status |
 |---|---|---|---|---|
-| **PF1** | Profile the trip dashboard load (`trips/[tripId]/+layout.server.ts` + `+page.server.ts`); identify the 3.8–5.0s server cost (suspect: per-request pricing sims + N+1 queries). *Read-only diagnosis → report.* | perf-be | M | ☐ |
+| **PF1** | Profile the trip dashboard load (`trips/[tripId]/+layout.server.ts` + `+page.server.ts`); identify the 3.8–5.0s server cost (suspect: per-request pricing sims + N+1 queries). *Read-only diagnosis → report.* | perf-be | M | ⊙ |
 | **PF2** | Fix N+1 / batch Prisma queries on the trip load (`include`/batched fetches). *Acceptance: trip-page server time materially down (target <800ms).* | perf-be | M | ☐ |
 | **PF3** | Memoize/cache pricing per request (don't recompute estimates repeatedly); cache where safe. | perf-be | M | ☐ |
 
