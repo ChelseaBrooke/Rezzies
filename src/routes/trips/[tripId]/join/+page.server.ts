@@ -3,6 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { getSessionUser } from '$lib/server/session.js';
 import { prisma } from '$lib/server/prisma.js';
 import { sendGuestJoinedEmail } from '$lib/server/notification-service.js';
+import { hasValidInviteForTrip } from '$lib/server/invite-access.js';
 
 export const load: PageServerLoad = async ({ params, cookies, url }) => {
 	const inviteFromQuery = url.searchParams.get('invite')?.trim() || '';
@@ -38,11 +39,19 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 			isPublished: true,
 			listingCoverPhoto: true,
 			locationCity: true,
-			inviteMode: true
+			inviteMode: true,
+			maxCapacity: true
 		}
 	});
 
-	if (!trip || !trip.isPublished) {
+	if (!trip) {
+		throw error(404, 'Trip not found');
+	}
+
+	// A host can send invites before finishing publish (draft trip). A guest who followed a
+	// valid, unexpired invite link for this exact trip should still be able to join — only
+	// block truly public/unauthenticated access to an unpublished trip.
+	if (!trip.isPublished && !(await hasValidInviteForTrip(inviteFromQuery, tripId))) {
 		throw error(404, 'Trip not found');
 	}
 
@@ -78,7 +87,12 @@ export const actions: Actions = {
 			select: { id: true, isPublished: true, inviteMode: true, maxCapacity: true }
 		});
 
-		if (!trip || !trip.isPublished) {
+		if (!trip) {
+			throw error(404, 'Trip not found');
+		}
+
+		// Same draft-trip-with-a-valid-invite exception as the load above.
+		if (!trip.isPublished && !(await hasValidInviteForTrip(inviteToken, tripId))) {
 			throw error(404, 'Trip not found');
 		}
 
