@@ -19,30 +19,36 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 
 	const tripId = params.tripId;
 
-	const existing = await prisma.tripMember.findUnique({
-		where: { tripId_userId: { tripId, userId: user.id } }
-	});
+	// One round trip for everything the page needs — this load sits on the invite funnel,
+	// and these three reads don't depend on each other (they were serial before).
+	const [existing, trip, approvedCount] = await Promise.all([
+		prisma.tripMember.findUnique({
+			where: { tripId_userId: { tripId, userId: user.id } }
+		}),
+		prisma.trip.findUnique({
+			where: { id: tripId },
+			select: {
+				id: true,
+				name: true,
+				checkInDate: true,
+				checkOutDate: true,
+				isPublished: true,
+				listingCoverPhoto: true,
+				locationCity: true,
+				inviteMode: true,
+				maxCapacity: true
+			}
+		}),
+		prisma.tripMember.count({
+			where: { tripId, inviteStatus: 'approved' }
+		})
+	]);
 
 	if (existing) {
 		if (existing.inviteStatus === 'approved') throw redirect(303, `/trips/${tripId}`);
 		if (existing.inviteStatus === 'pending') throw redirect(303, `/trips/${tripId}/pending`);
 		if (existing.inviteStatus === 'denied') throw redirect(303, `/trips/${tripId}/denied`);
 	}
-
-	const trip = await prisma.trip.findUnique({
-		where: { id: tripId },
-		select: {
-			id: true,
-			name: true,
-			checkInDate: true,
-			checkOutDate: true,
-			isPublished: true,
-			listingCoverPhoto: true,
-			locationCity: true,
-			inviteMode: true,
-			maxCapacity: true
-		}
-	});
 
 	if (!trip) {
 		throw error(404, 'Trip not found');
@@ -51,13 +57,12 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
 	// A host can send invites before finishing publish (draft trip). A guest who followed a
 	// valid, unexpired invite link for this exact trip should still be able to join — only
 	// block truly public/unauthenticated access to an unpublished trip.
+	// Deliberately left out of the batch above: it only runs on the draft-trip path, so the
+	// published (common) case pays nothing for it.
 	if (!trip.isPublished && !(await hasValidInviteForTrip(inviteFromQuery, tripId))) {
 		throw error(404, 'Trip not found');
 	}
 
-	const approvedCount = await prisma.tripMember.count({
-		where: { tripId, inviteStatus: 'approved' }
-	});
 	const maxCapacity = trip.maxCapacity ?? null;
 	const isTripFull = maxCapacity !== null && approvedCount >= maxCapacity;
 

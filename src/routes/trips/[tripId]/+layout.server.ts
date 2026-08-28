@@ -8,7 +8,7 @@ import { computeCommittedFundsFromYesRsvps, getCostAtMaxParticipation } from '$l
 import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
 import type { InvoiceBreakdown } from '$lib/server/invoice-calculator.js';
 import { FEATURE_TRIP_GAMES } from '$lib/config/features.js';
-import { hasValidInviteForTrip } from '$lib/server/invite-access.js';
+import { hasValidInviteForTrip, isInviteExpired } from '$lib/server/invite-access.js';
 
 const INVITE_COOKIE_PREFIX = 'trip_invite_';
 
@@ -49,7 +49,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			throw redirect(303, `/login?redirect=${encodeURIComponent(`/trips/${tripId}`)}`);
 		}
 
-		if (invite.expiresAt && invite.expiresAt < new Date()) {
+		if (isInviteExpired(invite)) {
 			throw error(410, 'This invite has expired');
 		}
 
