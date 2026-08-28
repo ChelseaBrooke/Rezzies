@@ -25,7 +25,7 @@ One trip-dashboard request issues **93–136 SQL statements** depending on who i
 Two things the story suspected that turned out **not** to be the problem:
 
 - **There is no N+1 over guests.** `computeCommittedFundsFromYesRsvps` was already de-N+1'd (see its comment at `src/lib/server/pricing-canonical.ts:705-707`) and costs a flat 5 SELECTs no matter how many people said yes. The N+1s that remain scale with *the viewing guest's own bed assignments* (typically 1), not with party size.
-- **`getPerBedRangeGuestCounts` / `computePerBedPricingAtHeadcount` / `computeRoomPricing` / `getPricingPreview` never run on this route.** They are on `/trips/[tripId]/rsvp` and in `pricing-display.ts`. `/rsvp` is in fact the slowest page in `perf-log.csv` (19.9 s) — a separate story.
+- **`getPerBedRangeGuestCounts` / `computePerBedPricingAtHeadcount` / `computeRoomPricing` never run on this route.** They are on `/trips/[tripId]/rsvp` and in `pricing-display.ts`. `/rsvp` is in fact the slowest page in `perf-log.csv` (19.9 s) — a separate story. **`getPricingPreview` (`pricing-canonical.ts:976`) has zero callers repo-wide** — it is dead code, not a perf item.
 
 ---
 
@@ -193,6 +193,8 @@ Measured per scenario. Counts are exact and reproduce identically on every run.
 | Guest `PER_PERSON`, same trip | + 1 own assignment, RSVP yes | 70 | 66 | **136** | 16.1 s |
 | Guest `PER_BED` (`76344db3`) | 5 rooms / 2 members / 0 own assignments | 58 | 60 | **118** | 12.3 s |
 
+> **Casing note.** Scenario labels above quote the value **as stored** — every `Trip.pricingModel` row in this database is UPPER_SNAKE (`PER_PERSON`, `PER_BED`), matching `prisma/schema.prisma`'s `@default("PER_PERSON")`. `CLAUDE.md` says stored/compared values should be snake_case, so the DB has drifted from the rule; the code papers over it by lowercasing at `pricing.ts:81` and `pricing-canonical.ts:867` before every comparison. Everywhere below that a **code branch** is named, this report uses the lowercase form the comparison actually sees (`per_bed`), and reserves UPPER_SNAKE for stored row values. Worth a `pricing-be` decision on which way to normalise — out of scope for PF1.
+
 Same-row re-reads on the 136-statement guest load:
 
 | table | times fetched in one request |
@@ -209,14 +211,14 @@ Same-row re-reads on the 136-statement guest load:
 
 | # | Site | Loop | Multiplies by | Cost per iteration | Parallel? |
 |---|---|---|---|---|---|
-| **N+1 ①** | `src/routes/trips/[tripId]/+page.server.ts:67-78` | `myAssignments.map(a => calculatePrice(…))` | **the viewing guest's own room assignments** | `PER_PERSON` **6 statements**; `PER_BED` **15 statements** (`pricing.ts:57` fetches the trip, then `pricing.ts:91` calls `calculateReservationPrice` which fetches it *again* at `pricing-canonical.ts:829`) | yes (`Promise.all`) |
-| **N+1 ②** | `src/lib/server/guest-estimate.ts:232-264` | `for (const a of guestAssignments) { … await calculateReservationPrice(…) }` at `:255` | **the viewing guest's own room assignments**, `PER_BED` only | **9 statements**, and it is a **sequential `await` inside a `for` loop** — no `Promise.all` | **no** |
+| **N+1 ①** | `src/routes/trips/[tripId]/+page.server.ts:67-78` | `myAssignments.map(a => calculatePrice(…))` | **the viewing guest's own room assignments** | `per_person` **6 statements**; `per_bed` **15 statements** (`pricing.ts:57` fetches the trip, then `pricing.ts:91` calls `calculateReservationPrice` which fetches it *again* at `pricing-canonical.ts:829`) | yes (`Promise.all`) |
+| **N+1 ②** | `src/lib/server/guest-estimate.ts:232-264` | `for (const a of guestAssignments) { … await calculateReservationPrice(…) }` at `:255` | **the viewing guest's own room assignments**, `per_bed` only | **9 statements**, and it is a **sequential `await` inside a `for` loop** — no `Promise.all` | **no** |
 | Not an N+1 | `src/lib/server/pricing-canonical.ts:749-808` | `for (const userId of yesUserIds)` | — | **0 queries** — already batched; see the comment at `:705-707` | — |
 | Not an N+1 | `pricing-canonical.ts:491`, `:527`, `:665` | `trip.rooms.map` / `.reduce` | — | pure in-memory math | — |
 
 **Neither N+1 scales with the size of the party.** They scale with how many beds *the person looking at the page* has claimed — normally 1, occasionally 2–3 for a household. That is why the empty trips in `perf-log.csv` are still 3.8–5.0 s: at zero assignments both N+1s contribute zero, and the page is *still* slow.
 
-The thing that behaves *like* an N+1 but isn't one is **Prisma's relation fan-out**: 12 `include` branches → 23 serial statements, regardless of row counts.
+The thing that behaves *like* an N+1 but isn't one is **Prisma's relation fan-out**: 12 `include` branches → 23 serial statements. It does not *grow* with row counts — one statement per branch, whatever the branch returns — but it is not perfectly fixed either: Prisma skips a nested query when its parent set comes back empty, which is why the empty trip's `:228` phase is 45 statements against the populated trip's 53. Call it a near-fixed floor that only ever shrinks on sparse trips.
 
 ### The other half of the statements
 
@@ -276,16 +278,18 @@ Measured individually against the live DB, medians:
 
 | Call | SELECTs | statements | wall | notes |
 |---|---|---|---|---|
-| `calculateReservationPrice` (`PER_BED`, 1 call) | 6 | 9 | 1 469 ms | `pricing-canonical.ts:829` re-fetches Trip + rooms + beds + yes-RSVPs + all roomAssignments (+ their rooms) |
-| `calculatePrice` (`PER_BED` wrapper, 1 call) | 9 | 15 | 2 379 ms | `pricing.ts:57` fetch **plus** the above |
-| `calculatePrice` (`PER_PERSON` wrapper, 1 call) | 3 | 6 | 876 ms | `pricing.ts:57` only; `:112` is pure math |
+| `calculateReservationPrice` (`per_bed`, 1 call) | 6 | 9 | 1 469 ms | `pricing-canonical.ts:829` re-fetches Trip + rooms + beds + yes-RSVPs + all roomAssignments (+ their rooms) |
+| `calculatePrice` (`per_bed` wrapper, 1 call) | 9 | 15 | 2 379 ms | `pricing.ts:57` fetch **plus** the above |
+| `calculatePrice` (`per_person` wrapper, 1 call) | 3 | 6 | 876 ms | `pricing.ts:57` only; the `:113` dispatch calls `calculatePerPersonPrice` (`pricing.ts:148`), which is pure math |
 | `computeCommittedFundsFromYesRsvps` | 5 | 8 | 1 242 ms | flat, independent of guest count |
 | `getCostAtMaxParticipation` | 3 | 6 | 951 ms | |
-| `computeGuestEstimateRange` (`PER_PERSON`, 1 assignment) | **15** | **30** | 3 767 ms | `:105-127` four-way `Promise.all` (9 SELECTs) + `:333` pricing call (6) |
-| `computeGuestEstimateRange` (`PER_BED`, 0 assignments) | 10 | 22 | 1 719 ms | takes the `:272` branch, no pricing call |
-| `computeGuestEstimateRange` (`PER_BED`, 1 assignment) | 15 | 30 | 2 925 ms | + 9 statements per additional assignment, **serially** |
+| `computeGuestEstimateRange` (`per_person`, 1 assignment) | **15** | **30** | 3 767 ms | `:105-127` four-way `Promise.all` (9 SELECTs) + `:333` pricing call (6) |
+| `computeGuestEstimateRange` (`per_bed`, 0 assignments) | 10 | 22 | 1 719 ms | takes the `:272` branch, no pricing call |
+| `computeGuestEstimateRange` (`per_bed`, 1 assignment) | 15 | 30 | 2 925 ms | + 9 statements per additional assignment, **serially** |
 
 Every input `computeGuestEstimateRange` fetches at `guest-estimate.ts:105-127` — the trip with rooms and beds, the yes-RSVPs, all room assignments, the guest's own RSVP — is **already in memory** from `+layout.server.ts:229-263` and `:266` by the time `+page.server.ts:88` calls it.
+
+> **The layout's copy is not a drop-in, though.** `guest-estimate.ts:120-123` fetches assignments with `room: { include: { beds: { orderBy: ROOM_BEDS_ORDER_BY } } }`, whereas the layout's copy at `+layout.server.ts:249` is `room: { select: { id, name, photoUrls } }` — **no `beds`**. PF2 must rehydrate beds from `trip.rooms` (which does carry them, via `+layout.server.ts:233-234`) by joining on `roomId`, not just hand the layout object over and assume the shapes match. Same trap for anything else that reads `assignment.room.beds`.
 
 Functions that loop over guests or beds in memory (no queries, correctly batched, leave them alone): `pricing-canonical.ts:749` (yes-RSVPs), `:496` (beds per room), `:665` (spot count), `guest-estimate.ts:133-137` (slot totals), `buildPerBedOccupancyMap` at `:324`.
 
@@ -400,19 +404,47 @@ Target from the PLAN is **< 800 ms**. Prototype ② reached 1 702 ms over a ~120
 
 In rough order of value:
 
-1. **Turn on `relationJoins`.** `prisma/schema.prisma:4-6` → `previewFeatures = ["relationJoins"]`, then `relationLoadStrategy: 'join'` on the mega `findUnique` at `+layout.server.ts:229`. Measured: 23 SELECTs → 1, 5 091 ms → sub-second on this link. Biggest single win in the whole story. Verify the row shapes are byte-identical before and after — this is the one change that could alter what the page renders.
+1. **Turn on `relationJoins`.** `prisma/schema.prisma:4-6` → `previewFeatures = ["relationJoins"]`, then `relationLoadStrategy: 'join'` on the mega `findUnique` at `+layout.server.ts:229`. Measured: 23 SELECTs → 1, 5 091 ms → sub-second on this link. Biggest single win in the whole story.
 
-2. **Prune the `include` at `+layout.server.ts:231-262`.** These relations have **zero readers anywhere under `[tripId]`**: `mealPlan` (`:237`), `reservations` (`:245`), `invites` (`:254-259`), `tripActivities` (`:260`). Every consumer re-queries them in its own `+page.server.ts` (`itinerary/+page.server.ts:78`, `guests/+page.server.ts:397`, `guests/+page.server.ts:120-124`). `roomAssignments` (`:247-253`) is read only as a `??` fallback in `HostDashboard.svelte:44-45` / `GuestDashboard.svelte:59-60` that can never fire, because `+page.server.ts:39-47` always supplies its own array. Measured on its own: 23 → 18 SELECTs. *Keep* `rooms`, `members`, `mealSlots`, `activities`, `invoices`, `rsvps`, `extraCostRules` — those are read by `HostDashboard.svelte` / `GuestDashboard.svelte`.
+   > **⚠️ Brett's gate.** This edits `prisma/schema.prisma`. Per `CLAUDE.md`'s tiered approval, **migrations are Brett's call** — PF2 cannot merge this on agent-pass + green CI the way the rest of the story can. It is a generator-only change (no `migrate`, no DDL, the database is untouched), which is worth saying out loud when asking, but it still goes to Brett.
+   >
+   > **It is a preview feature, not GA.** Prisma here is **5.22.0** (`node_modules/prisma/package.json`), where `relationJoins` is behind `previewFeatures`. Preview means the semantics can move between releases, and the one that moves is **nested ordering** — the join strategy orders differently from the send-a-query-per-relation strategy. So PF2's acceptance criteria must explicitly name:
+   > - the nested `orderBy` on rooms and beds — `TRIP_ROOMS_ORDER_BY` / `ROOM_BEDS_ORDER_BY` at `+layout.server.ts:233-234` (and the same pair at `pricing-canonical.ts:436-438`, `:610-611`, `:658-659`, `:712-713`, `:833-834`, `pricing.ts:61-63`, `guest-estimate.ts:110-111`, `:389-390`). Bed order is load-bearing: it drives which bed `guest-estimate.ts:181` and `:275` pick as "first bed" for a guest with no assignment.
+   > - the `orderBy: { createdAt: 'desc' }` **plus `take: 50`** on `tripActivities` at `+layout.server.ts:260` — `take` inside a join is exactly where a preview relation-load strategy is most likely to differ. (If item 2 lands, this relation is pruned and the risk disappears with it — sequence item 2 before item 1 and the acceptance surface shrinks.)
+   >
+   > Verify row shapes are byte-identical before and after; a snapshot diff of the serialized `trip` object across every trip in the DB is the cheapest proof.
 
-3. **Delete the duplicates in `+page.server.ts`.** `:40` → use `parentData.userRsvp`. `:45` → use `parentData.trip.roomAssignments` (keep exactly one of the two fetches; the layout's include at `:247-253` and the page's `assignmentInclude` at `:7-11` are the same shape). `:51` → `roomAssignments.filter(a => a.userId === user.id)`, which is already the fallback the code writes at `:65`. Removes 15–18 statements.
+2. **Prune four relations from the `include` at `+layout.server.ts:231-262`** — `mealPlan` (`:237`), `reservations` (`:245`), `invites` (`:254-259`), `tripActivities` (`:260`). Measured on its own: 23 → 18 SELECTs.
+
+   Prune-safety, traced reader by reader:
+   - `mealPlan` — `itinerary/+page.server.ts:116` reads it, but from its **own** query at `:78`. `invoice-calculator.ts:125` reads its own too.
+   - `reservations` — two readers, neither reachable through the layout's copy. `guests/+page.server.ts:956` reads it from its **own** `trip.findUnique` at `:945-953`, inside the `exportLegacyBookings` form action. `src/lib/trips/selectors.ts:24` (`trip.reservations?.length`) *is* a real read of a `TripForSidebar`, but its only caller is `TripSidebar.svelte:2`, and **`TripSidebar` is rendered by no route** — `grep -rn "TripSidebar" src/routes/` is empty. Orphaned component; the reader is unreachable.
+   - `invites`, `tripActivities` — sole reader is `trip-activity-log.ts:176` / `:186`, reached only via `guests/+page.svelte:27`, which is fed the **narrowed** trip from `guests/+page.server.ts:424-435`, not the layout's. That panel is already silently empty today (see the BUG note in §6).
+
+   **Do *not* prune `roomAssignments` (`:247-253`) — see item 3.** *Keep* `rooms`, `members`, `mealSlots`, `activities`, `invoices`, `rsvps`, `extraCostRules`: all read by `HostDashboard.svelte` / `GuestDashboard.svelte`.
+
+3. **Delete the duplicates in `+page.server.ts`. The layout's `roomAssignments` is the copy that survives; the page's two fetches are the ones that die.**
+
+   The layout's include at `:247-253` and the page's `assignmentInclude` at `:7-11` are the same shape, so exactly one of them should exist. Keep the **layout's**, because (a) it is one extra branch on a query that has to run anyway — and zero extra statements once item 1 lands — while the page's `:45` + `:51` are two separate operations costing 14 statements, and (b) every sub-route under `[tripId]` then gets assignments from shared layout data instead of re-querying.
+
+   - `:40` → use `parentData.userRsvp` (same row as `+layout.server.ts:266`).
+   - `:45` → delete; use `parentData.trip.roomAssignments`.
+   - `:51` → delete; `roomAssignments.filter(a => a.userId === user.id)`, which is already the fallback the code writes at `:65`.
+   - Keep re-exporting the result under the **same `roomAssignments` key** the page already returns at `:101`, so `HostDashboard.svelte:45` and `GuestDashboard.svelte:60` (`Array.isArray(data.roomAssignments) ? … : (trip?.roomAssignments ?? [])`) keep working untouched and never fall through to `?? []`.
+
+   Removes 14 statements.
 
 4. **Thin `getUserTripMembership`.** `trip-access.ts:11-14`: drop `include: { trip: true, user: true }`, or add a `select` for `{ role, inviteStatus }`. 6 statements → 4, off the critical path prologue. (Used elsewhere — check `isTripHost` / `isTripHostOrCoHost` at `trip-access.ts:18-26` first.)
 
 5. **Pass data in instead of re-fetching it.** Give `computeCommittedFundsFromYesRsvps` (`pricing-canonical.ts:704`) and `getCostAtMaxParticipation` (`:653`) an optional pre-loaded trip parameter; the layout already has rooms, beds, yes-RSVPs and roomAssignments in hand at `:229`. Keep the existing signature as a thin wrapper so the other 8 call sites are untouched. **Coordinate with `pricing-be`:** this changes the *inputs* to pricing math, and per `CLAUDE.md` that needs their sign-off even though the arithmetic is untouched. Nothing here should change a single output cent — the acceptance test is that `committedFundsFromYesRsvps` and `costAtMaxParticipation` are identical before and after on every trip in the DB.
 
-6. **Same for `computeGuestEstimateRange`.** `guest-estimate.ts:105-127` should accept the already-loaded trip / RSVPs / assignments rather than re-querying. Removes 9 SELECTs. Again a `pricing-be` coordination point — the whole `guest-estimate.ts` file is downstream of `calculateReservationPrice`.
+6. **Same for `computeGuestEstimateRange`.** `guest-estimate.ts:105-127` should accept the already-loaded trip / RSVPs / assignments rather than re-querying. Removes 9 SELECTs. **Mind the shape mismatch flagged in §3:** the layout's assignments carry `room: { id, name, photoUrls }` with **no `beds`**, while `guest-estimate.ts:122` expects `room.beds`; rehydrate from `trip.rooms` on `roomId` rather than passing the layout object through as-is. Again a `pricing-be` coordination point — the whole `guest-estimate.ts` file is downstream of `calculateReservationPrice`.
 
-7. **Kill both N+1s.** `+page.server.ts:67-78` and `guest-estimate.ts:232-264` should each take a single pre-loaded trip and compute in memory (`computePerBedLivePriceForBed` at `pricing-canonical.ts:371` and `buildPerBedOccupancyMap` at `:324` are already pure and take a trip object). At minimum, make `guest-estimate.ts:232-264` a `Promise.all` instead of a sequential `for … await`. **`pricing-be` owns this one** — it is inside the pricing engine.
+7. **Kill both N+1s — by giving the engine the trip, never by moving math into the route.**
+
+   > **Read this before touching `+page.server.ts:67-78`.** The fix is a **new optional parameter on `calculatePrice` / `calculateReservationPrice`** that accepts an already-loaded trip, so the engine skips its own `findUnique` and does the identical arithmetic on rows the caller already has. The route keeps calling the engine and keeps using its return value. It must **not** start computing a price itself from `trip.rooms` — that is `CLAUDE.md` footgun #1 ("compute price outside `calculateReservationPrice`") and it would be a second pricing path. `guest-estimate.ts:232-264` lives inside `$lib/server/` and is engine-adjacent, so it may work with trip rows directly; the route may not.
+
+   `computePerBedLivePriceForBed` (`pricing-canonical.ts:371`) and `buildPerBedOccupancyMap` (`:324`) are already pure and already take a trip object, so the preloaded-trip parameter is plumbing, not new math. At minimum, make `guest-estimate.ts:232-264` a `Promise.all` instead of a sequential `for … await`. **`pricing-be` owns this one** — it is inside the pricing engine.
 
 8. **Fold the serial tail into a batch.** `+layout.server.ts:324`, `:337`, `:346` and `:407` should join the `Promise.all` at `:283` (compute their conditions first, pass `Promise.resolve(null)` when they don't apply — the file already uses that pattern at `:270` and `:309`).
 
@@ -449,4 +481,14 @@ A lighter-weight alternative for spot checks: `PRISMA_LOG_QUERIES=true npm run d
 ### Gate results at the time of writing
 
 - `npm test` — **passes.** 3 files, 33 tests, 129 ms.
-- `npm run check` — **fails, pre-existing on `main`.** `svelte-check found 285 errors and 418 warnings in 92 files`. The working tree was clean and no application code was touched for PF1, so this is not caused by this story. First failures include `Type 'string[]' is not assignable to type '(LogLevel | LogDefinition)[]'` (`src/lib/server/prisma.ts`), `Property 'TRIP_FILLING_UP_80' does not exist…`, and several stale Prisma field references (`publishedAt`, `startDatetime`). Because `check` is `svelte-check && npm run lint:vocabulary`, the vocabulary lint never runs — worth its own cleanup story.
+- `npm run check` — **fails, pre-existing on `main`.** `svelte-check found 285 errors and 418 warnings in 92 files`. The working tree was clean and no application code was touched for PF1, so this is not caused by this story. First failures include `Type 'string[]' is not assignable to type '(LogLevel | LogDefinition)[]'` (`src/lib/server/prisma.ts`), `Property 'TRIP_FILLING_UP_80' does not exist…`, and several stale Prisma field references (`publishedAt`, `startDatetime`). Because `check` is `svelte-check && npm run lint:vocabulary`, the vocabulary lint never runs.
+- `npm run lint:vocabulary` **standalone also fails — exit code 1**, and it is a one-line fix:
+
+  ```
+  Vocabulary guard failed. Disallowed terms found:
+  - src/lib/components/trips/dashboard/GuestRsvpSummaryCard.svelte:107 (booking)
+    -> /** Confirmed: going + room + (bed or whole-room booking). */
+  ```
+
+  So the cleanup story is **two** problems, not one: 285 svelte-check errors, *and* a genuine vocabulary violation that the `&&` short-circuit has been hiding. The vocabulary half is a single word in a comment.
+- **Neither is visible to CI.** There is no `.github/workflows/` directory in this repo — CI is the Vercel deploy only. `npm run check` has never gated a merge, which is how 285 errors accumulated. Worth folding into the same cleanup story.
