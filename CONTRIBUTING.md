@@ -16,6 +16,103 @@ Why bother: it gives us reviewable units, an automated quality gate, and a clean
 
 ---
 
+## Local database setup (first run)
+
+You need a local Postgres before anything else works. We use the Supabase CLI.
+
+```bash
+# 1. Start local Supabase (Postgres on 54322, Studio on 54323)
+supabase start
+
+# 2. Point .env at it. Locally BOTH URLs are the same direct connection --
+#    there is no pooler, so do NOT add ?pgbouncer=true here.
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+DIRECT_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+# 3. Build the schema and seed a dev trip -- one command
+npm run db:fresh
+```
+
+`npm run db:fresh` drops the `public` schema, replays the full migration history
+with `prisma migrate deploy`, regenerates the Prisma client, and runs the dev
+seed. It **refuses to run unless `DATABASE_URL` and `DIRECT_URL` both point at
+localhost**, because it is destructive.
+
+To do it by hand instead:
+
+```bash
+npx prisma migrate deploy   # build the schema from prisma/migrations
+npm run db:seed             # dev users + one published trip
+```
+
+### What the seed gives you
+
+`npm run db:seed` (`prisma/seed.ts`) creates a published three-night trip with
+rooms, beds, trip members, RSVPs and bed assignments — enough for the dashboard
+and the pricing engine to render something real. It is idempotent: users are
+upserted, and the demo trip is rebuilt on each run, so re-running never
+duplicates. Dev logins (**local only — never use these anywhere real**):
+
+| Email | Password | Role |
+|---|---|---|
+| `host@divvi.local` | `DivviDev123!` | host |
+| `guest@divvi.local` | `DivviDev123!` | guest |
+| `guest2@divvi.local` | `DivviDev123!` | guest |
+
+### Running e2e
+
+Playwright seeds its own fixtures on top of the same database:
+
+```bash
+npm run test:e2e
+```
+
+### Verifying the migration history is still self-sufficient
+
+A fresh database must be buildable from `prisma/migrations` alone. If you change
+the schema, confirm the history still matches it:
+
+```bash
+# one-time: a scratch database for Prisma to replay migrations into
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c 'CREATE DATABASE divvi_shadow;'
+
+npx prisma migrate diff \
+  --from-migrations prisma/migrations \
+  --to-schema-datamodel prisma/schema.prisma \
+  --shadow-database-url "postgresql://postgres:postgres@127.0.0.1:54322/divvi_shadow" \
+  --script
+```
+
+It must print `No difference detected.` If it prints SQL, the schema has drifted
+ahead of the migrations — add a migration containing exactly that SQL. **Never
+patch a database by hand-running SQL**; that is what caused the drift TD4 fixed.
+The shadow database is reset by this command, so point it at a scratch database,
+never at the one you are working in.
+
+### Before merging a migration that touches an already-deployed database
+
+Production and existing local databases may already contain a change (for
+example, if it was ever applied by hand). Migrations in this repo are therefore
+written **idempotently** — `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT
+EXISTS`, guarded `DO $$` blocks for constraints — so `migrate deploy` is safe to
+run anywhere. Keep doing that.
+
+Whatever the style, run a **read-only** diff against production before merging:
+
+```bash
+npx prisma migrate diff \
+  --from-url "$PROD_DATABASE_URL" \
+  --to-schema-datamodel prisma/schema.prisma
+```
+
+If that reports `No difference detected.`, production already matches the schema
+and the migration will be a no-op there. If it reports SQL, production is itself
+missing something — sort that out before merging. (This matters most for the one
+statement in `20260827000000_close_schema_drift` that is destructive: it drops
+the long-dead `Trip.inviteCode` column.)
+
+---
+
 ## The loop (copy-paste)
 
 ```bash
