@@ -3,7 +3,7 @@
 > **Purpose:** the formal, story-level checklist for v1 launch. Each story is sized, owned, and has acceptance criteria so it can be handed to a dev/agent and marked complete for buyoff & tracking.
 > **Companions:** `LAUNCH_CUTLINE.md` (scope decisions) · `PRICING_ANALYSIS.md` (pricing detail) · `CLAUDE.md` (how-we-build rules — *to be authored*).
 > **Doc strategy:** `PRD.md` / `ARCHITECTURE.md` are **as-built**; this file holds the **divergence** (target behavior) + the backlog.
-> **Last updated:** 2026-06-21 · **Owner:** Brett
+> **Last updated:** 2026-08-27 · **Owner:** Brett
 
 **Status legend:** ☐ Todo · ◐ In progress · ⊙ In review (PR open) · ✅ Done (**merged to main**) · ⊘ Cut/deferred
 **Estimate:** S (≤½ day) · M (~1–2 days) · L (3+ days / needs design)
@@ -145,7 +145,7 @@ All agents follow **`CLAUDE.md`** (how-we-build rules) once authored.
 
 | ID | Story · acceptance | Owner | Est | Status |
 |---|---|---|---|---|
-| **PF1** | Profile the trip dashboard load (`trips/[tripId]/+layout.server.ts` + `+page.server.ts`); identify the 3.8–5.0s server cost (suspect: per-request pricing sims + N+1 queries). *Read-only diagnosis → report.* | perf-be | M | ☐ |
+| **PF1** | Profile the trip dashboard load (`trips/[tripId]/+layout.server.ts` + `+page.server.ts`); identify the 3.8–5.0s server cost (suspect: per-request pricing sims + N+1 queries). *Read-only diagnosis → report.* Report: [`PERF_TRIP_LOAD.md`](./PERF_TRIP_LOAD.md). | perf-be | M | ⊙ |
 | **PF2** | Fix N+1 / batch Prisma queries on the trip load (`include`/batched fetches). *Acceptance: trip-page server time materially down (target <800ms).* | perf-be | M | ☐ |
 | **PF3** | Memoize/cache pricing per request (don't recompute estimates repeatedly); cache where safe. | perf-be | M | ☐ |
 
