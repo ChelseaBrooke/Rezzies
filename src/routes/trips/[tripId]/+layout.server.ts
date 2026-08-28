@@ -8,6 +8,7 @@ import { computeCommittedFundsFromYesRsvps, getCostAtMaxParticipation } from '$l
 import { ROOM_BEDS_ORDER_BY, TRIP_ROOMS_ORDER_BY } from '$lib/server/trip-room-order.js';
 import type { InvoiceBreakdown } from '$lib/server/invoice-calculator.js';
 import { FEATURE_TRIP_GAMES } from '$lib/config/features.js';
+import { hasValidInviteForTrip, isInviteExpired } from '$lib/server/invite-access.js';
 
 const INVITE_COOKIE_PREFIX = 'trip_invite_';
 
@@ -33,6 +34,9 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 	const isTripDashboardRoot =
 		url.pathname === `/trips/${tripId}` || url.pathname === `/trips/${tripId}/`;
 
+	// Plain guest join route (not the household-claim join sub-route, which is handled separately below).
+	const isJoinRoute = url.pathname === `/trips/${tripId}/join`;
+
 	// ── Anonymous + valid invite: limited preview on trip dashboard root only ──
 	if (!user && inviteTokenResolved) {
 		const invite = await prisma.invite.findUnique({
@@ -40,12 +44,12 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			select: { tripId: true, expiresAt: true, status: true }
 		});
 
-		if (!invite || invite.tripId !== tripId) {
+		if (!invite || invite.tripId !== tripId || invite.status === 'declined') {
 			cookies.delete(inviteCookieName, { path: `/trips/${tripId}` });
 			throw redirect(303, `/login?redirect=${encodeURIComponent(`/trips/${tripId}`)}`);
 		}
 
-		if (invite.expiresAt && invite.expiresAt < new Date()) {
+		if (isInviteExpired(invite)) {
 			throw error(410, 'This invite has expired');
 		}
 
@@ -80,7 +84,10 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			}
 		});
 
-		if (!previewRow?.isPublished) {
+		// Note: a valid, unexpired invite for this exact trip is sufficient to preview it — a
+		// host can send invites before finishing publish, so gating on `isPublished` here would
+		// 404 a guest who followed a perfectly good invite link (that was the B1 bug).
+		if (!previewRow) {
 			throw error(404, 'Trip not found');
 		}
 
@@ -122,6 +129,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 		return {
 			gamesUiEnabled: FEATURE_TRIP_GAMES,
 			publicHouseholdClaim: false as const,
+			joinPreview: false as const,
 			user: null,
 			invitePreview: true as const,
 			inviteToken: inviteTokenResolved,
@@ -174,6 +182,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 			gamesUiEnabled: FEATURE_TRIP_GAMES,
 			user: sUser,
 			publicHouseholdClaim: true as const,
+			joinPreview: false as const,
 			invitePreview: false as const,
 			inviteToken: null as string | null,
 			inviteStatus: null as string | null,
@@ -207,6 +216,63 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 	const membership = await getUserTripMembership(tripId, user.id);
 
 	if (!membership) {
+		// Already on the join route: render it (below) instead of redirecting to itself, which
+		// would loop forever and never let the guest see the join page (the B1 bug).
+		if (isJoinRoute) {
+			const joinTrip = await prisma.trip.findUnique({
+				where: { id: tripId },
+				select: {
+					id: true,
+					name: true,
+					checkInDate: true,
+					checkOutDate: true,
+					listingCoverPhoto: true,
+					locationCity: true,
+					isPublished: true
+				}
+			});
+
+			if (!joinTrip) {
+				throw error(404, 'Trip not found');
+			}
+
+			// Same draft-trip-with-a-valid-invite exception as join/+page.server.ts: don't leak
+			// even this minimal trip preview to a non-member who isn't published or invited.
+			if (!joinTrip.isPublished && !(await hasValidInviteForTrip(inviteFromQuery, tripId))) {
+				throw error(404, 'Trip not found');
+			}
+
+			return {
+				gamesUiEnabled: FEATURE_TRIP_GAMES,
+				publicHouseholdClaim: false as const,
+				joinPreview: true as const,
+				user,
+				invitePreview: false as const,
+				inviteToken: inviteFromQuery || null,
+				inviteStatus: null as string | null,
+				previewHostName: null as string | null,
+				previewCounts: null as { meals: number; activities: number; games: number } | null,
+				trip: joinTrip,
+				allTrips: [] as { id: string; name: string; listingCoverPhoto?: string | null }[],
+				membership: null,
+				isHost: false,
+				isCoHost: false,
+				canHostShare: false,
+				householdShare: null,
+				costAtMaxParticipation: null,
+				userRsvp: null,
+				costReapprovalBlock: null,
+				canChat: false,
+				pendingMemberCount: 0,
+				committedFundsFromYesRsvps: 0,
+				pollsBadgeCount: 0,
+				tripGames: [] as { id: string; name: string }[],
+				recentPolls: [] as { id: string; title: string; createdAt: string }[],
+				tripGalleryFiles: [] as { id: string; name: string; url: string }[],
+				featureTourVariant: null as FeatureTourVariant
+			};
+		}
+
 		const joinQs = inviteFromQuery ? `?invite=${encodeURIComponent(inviteFromQuery)}` : '';
 		throw redirect(303, `/trips/${tripId}/join${joinQs}`);
 	}
@@ -424,6 +490,7 @@ export const load: LayoutServerLoad = async ({ params, cookies, locals, url }) =
 	return {
 		gamesUiEnabled: FEATURE_TRIP_GAMES,
 		publicHouseholdClaim: false as const,
+		joinPreview: false as const,
 		user,
 		invitePreview: false as const,
 		inviteToken: null as string | null,

@@ -54,9 +54,15 @@ All agents follow **`CLAUDE.md`** (how-we-build rules) once authored.
 
 | ID | Story · acceptance | Owner | Est | Status |
 |---|---|---|---|---|
-| **B1** | **Invite link 404.** `/invite/<token>` → `/trips/<tripId>?invite=<token>` 404s for the invited user. Root-cause the guard in `trips/[tripId]/+layout.server.ts` (~`throw error(404)` line 84, invite-preview / not-yet-member path). *Acceptance: clicking a fresh invite link (logged-out and logged-in-non-member) lands on the trip join page, never 404.* | divvi-backend | M | ☐ |
+| **B1** | **Invite link 404.** `/invite/<token>` → `/trips/<tripId>?invite=<token>` 404s for the invited user. Root-cause the guard in `trips/[tripId]/+layout.server.ts` (~`throw error(404)` line 84, invite-preview / not-yet-member path). *Acceptance: clicking a fresh invite link (logged-out and logged-in-non-member) lands on the trip join page, never 404.* | divvi-backend | M | ⊙ |
 | **B2** | **Guest edit "Missing user".** Setting a guest's status/room from the guest list fails. Param mismatch: actions read `targetUserId` (`guests/+page.server.ts:978…1161`) vs `userId` (:638/:713/:795); form posts the wrong name. *Acceptance: host sets status + room with no error; regression test.* | divvi-backend | S | ☐ |
 | **B3** | **Delete guest.** Today `removeGuest` only soft-removes (`:629`). Add a hard delete (remove `TripMember` + cascade RSVP/assignments) behind a **confirmation dialog**. *Acceptance: host deletes a guest after confirming; guest gone from list + trip; cancel aborts.* | divvi-backend (+FE confirm) | M | ☐ |
+
+> **Found while fixing B1 (not fixed — out of scope, flagging for backlog):**
+> - `trips/[tripId]/+layout.server.ts`: the `membership.inviteStatus === 'pending'` / `'denied'` branches unconditionally `redirect(303, …/pending|/denied)`, the same self-redirect-loop shape B1 had for `/join`. A pending/denied member landing directly on `/trips/<id>/pending` or `/trips/<id>/denied` will loop. Same fix shape as the B1 `isJoinRoute` guard would apply.
+> - `lint:vocabulary` currently fails on a pre-existing comment: `src/lib/components/trips/dashboard/GuestRsvpSummaryCard.svelte:107` uses "booking" in a doc comment. Not touched by B1; needs a wording pass.
+> - **Code review caught (fixed in this PR):** the new `isJoinRoute` branch returned trip metadata (name/dates/photo/city) to any authenticated non-member hitting `/join` directly, with no publish/invite check — closed by reusing `hasValidInviteForTrip`. Also closed a gap where a *declined* invite still counted as valid (`isInviteValidForTrip` now checks `status !== 'declined'`).
+> - **Still open:** no e2e regression test for "logged-in, not-a-member, visits `/join` directly" — the existing e2e personas (`e2e/.auth/host.json`, `guest.json`) are both already trip members, so covering this needs a third auth fixture. Recommend a follow-up story to add one.
 
 ---
 

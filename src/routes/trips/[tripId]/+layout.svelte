@@ -28,7 +28,7 @@
 	}
 </script>
 
-{#if data.publicHouseholdClaim}
+{#if data.publicHouseholdClaim || data.joinPreview}
 	{#if safeChildren}
 		{@render safeChildren()}
 	{/if}
@@ -59,11 +59,11 @@
 	{/if}
 {/if}
 
-{#if !data.publicHouseholdClaim && data.featureTourVariant}
+{#if !data.publicHouseholdClaim && !data.joinPreview && data.featureTourVariant}
 	<FeatureTourModal variant={data.featureTourVariant} />
 {/if}
 
-{#if !data.publicHouseholdClaim && data.canChat && data.user}
+{#if !data.publicHouseholdClaim && !data.joinPreview && data.canChat && data.user}
 	<TripChat tripId={data.trip.id} userId={data.user.id} />
 {/if}
 
