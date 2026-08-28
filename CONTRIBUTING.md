@@ -18,32 +18,71 @@ Why bother: it gives us reviewable units, an automated quality gate, and a clean
 
 ## Local database setup (first run)
 
-You need a local Postgres before anything else works. We use the Supabase CLI.
+Getting from a fresh clone to a working app. Every command below is meant to be
+run in order, from the repo root.
+
+**Prerequisites:**
+
+- **Node 20.x exactly.** `.npmrc` sets `engine-strict=true` against
+  `engines.node: "20.x"`, so `npm install` hard-fails on Node 21+ with
+  `Unsupported engine`. Run `nvm use` (reads `.nvmrc`) first.
+- **[Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)**
+  — `brew install supabase/tap/supabase`, or use `npx supabase` in place of
+  `supabase` below.
+- **Docker running** — `supabase start` boots Postgres in a container.
 
 ```bash
-# 1. Start local Supabase (Postgres on 54322, Studio on 54323)
+# 1. Use the pinned Node version, then install dependencies
+nvm use          # -> Now using node v20.x (from .nvmrc)
+npm install
+
+# 2. Start local Supabase (Postgres on 54322, Studio on 54323)
 supabase start
 
-# 2. Point .env at it. Locally BOTH URLs are the same direct connection --
-#    there is no pooler, so do NOT add ?pgbouncer=true here.
+# 3. Create your .env from the placeholder template
+#    NOTE: copy env.example (no leading dot).
+cp env.example .env
+```
+
+Now open `.env` and replace the two database lines with the local connection.
+Locally **both** URLs are the same direct connection — there is no pooler, so do
+**not** add `?pgbouncer=true`:
+
+```env
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 DIRECT_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
-
-# 3. Build the schema and seed a dev trip -- one command
-npm run db:fresh
 ```
+
+The rest of `env.example` is placeholders. Nothing else needs real values to get
+the app running — email, Stripe and Maps features simply stay inert until you
+fill them in.
+
+```bash
+# 4. Build the schema and seed a dev trip -- one command
+npm run db:fresh
+
+# 5. Run it
+npm run dev
+```
+
+Then sign in at http://localhost:5173/login as `host@divvi.local` /
+`DivviDev123!` (see the table below).
 
 `npm run db:fresh` drops the `public` schema, replays the full migration history
 with `prisma migrate deploy`, regenerates the Prisma client, and runs the dev
 seed. It **refuses to run unless `DATABASE_URL` and `DIRECT_URL` both point at
 localhost**, because it is destructive.
 
-To do it by hand instead:
+To do the database step by hand instead:
 
 ```bash
 npx prisma migrate deploy   # build the schema from prisma/migrations
 npm run db:seed             # dev users + one published trip
 ```
+
+`npm run db:seed` carries the same localhost-only guard as `db:fresh` — both go
+through `scripts/require-local-db.mjs`, which refuses to write unless *both*
+connection URLs are local.
 
 ### What the seed gives you
 
@@ -97,7 +136,14 @@ written **idempotently** — `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT
 EXISTS`, guarded `DO $$` blocks for constraints — so `migrate deploy` is safe to
 run anywhere. Keep doing that.
 
-Whatever the style, run a **read-only** diff against production before merging:
+Two questions have to be answered, and they are **not** the same question:
+
+1. *Does production's schema match `schema.prisma`?* → `migrate diff`
+2. *Will `migrate deploy` actually run?* → does `_prisma_migrations` exist?
+
+Both checks are read-only. Run both.
+
+#### Check 1 — does the schema match?
 
 ```bash
 npx prisma migrate diff \
@@ -105,11 +151,61 @@ npx prisma migrate diff \
   --to-schema-datamodel prisma/schema.prisma
 ```
 
-If that reports `No difference detected.`, production already matches the schema
-and the migration will be a no-op there. If it reports SQL, production is itself
-missing something — sort that out before merging. (This matters most for the one
+`No difference detected.` means production already matches the schema and the
+migration will be a no-op there. If it prints SQL, production is itself missing
+something — sort that out before merging. (This matters most for the one
 statement in `20260827000000_close_schema_drift` that is destructive: it drops
 the long-dead `Trip.inviteCode` column.)
+
+#### Check 2 — does production have migration history?
+
+A database built with `prisma db push` has **no `_prisma_migrations` table**. It
+will pass Check 1 with a clean bill of health and then fail to deploy at all —
+so Check 1 alone is not enough.
+
+```bash
+psql "$PROD_DATABASE_URL" -c 'select count(*) from _prisma_migrations;'
+```
+
+**If it returns a count** (normally the number of migrations in
+`prisma/migrations`): nothing special to do. `npx prisma migrate deploy` applies
+whatever is pending.
+
+**If it errors with `relation "_prisma_migrations" does not exist`**: the
+database was built with `db push`. `migrate deploy` will refuse with:
+
+```
+Error: P3005
+The database schema is not empty.
+```
+
+and apply **nothing**. Baseline the already-present migrations first, then
+deploy. From the repo root, with `DATABASE_URL`/`DIRECT_URL` pointed at that
+database:
+
+```bash
+# Mark every migration EXCEPT the new one as already applied
+for d in prisma/migrations/*/; do
+  name=$(basename "$d")
+  [ "$name" = "20260827000000_close_schema_drift" ] && continue
+  npx prisma migrate resolve --applied "$name"
+done
+
+# Now only the new migration is pending
+npx prisma migrate deploy
+```
+
+Then re-run Check 1 — it must still report `No difference detected.`
+
+> `migrate resolve --applied` only writes a row to `_prisma_migrations`; it does
+> not run any SQL. That is exactly why Check 1 must pass **first**: baselining a
+> database that is genuinely missing a change would mark it applied and leave
+> that database permanently broken.
+
+Note this applies to local databases too — Brett's local `postgres` database was
+built with `db push` and has no `_prisma_migrations` table, so `migrate deploy`
+against it returns P3005. For a local database with nothing worth keeping, the
+simpler fix is just `npm run db:fresh`.
 
 ---
 

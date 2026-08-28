@@ -6,9 +6,13 @@
  * members, RSVPs and bed assignments.
  *
  * Design notes:
- * - Idempotent. Users are upserted by email; the demo trip is dropped and
- *   rebuilt on every run, so re-running never duplicates or crashes. Re-running
- *   DOES reset the demo trip, which is what you want from a dev seed.
+ * - LOCAL ONLY. Refuses to run unless DATABASE_URL and DIRECT_URL both point at
+ *   localhost (scripts/require-local-db.mjs), because it writes well-known dev
+ *   credentials and rebuilds the demo trip.
+ * - Idempotent. Users are upserted by email and the demo trip is rebuilt under
+ *   a fixed id, so re-running never duplicates, never crashes, and keeps stable
+ *   ids/URLs. Re-running DOES reset the demo trip, which is what you want from
+ *   a dev seed.
  * - No pricing math here. Prices come from calculateReservationPrice
  *   ($lib/server/pricing-canonical.ts) at read time -- the seed only supplies
  *   the inputs (total cost, rooms, beds, RSVPs, assignments) so the dashboard
@@ -20,6 +24,7 @@
  */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { requireLocalDatabase } from '../scripts/require-local-db.mjs';
 
 const prisma = new PrismaClient();
 
@@ -33,6 +38,11 @@ const DEV_USERS = [
 	{ key: 'guest2', email: `guest2${DEV_EMAIL_DOMAIN}`, name: 'Priya Patel', homeCity: 'Denver, CO' }
 ] as const;
 
+/**
+ * Fixed id so re-runs are stable (same trip URL every time) and so the seed can
+ * never collide with a real trip that happens to share the display name.
+ */
+const DEMO_TRIP_ID = '00000000-0000-4000-8000-000000000001';
 const DEMO_TRIP_NAME = 'Divvi Dev Lakehouse';
 
 /** Rooms and beds for the demo trip. capacitySlots drives the canonical model. */
@@ -74,6 +84,11 @@ function daysFromNow(days: number): Date {
 }
 
 async function main() {
+	// Refuse to touch anything that is not a local database. This runs before
+	// the first write: the seed sets well-known dev passwords and rebuilds the
+	// demo trip, neither of which may ever happen against a hosted database.
+	requireLocalDatabase('db:seed');
+
 	console.log('Seeding Divvi dev data...');
 
 	// 1. Users -- upserted by email, so ids stay stable across runs.
@@ -90,10 +105,11 @@ async function main() {
 	}
 	console.log(`  users: ${DEV_USERS.length} upserted`);
 
-	// 2. Drop any previous demo trip. Cascades to rooms, beds, members, RSVPs
-	//    and assignments, which keeps the seed re-runnable.
-	const { count: removed } = await prisma.trip.deleteMany({ where: { name: DEMO_TRIP_NAME } });
-	if (removed > 0) console.log(`  removed ${removed} previous demo trip(s)`);
+	// 2. Reset the demo trip by its FIXED id -- never by display name, which
+	//    could match a real trip. Deleting cascades to rooms, beds, members,
+	//    RSVPs and assignments, so the rebuild below is a clean upsert.
+	const { count: removed } = await prisma.trip.deleteMany({ where: { id: DEMO_TRIP_ID } });
+	if (removed > 0) console.log('  reset previous demo trip');
 
 	// 3. The trip, with rooms and beds created in one nested write.
 	const checkInDate = daysFromNow(21);
@@ -101,6 +117,7 @@ async function main() {
 
 	const created = await prisma.trip.create({
 		data: {
+			id: DEMO_TRIP_ID,
 			name: DEMO_TRIP_NAME,
 			description: 'A three-night lakehouse weekend for poking at the dev build.',
 			location: 'Lake Chelan, WA',

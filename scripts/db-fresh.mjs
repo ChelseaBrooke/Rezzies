@@ -8,68 +8,17 @@
  * migration is ever missing again, this command is where it shows up.
  *
  * Safety: refuses to run unless DATABASE_URL and DIRECT_URL both point at
- * localhost. This script is destructive by design and must never touch a
- * hosted database.
+ * localhost (see scripts/require-local-db.mjs). This script is destructive by
+ * design and must never touch a hosted database.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
-import path from 'node:path';
+import { requireLocalDatabase } from './require-local-db.mjs';
 
 const ROOT = process.cwd();
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
 
-/** Minimal .env reader -- we only need it to check the host before destroying anything. */
-function readEnvFile() {
-	const envPath = path.join(ROOT, '.env');
-	if (!existsSync(envPath)) return {};
-	const out = {};
-	for (const raw of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-		const line = raw.trim();
-		if (!line || line.startsWith('#')) continue;
-		const eq = line.indexOf('=');
-		if (eq === -1) continue;
-		const key = line.slice(0, eq).trim();
-		let value = line.slice(eq + 1).trim();
-		if (
-			(value.startsWith('"') && value.endsWith('"')) ||
-			(value.startsWith("'") && value.endsWith("'"))
-		) {
-			value = value.slice(1, -1);
-		}
-		out[key] = value;
-	}
-	return out;
-}
-
-const fileEnv = readEnvFile();
-/** Real environment wins, matching how the Prisma CLI resolves these. */
-const resolve = (key) => process.env[key] ?? fileEnv[key];
-
-function assertLocal(key) {
-	const value = resolve(key);
-	if (!value) {
-		console.error(`db:fresh: ${key} is not set. Point it at your local Supabase and retry.`);
-		process.exit(1);
-	}
-	let host;
-	try {
-		host = new URL(value).hostname;
-	} catch {
-		console.error(`db:fresh: ${key} is not a valid connection URL.`);
-		process.exit(1);
-	}
-	if (!LOCAL_HOSTS.has(host)) {
-		console.error(
-			`db:fresh: refusing to run -- ${key} points at "${host}", which is not local.\n` +
-				'This command drops the public schema, so it is only ever safe against a local database.'
-		);
-		process.exit(1);
-	}
-	return value;
-}
-
-const databaseUrl = assertLocal('DATABASE_URL');
-assertLocal('DIRECT_URL');
+// Guard first -- nothing below this line is safe against a hosted database.
+const { fileEnv, urls } = requireLocalDatabase('db:fresh', ROOT);
+const databaseUrl = urls.DATABASE_URL;
 
 const targetDb = new URL(databaseUrl).pathname.replace(/^\//, '') || '(default)';
 console.log(`db:fresh: rebuilding local database "${targetDb}" from the migration history.\n`);

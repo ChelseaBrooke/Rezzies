@@ -167,8 +167,8 @@ All agents follow **`CLAUDE.md`** (how-we-build rules) once authored.
 | **TD1** | Contacts modal dead button on invite step (TECH_DEBT #5) — remove or wire. | divvi-frontend | S | ☐ |
 | **TD2** | `locked` RSVP status referenced but unwired (TECH_DEBT #6) — remove the reference or implement. Low priority. | divvi-backend | S | ☐ |
 | **TD3** | Bed-removed email is listed both **open and resolved** in TECH_DEBT.md (#4) — verify actual state, fix the register. | divvi-backend | S | ☐ |
-| **TD4** | A fresh database cannot be built from the migration history — `schema.prisma` drifted ahead of `prisma/migrations`, so `migrate deploy` on an empty DB yields a schema the app can't run on. Add one migration closing the drift; `migrate diff --from-migrations --to-schema-datamodel` must report no difference and the e2e seed must run clean. Add a documented fresh-setup path (`db:fresh` + CONTRIBUTING). | divvi-backend | M | ☐ |
-| **TD5** | `prisma/seed.ts` is dead code and crashes (`Argument 'trip' is missing`) — it seeds 9 hard-coded rooms with no `tripId` from the single-property era. Rewrite for the current schema: host + guests, one published trip with rooms/beds, members, RSVPs and assignments; idempotent, obvious non-production credentials. | divvi-backend | M | ☐ |
+| **TD4** | A fresh database cannot be built from the migration history — `schema.prisma` drifted ahead of `prisma/migrations`, so `migrate deploy` on an empty DB yields a schema the app can't run on. Add one migration closing the drift; `migrate diff --from-migrations --to-schema-datamodel` must report no difference and the e2e seed must run clean. Add a documented fresh-setup path (`db:fresh` + CONTRIBUTING). | divvi-backend | M | ⊙ |
+| **TD5** | `prisma/seed.ts` is dead code and crashes (`Argument 'trip' is missing`) — it seeds 9 hard-coded rooms with no `tripId` from the single-property era. Rewrite for the current schema: host + guests, one published trip with rooms/beds, members, RSVPs and assignments; idempotent, obvious non-production credentials. | divvi-backend | M | ⊙ |
 
 ---
 
