@@ -1,105 +1,229 @@
+/**
+ * Development seed (TD5).
+ *
+ * Creates a small but coherent dev world you can actually log into and click
+ * around: a host, two guests, one published trip with rooms and beds, trip
+ * members, RSVPs and bed assignments.
+ *
+ * Design notes:
+ * - Idempotent. Users are upserted by email; the demo trip is dropped and
+ *   rebuilt on every run, so re-running never duplicates or crashes. Re-running
+ *   DOES reset the demo trip, which is what you want from a dev seed.
+ * - No pricing math here. Prices come from calculateReservationPrice
+ *   ($lib/server/pricing-canonical.ts) at read time -- the seed only supplies
+ *   the inputs (total cost, rooms, beds, RSVPs, assignments) so the dashboard
+ *   and the pricing engine have something meaningful to work with.
+ * - Trip.totalCost is a Float in dollars in the current schema; the seed stores
+ *   no hand-computed `*Cents` values.
+ *
+ * Usage: npm run db:seed   (or `npm run db:fresh` to rebuild the DB first)
+ */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-async function hashPassword(password: string): Promise<string> {
-	return bcrypt.hash(password, 10);
+/** Obvious, clearly non-production dev credentials. */
+const DEV_PASSWORD = 'DivviDev123!';
+const DEV_EMAIL_DOMAIN = '@divvi.local';
+
+const DEV_USERS = [
+	{ key: 'host', email: `host${DEV_EMAIL_DOMAIN}`, name: 'Hana Host', homeCity: 'Portland, OR' },
+	{ key: 'guest', email: `guest${DEV_EMAIL_DOMAIN}`, name: 'Gabe Guest', homeCity: 'Seattle, WA' },
+	{ key: 'guest2', email: `guest2${DEV_EMAIL_DOMAIN}`, name: 'Priya Patel', homeCity: 'Denver, CO' }
+] as const;
+
+const DEMO_TRIP_NAME = 'Divvi Dev Lakehouse';
+
+/** Rooms and beds for the demo trip. capacitySlots drives the canonical model. */
+const DEMO_ROOMS = [
+	{
+		name: 'Master Suite',
+		roomType: 'master-bedroom',
+		description: 'King bed, lake view, private bath',
+		privacyFactor: 1.25,
+		beds: [{ bedType: 'king', capacitySlots: 2 }]
+	},
+	{
+		name: 'Garden Room',
+		roomType: 'bedroom',
+		description: 'Queen bed plus a twin',
+		privacyFactor: 1.0,
+		beds: [
+			{ bedType: 'queen', capacitySlots: 2 },
+			{ bedType: 'twin', capacitySlots: 1 }
+		]
+	},
+	{
+		name: 'Bunk Room',
+		roomType: 'bedroom',
+		description: 'Two bunks, great for kids',
+		privacyFactor: 1.0,
+		beds: [
+			{ bedType: 'bunk', capacitySlots: 1 },
+			{ bedType: 'bunk', capacitySlots: 1 }
+		]
+	}
+] as const;
+
+function daysFromNow(days: number): Date {
+	const d = new Date();
+	d.setUTCHours(15, 0, 0, 0);
+	d.setUTCDate(d.getUTCDate() + days);
+	return d;
 }
 
 async function main() {
-	console.log('Seeding database...');
+	console.log('Seeding Divvi dev data...');
 
-	// Create rooms (matching the canonical inventory from pricing.ts)
-	const rooms = [
-		{ id: 1, name: 'Bedroom 1', description: 'Master bedroom with king bed and bunks' },
-		{ id: 2, name: 'Bedroom 2', description: 'Queen bed with bunks' },
-		{ id: 3, name: 'Bedroom 3', description: 'Queen bed with bunks' },
-		{ id: 4, name: 'Bedroom 4', description: 'Queen and twin beds' },
-		{ id: 5, name: 'Bedroom 5', description: 'Queen bed' },
-		{ id: 6, name: 'Bedroom 6', description: 'Queen bed' },
-		{ id: 7, name: 'Bedroom 7', description: 'Queen bed with bunks' },
-		{ id: 8, name: 'Bedroom 8', description: 'Queen bed with bunks' },
-		{ id: 9, name: 'Bedroom 9', description: 'Queen and twin beds' }
-	];
+	// 1. Users -- upserted by email, so ids stay stable across runs.
+	const passwordHash = await bcrypt.hash(DEV_PASSWORD, 10);
+	const users: Record<string, { id: string; email: string }> = {};
 
-	for (const room of rooms) {
-		await prisma.room.upsert({
-			where: { id: room.id },
-			update: {},
-			create: room
+	for (const u of DEV_USERS) {
+		const user = await prisma.user.upsert({
+			where: { email: u.email },
+			update: { name: u.name, passwordHash, homeCity: u.homeCity },
+			create: { email: u.email, name: u.name, passwordHash, homeCity: u.homeCity }
 		});
+		users[u.key] = { id: user.id, email: user.email };
 	}
+	console.log(`  users: ${DEV_USERS.length} upserted`);
 
-	// Create beds (matching canonical inventory)
-	const beds = [
-		// Bedroom 1
-		{ id: 'r1-king', roomId: 1, bedType: 'king', capacity: 2 },
-		{ id: 'r1-bunk-a', roomId: 1, bedType: 'bunk', capacity: 1 },
-		{ id: 'r1-bunk-b', roomId: 1, bedType: 'bunk', capacity: 1 },
+	// 2. Drop any previous demo trip. Cascades to rooms, beds, members, RSVPs
+	//    and assignments, which keeps the seed re-runnable.
+	const { count: removed } = await prisma.trip.deleteMany({ where: { name: DEMO_TRIP_NAME } });
+	if (removed > 0) console.log(`  removed ${removed} previous demo trip(s)`);
 
-		// Bedroom 2
-		{ id: 'r2-queen', roomId: 2, bedType: 'queen', capacity: 2 },
-		{ id: 'r2-bunk-a', roomId: 2, bedType: 'bunk', capacity: 1 },
-		{ id: 'r2-bunk-b', roomId: 2, bedType: 'bunk', capacity: 1 },
+	// 3. The trip, with rooms and beds created in one nested write.
+	const checkInDate = daysFromNow(21);
+	const checkOutDate = daysFromNow(24); // 3 nights
 
-		// Bedroom 3
-		{ id: 'r3-queen', roomId: 3, bedType: 'queen', capacity: 2 },
-		{ id: 'r3-bunk-a', roomId: 3, bedType: 'bunk', capacity: 1 },
-		{ id: 'r3-bunk-b', roomId: 3, bedType: 'bunk', capacity: 1 },
+	const created = await prisma.trip.create({
+		data: {
+			name: DEMO_TRIP_NAME,
+			description: 'A three-night lakehouse weekend for poking at the dev build.',
+			location: 'Lake Chelan, WA',
+			locationCity: 'Lake Chelan',
+			checkInDate,
+			checkOutDate,
+			rsvpByDate: daysFromNow(14),
+			totalCost: 4800, // dollars, per the current schema
+			pricingModel: 'PER_BED',
+			expectedPeopleCount: 6,
+			maxGuests: 8,
+			isPublished: true,
+			inviteMode: 'approval_required',
+			costSharingEnabled: true,
+			timezone: 'America/Los_Angeles',
+			checkInTime: '4:00 PM',
+			checkOutTime: '11:00 AM',
+			houseRules: 'Shoes off inside. Quiet hours after 10pm.',
+			whatToBring: 'Towel, swimsuit, a board game.',
+			petsAllowed: true,
+			childrenAllowed: true,
+			rooms: {
+				create: DEMO_ROOMS.map((room) => ({
+					name: room.name,
+					roomType: room.roomType,
+					description: room.description,
+					privacyFactor: room.privacyFactor,
+					beds: { create: room.beds.map((b) => ({ ...b })) }
+				}))
+			}
+		},
+		select: { id: true }
+	});
 
-		// Bedroom 4
-		{ id: 'r4-queen', roomId: 4, bedType: 'queen', capacity: 2 },
-		{ id: 'r4-twin', roomId: 4, bedType: 'twin', capacity: 1 },
-
-		// Bedroom 5
-		{ id: 'r5-queen', roomId: 5, bedType: 'queen', capacity: 2 },
-
-		// Bedroom 6
-		{ id: 'r6-queen', roomId: 6, bedType: 'queen', capacity: 2 },
-
-		// Bedroom 7
-		{ id: 'r7-queen', roomId: 7, bedType: 'queen', capacity: 2 },
-		{ id: 'r7-bunk-a', roomId: 7, bedType: 'bunk', capacity: 1 },
-		{ id: 'r7-bunk-b', roomId: 7, bedType: 'bunk', capacity: 1 },
-
-		// Bedroom 8
-		{ id: 'r8-queen', roomId: 8, bedType: 'queen', capacity: 2 },
-		{ id: 'r8-bunk-a', roomId: 8, bedType: 'bunk', capacity: 1 },
-		{ id: 'r8-bunk-b', roomId: 8, bedType: 'bunk', capacity: 1 },
-
-		// Bedroom 9
-		{ id: 'r9-queen', roomId: 9, bedType: 'queen', capacity: 2 },
-		{ id: 'r9-twin', roomId: 9, bedType: 'twin', capacity: 1 }
-	];
-
-	for (const bed of beds) {
-		await prisma.bed.upsert({
-			where: { id: bed.id },
-			update: {},
-			create: bed
-		});
-	}
-
-	console.log('Rooms and beds seeded successfully!');
-
-	// Create default admin user (change password in production!)
-	const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-	const adminPassword = process.env.ADMIN_PASSWORD || 'changeme123';
-
-	const passwordHash = await hashPassword(adminPassword);
-
-	await prisma.adminUser.upsert({
-		where: { email: adminEmail },
-		update: {},
-		create: {
-			email: adminEmail,
-			passwordHash
+	// Read the generated room/bed ids back in a single batched query.
+	const trip = await prisma.trip.findUniqueOrThrow({
+		where: { id: created.id },
+		select: {
+			id: true,
+			rooms: {
+				select: { id: true, name: true, beds: { select: { id: true, bedType: true } } },
+				orderBy: { id: 'asc' }
+			}
 		}
 	});
 
-	console.log(`Admin user created: ${adminEmail}`);
-	console.log('⚠️  IMPORTANT: Change the admin password in production!');
+	const roomByName = new Map(trip.rooms.map((r) => [r.name, r]));
+	const masterSuite = roomByName.get('Master Suite')!;
+	const gardenRoom = roomByName.get('Garden Room')!;
+	const kingBed = masterSuite.beds.find((b) => b.bedType === 'king')!;
+	const queenBed = gardenRoom.beds.find((b) => b.bedType === 'queen')!;
+
+	console.log(`  trip: ${trip.id} (${trip.rooms.length} rooms)`);
+
+	// 4. Trip members.
+	await prisma.tripMember.createMany({
+		data: [
+			{ tripId: trip.id, userId: users.host.id, role: 'host', inviteStatus: 'approved' },
+			{ tripId: trip.id, userId: users.guest.id, role: 'guest', inviteStatus: 'approved' },
+			{ tripId: trip.id, userId: users.guest2.id, role: 'guest', inviteStatus: 'approved' }
+		]
+	});
+
+	// 5. RSVPs -- a confirmed yes, a second yes, and a maybe, so headcount-driven
+	//    pricing and the dashboard have a realistic mix to render.
+	await prisma.rSVP.createMany({
+		data: [
+			{
+				tripId: trip.id,
+				userId: users.host.id,
+				status: 'yes',
+				adultsCount: 1,
+				costCommitmentAccepted: true,
+				yesSubstatus: 'confirmed',
+				rsvpYesAcceptedAt: new Date()
+			},
+			{
+				tripId: trip.id,
+				userId: users.guest.id,
+				status: 'yes',
+				adultsCount: 2,
+				costCommitmentAccepted: true,
+				yesSubstatus: 'confirmed',
+				rsvpYesAcceptedAt: new Date(),
+				notes: 'Driving up Friday afternoon.'
+			},
+			{
+				tripId: trip.id,
+				userId: users.guest2.id,
+				status: 'maybe',
+				adultsCount: 1,
+				notes: 'Waiting to hear back about work.'
+			}
+		]
+	});
+
+	// 6. Bed assignments for the two confirmed guests.
+	await prisma.roomAssignment.createMany({
+		data: [
+			{
+				tripId: trip.id,
+				roomId: masterSuite.id,
+				userId: users.host.id,
+				bedId: kingBed.id,
+				bedType: kingBed.bedType,
+				partySize: 1
+			},
+			{
+				tripId: trip.id,
+				roomId: gardenRoom.id,
+				userId: users.guest.id,
+				bedId: queenBed.id,
+				bedType: queenBed.bedType,
+				partySize: 2
+			}
+		]
+	});
+
+	console.log('  members, RSVPs and bed assignments created');
+	console.log('\nDone. Dev logins (local only -- never use these anywhere real):');
+	for (const u of DEV_USERS) {
+		console.log(`  ${u.email.padEnd(22)} ${DEV_PASSWORD}   (${u.name})`);
+	}
 }
 
 main()
@@ -110,4 +234,3 @@ main()
 	.finally(async () => {
 		await prisma.$disconnect();
 	});
-
